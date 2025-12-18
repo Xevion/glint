@@ -1,0 +1,22 @@
+{
+  "name": "glint",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shader Preview Catalog - Automated shader capture and comparison platform",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "bun run --filter='frontend' dev",
+    "build": "bun run --filter='*' build",
+    "lint": "bun run --filter='*' lint",
+    "format": "bun run --filter='*' format"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
