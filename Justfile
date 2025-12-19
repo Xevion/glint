@@ -34,3 +34,19 @@ build:
 # Run backend tests
 test:
     cargo nextest run --manifest-path backend/Cargo.toml
+
+# Run any bun command in frontend
+bun *args:
+    cd frontend && bun {{args}}
+
+# Run any cargo command in backend
+cargo *args:
+    cd backend && cargo {{args}}
+
+# Shorthand for frontend commands
+fe *args:
+    cd frontend && {{args}}
+
+# Shorthand for backend commands
+be *args:
+    cd backend && {{args}}
