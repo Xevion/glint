@@ -12,14 +12,20 @@
 		</p>
 
 		<div class="mb-12 grid gap-6 md:grid-cols-2">
-			<a href="/shaders" class="group block rounded-lg border p-8 transition hover:border-primary">
+			<a
+				href="/shaders"
+				class="glass group block rounded-lg border p-8 transition hover:border-primary"
+			>
 				<h2 class="mb-2 text-2xl font-semibold">Browse by Shader</h2>
 				<p class="text-muted-foreground">
 					Explore all shaders with performance metrics and scene comparisons
 				</p>
 			</a>
 
-			<a href="/scenes" class="group block rounded-lg border p-8 transition hover:border-primary">
+			<a
+				href="/scenes"
+				class="glass group block rounded-lg border p-8 transition hover:border-primary"
+			>
 				<h2 class="mb-2 text-2xl font-semibold">Browse by Scene</h2>
 				<p class="text-muted-foreground">
 					Compare how different shaders render the same environments
