@@ -4,7 +4,7 @@
 	const sceneId = $page.params.id || '1';
 	const sceneNames = ['Forest', 'Village', 'Cave', 'Nether', 'End', 'Ocean'];
 	const index = parseInt(sceneId) - 1;
-	const sceneName = (index >= 0 && index < sceneNames.length) ? sceneNames[index] : 'Unknown';
+	const sceneName = index >= 0 && index < sceneNames.length ? sceneNames[index] : 'Unknown';
 </script>
 
 <div class="container mx-auto px-4 py-8">

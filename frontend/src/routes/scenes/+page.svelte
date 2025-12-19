@@ -14,9 +14,7 @@
 			>
 				<div class="mb-4 aspect-video rounded bg-muted"></div>
 				<h3 class="mb-2 text-xl font-semibold">{scene}</h3>
-				<p class="text-sm text-muted-foreground">
-					Compare all shaders in this environment
-				</p>
+				<p class="text-sm text-muted-foreground">Compare all shaders in this environment</p>
 			</a>
 		{/each}
 	</div>

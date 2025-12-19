@@ -33,14 +33,14 @@ frontend/
 
 ## Routes
 
-| Route                | Description                                  |
-|----------------------|----------------------------------------------|
-| `/`                  | Landing page with dual-pane navigation       |
-| `/shaders`           | List of all shaders                          |
-| `/shaders/[id]`      | Shader detail with all scenes                |
-| `/scenes`            | List of all scenes                           |
-| `/scenes/[id]`       | Scene detail with all shaders                |
-| `/compare`           | Side-by-side shader comparison tool          |
+| Route           | Description                            |
+| --------------- | -------------------------------------- |
+| `/`             | Landing page with dual-pane navigation |
+| `/shaders`      | List of all shaders                    |
+| `/shaders/[id]` | Shader detail with all scenes          |
+| `/scenes`       | List of all scenes                     |
+| `/scenes/[id]`  | Scene detail with all shaders          |
+| `/compare`      | Side-by-side shader comparison tool    |
 
 ## Development
 

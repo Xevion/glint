@@ -4,7 +4,9 @@
 
 <div class="container mx-auto px-4 py-8">
 	<h1 class="mb-6 text-4xl font-bold">Shaders</h1>
-	<p class="text-muted-foreground">Browse all available Minecraft shaders with performance metrics</p>
+	<p class="text-muted-foreground">
+		Browse all available Minecraft shaders with performance metrics
+	</p>
 
 	<div class="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 		{#each Array(6) as _, i}

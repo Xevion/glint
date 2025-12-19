@@ -32,9 +32,7 @@
 				</div>
 			</dl>
 			<div class="mt-6">
-				<Button class="w-full" href="https://modrinth.com" target="_blank">
-					View on Modrinth
-				</Button>
+				<Button class="w-full" href="https://modrinth.com" target="_blank">View on Modrinth</Button>
 			</div>
 		</div>
 	</div>
