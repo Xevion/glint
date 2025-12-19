@@ -120,23 +120,74 @@
 	}
 }
 
-/* Noise texture overlay - subtle grain effect */
-.noise-texture {
-	position: relative;
+/* Page transition animations */
+@keyframes fade-in-down {
+	from {
+		opacity: 0;
+		transform: translateY(-10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
-.noise-texture::after {
-	content: '';
-	position: absolute;
-	inset: 0;
-	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-	opacity: 0.3;
-	pointer-events: none;
-	z-index: 100;
+@keyframes fade-in-up {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
-.dark .noise-texture::after {
-	opacity: 0.14;
+@keyframes fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes fade-in-scale {
+	from {
+		opacity: 0;
+		transform: scale(0.95);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+.animate-fade-in-down {
+	animation: fade-in-down 0.4s ease-out forwards;
+}
+
+.animate-fade-in-up {
+	opacity: 0;
+	animation: fade-in-up 0.4s ease-out forwards;
+}
+
+.animate-fade-in {
+	opacity: 0;
+	animation: fade-in 0.3s ease-out forwards;
+}
+
+.animate-fade-in-scale {
+	opacity: 0;
+	animation: fade-in-scale 0.35s ease-out forwards;
+}
+
+.animation-delay-100 {
+	animation-delay: 100ms;
+}
+
+.animation-delay-200 {
+	animation-delay: 200ms;
 }
 
 /* Glass effect utilities */
@@ -154,4 +205,29 @@
 	background: oklch(from var(--background) l c h / 85%);
 	backdrop-filter: blur(8px);
 	-webkit-backdrop-filter: blur(8px);
+}
+
+/* Theme-aware shadows: dark shadows in light mode, light shadows in dark mode */
+.shadow-theme-sm {
+	box-shadow:
+		0 1px 2px 0 rgb(0 0 0 / 0.05),
+		0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.shadow-theme-lg {
+	box-shadow:
+		0 10px 15px -3px rgb(0 0 0 / 0.1),
+		0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.dark .shadow-theme-sm {
+	box-shadow:
+		0 1px 2px 0 rgb(255 255 255 / 0.03),
+		0 1px 3px 0 rgb(255 255 255 / 0.06);
+}
+
+.dark .shadow-theme-lg {
+	box-shadow:
+		0 10px 15px -3px rgb(255 255 255 / 0.06),
+		0 4px 6px -4px rgb(255 255 255 / 0.06);
 }

@@ -2,23 +2,19 @@ import { browser } from '$app/environment';
 
 type Theme = 'light' | 'dark';
 
+function getInitialTheme(): Theme {
+	if (!browser) return 'light';
+	// Read from DOM - the blocking script in app.html already set this
+	return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+}
+
 function createThemeStore() {
-	let theme = $state<Theme>('light');
+	let theme = $state<Theme>(getInitialTheme());
 
 	function init() {
 		if (!browser) return;
 
-		// Check localStorage first, then system preference
-		const stored = localStorage.getItem('theme') as Theme | null;
-		if (stored === 'light' || stored === 'dark') {
-			theme = stored;
-		} else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-			theme = 'dark';
-		}
-
-		applyTheme();
-
-		// Listen for system preference changes
+		// Listen for system preference changes (only when no explicit preference is stored)
 		window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
 			if (!localStorage.getItem('theme')) {
 				theme = e.matches ? 'dark' : 'light';

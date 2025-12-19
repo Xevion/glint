@@ -44,3 +44,14 @@ coverage/
 
 # Database
 *.db
+
+# Image assets
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.svg
+*.ico
+*.bmp
+*.tiff
