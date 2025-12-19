@@ -18,7 +18,7 @@
 	}
 </script>
 
-<nav class="border-b">
+<nav class="nav-header dark:border-b">
 	<div class="container mx-auto flex h-16 items-center px-4">
 		<a href="/" class="glint-title mr-8 text-xl font-bold">Glint</a>
 
@@ -26,9 +26,8 @@
 			{#each navItems as item}
 				<a
 					href={item.href}
-					class="text-sm font-medium transition-colors hover:text-primary {isActive(item.href)
-						? 'text-foreground'
-						: 'text-muted-foreground'}"
+					class="nav-link text-sm font-medium transition-colors"
+					class:active={isActive(item.href)}
 				>
 					{item.label}
 				</a>
@@ -37,7 +36,7 @@
 
 		<button
 			onclick={() => themeStore.toggle()}
-			class="rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+			class="nav-icon rounded-md p-2 transition-colors"
 			aria-label="Toggle theme"
 		>
 			{#if themeStore.isDark}
@@ -76,5 +75,65 @@
 		15% {
 			background-position: 90% 0;
 		}
+	}
+
+	.nav-header {
+		background: oklch(1 0 0 / 76%);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+	}
+
+	:global(.dark) .nav-header {
+		background: oklch(0.141 0.005 285.823 / 60%);
+	}
+
+	/* Light mode: dark text with white glow for contrast */
+	.nav-link {
+		color: oklch(0.3 0 0 / 80%);
+		text-shadow:
+			0 0 8px oklch(1 0 0 / 80%),
+			0 0 3px oklch(1 0 0 / 90%);
+	}
+
+	.nav-link:hover {
+		color: oklch(0.15 0 0);
+	}
+
+	.nav-link.active {
+		color: oklch(0.1 0 0);
+	}
+
+	.nav-icon {
+		color: oklch(0.3 0 0);
+		filter: drop-shadow(0 0 3px oklch(1 0 0 / 80%));
+	}
+
+	.nav-icon:hover {
+		color: oklch(0.15 0 0);
+		background: oklch(0 0 0 / 8%);
+	}
+
+	/* Dark mode: light text, no glow needed */
+	:global(.dark) .nav-link {
+		color: oklch(1 0 0 / 60%);
+		text-shadow: none;
+	}
+
+	:global(.dark) .nav-link:hover {
+		color: oklch(1 0 0 / 100%);
+	}
+
+	:global(.dark) .nav-link.active {
+		color: oklch(1 0 0 / 100%);
+	}
+
+	:global(.dark) .nav-icon {
+		color: oklch(1 0 0 / 60%);
+		filter: none;
+	}
+
+	:global(.dark) .nav-icon:hover {
+		color: oklch(1 0 0 / 100%);
+		background: oklch(1 0 0 / 10%);
 	}
 </style>

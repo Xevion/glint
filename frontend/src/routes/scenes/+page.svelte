@@ -47,7 +47,7 @@
 	<!-- Header -->
 	<div class="animate-fade-in-down mb-8">
 		<h1 class="mb-2 text-4xl font-bold tracking-tight">Test Scenes</h1>
-		<p class="text-lg text-muted-foreground">
+		<p class="text-lg text-foreground/70 dark:text-muted-foreground">
 			{scenes.length} standardized environments for consistent shader comparison
 		</p>
 	</div>

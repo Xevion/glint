@@ -77,7 +77,7 @@
 	onmouseleave={() => (isHovered = false)}
 	class={cn(
 		'group relative flex flex-col overflow-hidden rounded-xl bg-card transition-all duration-300',
-		'hover:shadow-xl hover:shadow-primary/10',
+		'card-glow',
 		'focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
 		hasAnySelection
 			? 'cursor-default'

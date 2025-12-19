@@ -231,3 +231,29 @@
 		0 10px 15px -3px rgb(255 255 255 / 0.06),
 		0 4px 6px -4px rgb(255 255 255 / 0.06);
 }
+
+/* Card glow effect - subtle base glow that intensifies on hover */
+.card-glow {
+	--glow-color: var(--primary);
+	--glow-opacity: 0.02;
+	--glow-size: 0 10px 15px -3px, 0 4px 6px -4px;
+	box-shadow:
+		0 10px 15px -3px oklch(from var(--glow-color) l c h / var(--glow-opacity)),
+		0 4px 6px -4px oklch(from var(--glow-color) l c h / var(--glow-opacity));
+	transition: box-shadow 0.3s ease;
+}
+
+.card-glow:hover {
+	--glow-opacity: 0.08;
+	box-shadow:
+		0 20px 25px -5px oklch(from var(--glow-color) l c h / var(--glow-opacity)),
+		0 8px 10px -6px oklch(from var(--glow-color) l c h / var(--glow-opacity));
+}
+
+.dark .card-glow {
+	--glow-opacity: 0.05;
+}
+
+.dark .card-glow:hover {
+	--glow-opacity: 0.15;
+}

@@ -41,7 +41,13 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<BackgroundImage lightSrc="/hero-bg-light.jpg" darkSrc="/hero-bg-dark.jpg" blur={4} overlayOpacity={0.7}>
+<BackgroundImage
+	lightWallpapers={[13, 53, 31, 71, 18, 65, 32, 97]}
+	darkWallpapers={[102, 69, 23, 94, 13]}
+	blur={4}
+	overlayOpacity={0.7}
+	lightBrightness={1.7}
+>
 	<div class="flex min-h-screen flex-col">
 		<Navigation />
 		<main class="flex-1">
