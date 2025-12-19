@@ -1,8 +1,5 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import TierIcon from '$lib/components/TierIcon.svelte';
-	import BrandIcon from '$lib/components/icons/BrandIcon.svelte';
+	import { resolve } from '$app/paths';
 	import {
 		getShaderById,
 		getCapturesForShader,
@@ -16,17 +13,26 @@
 		getWeatherColor,
 		type Capture
 	} from '$lib/data/mock';
+	import { cn } from '$lib/utils';
+	import TierIcon from '$lib/components/TierIcon.svelte';
+	import BrandIcon from '$lib/components/icons/BrandIcon.svelte';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		data: { id: string };
 	}
 
 	let { data }: Props = $props();
-	const shader = getShaderById(data.id);
-	const captures = shader ? getCapturesForShader(data.id) : [];
+	const shader = $derived(getShaderById(data.id));
+	const captures = $derived(shader ? getCapturesForShader(data.id) : []);
 
 	// Selected capture for the main preview
-	let selectedCapture = $state<Capture | null>(captures[0] || null);
+	// eslint-disable-next-line svelte/prefer-writable-derived -- user can manually select captures, effect resets on navigation
+	let selectedCapture = $state<Capture | null>(null);
+
+	$effect(() => {
+		selectedCapture = captures[0] || null;
+	});
 
 	// Get scene info for the selected capture
 	const selectedScene = $derived(() => {
@@ -39,7 +45,7 @@
 	<div class="container mx-auto px-4 py-8">
 		<!-- Breadcrumb -->
 		<nav class="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-			<a href="/shaders" class="transition-colors hover:text-foreground">Shaders</a>
+			<a href={resolve('/shaders')} class="transition-colors hover:text-foreground">Shaders</a>
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
 			</svg>
@@ -51,7 +57,9 @@
 			<!-- Main Preview Area -->
 			<div class="space-y-4 lg:col-span-2">
 				<!-- Main Image -->
-				<div class="relative aspect-video w-full overflow-hidden rounded-xl bg-card shadow-theme-lg">
+				<div
+					class="shadow-theme-lg relative aspect-video w-full overflow-hidden rounded-xl bg-card"
+				>
 					{#if selectedCapture}
 						<img
 							src={selectedCapture.image}
@@ -85,8 +93,8 @@
 												{selectedCapture.weather}
 											</span>
 										</div>
+									</div>
 								</div>
-							</div>
 							</div>
 						</div>
 					{/if}
@@ -94,7 +102,7 @@
 
 				<!-- Scene Thumbnails -->
 				<div class="scrollbar-thin flex gap-2 overflow-x-auto pb-2">
-					{#each captures as capture}
+					{#each captures as capture (capture.id)}
 						{@const scene = getSceneById(capture.sceneId)}
 						<button
 							onclick={() => (selectedCapture = capture)}
@@ -124,12 +132,14 @@
 			<!-- Sidebar -->
 			<div class="space-y-4">
 				<!-- Shader Info Card -->
-				<div class="rounded-xl bg-card p-6 shadow-theme-sm">
+				<div class="shadow-theme-sm rounded-xl bg-card p-6">
 					<div class="mb-4 flex items-start justify-between">
 						<div>
 							<h1 class="text-2xl font-bold text-card-foreground">{shader.name}</h1>
 							<div class="mt-1 text-sm text-muted-foreground">
-								by <a
+								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
+								by
+								<a
 									href={shader.authorUrl}
 									target="_blank"
 									rel="noopener noreferrer"
@@ -197,7 +207,6 @@
 							<dt class="text-muted-foreground">Updated</dt>
 							<dd class="font-medium">{formatDate(shader.lastUpdated)}</dd>
 						</div>
-	
 					</dl>
 				</div>
 
@@ -220,7 +229,11 @@
 							Get on CurseForge
 						</Button>
 					{/if}
-					<Button href="/compare?shader={shader.id}" variant="outline" class="w-full gap-2">
+					<Button
+						href={`${resolve('/compare')}?shader=${shader.id}`}
+						variant="outline"
+						class="w-full gap-2"
+					>
 						<svg
 							class="h-4 w-4"
 							fill="none"
@@ -241,10 +254,10 @@
 		</div>
 
 		<!-- Features -->
-		<div class="mb-8 rounded-xl bg-card p-6 shadow-theme-sm">
+		<div class="shadow-theme-sm mb-8 rounded-xl bg-card p-6">
 			<h2 class="mb-4 text-lg font-bold text-card-foreground">Features</h2>
 			<div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-				{#each shader.features as feature}
+				{#each shader.features as feature (feature.name)}
 					<div class="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
 						<svg
 							class="h-4 w-4 flex-shrink-0 text-emerald-500"
@@ -262,19 +275,17 @@
 			</div>
 		</div>
 
-
-
 		<!-- All Captures Gallery -->
 		<div>
 			<div class="mb-4 flex items-center justify-between">
 				<h2 class="text-lg font-bold text-foreground">All Scene Captures</h2>
 			</div>
 			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-				{#each captures as capture}
+				{#each captures as capture (capture.id)}
 					{@const scene = getSceneById(capture.sceneId)}
 					<a
-						href="/scenes/{capture.sceneId}"
-						class="group relative overflow-hidden rounded-xl bg-card shadow-theme-sm transition-all hover:-translate-y-1 hover:ring-2 hover:ring-primary/50"
+						href={resolve('/scenes/[id]', { id: capture.sceneId })}
+						class="group shadow-theme-sm relative overflow-hidden rounded-xl bg-card transition-all hover:-translate-y-1 hover:ring-2 hover:ring-primary/50"
 					>
 						<div class="aspect-video overflow-hidden">
 							<img
@@ -333,6 +344,6 @@
 		</svg>
 		<h1 class="mb-2 text-2xl font-bold text-foreground">Shader Not Found</h1>
 		<p class="mb-6 text-muted-foreground">The shader you're looking for doesn't exist.</p>
-		<Button href="/shaders">Back to Shaders</Button>
+		<Button href={resolve('/shaders')}>Back to Shaders</Button>
 	</div>
 {/if}

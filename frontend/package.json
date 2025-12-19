@@ -7,13 +7,26 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
-		"lint": "prettier --check . && eslint .",
+		"format:check": "prettier --check .",
+		"lint": "prettier --check . && eslint . && stylelint '**/*.{css,svelte}'",
+		"lint:fix": "prettier --write . && eslint --fix . && stylelint --fix '**/*.{css,svelte}'",
+		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"test:unit": "vitest",
-		"test": "npm run test:unit -- --run"
+		"test": "bun run test:unit --run"
+	},
+	"lint-staged": {
+		"*.{js,ts,svelte,json,md}": [
+			"prettier --write"
+		],
+		"*.{js,ts,svelte}": [
+			"eslint --fix"
+		],
+		"*.{css,svelte}": [
+			"stylelint --fix"
+		]
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
@@ -32,11 +45,17 @@
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.13.1",
 		"globals": "^16.5.0",
+		"lint-staged": "^16.2.7",
 		"phosphor-svelte": "^3.0.1",
 		"playwright": "^1.57.0",
+		"postcss-html": "^1.8.0",
 		"prettier": "^3.7.4",
-		"prettier-plugin-svelte": "^3.4.0",
+		"prettier-plugin-svelte": "^3.4.1",
 		"prettier-plugin-tailwindcss": "^0.7.2",
+		"stylelint": "^16.26.1",
+		"stylelint-config-html": "^1.1.0",
+		"stylelint-config-recommended": "^17.0.0",
+		"stylelint-config-standard": "^39.0.1",
 		"svelte": "^5.45.6",
 		"svelte-check": "^4.3.4",
 		"tailwind-merge": "^3.4.0",

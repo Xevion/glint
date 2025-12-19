@@ -115,6 +115,7 @@
 	* {
 		@apply border-border outline-ring/50;
 	}
+
 	body {
 		@apply bg-background text-foreground;
 	}
@@ -126,6 +127,7 @@
 		opacity: 0;
 		transform: translateY(-10px);
 	}
+
 	to {
 		opacity: 1;
 		transform: translateY(0);
@@ -137,6 +139,7 @@
 		opacity: 0;
 		transform: translateY(10px);
 	}
+
 	to {
 		opacity: 1;
 		transform: translateY(0);
@@ -147,6 +150,7 @@
 	from {
 		opacity: 0;
 	}
+
 	to {
 		opacity: 1;
 	}
@@ -157,6 +161,7 @@
 		opacity: 0;
 		transform: scale(0.95);
 	}
+
 	to {
 		opacity: 1;
 		transform: scale(1);
@@ -194,7 +199,6 @@
 .glass {
 	background: oklch(from var(--background) l c h / 70%);
 	backdrop-filter: blur(12px);
-	-webkit-backdrop-filter: blur(12px);
 }
 
 .dark .glass {
@@ -204,32 +208,31 @@
 .glass-subtle {
 	background: oklch(from var(--background) l c h / 85%);
 	backdrop-filter: blur(8px);
-	-webkit-backdrop-filter: blur(8px);
 }
 
 /* Theme-aware shadows: dark shadows in light mode, light shadows in dark mode */
 .shadow-theme-sm {
 	box-shadow:
-		0 1px 2px 0 rgb(0 0 0 / 0.05),
-		0 1px 3px 0 rgb(0 0 0 / 0.1);
+		0 1px 2px 0 rgb(0 0 0 / 5%),
+		0 1px 3px 0 rgb(0 0 0 / 10%);
 }
 
 .shadow-theme-lg {
 	box-shadow:
-		0 10px 15px -3px rgb(0 0 0 / 0.1),
-		0 4px 6px -4px rgb(0 0 0 / 0.1);
+		0 10px 15px -3px rgb(0 0 0 / 10%),
+		0 4px 6px -4px rgb(0 0 0 / 10%);
 }
 
 .dark .shadow-theme-sm {
 	box-shadow:
-		0 1px 2px 0 rgb(255 255 255 / 0.03),
-		0 1px 3px 0 rgb(255 255 255 / 0.06);
+		0 1px 2px 0 rgb(255 255 255 / 3%),
+		0 1px 3px 0 rgb(255 255 255 / 6%);
 }
 
 .dark .shadow-theme-lg {
 	box-shadow:
-		0 10px 15px -3px rgb(255 255 255 / 0.06),
-		0 4px 6px -4px rgb(255 255 255 / 0.06);
+		0 10px 15px -3px rgb(255 255 255 / 6%),
+		0 4px 6px -4px rgb(255 255 255 / 6%);
 }
 
 /* Card glow effect - subtle base glow that intensifies on hover */
@@ -237,6 +240,7 @@
 	--glow-color: var(--primary);
 	--glow-opacity: 0.02;
 	--glow-size: 0 10px 15px -3px, 0 4px 6px -4px;
+
 	box-shadow:
 		0 10px 15px -3px oklch(from var(--glow-color) l c h / var(--glow-opacity)),
 		0 4px 6px -4px oklch(from var(--glow-color) l c h / var(--glow-opacity));
@@ -245,6 +249,7 @@
 
 .card-glow:hover {
 	--glow-opacity: 0.08;
+
 	box-shadow:
 		0 20px 25px -5px oklch(from var(--glow-color) l c h / var(--glow-opacity)),
 		0 8px 10px -6px oklch(from var(--glow-color) l c h / var(--glow-opacity));

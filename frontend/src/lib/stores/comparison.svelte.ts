@@ -4,9 +4,11 @@
  * for UI behavior changes (checkbox visibility, click behavior, etc.)
  */
 
+import { SvelteSet } from 'svelte/reactivity';
+
 function createComparisonStore() {
-	let selectedShaders = $state<Set<string>>(new Set());
-	let selectedScenes = $state<Set<string>>(new Set());
+	const selectedShaders = new SvelteSet<string>();
+	const selectedScenes = new SvelteSet<string>();
 
 	return {
 		get selectedShaders() {
@@ -39,32 +41,30 @@ function createComparisonStore() {
 		toggleShader(id: string) {
 			if (selectedShaders.has(id)) {
 				selectedShaders.delete(id);
-				selectedShaders = new Set(selectedShaders);
 			} else {
-				selectedShaders = new Set(selectedShaders).add(id);
+				selectedShaders.add(id);
 			}
 		},
 
 		toggleScene(id: string) {
 			if (selectedScenes.has(id)) {
 				selectedScenes.delete(id);
-				selectedScenes = new Set(selectedScenes);
 			} else {
-				selectedScenes = new Set(selectedScenes).add(id);
+				selectedScenes.add(id);
 			}
 		},
 
 		clearShaders() {
-			selectedShaders = new Set();
+			selectedShaders.clear();
 		},
 
 		clearScenes() {
-			selectedScenes = new Set();
+			selectedScenes.clear();
 		},
 
 		clearAll() {
-			selectedShaders = new Set();
-			selectedScenes = new Set();
+			selectedShaders.clear();
+			selectedScenes.clear();
 		}
 	};
 }

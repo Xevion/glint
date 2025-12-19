@@ -1,31 +1,32 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { themeStore } from '$lib/stores/theme.svelte';
+	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { Sun, Moon } from '@lucide/svelte';
+	import { themeStore } from '$lib/stores/theme.svelte';
 
 	const navItems = [
-		{ href: '/', label: 'Home' },
-		{ href: '/shaders', label: 'Shaders' },
-		{ href: '/scenes', label: 'Scenes' },
-		{ href: '/compare', label: 'Compare' }
+		{ href: '/' as const, label: 'Home' },
+		{ href: '/shaders' as const, label: 'Shaders' },
+		{ href: '/scenes' as const, label: 'Scenes' },
+		{ href: '/compare' as const, label: 'Compare' }
 	];
 
 	function isActive(href: string): boolean {
 		if (href === '/') {
-			return $page.url.pathname === '/';
+			return page.url.pathname === '/';
 		}
-		return $page.url.pathname.startsWith(href);
+		return page.url.pathname.startsWith(href);
 	}
 </script>
 
 <nav class="nav-header dark:border-b">
 	<div class="container mx-auto flex h-16 items-center px-4">
-		<a href="/" class="glint-title mr-8 text-xl font-bold">Glint</a>
+		<a href={resolve('/')} class="glint-title mr-8 text-xl font-bold">Glint</a>
 
 		<div class="flex flex-1 gap-6">
-			{#each navItems as item}
+			{#each navItems as item (item.href)}
 				<a
-					href={item.href}
+					href={resolve(item.href)}
 					class="nav-link text-sm font-medium transition-colors"
 					class:active={isActive(item.href)}
 				>
@@ -35,7 +36,9 @@
 		</div>
 
 		<button
-			onclick={() => themeStore.toggle()}
+			onclick={() => {
+				themeStore.toggle();
+			}}
 			class="nav-icon rounded-md p-2 transition-colors"
 			aria-label="Toggle theme"
 		>
@@ -62,8 +65,8 @@
 			var(--foreground) 100%
 		);
 		background-size: 900% 100%;
-		background-clip: text;
 		-webkit-background-clip: text;
+		background-clip: text;
 		-webkit-text-fill-color: transparent;
 		animation: glint-sweep 9s linear infinite;
 	}
@@ -72,6 +75,7 @@
 		0% {
 			background-position: 117% 0;
 		}
+
 		15% {
 			background-position: 90% 0;
 		}
@@ -79,8 +83,8 @@
 
 	.nav-header {
 		background: oklch(1 0 0 / 76%);
-		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
+		backdrop-filter: blur(12px);
 	}
 
 	:global(.dark) .nav-header {

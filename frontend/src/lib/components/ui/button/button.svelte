@@ -1,15 +1,16 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
+	import type { Snippet } from 'svelte';
 	import { cva, type VariantProps } from 'class-variance-authority';
+	import { cn } from '$lib/utils';
 
-	type Props = {
+	interface Props {
 		variant?: VariantProps<typeof buttonVariants>['variant'];
 		size?: VariantProps<typeof buttonVariants>['size'];
 		href?: string;
 		class?: string;
-		children?: import('svelte').Snippet;
+		children?: Snippet;
 		[key: string]: unknown;
-	};
+	}
 
 	let {
 		variant = 'default',

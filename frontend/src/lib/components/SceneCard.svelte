@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
+	import type { Scene, Weather } from '$lib/data/mock';
 	import {
-		type Scene,
-		type Weather,
 		getTimeColor,
-		getWeatherColor,
-		getBiomeColor,
 		getTimeIconPath,
-		getWeatherIconPath
+		getWeatherColor,
+		getWeatherIconPath,
+		getBiomeColor
 	} from '$lib/data/mock';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { comparisonStore } from '$lib/stores/comparison.svelte';
+	import { cn } from '$lib/utils';
 
 	interface Props {
 		scene: Scene;
@@ -21,7 +21,7 @@
 
 	// Only show weather badge for weather types that significantly affect the scene
 	const significantWeathers: Weather[] = ['cloudy', 'rain', 'storm', 'snow', 'fog'];
-	const showWeather = significantWeathers.includes(scene.defaultWeather);
+	const showWeather = $derived(significantWeathers.includes(scene.defaultWeather));
 
 	let isHovered = $state(false);
 	const isSelected = $derived(comparisonStore.isSceneSelected(scene.id));
@@ -48,7 +48,7 @@
 		}
 
 		// Default: navigate to scene page
-		goto(`/scenes/${scene.id}`);
+		void goto(resolve('/scenes/[id]', { id: scene.id }));
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
@@ -57,7 +57,7 @@
 			if (hasAnySelection) {
 				comparisonStore.toggleScene(scene.id);
 			} else {
-				goto(`/scenes/${scene.id}`);
+				void goto(resolve('/scenes/[id]', { id: scene.id }));
 			}
 		}
 	}
@@ -113,7 +113,11 @@
 				)}
 			>
 				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d={getTimeIconPath(scene.defaultTime)} />
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d={getTimeIconPath(scene.defaultTime)}
+					/>
 				</svg>
 				{scene.defaultTime}
 			</span>
@@ -125,7 +129,13 @@
 						getWeatherColor(scene.defaultWeather)
 					)}
 				>
-					<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<svg
+						class="h-3 w-3"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="2"
+					>
 						<path
 							stroke-linecap="round"
 							stroke-linejoin="round"
@@ -176,9 +186,11 @@
 		<!-- Header -->
 		<div class="space-y-1.5">
 			<a
-				href="/scenes/{scene.id}"
+				href={resolve('/scenes/[id]', { id: scene.id })}
 				data-clickable
-				onclick={(e) => e.stopPropagation()}
+				onclick={(e) => {
+					e.stopPropagation();
+				}}
 				class={cn(
 					'line-clamp-1 block text-lg font-semibold text-card-foreground transition-colors hover:text-primary',
 					hasAnySelection ? 'cursor-pointer' : ''
@@ -205,7 +217,7 @@
 
 		<!-- Features -->
 		<div class="flex flex-wrap gap-1.5">
-			{#each scene.features as feature}
+			{#each scene.features as feature (feature)}
 				<span
 					class="inline-flex items-center rounded-md bg-muted/50 px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/50"
 				>

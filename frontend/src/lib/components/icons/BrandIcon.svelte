@@ -14,7 +14,7 @@
 </script>
 
 <svg class={className} viewBox={icon.viewBox} fill="currentColor">
-	{#each icon.paths as path}
+	{#each icon.paths as path (path.d)}
 		<path
 			class={colorOnHover ? 'transition-colors' : undefined}
 			style={colorOnHover ? `--hover-color: ${icon.hoverColor}` : undefined}

@@ -1,15 +1,21 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { onMount } from 'svelte';
 	import { OverlayScrollbars } from 'overlayscrollbars';
 	import type { OverlayScrollbars as OverlayScrollbarsInstance } from 'overlayscrollbars';
 	import 'overlayscrollbars/overlayscrollbars.css';
-	import Navigation from '$lib/components/Navigation.svelte';
-	import BackgroundImage from '$lib/components/BackgroundImage.svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
+	import BackgroundImage from '$lib/components/BackgroundImage.svelte';
+	import Navigation from '$lib/components/Navigation.svelte';
 	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
 
-	let { children } = $props();
+	interface Props {
+		children: Snippet;
+	}
+
+	let { children }: Props = $props();
+
+	const favicon = $derived(themeStore.isDark ? '/favicon-dark.ico' : '/favicon-light.ico');
 
 	let osInstance: OverlayScrollbarsInstance | null = null;
 

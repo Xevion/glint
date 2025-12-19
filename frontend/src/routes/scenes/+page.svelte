@@ -1,7 +1,7 @@
 <script lang="ts">
-	import SceneCard from '$lib/components/SceneCard.svelte';
 	import { getAllScenes, type TimeOfDay, type Weather, type Dimension } from '$lib/data/mock';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import SceneCard from '$lib/components/SceneCard.svelte';
 
 	const scenes = getAllScenes();
 
@@ -80,7 +80,7 @@
 
 			<!-- Dimension filter -->
 			<div class="flex gap-1">
-				{#each dimensions as dimension}
+				{#each dimensions as dimension (dimension)}
 					<button
 						onclick={() => (selectedDimension = selectedDimension === dimension ? null : dimension)}
 						class="rounded-lg px-3 py-2 text-xs font-medium capitalize transition-colors
@@ -99,7 +99,7 @@
 			<div class="flex items-center gap-2">
 				<span class="text-sm font-medium text-muted-foreground">Time:</span>
 				<div class="flex flex-wrap gap-1">
-					{#each times as time}
+					{#each times as time (time)}
 						<button
 							onclick={() => (selectedTime = selectedTime === time ? null : time)}
 							class="rounded-lg px-2.5 py-1.5 text-xs font-medium capitalize transition-colors
@@ -119,7 +119,7 @@
 			<div class="flex items-center gap-2">
 				<span class="text-sm font-medium text-muted-foreground">Weather:</span>
 				<div class="flex flex-wrap gap-1">
-					{#each weathers as weather}
+					{#each weathers as weather (weather)}
 						<button
 							onclick={() => (selectedWeather = selectedWeather === weather ? null : weather)}
 							class="rounded-lg px-2.5 py-1.5 text-xs font-medium capitalize transition-colors

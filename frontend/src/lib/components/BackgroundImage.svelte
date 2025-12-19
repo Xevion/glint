@@ -18,7 +18,7 @@
 		lightBrightness?: number;
 	}
 
-	let {
+	const {
 		lightWallpapers,
 		darkWallpapers,
 		blur = 0,
@@ -115,7 +115,7 @@
 
 <div class="background-container" bind:this={containerEl}>
 	<!-- Light theme wallpapers -->
-	{#each lightIndices as wallpaperIndex, i}
+	{#each lightIndices as wallpaperIndex, i (wallpaperIndex)}
 		{@const top = i * sectionHeight()}
 		{@const isFirst = i === 0}
 		{@const isLast = i === lightIndices.length - 1}
@@ -133,7 +133,7 @@
 	{/each}
 
 	<!-- Dark theme wallpapers -->
-	{#each darkIndices as wallpaperIndex, i}
+	{#each darkIndices as wallpaperIndex, i (wallpaperIndex)}
 		{@const top = i * sectionHeight()}
 		{@const isFirst = i === 0}
 		{@const isLast = i === darkIndices.length - 1}
@@ -182,25 +182,11 @@
 
 	/* Gradient masks for smooth blending */
 	.wallpaper-section.has-fade-top {
-		mask-image: linear-gradient(
-			to bottom,
-			transparent 0px,
-			black var(--blend-height)
-		);
-		-webkit-mask-image: linear-gradient(
-			to bottom,
-			transparent 0px,
-			black var(--blend-height)
-		);
+		mask-image: linear-gradient(to bottom, transparent 0, black var(--blend-height));
 	}
 
 	.wallpaper-section.has-fade-bottom {
 		mask-image: linear-gradient(
-			to bottom,
-			black calc(100% - var(--blend-height)),
-			transparent 100%
-		);
-		-webkit-mask-image: linear-gradient(
 			to bottom,
 			black calc(100% - var(--blend-height)),
 			transparent 100%
@@ -210,14 +196,7 @@
 	.wallpaper-section.has-fade-top.has-fade-bottom {
 		mask-image: linear-gradient(
 			to bottom,
-			transparent 0px,
-			black var(--blend-height),
-			black calc(100% - var(--blend-height)),
-			transparent 100%
-		);
-		-webkit-mask-image: linear-gradient(
-			to bottom,
-			transparent 0px,
+			transparent 0,
 			black var(--blend-height),
 			black calc(100% - var(--blend-height)),
 			transparent 100%

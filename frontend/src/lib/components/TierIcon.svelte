@@ -1,10 +1,6 @@
 <script lang="ts">
 	import type { PerformanceTier } from '$lib/data/mock';
-	import Feather from 'phosphor-svelte/lib/Feather';
-	import Leaf from 'phosphor-svelte/lib/Leaf';
-	import Scales from 'phosphor-svelte/lib/Scales';
-	import Lightning from 'phosphor-svelte/lib/Lightning';
-	import Fire from 'phosphor-svelte/lib/Fire';
+	import { Feather, Leaf, Scales, Lightning, Fire } from 'phosphor-svelte';
 
 	interface Props {
 		tier: PerformanceTier;

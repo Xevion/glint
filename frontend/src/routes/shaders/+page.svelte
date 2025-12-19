@@ -1,7 +1,7 @@
 <script lang="ts">
-	import ShaderCard from '$lib/components/ShaderCard.svelte';
 	import { getAllShaders, type PerformanceTier, type ShaderStyle } from '$lib/data/mock';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import ShaderCard from '$lib/components/ShaderCard.svelte';
 
 	const shaders = getAllShaders();
 
@@ -103,7 +103,7 @@
 			<div class="flex items-center gap-2">
 				<span class="text-sm font-medium text-muted-foreground">Performance:</span>
 				<div class="flex flex-wrap gap-1">
-					{#each tiers as tier}
+					{#each tiers as tier (tier)}
 						<button
 							onclick={() => (selectedTier = selectedTier === tier ? null : tier)}
 							class="rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors
@@ -123,7 +123,7 @@
 			<div class="flex items-center gap-2">
 				<span class="text-sm font-medium text-muted-foreground">Style:</span>
 				<div class="flex flex-wrap gap-1">
-					{#each styles as style}
+					{#each styles as style (style)}
 						<button
 							onclick={() => (selectedStyle = selectedStyle === style ? null : style)}
 							class="rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors

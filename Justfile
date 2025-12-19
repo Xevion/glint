@@ -5,48 +5,54 @@ default:
 
 # Run both frontend and backend dev servers
 dev:
-    @just dev-frontend & just dev-backend & wait
+    @just dev-fe & just dev-be & wait
 
 # Start frontend dev server
-dev-frontend:
+dev-fe:
     bun run --cwd frontend dev
 
 # Start backend dev server
-dev-backend:
+dev-be:
     cargo run --manifest-path backend/Cargo.toml
 
-# Validate all code (format, lint, typecheck)
+# Validate all code (typecheck, clippy)
 check:
+    bun run --cwd frontend check
     cargo fmt --manifest-path backend/Cargo.toml -- --check
     cargo clippy --manifest-path backend/Cargo.toml -- --deny warnings
-    bun run --cwd frontend check
 
 # Auto-format all code
 format:
-    cargo fmt --manifest-path backend/Cargo.toml
     bun run --cwd frontend format
+    cargo fmt --manifest-path backend/Cargo.toml
+
+# Lint all code
+lint:
+    bun run --cwd frontend lint
+    cargo clippy --manifest-path backend/Cargo.toml -- --deny warnings
 
 # Build everything for production
 build:
-    cargo build --manifest-path backend/Cargo.toml --release
     bun run --cwd frontend build
+    cargo build --manifest-path backend/Cargo.toml --release
 
-# Run backend tests
+# Run all tests
 test:
+    bun run --cwd frontend test
     cargo nextest run --manifest-path backend/Cargo.toml
 
-# Run any bun command in frontend
+# Run bun commands in frontend (e.g., `just bun run test`)
 bun *args:
     cd frontend && bun {{args}}
 
-# Run any cargo command in backend
+# Run cargo commands in backend (e.g., `just cargo build`)
 cargo *args:
     cd backend && cargo {{args}}
 
-# Shorthand for frontend commands
+# Run any command in frontend
 fe *args:
     cd frontend && {{args}}
 
-# Shorthand for backend commands
+# Run any command in backend
 be *args:
     cd backend && {{args}}

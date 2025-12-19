@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 </script>
 
@@ -13,7 +14,7 @@
 
 		<div class="mb-12 grid gap-6 md:grid-cols-2">
 			<a
-				href="/shaders"
+				href={resolve('/shaders')}
 				class="glass group block rounded-lg border p-8 transition hover:border-primary"
 			>
 				<h2 class="mb-2 text-2xl font-semibold">Browse by Shader</h2>
@@ -23,7 +24,7 @@
 			</a>
 
 			<a
-				href="/scenes"
+				href={resolve('/scenes')}
 				class="glass group block rounded-lg border p-8 transition hover:border-primary"
 			>
 				<h2 class="mb-2 text-2xl font-semibold">Browse by Scene</h2>
@@ -34,8 +35,8 @@
 		</div>
 
 		<div class="flex justify-center gap-4">
-			<Button href="/compare" variant="default" size="lg">Start Comparing</Button>
-			<Button href="/shaders" variant="outline" size="lg">View All Shaders</Button>
+			<Button href={resolve('/compare')} variant="default" size="lg">Start Comparing</Button>
+			<Button href={resolve('/shaders')} variant="outline" size="lg">View All Shaders</Button>
 		</div>
 	</div>
 </div>

@@ -1,7 +1,7 @@
-import prettier from 'eslint-config-prettier';
 import { fileURLToPath } from 'node:url';
 import { includeIgnoreFile } from '@eslint/compat';
 import js from '@eslint/js';
+import prettier from 'eslint-config-prettier';
 import svelte from 'eslint-plugin-svelte';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
@@ -13,17 +13,45 @@ const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
 	js.configs.recommended,
-	...ts.configs.recommended,
+	...ts.configs.strictTypeChecked,
+	...ts.configs.stylisticTypeChecked,
 	...svelte.configs.recommended,
 	prettier,
 	...svelte.configs.prettier,
 	{
-		languageOptions: { globals: { ...globals.browser, ...globals.node } },
+		languageOptions: {
+			globals: { ...globals.browser, ...globals.node },
+			parserOptions: {
+				projectService: {
+					allowDefaultProject: ['*.js', '*.mjs', '*.cjs', 'vitest.config.ts']
+				}
+			}
+		},
 
 		rules: {
-			// typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
-			// see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
-			'no-undef': 'off'
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{
+					argsIgnorePattern: '^_',
+					varsIgnorePattern: '^_',
+					caughtErrorsIgnorePattern: '^_'
+				}
+			],
+			'@typescript-eslint/consistent-type-imports': [
+				'error',
+				{ prefer: 'type-imports', fixStyle: 'separate-type-imports' }
+			],
+			'@typescript-eslint/no-misused-promises': [
+				'error',
+				{ checksVoidReturn: { attributes: false } }
+			],
+			'@typescript-eslint/restrict-template-expressions': [
+				'error',
+				{
+					allowNumber: true,
+					allowBoolean: true
+				}
+			]
 		}
 	},
 	{
@@ -36,6 +64,14 @@ export default defineConfig(
 				parser: ts.parser,
 				svelteConfig
 			}
+		},
+
+		rules: {
+			'@typescript-eslint/no-misused-promises': [
+				'error',
+				{ checksVoidReturn: { attributes: false } }
+			],
+			'svelte/no-navigation-without-resolve': ['error', { ignoreLinks: true }]
 		}
 	}
 );

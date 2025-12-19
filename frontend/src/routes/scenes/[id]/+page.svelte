@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import TierIcon from '$lib/components/TierIcon.svelte';
+	import { resolve } from '$app/paths';
 	import {
 		getSceneById,
 		getCapturesForScene,
@@ -14,17 +12,25 @@
 		type Capture,
 		type PerformanceTier
 	} from '$lib/data/mock';
+	import { cn } from '$lib/utils';
+	import TierIcon from '$lib/components/TierIcon.svelte';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		data: { id: string };
 	}
 
 	let { data }: Props = $props();
-	const scene = getSceneById(data.id);
-	const captures = scene ? getCapturesForScene(data.id) : [];
+	const scene = $derived(getSceneById(data.id));
+	const captures = $derived(scene ? getCapturesForScene(data.id) : []);
 
 	// Selected capture for the main preview
-	let selectedCapture = $state<Capture | null>(captures[0] || null);
+	// eslint-disable-next-line svelte/prefer-writable-derived -- user can manually select captures, effect resets on navigation
+	let selectedCapture = $state<Capture | null>(null);
+
+	$effect(() => {
+		selectedCapture = captures[0] || null;
+	});
 
 	// Get shader info for the selected capture
 	const selectedShader = $derived(() => {
@@ -34,7 +40,13 @@
 
 	// Group captures by performance tier
 	const capturesByTier = $derived(() => {
-		const groups = { potato: 0, low: 0, medium: 0, high: 0, ultra: 0 };
+		const groups: Record<PerformanceTier, number> = {
+			potato: 0,
+			low: 0,
+			medium: 0,
+			high: 0,
+			ultra: 0
+		};
 		for (const capture of captures) {
 			const shader = getShaderById(capture.shaderId);
 			if (shader) {
@@ -49,7 +61,7 @@
 	<div class="container mx-auto px-4 py-8">
 		<!-- Breadcrumb -->
 		<nav class="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-			<a href="/scenes" class="transition-colors hover:text-foreground">Scenes</a>
+			<a href={resolve('/scenes')} class="transition-colors hover:text-foreground">Scenes</a>
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
 			</svg>
@@ -61,7 +73,9 @@
 			<!-- Main Preview Area -->
 			<div class="space-y-4 lg:col-span-2">
 				<!-- Main Image -->
-				<div class="relative aspect-video w-full overflow-hidden rounded-xl bg-card shadow-theme-lg">
+				<div
+					class="shadow-theme-lg relative aspect-video w-full overflow-hidden rounded-xl bg-card"
+				>
 					{#if selectedCapture}
 						{@const shader = selectedShader()}
 						<img
@@ -91,9 +105,9 @@
 													{getTierLabel(shader.tier)}
 												</span>
 											{/if}
+										</div>
+									</div>
 								</div>
-							</div>
-						</div>
 							</div>
 						</div>
 					{/if}
@@ -101,7 +115,7 @@
 
 				<!-- Shader Thumbnails -->
 				<div class="scrollbar-thin flex gap-2 overflow-x-auto pb-2">
-					{#each captures as capture}
+					{#each captures as capture (capture.id)}
 						{@const shader = getShaderById(capture.shaderId)}
 						<button
 							onclick={() => (selectedCapture = capture)}
@@ -131,7 +145,7 @@
 			<!-- Sidebar -->
 			<div class="space-y-4">
 				<!-- Scene Info Card -->
-				<div class="rounded-xl bg-card p-6 shadow-theme-sm">
+				<div class="shadow-theme-sm rounded-xl bg-card p-6">
 					<h1 class="mb-3 text-2xl font-bold text-card-foreground">{scene.name}</h1>
 
 					<!-- Scene attributes -->
@@ -187,7 +201,7 @@
 					<div class="mt-4">
 						<h3 class="mb-2 text-sm font-medium text-muted-foreground">Scene Features</h3>
 						<div class="flex flex-wrap gap-1.5">
-							{#each scene.features as feature}
+							{#each scene.features as feature (feature)}
 								<span
 									class="rounded bg-muted/50 px-2 py-1 text-xs text-muted-foreground ring-1 ring-border/50"
 								>
@@ -199,23 +213,22 @@
 				</div>
 
 				<!-- Performance Tier Breakdown -->
-				<div class="rounded-xl bg-card p-6 shadow-theme-sm">
+				<div class="shadow-theme-sm rounded-xl bg-card p-6">
 					<h2 class="mb-4 text-sm font-bold tracking-wider text-muted-foreground uppercase">
 						By Weight
 					</h2>
 					<div class="space-y-2">
-						{#each ['potato', 'low', 'medium', 'high', 'ultra'] as tier}
-							{@const typedTier = tier as PerformanceTier}
-							{@const count = capturesByTier()[tier as keyof typeof capturesByTier]}
+						{#each ['potato', 'low', 'medium', 'high', 'ultra'] as const as tier (tier)}
+							{@const count = capturesByTier()[tier]}
 							{@const percentage = (count / captures.length) * 100}
 							<div class="flex items-center gap-3">
 								<span
 									class={cn(
 										'w-24 rounded px-2 py-1 text-center text-xs font-bold',
-										getTierColor(typedTier)
+										getTierColor(tier)
 									)}
 								>
-									{getTierLabel(typedTier)}
+									{getTierLabel(tier)}
 								</span>
 								<div class="h-2 flex-1 overflow-hidden rounded-full bg-muted">
 									<div
@@ -230,7 +243,11 @@
 				</div>
 
 				<!-- Action -->
-				<Button href="/compare?scene={scene.id}" variant="outline" class="w-full gap-2">
+				<Button
+					href={`${resolve('/compare')}?scene=${scene.id}`}
+					variant="outline"
+					class="w-full gap-2"
+				>
 					<svg
 						class="h-4 w-4"
 						fill="none"
@@ -255,11 +272,11 @@
 				<h2 class="text-lg font-bold text-foreground">All Shader Renders</h2>
 			</div>
 			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-				{#each captures as capture}
+				{#each captures as capture (capture.id)}
 					{@const shader = getShaderById(capture.shaderId)}
 					<a
-						href="/shaders/{capture.shaderId}"
-						class="group relative overflow-hidden rounded-xl bg-card shadow-theme-sm transition-all hover:-translate-y-1 hover:ring-2 hover:ring-primary/50"
+						href={resolve('/shaders/[id]', { id: capture.shaderId })}
+						class="group shadow-theme-sm relative overflow-hidden rounded-xl bg-card transition-all hover:-translate-y-1 hover:ring-2 hover:ring-primary/50"
 					>
 						<div class="aspect-video overflow-hidden">
 							<img
@@ -315,6 +332,6 @@
 		</svg>
 		<h1 class="mb-2 text-2xl font-bold text-foreground">Scene Not Found</h1>
 		<p class="mb-6 text-muted-foreground">The scene you're looking for doesn't exist.</p>
-		<Button href="/scenes">Back to Scenes</Button>
+		<Button href={resolve('/scenes')}>Back to Scenes</Button>
 	</div>
 {/if}

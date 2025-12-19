@@ -32,7 +32,7 @@ const WALLPAPER_COUNT = 112;
 
 // Seeded random for consistent results per item
 function seededRandom(seed: number): () => number {
-	return function () {
+	return () => {
 		seed = (seed * 1103515245 + 12345) & 0x7fffffff;
 		return seed / 0x7fffffff;
 	};
@@ -554,17 +554,17 @@ let _capturesCache: Capture[] | null = null;
 // Data accessors
 
 export function getAllShaders(): Shader[] {
-	if (!_shadersCache) _shadersCache = generateShaders();
+	_shadersCache ??= generateShaders();
 	return _shadersCache;
 }
 
 export function getAllScenes(): Scene[] {
-	if (!_scenesCache) _scenesCache = generateScenes();
+	_scenesCache ??= generateScenes();
 	return _scenesCache;
 }
 
 export function getAllCaptures(): Capture[] {
-	if (!_capturesCache) _capturesCache = generateCaptures();
+	_capturesCache ??= generateCaptures();
 	return _capturesCache;
 }
 
@@ -628,8 +628,8 @@ export function getScenePerformance(sceneId: string): ScenePerformance | undefin
 // Formatting utilities
 
 export function formatNumber(num: number): string {
-	if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-	if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+	if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+	if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
 	return num.toString();
 }
 
