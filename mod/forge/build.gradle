@@ -32,10 +32,12 @@ dependencies {
     modImplementation libs.kotlin.stdlib
     modImplementation libs.kotlinx.coroutines.core
     modImplementation libs.kotlinx.serialization.core
+    modImplementation libs.kotlinx.serialization.json
 
     include libs.kotlin.stdlib
     include libs.kotlinx.coroutines.core
     include libs.kotlinx.serialization.core
+    include libs.kotlinx.serialization.json
 }
 
 processResources {

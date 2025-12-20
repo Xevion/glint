@@ -27,6 +27,8 @@ allprojects {
         maven { url = 'https://maven.architectury.dev/' }
         maven { url = 'https://maven.neoforged.net/releases/' }
         maven { url = 'https://thedarkcolour.github.io/KotlinForForge/' }
+        // Iris Shaders - for API access
+        maven { url = 'https://api.modrinth.com/maven' }
     }
 
     tasks.withType(JavaCompile).configureEach {

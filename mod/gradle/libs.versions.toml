@@ -11,6 +11,10 @@ architectury-api = "15.0.3"
 mixin = "0.8.7"
 mixinextras = "0.4.1"
 
+# Iris Shaders (Modrinth Maven uses version_number from API)
+iris = "1.8.8+1.21.4-fabric"
+sodium = "mc1.21.4-0.6.13-fabric"
+
 kotlin = "2.2.21"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.8.0"
@@ -34,8 +38,12 @@ mixinextras-forge = { module = "io.github.llamalad7:mixinextras-forge", version.
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+
+iris = { module = "maven.modrinth:iris", version.ref = "iris" }
+sodium = { module = "maven.modrinth:sodium", version.ref = "sodium" }
 
 [plugins]
 architectury = { id = "architectury-plugin", version.ref = "architectury-plugin" }

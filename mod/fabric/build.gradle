@@ -27,9 +27,15 @@ dependencies {
     modImplementation libs.kotlin.stdlib
     modImplementation libs.kotlinx.coroutines.core
     modImplementation libs.kotlinx.serialization.core
+    modImplementation libs.kotlinx.serialization.json
 
+    // Bundle dependencies into the mod JAR
     include libs.kotlinx.coroutines.core
     include libs.kotlinx.serialization.core
+    include libs.kotlinx.serialization.json
+
+    modCompileOnly libs.iris
+    modCompileOnly libs.sodium
 }
 
 processResources {

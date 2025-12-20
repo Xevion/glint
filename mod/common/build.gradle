@@ -19,4 +19,5 @@ dependencies {
     modImplementation libs.kotlin.stdlib
     modImplementation libs.kotlinx.coroutines.core
     modImplementation libs.kotlinx.serialization.core
+    modImplementation libs.kotlinx.serialization.json
 }
