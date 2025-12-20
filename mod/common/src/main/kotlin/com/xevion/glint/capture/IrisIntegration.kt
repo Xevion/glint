@@ -1,204 +1,165 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Glint
+import com.xevion.glint.mixin.ShaderPackAccessor
+import net.irisshaders.iris.Iris
 import java.nio.file.Path
 
 /**
  * Handles integration with Iris Shaders mod.
- * Uses reflection to access Iris API since it's only available at runtime.
+ * Uses compile-time Iris API with runtime availability checks for type-safe integration.
  */
 object IrisIntegration {
-    private const val IRIS_API_CLASS = "net.irisshaders.iris.api.v0.IrisApi"
-    private const val IRIS_MAIN_CLASS = "net.irisshaders.iris.Iris"
-    private const val IRIS_CONFIG_CLASS = "net.irisshaders.iris.config.IrisConfig"
-
-    private val irisApiClass: Class<*>? by lazy {
-        try {
-            Class.forName(IRIS_API_CLASS)
-        } catch (e: ClassNotFoundException) {
-            Glint.LOGGER.debug("Iris API class not found: $IRIS_API_CLASS")
-            null
-        }
-    }
-
-    private val irisMainClass: Class<*>? by lazy {
-        try {
-            Class.forName(IRIS_MAIN_CLASS)
-        } catch (e: ClassNotFoundException) {
-            Glint.LOGGER.debug("Iris main class not found: $IRIS_MAIN_CLASS")
-            null
-        }
-    }
-
-    /**
-     * Whether Iris mod is loaded and available.
-     */
-    val isAvailable: Boolean
-        get() = irisApiClass != null
-
-    /**
-     * Gets the IrisApi instance via reflection.
-     */
-    private fun getApiInstance(): Any? {
-        val clazz = irisApiClass ?: return null
-        return try {
-            val getInstance = clazz.getMethod("getInstance")
-            getInstance.invoke(null)
-        } catch (e: Exception) {
-            Glint.LOGGER.debug("Failed to get IrisApi instance", e)
-            null
-        }
-    }
-
-    /**
-     * Gets the IrisConfig instance via Iris.getIrisConfig().
-     */
-    private fun getIrisConfig(): Any? {
-        val mainClass = irisMainClass ?: return null
-        return try {
-            val method = mainClass.getMethod("getIrisConfig")
-            method.invoke(null)
-        } catch (e: Exception) {
-            Glint.LOGGER.debug("Failed to get IrisConfig instance", e)
-            null
-        }
-    }
-
-    /**
-     * Checks if a shader pack is currently in use.
-     */
-    fun isShaderPackInUse(): Boolean {
-        if (!isAvailable) return false
-
-        return try {
-            val api = getApiInstance() ?: return false
-            val method = api.javaClass.getMethod("isShaderPackInUse")
-            method.invoke(api) as Boolean
-        } catch (e: NoSuchMethodException) {
-            Glint.LOGGER.error("IrisApi.isShaderPackInUse() method signature changed", e)
-            false
-        } catch (e: Exception) {
-            Glint.LOGGER.warn("Failed to check if shader pack is in use", e)
+    private val available: Boolean =
+        runCatching {
+            Class.forName("net.irisshaders.iris.Iris")
+            Glint.LOGGER.info("Iris integration enabled")
+            true
+        }.getOrElse { e ->
+            when (e) {
+                is ClassNotFoundException -> Glint.LOGGER.debug("Iris not detected, shader features disabled")
+                is NoClassDefFoundError -> Glint.LOGGER.warn("Iris detected but failed to load", e)
+            }
             false
         }
-    }
 
-    /**
-     * Gets the name of the current shader pack, if any.
-     */
-    fun getShaderPackName(): String? {
-        val mainClass = irisMainClass ?: return null
+    val isAvailable: Boolean get() = available
 
-        return try {
-            if (!isShaderPackInUse()) return null
-
-            val method = mainClass.getMethod("getCurrentPackName")
-            method.invoke(null) as String
-        } catch (e: NoSuchMethodException) {
-            Glint.LOGGER.error("Iris.getCurrentPackName() method signature changed", e)
-            null
-        } catch (e: ClassCastException) {
-            Glint.LOGGER.error("Iris.getCurrentPackName() return type changed", e)
-            null
-        } catch (e: Exception) {
-            Glint.LOGGER.warn("Failed to get shader pack name", e)
-            null
+    fun isShaderPackInUse(): Result<Boolean> {
+        if (!available) return Result.success(false)
+        return runCatching {
+            Iris.getCurrentPack().isPresent
+        }.onFailure { e ->
+            Glint.LOGGER.error("Error checking shader pack status", e)
         }
     }
 
-    /**
-     * Gets the shaderpacks directory path.
-     */
-    fun getShaderpacksDirectory(): Path? {
-        val mainClass = irisMainClass ?: return null
-
-        return try {
-            val method = mainClass.getMethod("getShaderpacksDirectory")
-            method.invoke(null) as Path
-        } catch (e: NoSuchMethodException) {
-            Glint.LOGGER.error("Iris.getShaderpacksDirectory() method signature changed", e)
-            null
-        } catch (e: ClassCastException) {
-            Glint.LOGGER.error("Iris.getShaderpacksDirectory() return type changed", e)
-            null
-        } catch (e: Exception) {
-            Glint.LOGGER.warn("Failed to get shaderpacks directory", e)
-            null
+    fun getShaderPackName(): Result<String?> {
+        if (!available) return Result.success(null)
+        return runCatching {
+            Iris.getCurrentPackName()
+        }.onFailure { e ->
+            Glint.LOGGER.error("Error getting shader pack name", e)
         }
     }
 
-    /**
-     * Lists all available shader pack names from the shaderpacks directory.
-     * Returns folder names and .zip filenames (with extension, as Iris expects).
-     */
-    fun listAvailableShaderPacks(): List<String> {
-        val shaderpacksDir = getShaderpacksDirectory() ?: return emptyList()
+    fun getShaderpacksDirectory(): Result<Path?> {
+        if (!available) return Result.success(null)
+        return runCatching {
+            Iris.getShaderpacksDirectory()
+        }.onFailure { e ->
+            Glint.LOGGER.error("Error getting shaderpacks directory", e)
+        }
+    }
 
-        return try {
+    fun listAvailableShaderPacks(): Result<List<String>> {
+        val shaderpacksDir = getShaderpacksDirectory().getOrNull() ?: return Result.success(emptyList())
+
+        return runCatching {
             val dir = shaderpacksDir.toFile()
-            if (!dir.exists() || !dir.isDirectory) return emptyList()
+            if (!dir.exists() || !dir.isDirectory) return@runCatching emptyList()
 
             dir
                 .listFiles()
                 ?.filter { file ->
                     file.isDirectory || (file.isFile && file.extension.equals("zip", ignoreCase = true))
                 }?.map { file ->
-                    // Iris expects full filename for zips, folder name for directories
                     file.name
                 }?.sorted()
                 ?: emptyList()
-        } catch (e: Exception) {
+        }.onFailure { e ->
             Glint.LOGGER.warn("Failed to list shader packs", e)
-            emptyList()
         }
     }
 
-    /**
-     * Sets the shader pack and enables/disables shaders.
-     * @param packName The shader pack name, or null to disable shaders
-     * @return true if successful
-     */
-    fun setShaderPack(packName: String?): Boolean {
-        val config = getIrisConfig() ?: return false
-        val mainClass = irisMainClass ?: return false
+    private fun setShaderPack(packName: String?): Result<Unit> {
+        if (!available) return Result.failure(IllegalStateException("Iris not available"))
 
-        return try {
-            // Set the pack name (empty string or null means internal/disabled)
-            val setPackMethod = config.javaClass.getMethod("setShaderPackName", String::class.java)
-            setPackMethod.invoke(config, packName ?: "")
-
-            // Set shaders enabled state
-            val setEnabledMethod = config.javaClass.getMethod("setShadersEnabled", Boolean::class.java)
-            setEnabledMethod.invoke(config, packName != null)
-
-            // Save config
-            val saveMethod = config.javaClass.getMethod("save")
-            saveMethod.invoke(config)
-
-            // Reload shaders
-            val reloadMethod = mainClass.getMethod("reload")
-            reloadMethod.invoke(null)
-
+        return runCatching {
+            val config = Iris.getIrisConfig()
+            config.setShaderPackName(packName ?: "")
+            config.setShadersEnabled(packName != null)
+            config.save()
+            Iris.reload()
             Glint.LOGGER.info("Shader pack set to: ${packName ?: "(disabled)"}")
-            true
-        } catch (e: NoSuchMethodException) {
-            Glint.LOGGER.error("Iris config method signature changed", e)
-            false
-        } catch (e: Exception) {
-            Glint.LOGGER.error("Failed to set shader pack", e)
-            false
+        }.onFailure { e ->
+            Glint.LOGGER.error("Failed to set shader pack: $packName", e)
         }
     }
 
-    /**
-     * Disables shaders (switches to vanilla rendering).
-     * @return true if successful
-     */
-    fun disableShaders(): Boolean = setShaderPack(null)
+    fun disableShaders(): Result<Unit> = setShaderPack(null)
 
-    /**
-     * Enables shaders with a specific pack.
-     * @return true if successful
-     */
-    fun enableShaders(packName: String): Boolean = setShaderPack(packName)
+    fun enableShaders(packName: String): Result<Unit> = setShaderPack(packName)
+
+    fun getShaderProfiles(): Result<List<String>> {
+        if (!available || !isShaderPackInUse().getOrDefault(false)) {
+            return Result.success(emptyList())
+        }
+
+        return runCatching {
+            val pack = Iris.getCurrentPack().orElse(null) ?: return@runCatching emptyList()
+            val menuContainer = (pack as ShaderPackAccessor).getMenuContainer()
+            val profileSet = menuContainer.profiles
+
+            val profileNames = mutableListOf<String>()
+            profileSet.forEach { name, _ -> profileNames.add(name) }
+            profileNames.toList()
+        }.onFailure { e ->
+            Glint.LOGGER.error("Error getting shader profiles", e)
+        }
+    }
+
+    fun applyShaderProfile(profileName: String): Result<Unit> {
+        if (!available || !isShaderPackInUse().getOrDefault(false)) {
+            return Result.failure(IllegalStateException("Iris not available or no shader pack loaded"))
+        }
+
+        return runCatching {
+            val pack =
+                Iris.getCurrentPack().orElse(null)
+                    ?: throw IllegalStateException("No shader pack loaded")
+
+            val menuContainer = (pack as ShaderPackAccessor).getMenuContainer()
+            val profileSet = menuContainer.profiles
+
+            var foundProfile: Any? = null
+            profileSet.forEach { name, p ->
+                if (name == profileName) {
+                    foundProfile = p
+                }
+            }
+
+            val profile =
+                foundProfile ?: run {
+                    Glint.LOGGER.warn("Profile not found: $profileName")
+                    throw IllegalArgumentException("Profile not found: $profileName")
+                }
+
+            Iris.queueShaderPackOptionsFromProfile(profile as net.irisshaders.iris.shaderpack.option.Profile)
+
+            val queue = Iris.getShaderPackOptionQueue()
+            if (queue.isEmpty()) {
+                Glint.LOGGER.warn("Profile queued but option queue is empty: $profileName")
+            }
+
+            Iris.reload()
+            Glint.LOGGER.info("Applied shader profile: $profileName")
+        }.onFailure { e ->
+            Glint.LOGGER.error("Failed to apply shader profile: $profileName", e)
+        }
+    }
+
+    fun resetShaderOptions(): Result<Unit> {
+        if (!available || !isShaderPackInUse().getOrDefault(false)) {
+            return Result.failure(IllegalStateException("Iris not available or no shader pack loaded"))
+        }
+
+        return runCatching {
+            Iris.getShaderPackOptionQueue().clear()
+            Iris.reload()
+            Glint.LOGGER.info("Reset shader options to defaults")
+        }.onFailure { e ->
+            Glint.LOGGER.error("Failed to reset shader options", e)
+        }
+    }
 }

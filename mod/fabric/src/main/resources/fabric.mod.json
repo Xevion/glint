@@ -23,5 +23,8 @@
     "java": ">=21",
     "fabric-api": "*",
     "architectury": ">=15.0.0"
+  },
+  "suggests": {
+    "iris": ">=1.8.0"
   }
 }

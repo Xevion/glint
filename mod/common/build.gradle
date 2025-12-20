@@ -20,4 +20,7 @@ dependencies {
     modImplementation libs.kotlinx.coroutines.core
     modImplementation libs.kotlinx.serialization.core
     modImplementation libs.kotlinx.serialization.json
+
+    // Iris integration - compile-time only, not bundled
+    modCompileOnly libs.iris
 }

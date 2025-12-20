@@ -1,19 +1,12 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Glint
-import com.xevion.glint.screenshot.Camera
-import com.xevion.glint.screenshot.MinecraftInfo
-import com.xevion.glint.screenshot.Position
-import com.xevion.glint.screenshot.Resolution
-import com.xevion.glint.screenshot.ScreenshotEntry
-import com.xevion.glint.screenshot.SessionInfo
-import com.xevion.glint.screenshot.SessionManifest
-import com.xevion.glint.screenshot.ShaderMetadata
+import com.xevion.glint.screenshot.*
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
+import net.minecraft.world.level.chunk.EmptyLevelChunk
 import java.io.File
 import java.time.Instant
-import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 /**
@@ -35,14 +28,31 @@ class CaptureSession(
     private var ticksInState: Int = 0
 
     private var originalShaderPack: String? = null
-    private var shadersToCapture: List<String?> = emptyList()
+    private var shadersToCapture: List<ShaderConfig> = emptyList()
     private var currentIndex: Int = 0
     private var sessionDir: File? = null
     private var sessionId: String = ""
     private var startedAt: Instant? = null
     private val screenshotEntries: MutableList<ScreenshotEntry> = mutableListOf()
 
-    private val json = Json { prettyPrint = true }
+    private val stabilizationDetector = StabilizationDetector()
+
+    /**
+     * Represents a shader configuration to capture (shader pack + optional profile).
+     * Localized to CaptureSession - not intended for external use.
+     */
+    private data class ShaderConfig(
+        val packName: String?,
+        val profile: String? = null,
+    ) {
+        val displayName: String
+            get() =
+                when {
+                    packName == null -> "Vanilla"
+                    profile != null -> "$packName ($profile)"
+                    else -> packName
+                }
+    }
 
     /**
      * Starts a new capture session.
@@ -72,23 +82,42 @@ class CaptureSession(
 
         if (!IrisIntegration.isAvailable) {
             Glint.LOGGER.warn("Iris is not available, capturing vanilla only")
-            shadersToCapture = listOf(null)
+            shadersToCapture = listOf(ShaderConfig(packName = null))
             originalShaderPack = null
         } else {
             originalShaderPack =
-                if (IrisIntegration.isShaderPackInUse()) {
-                    IrisIntegration.getShaderPackName()
+                if (IrisIntegration.isShaderPackInUse().getOrDefault(false)) {
+                    IrisIntegration.getShaderPackName().getOrNull()
                 } else {
                     null
                 }
 
-            val availablePacks = IrisIntegration.listAvailableShaderPacks()
-            // null represents vanilla (no shader)
-            shadersToCapture = listOf(null) + availablePacks
+            val availablePacks = IrisIntegration.listAvailableShaderPacks().getOrDefault(emptyList())
+
+            shadersToCapture =
+                buildList {
+                    add(ShaderConfig(packName = null))
+
+                    for (pack in availablePacks) {
+                        if (IrisIntegration.enableShaders(pack).isSuccess) {
+                            val profiles = IrisIntegration.getShaderProfiles().getOrDefault(emptyList())
+
+                            if (profiles.isEmpty()) {
+                                add(ShaderConfig(packName = pack))
+                            } else {
+                                for (profile in profiles) {
+                                    add(ShaderConfig(packName = pack, profile = profile))
+                                }
+                            }
+                        } else {
+                            Glint.LOGGER.warn("Failed to load shader pack for profile discovery: $pack")
+                        }
+                    }
+                }
 
             Glint.LOGGER.info(
                 "Starting capture session with ${shadersToCapture.size} configurations: " +
-                    "Vanilla + ${availablePacks.joinToString(", ")}",
+                    shadersToCapture.joinToString(", ") { it.displayName },
             )
         }
 
@@ -140,40 +169,61 @@ class CaptureSession(
         Glint.LOGGER.debug("Capture session: $state -> $newState")
         state = newState
         ticksInState = 0
+
+        if (newState == State.WaitingForStabilization) {
+            stabilizationDetector.reset()
+        }
     }
 
     private fun handleLoadingShader() {
-        val targetShader = shadersToCapture.getOrNull(currentIndex)
+        val config = shadersToCapture.getOrNull(currentIndex)
+        if (config == null) {
+            Glint.LOGGER.error("Invalid shader config at index $currentIndex")
+            advanceToNextShader()
+            return
+        }
 
         if (IrisIntegration.isAvailable) {
-            val shaderName = targetShader ?: "(Vanilla)"
-            Glint.LOGGER.info("Loading shader: $shaderName")
+            Glint.LOGGER.info("Loading shader configuration: ${config.displayName}")
 
-            val success =
-                if (targetShader == null) {
+            val result =
+                if (config.packName == null) {
                     IrisIntegration.disableShaders()
                 } else {
-                    IrisIntegration.enableShaders(targetShader)
+                    IrisIntegration.enableShaders(config.packName).onFailure {
+                        Glint.LOGGER.error("Failed to load shader pack: ${config.packName}")
+                        advanceToNextShader()
+                        return
+                    }
+
+                    if (config.profile != null) {
+                        IrisIntegration.applyShaderProfile(config.profile).onFailure {
+                            Glint.LOGGER.error("Failed to apply profile: ${config.profile}, skipping")
+                            advanceToNextShader()
+                            return
+                        }
+                    } else {
+                        IrisIntegration.resetShaderOptions()
+                    }
+
+                    Result.success(Unit)
                 }
 
-            if (!success) {
-                Glint.LOGGER.error("Failed to load shader: $shaderName, skipping")
+            if (result.isFailure) {
+                Glint.LOGGER.error("Failed to load shader configuration: ${config.displayName}, skipping")
                 advanceToNextShader()
                 return
             }
         }
 
+        // Force all chunks to rebuild - Iris may not immediately mark sections dirty
+        Minecraft.getInstance().levelRenderer.allChanged()
+
         transitionTo(State.WaitingForStabilization)
     }
 
     private fun handleWaitingForStabilization() {
-        // Wait for chunks to load and FPS to stabilize
-        // Simple heuristic: wait a fixed number of ticks
-        // TODO: Could be smarter - check chunk loading status, FPS variance, etc.
-        if (ticksInState >= STABILIZATION_TICKS) {
-            val mc = Minecraft.getInstance()
-            val chunksLoading = mc.level?.chunkSource?.loadedChunksCount ?: 0
-            Glint.LOGGER.debug("Stabilization complete after $ticksInState ticks, chunks loaded: $chunksLoading")
+        if (stabilizationDetector.isStable(ticksInState)) {
             transitionTo(State.Capturing)
         }
     }
@@ -182,19 +232,25 @@ class CaptureSession(
         val mc = Minecraft.getInstance()
         val renderTarget = mc.mainRenderTarget
 
-        val currentShader = shadersToCapture.getOrNull(currentIndex)
-        val screenshotName = buildScreenshotFilename(currentShader)
-        Glint.LOGGER.info("Capturing screenshot for: ${currentShader ?: "vanilla"} -> $screenshotName")
+        val config = shadersToCapture.getOrNull(currentIndex)
+        if (config == null) {
+            Glint.LOGGER.error("Invalid shader config at index $currentIndex")
+            advanceToNextShader()
+            return
+        }
 
-        // Collect metadata before capture
+        val screenshotName = buildScreenshotFilename(config)
+        Glint.LOGGER.info("Capturing screenshot for: ${config.displayName} -> $screenshotName")
+
         val timestamp = Instant.now().toString()
-        val parsed = currentShader?.let { parseShaderPackName(it) }
+        val shaderInfo = config.packName?.let { parseShaderPackName(it) }
         val shaderMeta =
-            if (currentShader != null && parsed != null) {
+            if (config.packName != null && shaderInfo != null) {
                 ShaderMetadata(
-                    packFile = currentShader,
-                    id = parsed.id,
-                    version = parsed.version,
+                    packFile = config.packName,
+                    id = shaderInfo.id,
+                    version = shaderInfo.version,
+                    profile = config.profile,
                 )
             } else {
                 null
@@ -226,20 +282,21 @@ class CaptureSession(
     }
 
     /**
-     * Builds a screenshot filename from the shader pack name.
+     * Builds a screenshot filename from the shader configuration.
      *
      * Expected shader pack format: `<shader-id>_<version>_mc<mc-version>.zip`
-     * Output format: `<shader-id>_<version>_<scene-id>.png`
+     * Output format: `<shader-id>_<version>_<profile>_<scene-id>.png`
      *
      * For vanilla: `vanilla_<scene-id>.png`
      */
-    private fun buildScreenshotFilename(shaderPackName: String?): String {
-        if (shaderPackName == null) {
+    private fun buildScreenshotFilename(config: ShaderConfig): String {
+        if (config.packName == null) {
             return "vanilla_$sceneId.png"
         }
 
-        val parsed = parseShaderPackName(shaderPackName)
-        return "${parsed.id}_${parsed.version}_$sceneId.png"
+        val shaderInfo = parseShaderPackName(config.packName)
+        val profileSuffix = config.profile?.let { "_${sanitizeForFilename(it)}" } ?: ""
+        return "${shaderInfo.id}_${shaderInfo.version}${profileSuffix}_$sceneId.png"
     }
 
     /**
@@ -294,7 +351,6 @@ class CaptureSession(
     )
 
     private fun handlePostCaptureCooldown() {
-        // Wait a few ticks after capture before moving to next shader
         if (ticksInState >= POST_CAPTURE_COOLDOWN_TICKS) {
             advanceToNextShader()
         }
@@ -317,8 +373,9 @@ class CaptureSession(
 
         // Restore original shader
         if (IrisIntegration.isAvailable) {
-            if (originalShaderPack != null) {
-                IrisIntegration.enableShaders(originalShaderPack!!)
+            val shaderPack = originalShaderPack
+            if (shaderPack != null) {
+                IrisIntegration.enableShaders(shaderPack)
             } else {
                 IrisIntegration.disableShaders()
             }
@@ -368,7 +425,7 @@ class CaptureSession(
                         startedAt = startedAt.toString(),
                         completedAt = completedAt.toString(),
                         totalScreenshots = screenshotEntries.size,
-                        shaderPacks = shadersToCapture.filterNotNull(),
+                        shaderPacks = shadersToCapture.mapNotNull { it.packName }.distinct(),
                     ),
                 minecraft =
                     MinecraftInfo(
@@ -382,7 +439,7 @@ class CaptureSession(
 
         val manifestFile = File(sessionDir!!, "session.json")
         try {
-            manifestFile.writeText(json.encodeToString(SessionManifest.serializer(), manifest))
+            manifestFile.writeText(JSON.encodeToString(SessionManifest.serializer(), manifest))
             Glint.LOGGER.info("Session manifest written to: ${manifestFile.absolutePath}")
         } catch (e: Exception) {
             Glint.LOGGER.error("Failed to write session manifest", e)
@@ -399,10 +456,7 @@ class CaptureSession(
     }
 
     companion object {
-        // Number of ticks to wait for world/shader to stabilize (20 ticks = 1 second)
-        private const val STABILIZATION_TICKS = 100 // 5 seconds
-
-        // Number of ticks to wait after capturing before moving to next shader
-        private const val POST_CAPTURE_COOLDOWN_TICKS = 10 // 0.5 seconds
+        private val JSON = Json { prettyPrint = true }
+        private const val POST_CAPTURE_COOLDOWN_TICKS = 10
     }
 }

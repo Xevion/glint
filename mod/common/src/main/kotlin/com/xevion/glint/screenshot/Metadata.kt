@@ -2,10 +2,6 @@ package com.xevion.glint.screenshot
 
 import kotlinx.serialization.Serializable
 
-/**
- * Session manifest containing metadata for all screenshots in a capture session.
- * Written to `session.json` in the session directory.
- */
 @Serializable
 data class SessionManifest(
     val session: SessionInfo,
@@ -60,6 +56,7 @@ data class ShaderMetadata(
     val packFile: String,
     val id: String,
     val version: String,
+    val profile: String? = null,
 )
 
 @Serializable

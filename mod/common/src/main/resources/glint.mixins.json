@@ -3,7 +3,9 @@
   "package": "com.xevion.glint.mixin",
   "compatibilityLevel": "JAVA_21",
   "minVersion": "0.8",
-  "mixins": [],
+  "mixins": [
+    "ShaderPackAccessor"
+  ],
   "client": [],
   "injectors": {
     "defaultRequire": 1

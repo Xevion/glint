@@ -9,12 +9,10 @@ object Glint {
     val LOGGER: Logger = LoggerFactory.getLogger(MOD_ID)
 
     fun init() {
+        LogConfig.setupDebugLogging(MOD_ID)
         LOGGER.info("Initializing Glint mod")
     }
 
-    /**
-     * Called every client tick. Register this with the platform's tick event.
-     */
     fun onClientTick() {
         KeybindHandler.onTick()
     }
