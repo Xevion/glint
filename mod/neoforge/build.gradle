@@ -1,0 +1,45 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+}
+
+architectury {
+    platformSetupLoomIde()
+    neoForge()
+}
+
+configurations {
+    common
+    compileClasspath.extendsFrom common
+    runtimeClasspath.extendsFrom common
+    developmentNeoForge.extendsFrom common
+}
+
+loom {
+    neoForge {}
+}
+
+dependencies {
+    common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
+
+    neoForge libs.neoforge
+
+    modImplementation libs.architectury.neoforge
+    
+    modImplementation libs.kotlin.stdlib
+    modImplementation libs.kotlinx.coroutines.core
+    modImplementation libs.kotlinx.serialization.core
+    
+    developmentNeoForge libs.kotlin.stdlib
+
+    include libs.kotlin.stdlib
+    include libs.kotlinx.coroutines.core
+    include libs.kotlinx.serialization.core
+}
+
+processResources {
+    inputs.property 'version', project.version
+
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand 'version': project.version
+    }
+}

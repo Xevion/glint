@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "glint",
+  "version": "${version}",
+  "name": "Glint",
+  "description": "A Minecraft mod built with Architectury",
+  "authors": [
+    "Xevion"
+  ],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "com.xevion.glint.fabric.GlintFabric"
+    ]
+  },
+  "mixins": [
+    "glint.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*",
+    "architectury": ">=15.0.0"
+  }
+}

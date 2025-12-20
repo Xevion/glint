@@ -1,0 +1,22 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+    alias libs.plugins.kotlin.serialization
+}
+
+architectury {
+    common('fabric', 'neoforge')
+}
+
+dependencies {
+    compileOnly libs.mixin
+    compileOnly libs.mixinextras.common
+    annotationProcessor libs.mixinextras.common
+
+    compileOnly libs.fabric.loader
+
+    modApi libs.slf4j.api
+
+    modImplementation libs.kotlin.stdlib
+    modImplementation libs.kotlinx.coroutines.core
+    modImplementation libs.kotlinx.serialization.core
+}

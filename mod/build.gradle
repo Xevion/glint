@@ -1,0 +1,60 @@
+plugins {
+    id 'java'
+    alias libs.plugins.architectury
+    alias libs.plugins.architectury.loom apply false
+    alias libs.plugins.kotlin.jvm apply false
+}
+
+architectury {
+    minecraft = libs.versions.minecraft.get()
+}
+
+if (JavaVersion.current() < JavaVersion.VERSION_21) {
+    throw new GradleException("This project requires Java 21+")
+}
+
+allprojects {
+    apply plugin: 'java'
+    apply plugin: 'architectury-plugin'
+    apply plugin: 'maven-publish'
+
+    version = rootProject.mod_version
+    group = rootProject.maven_group
+
+    repositories {
+        mavenCentral()
+        maven { url = 'https://maven.fabricmc.net/' }
+        maven { url = 'https://maven.architectury.dev/' }
+        maven { url = 'https://maven.neoforged.net/releases/' }
+        maven { url = 'https://thedarkcolour.github.io/KotlinForForge/' }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = project.java_version.toInteger()
+    }
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(project.java_version.toInteger())
+        }
+        withSourcesJar()
+    }
+}
+
+subprojects {
+    apply plugin: 'dev.architectury.loom'
+    apply plugin: 'org.jetbrains.kotlin.jvm'
+
+    loom {
+        silentMojangMappingsLicense()
+    }
+
+    dependencies {
+        minecraft "com.mojang:minecraft:${libs.versions.minecraft.get()}"
+
+        mappings loom.layered() {
+            officialMojangMappings()
+        }
+    }
+}

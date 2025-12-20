@@ -1,0 +1,47 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+}
+
+architectury {
+    platformSetupLoomIde()
+    forge()
+}
+
+configurations {
+    common
+    compileClasspath.extendsFrom common
+    runtimeClasspath.extendsFrom common
+    developmentForge.extendsFrom common
+}
+
+loom {
+    forge {
+        mixinConfig 'glint.mixins.json'
+    }
+}
+
+dependencies {
+    common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
+
+    forge libs.forge
+
+    modImplementation libs.architectury.forge
+
+    modImplementation libs.mixinextras.forge
+
+    modImplementation libs.kotlin.stdlib
+    modImplementation libs.kotlinx.coroutines.core
+    modImplementation libs.kotlinx.serialization.core
+
+    include libs.kotlin.stdlib
+    include libs.kotlinx.coroutines.core
+    include libs.kotlinx.serialization.core
+}
+
+processResources {
+    inputs.property 'version', project.version
+
+    filesMatching('META-INF/mods.toml') {
+        expand 'version': project.version
+    }
+}

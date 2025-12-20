@@ -56,3 +56,7 @@ fe *args:
 # Run any command in backend
 be *args:
     cd backend && {{args}}
+
+# Run any command from mod
+mod *args:
+	cd mod && {{args}}

@@ -1,0 +1,15 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.fabricmc.net/' }
+        maven { url = 'https://maven.architectury.dev/' }
+        maven { url = 'https://maven.neoforged.net/releases/' }
+    }
+}
+
+rootProject.name = 'glint'
+
+include 'common'
+include 'fabric'
+// include 'forge'  // Disabled: Forge not supported for MC 1.21.4, use NeoForge instead
+include 'neoforge'

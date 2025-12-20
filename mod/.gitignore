@@ -1,0 +1,37 @@
+# Gradle
+.gradle/
+.kotlin/
+build/
+out/
+classes/
+
+# IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Fabric
+run/
+runs/
+
+# macOS
+.DS_Store
+
+# Loom
+.loom-cache/
+remappedJars/
+remappedSrc/
+
+# Misc
+logs/
+*.log
