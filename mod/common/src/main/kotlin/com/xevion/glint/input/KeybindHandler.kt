@@ -1,8 +1,7 @@
 package com.xevion.glint.input
 
 import com.xevion.glint.Glint
-import com.xevion.glint.capture.IrisIntegration
-import com.xevion.glint.screenshot.ScreenshotHandler
+import com.xevion.glint.capture.CaptureSession
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 
@@ -10,17 +9,26 @@ import org.lwjgl.glfw.GLFW
  * Handles keybindings for Glint.
  *
  * Keybindings:
- * - GRAVE (`) - Capture screenshot with metadata
+ * - GRAVE (`) - Start multi-shader capture session
  */
 object KeybindHandler {
     private var wasGravePressed = false
+    private var captureSession: CaptureSession? = null
 
     /**
-     * Called every client tick to poll key states.
+     * Called every client tick to poll key states and advance capture session.
      * Must be registered with the platform's tick event system.
      */
     fun onTick() {
         val mc = Minecraft.getInstance()
+
+        // Always tick the capture session if running
+        captureSession?.tick()
+
+        // Clean up completed sessions
+        if (captureSession?.isRunning == false) {
+            captureSession = null
+        }
 
         // Don't process keybinds if a screen is open or not in-game
         if (mc.screen != null || mc.level == null) {
@@ -31,29 +39,21 @@ object KeybindHandler {
         val gravePressed = isKeyPressed(GLFW.GLFW_KEY_GRAVE_ACCENT)
 
         if (gravePressed && !wasGravePressed) {
-            triggerDemoCapture()
+            startCaptureSession()
         }
 
         wasGravePressed = gravePressed
     }
 
-    private fun triggerDemoCapture() {
-        val mc = Minecraft.getInstance()
-        val renderTarget = mc.mainRenderTarget
-
-        val shaderInfo = IrisIntegration.getShaderInfo()
-        if (shaderInfo != null) {
-            Glint.LOGGER.debug("Capturing with shader: ${shaderInfo.pack}")
-        } else if (IrisIntegration.isAvailable) {
-            Glint.LOGGER.debug("Capturing without shader (Iris available)")
+    private fun startCaptureSession() {
+        if (captureSession?.isRunning == true) {
+            Glint.LOGGER.warn("Capture session already in progress")
+            return
         }
 
-        net.minecraft.client.Screenshot.grab(
-            mc.gameDirectory,
-            null,
-            renderTarget,
-        ) { message ->
-            Glint.LOGGER.info("${message.string}")
+        captureSession = CaptureSession()
+        if (!captureSession!!.start()) {
+            captureSession = null
         }
     }
 

@@ -2,19 +2,25 @@ package com.xevion.glint.screenshot
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Session manifest containing metadata for all screenshots in a capture session.
+ * Written to `session.json` in the session directory.
+ */
 @Serializable
-data class ScreenshotMetadata(
-    val timestamp: String,
-    val screenshot: ScreenshotInfo,
+data class SessionManifest(
+    val session: SessionInfo,
     val minecraft: MinecraftInfo,
-    val shader: ShaderInfo? = null,
+    val screenshots: List<ScreenshotEntry>,
 )
 
 @Serializable
-data class ScreenshotInfo(
-    val file: String,
-    val width: Int,
-    val height: Int,
+data class SessionInfo(
+    val id: String,
+    val sceneId: String,
+    val startedAt: String,
+    val completedAt: String,
+    val totalScreenshots: Int,
+    val shaderPacks: List<String>,
 )
 
 @Serializable
@@ -38,8 +44,26 @@ data class Camera(
     val pitch: Float,
 )
 
+/**
+ * Metadata for a single screenshot within a session.
+ */
 @Serializable
-data class ShaderInfo(
-    val pack: String,
-    val enabled: Boolean,
+data class ScreenshotEntry(
+    val file: String,
+    val timestamp: String,
+    val shader: ShaderMetadata?,
+    val resolution: Resolution,
+)
+
+@Serializable
+data class ShaderMetadata(
+    val packFile: String,
+    val id: String,
+    val version: String,
+)
+
+@Serializable
+data class Resolution(
+    val width: Int,
+    val height: Int,
 )
