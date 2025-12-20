@@ -23,7 +23,13 @@ export default defineConfig(
 			globals: { ...globals.browser, ...globals.node },
 			parserOptions: {
 				projectService: {
-					allowDefaultProject: ['*.js', '*.mjs', '*.cjs', 'vitest.config.ts']
+					allowDefaultProject: [
+						'*.js',
+						'*.mjs',
+						'*.cjs',
+						'vitest.config.ts',
+						'playwright.config.ts'
+					]
 				}
 			}
 		},
