@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/state';
+	import { page } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { Sun, Moon } from '@lucide/svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
@@ -13,9 +13,9 @@
 
 	function isActive(href: string): boolean {
 		if (href === '/') {
-			return page.url.pathname === '/';
+			return $page.url.pathname === '/';
 		}
-		return page.url.pathname.startsWith(href);
+		return $page.url.pathname.startsWith(href);
 	}
 </script>
 

@@ -115,7 +115,7 @@
 
 <div class="background-container" bind:this={containerEl}>
 	<!-- Light theme wallpapers -->
-	{#each lightIndices as wallpaperIndex, i (wallpaperIndex)}
+	{#each lightIndices as wallpaperIndex, i (i)}
 		{@const top = i * sectionHeight()}
 		{@const isFirst = i === 0}
 		{@const isLast = i === lightIndices.length - 1}
@@ -133,7 +133,7 @@
 	{/each}
 
 	<!-- Dark theme wallpapers -->
-	{#each darkIndices as wallpaperIndex, i (wallpaperIndex)}
+	{#each darkIndices as wallpaperIndex, i (i)}
 		{@const top = i * sectionHeight()}
 		{@const isFirst = i === 0}
 		{@const isLast = i === darkIndices.length - 1}
