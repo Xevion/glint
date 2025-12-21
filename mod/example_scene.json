@@ -1,13 +1,13 @@
 {
   "world": "example_world",
   "version": "1.21.4",
-  "description": "Example scene collection showing various configuration options",
+  "description": "Example scene collection showing nested variants and new structure",
   "defaultConfig": {
     "renderDistance": 20,
     "graphicsMode": "FABULOUS",
     "particles": "ALL",
     "clouds": "FANCY",
-    "showHud": false,
+    "hideHud": true,
     "entityAiFrozen": true
   },
   "scenes": [
@@ -35,29 +35,27 @@
         "fov": 70,
         "brightness": 0.5,
         "cameraType": "FIRST_PERSON"
-      }
-    },
-    {
-      "id": "sunset_ocean_wide",
-      "name": "Sunset Ocean - Wide Angle",
-      "description": "Same location but with wider FOV for comparison",
-      "dimension": "minecraft:overworld",
-      "position": {
-        "x": 0.5,
-        "y": 80.0,
-        "z": 0.5
       },
-      "camera": {
-        "yaw": 180.0,
-        "pitch": 10.0
-      },
-      "timeOfDay": 12500,
-      "weather": "clear",
-      "tags": ["sunset", "ocean", "wide"],
-      "config": {
-        "fov": 90,
-        "renderDistance": 24
-      }
+      "variants": [
+        {
+          "id": "sunset_ocean_wide",
+          "name": "Sunset Ocean - Wide Angle",
+          "description": "Same location but with wider FOV",
+          "tags": ["sunset", "ocean", "wide"],
+          "config": {
+            "fov": 90,
+            "renderDistance": 24
+          }
+        },
+        {
+          "id": "sunset_ocean_rain",
+          "name": "Sunset Ocean - Rainy",
+          "description": "Same location during rain",
+          "weather": "rain",
+          "weatherIntensity": 0.6,
+          "tags": ["sunset", "ocean", "rain"]
+        }
+      ]
     },
     {
       "id": "nether_fortress",
@@ -82,9 +80,9 @@
       }
     },
     {
-      "id": "rainy_village",
-      "name": "Rainy Village",
-      "description": "Village scene with heavy rain",
+      "id": "village_midday",
+      "name": "Village - Midday",
+      "description": "Village scene at midday",
       "dimension": "minecraft:overworld",
       "position": {
         "x": 250.0,
@@ -96,10 +94,26 @@
         "pitch": 0.0
       },
       "timeOfDay": 6000,
-      "weather": "rain",
-      "weatherIntensity": 0.8,
+      "weather": "clear",
       "biome": "minecraft:plains",
-      "tags": ["village", "rain", "midday"]
+      "tags": ["village", "midday"],
+      "variants": [
+        {
+          "id": "village_rain",
+          "name": "Village - Rainy",
+          "description": "Same village during heavy rain",
+          "weather": "rain",
+          "weatherIntensity": 0.8,
+          "tags": ["village", "rain", "midday"]
+        },
+        {
+          "id": "village_sunset",
+          "name": "Village - Sunset",
+          "description": "Same village at sunset",
+          "timeOfDay": 12500,
+          "tags": ["village", "sunset"]
+        }
+      ]
     }
   ],
   "entities": [
@@ -114,7 +128,7 @@
         "yaw": 90.0,
         "pitch": 0.0
       },
-      "frozenForScenes": ["sunset_ocean", "sunset_ocean_wide"]
+      "frozenForScenes": ["sunset_ocean"]
     },
     {
       "type": "minecraft:villager",
@@ -127,7 +141,7 @@
         "yaw": 0.0,
         "pitch": 0.0
       },
-      "frozenForScenes": ["rainy_village"]
+      "frozenForScenes": ["village_midday"]
     }
   ]
 }

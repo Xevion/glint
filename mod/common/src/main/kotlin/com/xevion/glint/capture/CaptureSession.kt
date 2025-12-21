@@ -24,6 +24,8 @@ import java.time.format.DateTimeFormatter
  */
 class CaptureSession(
     private val sceneId: String = "default",
+    private val outputDir: File? = null,
+    private val worldName: String? = null,
 ) {
     private val logger = Glint.LOGGER
     private var state: State = State.Idle
@@ -41,6 +43,9 @@ class CaptureSession(
     private var resolvedScene: com.xevion.glint.scene.ResolvedScene? = null
     private var sceneApplied: Boolean = false
     private var originalState: CaptureState.SavedState? = null
+
+    // Session data returned on completion (for autonomous orchestration)
+    private var sessionData: CaptureSessionData? = null
 
     /**
      * Represents a shader configuration to capture (shader pack + optional profile).
@@ -91,12 +96,17 @@ class CaptureSession(
                 .ofPattern("yyyy-MM-dd_HH-mm-ss")
                 .withZone(java.time.ZoneId.systemDefault())
                 .format(startedAt)
-        sessionDir = File(mc.gameDirectory, "glint_captures/$sessionId")
-        if (!sessionDir!!.mkdirs()) {
-            logger.error("Failed to create capture session directory: ${sessionDir!!.absolutePath}")
-            return false
-        }
-        logger.info("Capture session directory: ${sessionDir!!.absolutePath}")
+        sessionDir =
+            outputDir?.also {
+                // Orchestrator provides parent directory, Screenshot.grab creates screenshots/ subdirectory
+                logger.info("Using provided output directory: ${it.absolutePath}")
+            } ?: File(mc.gameDirectory, "glint/captures/$sessionId").also {
+                if (!it.mkdirs()) {
+                    logger.error("Failed to create capture session directory: ${it.absolutePath}")
+                    return false
+                }
+                logger.info("Created capture session directory: ${it.absolutePath}")
+            }
         screenshotEntries.clear()
 
         if (!IrisIntegration.isAvailable) {
@@ -193,6 +203,11 @@ class CaptureSession(
      */
     val isRunning: Boolean
         get() = state != State.Idle
+
+    /**
+     * Get session data after completion (null if still running or not started).
+     */
+    fun getSessionData(): CaptureSessionData? = sessionData
 
     private fun transitionTo(newState: State) {
         logger.info("Capture session state: $state -> $newState")
@@ -354,18 +369,18 @@ class CaptureSession(
      * Builds a screenshot filename from the shader configuration.
      *
      * Expected shader pack format: `<shader-id>_<version>_mc<mc-version>.zip`
-     * Output format: `<shader-id>_<version>_<profile>_<scene-id>.png`
+     * Output format: `<shader-id>_<version>_<profile>.png`
      *
-     * For vanilla: `vanilla_<scene-id>.png`
+     * For vanilla: `vanilla.png`
      */
     private fun buildScreenshotFilename(config: ShaderConfig): String {
         if (config.packName == null) {
-            return "vanilla_$sceneId.png"
+            return "vanilla.png"
         }
 
         val shaderInfo = parseShaderPackName(config.packName)
         val profileSuffix = config.profile?.let { "_${sanitizeForFilename(it)}" } ?: ""
-        return "${shaderInfo.id}_${shaderInfo.version}${profileSuffix}_$sceneId.png"
+        return "${shaderInfo.id}_${shaderInfo.version}$profileSuffix.png"
     }
 
     /**
@@ -437,8 +452,8 @@ class CaptureSession(
     private fun handleFinishing() {
         logger.info("Capture session complete, restoring original state")
 
-        // Write session manifest
-        writeSessionManifest()
+        // Build session data for return
+        sessionData = buildSessionData()
 
         // Restore original shader
         if (IrisIntegration.isAvailable) {
@@ -456,7 +471,7 @@ class CaptureSession(
         // End capture mode
         CaptureState.endCapture()
 
-        // Reset state
+        // Reset state (keep sessionData for retrieval)
         state = State.Idle
         ticksInState = 0
         currentIndex = 0
@@ -470,7 +485,7 @@ class CaptureSession(
         logger.info("Capture session finished")
     }
 
-    private fun writeSessionManifest() {
+    private fun buildSessionData(): CaptureSessionData {
         val mc = Minecraft.getInstance()
         val completedAt = Instant.now()
 
@@ -486,34 +501,32 @@ class CaptureSession(
                 ?.location()
                 ?.toString()
 
-        val manifest =
-            SessionManifest(
-                session =
-                    SessionInfo(
-                        id = sessionId,
-                        sceneId = sceneId,
-                        startedAt = startedAt.toString(),
-                        completedAt = completedAt.toString(),
-                        totalScreenshots = screenshotEntries.size,
-                        shaderPacks = shadersToCapture.mapNotNull { it.packName }.distinct(),
-                    ),
-                minecraft =
-                    MinecraftInfo(
-                        version = mc.launchedVersion,
-                        dimension = dimension,
-                        position = position,
-                        camera = camera,
-                    ),
-                screenshots = screenshotEntries.toList(),
-            )
+        // Determine world name (provided by orchestrator or from current world)
+        val resolvedWorldName = worldName ?: mc.singleplayerServer?.worldData?.levelName ?: "unknown"
 
-        val manifestFile = File(sessionDir!!, "session.json")
-        try {
-            manifestFile.writeText(JSON.encodeToString(SessionManifest.serializer(), manifest))
-            logger.info("Session manifest written to: ${manifestFile.absolutePath}")
-        } catch (e: Exception) {
-            logger.error("Failed to write session manifest", e)
-        }
+        // Session directory path relative to game directory
+        val sessionDirPath =
+            sessionDir?.let {
+                it.relativeTo(mc.gameDirectory).path
+            } ?: "unknown"
+
+        return CaptureSessionData(
+            worldName = resolvedWorldName,
+            sceneId = sceneId,
+            sessionDir = sessionDirPath,
+            startedAt = startedAt.toString(),
+            completedAt = completedAt.toString(),
+            totalScreenshots = screenshotEntries.size,
+            shaderPacks = shadersToCapture.mapNotNull { it.packName }.distinct(),
+            minecraft =
+                MinecraftInfo(
+                    version = mc.launchedVersion,
+                    dimension = dimension,
+                    position = position,
+                    camera = camera,
+                ),
+            screenshots = screenshotEntries.toList(),
+        )
     }
 
     private enum class State {
@@ -527,7 +540,6 @@ class CaptureSession(
     }
 
     companion object {
-        private val JSON = Json { prettyPrint = true }
         private const val POST_CAPTURE_COOLDOWN_TICKS = 10
         private const val SCENE_APPLICATION_WAIT_TICKS = 40
     }

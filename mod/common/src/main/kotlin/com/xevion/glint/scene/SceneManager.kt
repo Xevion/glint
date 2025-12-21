@@ -22,39 +22,34 @@ object SceneManager {
     /**
      * Loads a scene by ID from available scene collections.
      *
-     * Scene ID format: "<world_name>.<scene_id>" or just "<scene_id>" (searches all collections)
+     * Scene IDs are globally unique and searched across all collections.
+     * Variants are automatically expanded during discovery.
      *
      * Examples:
-     * - "sunset_ocean.main" - loads scene "main" from sunset_ocean.json
-     * - "main" - searches all collections for a scene with id "main"
+     * - "village_sunrise" - searches all collections for a scene or variant with this ID
+     * - "nether_fortress" - base scene ID
      */
     fun loadScene(sceneId: String): ResolvedScene? {
         Glint.LOGGER.info("Loading scene: $sceneId")
 
-        val (worldName, localSceneId) =
-            if (sceneId.contains('.')) {
-                val parts = sceneId.split('.', limit = 2)
-                parts[0] to parts[1]
-            } else {
-                null to sceneId
+        val collections = discoverCollections()
+        Glint.LOGGER.debug("Searching ${collections.size} collections for scene ID: $sceneId")
+
+        for ((fileName, collection) in collections) {
+            // Search base scenes
+            val baseScene = collection.scenes.find { it.id == sceneId }
+            if (baseScene != null) {
+                Glint.LOGGER.debug("Found base scene '$sceneId' in '${collection.world}'")
+                return resolveScene(baseScene, collection, fileName)
             }
 
-        Glint.LOGGER.debug("Parsed scene ID: world=$worldName, scene=$localSceneId")
-
-        worldName?.let { world ->
-            val collection = loadCollection(world) ?: return null
-            val scene = collection.scenes.find { it.id == localSceneId }
-            if (scene != null) {
-                return resolveScene(scene, collection)
-            }
-        } ?: run {
-            val collections = discoverCollections()
-            Glint.LOGGER.debug("Searching ${collections.size} collections for scene")
-            for (collection in collections) {
-                val scene = collection.scenes.find { it.id == localSceneId }
-                if (scene != null) {
-                    Glint.LOGGER.debug("Found scene '$localSceneId' in '${collection.world}'")
-                    return resolveScene(scene, collection)
+            // Search variants
+            for (scene in collection.scenes) {
+                val variant = scene.variants.find { it.id == sceneId }
+                if (variant != null) {
+                    Glint.LOGGER.debug("Found variant '$sceneId' of scene '${scene.id}' in '${collection.world}'")
+                    val expandedScene = variant.applyTo(scene)
+                    return resolveScene(expandedScene, collection, fileName)
                 }
             }
         }
@@ -70,7 +65,7 @@ object SceneManager {
         loadedCollections[worldName]?.let { return it }
 
         val mc = Minecraft.getInstance()
-        val sceneFile = File(mc.gameDirectory, "glint_scenes/$worldName.json")
+        val sceneFile = File(mc.gameDirectory, "glint/scenes/$worldName.json")
 
         if (!sceneFile.exists()) {
             Glint.LOGGER.error("Scene collection not found: ${sceneFile.absolutePath}")
@@ -90,22 +85,29 @@ object SceneManager {
 
     /**
      * Discovers all available scene collections.
+     * Returns map of filename (without .json) to SceneCollection.
      */
-    private fun discoverCollections(): List<SceneCollection> {
+    private fun discoverCollections(): Map<String, SceneCollection> {
         val mc = Minecraft.getInstance()
-        val scenesDir = File(mc.gameDirectory, "glint_scenes")
+        val scenesDir = File(mc.gameDirectory, "glint/scenes")
 
         if (!scenesDir.exists() || !scenesDir.isDirectory) {
-            return emptyList()
+            return emptyMap()
         }
 
         return scenesDir
             .listFiles { file -> file.extension == "json" }
             ?.mapNotNull { file ->
-                val worldName = file.nameWithoutExtension
-                loadCollection(worldName)
-            } ?: emptyList()
+                val fileName = file.nameWithoutExtension
+                loadCollection(fileName)?.let { fileName to it }
+            }?.toMap() ?: emptyMap()
     }
+
+    /**
+     * Discovers all available scene collections (public API for orchestrator).
+     * Returns list of collections with their filenames.
+     */
+    fun discoverAllCollections(): List<Pair<String, SceneCollection>> = discoverCollections().toList()
 
     /**
      * Resolves a scene with its config inheritance.
@@ -113,6 +115,7 @@ object SceneManager {
     private fun resolveScene(
         scene: Scene,
         collection: SceneCollection,
+        collectionFileName: String,
     ): ResolvedScene {
         val mergedConfig =
             (scene.config ?: SceneConfig())
@@ -123,6 +126,7 @@ object SceneManager {
             scene = scene,
             collection = collection,
             config = mergedConfig,
+            collectionFileName = collectionFileName,
         )
     }
 
@@ -196,9 +200,17 @@ data class ResolvedScene(
     val scene: Scene,
     val collection: SceneCollection,
     val config: SceneConfig,
+    val collectionFileName: String,
 ) {
-    val worldName: String get() = collection.world
-    val worldPath: String get() = "glint_scenes/${collection.world}"
+    /**
+     * The world name from the collection manifest.
+     */
+    val worldName: String
+        get() = collection.world
+
+    /**
+     * Entities applicable to this scene.
+     */
     val entities: List<SceneEntity>
         get() =
             collection.entities.filter {

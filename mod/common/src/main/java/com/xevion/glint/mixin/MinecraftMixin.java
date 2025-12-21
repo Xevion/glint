@@ -37,13 +37,19 @@ public class MinecraftMixin {
     }
 
     /**
-     * Releases mouse cursor once when capture session starts.
+     * Releases mouse cursor and closes pause screen when capture session starts.
      */
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
         boolean isCapturing = CaptureState.INSTANCE.isActive();
+        Minecraft mc = (Minecraft) (Object) this;
         
         if (isCapturing && !mouseReleasedForCapture) {
+            // Close pause screen if it's currently open
+            if (mc.screen != null && mc.screen.isPauseScreen()) {
+                mc.setScreen(null);
+            }
+            
             // Release mouse to allow user to interact with other windows
             if (mouseHandler.isMouseGrabbed()) {
                 mouseHandler.releaseMouse();

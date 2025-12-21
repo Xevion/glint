@@ -2,21 +2,21 @@ package com.xevion.glint.screenshot
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Capture session data returned by CaptureSession for aggregation into master manifest.
+ * Contains all metadata about a single scene capture (all shaders for one scene).
+ */
 @Serializable
-data class SessionManifest(
-    val session: SessionInfo,
-    val minecraft: MinecraftInfo,
-    val screenshots: List<ScreenshotEntry>,
-)
-
-@Serializable
-data class SessionInfo(
-    val id: String,
+data class CaptureSessionData(
+    val worldName: String,
     val sceneId: String,
+    val sessionDir: String,
     val startedAt: String,
     val completedAt: String,
     val totalScreenshots: Int,
     val shaderPacks: List<String>,
+    val minecraft: MinecraftInfo,
+    val screenshots: List<ScreenshotEntry>,
 )
 
 @Serializable

@@ -95,6 +95,10 @@ clean-mod:
 smoke platform="fabric":
 	bun ./scripts/smoke.ts {{platform}}
 
+# Run autonomous shader capture orchestration
+orchestrate platform="fabric":
+	cd mod && GLINT_AUTONOMOUS=true ./gradlew :{{platform}}:runClient
+
 # Query Minecraft source JAR
 # Usage:
 #   just mcjar list net/minecraft/client/renderer/        # List classes in package

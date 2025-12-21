@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * A collection of scenes for a single world.
- * File format: .minecraft/glint_scenes/<world_name>.json
+ * File format: .minecraft/glint/scenes/<world_name>.json
  */
 @Serializable
 data class SceneCollection(
@@ -36,7 +36,42 @@ data class Scene(
     val biome: String? = null,
     val tags: List<String> = emptyList(),
     val config: SceneConfig? = null,
+    val variants: List<SceneVariant> = emptyList(),
 )
+
+/**
+ * A variant of a scene that modifies specific settings.
+ * Inherits all base scene properties and overrides specific fields.
+ */
+@Serializable
+data class SceneVariant(
+    val id: String,
+    val name: String,
+    val description: String? = null,
+    val timeOfDay: Int? = null,
+    val weather: Weather? = null,
+    val weatherIntensity: Float? = null,
+    val moonPhase: Int? = null,
+    val tags: List<String> = emptyList(),
+    val config: SceneConfig? = null,
+) {
+    /**
+     * Applies this variant's overrides to a base scene, creating a new Scene instance.
+     */
+    fun applyTo(base: Scene): Scene =
+        base.copy(
+            id = id,
+            name = name,
+            description = description ?: base.description,
+            timeOfDay = timeOfDay ?: base.timeOfDay,
+            weather = weather ?: base.weather,
+            weatherIntensity = weatherIntensity ?: base.weatherIntensity,
+            moonPhase = moonPhase ?: base.moonPhase,
+            tags = if (tags.isNotEmpty()) tags else base.tags,
+            config = config?.mergeWith(base.config) ?: base.config,
+            variants = emptyList(),
+        )
+}
 
 /**
  * Render and capture configuration for a scene.
