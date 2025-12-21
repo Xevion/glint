@@ -1,227 +1,101 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
-	import { comparisonStore } from '$lib/stores/comparison.svelte';
-	import { getAllScenes, getShaderById, getSceneById, getCapture } from '$lib/data/mock';
+	import { fly, fade } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
 
-	const scenes = getAllScenes();
-
-	// Get selected items from store
-	const selectedShaderIds = $derived(Array.from(comparisonStore.selectedShaders));
-	const selectedSceneIds = $derived(Array.from(comparisonStore.selectedScenes));
-
-	const selectedShaders = $derived(
-		selectedShaderIds.map((id) => getShaderById(id)).filter(Boolean)
-	);
-	const selectedScenes = $derived(selectedSceneIds.map((id) => getSceneById(id)).filter(Boolean));
-
-	// Active comparison scene (for shader comparison mode)
-	let activeSceneId = $state<string | null>(null);
-	const activeScene = $derived(activeSceneId ? getSceneById(activeSceneId) : scenes[0]);
-
-	// Get captures for selected shaders in active scene
-	const comparisonCaptures = $derived(
-		selectedShaders
-			.map((shader) => {
-				if (!shader || !activeScene) return null;
-				return {
-					shader,
-					capture: getCapture(shader.id, activeScene.id)
-				};
-			})
-			.filter(Boolean)
-	);
+	const message = 'Comparison features coming soon in alpha development';
 </script>
 
-<div class="container mx-auto px-4 py-8">
-	<div class="animate-fade-in-down mb-8">
-		<h1 class="mb-2 text-4xl font-bold tracking-tight">Compare</h1>
-		<p class="text-lg text-muted-foreground">Compare shaders and scenes side-by-side</p>
-	</div>
-
-	<!-- Selection Summary -->
-	<div class="animate-fade-in-up animation-delay-100 mb-8 grid gap-6 md:grid-cols-2">
-		<!-- Selected Shaders -->
-		<div class="rounded-xl bg-card p-6">
-			<div class="mb-4 flex items-center justify-between">
-				<h2 class="text-xl font-semibold">Selected Shaders</h2>
-				{#if comparisonStore.shaderCount > 0}
-					<Button
-						variant="ghost"
-						size="sm"
-						onclick={() => {
-							comparisonStore.clearShaders();
-						}}
-					>
-						Clear all
-					</Button>
-				{/if}
-			</div>
-			{#if selectedShaders.length === 0}
-				<p class="text-muted-foreground">
-					No shaders selected. Go to <a
-						href={resolve('/shaders')}
-						class="text-primary hover:underline">Shaders</a
-					> and check the ones you want to compare.
-				</p>
-			{:else}
-				<div class="flex flex-wrap gap-3">
-					{#each selectedShaders as shader (shader?.id)}
-						{#if shader}
-							<div class="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-								<img
-									src={shader.thumbnail}
-									alt={shader.name}
-									class="h-8 w-8 rounded object-cover"
-								/>
-								<span class="text-sm font-medium">{shader.name}</span>
-								<button
-									onclick={() => {
-										comparisonStore.toggleShader(shader.id);
-									}}
-									class="ml-1 text-muted-foreground hover:text-foreground"
-									aria-label="Remove {shader.name} from comparison"
-								>
-									<svg
-										class="h-4 w-4"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="2"
-									>
-										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-									</svg>
-								</button>
-							</div>
-						{/if}
-					{/each}
-				</div>
-			{/if}
-		</div>
-
-		<!-- Selected Scenes -->
-		<div class="rounded-xl bg-card p-6">
-			<div class="mb-4 flex items-center justify-between">
-				<h2 class="text-xl font-semibold">Selected Scenes</h2>
-				{#if comparisonStore.sceneCount > 0}
-					<Button
-						variant="ghost"
-						size="sm"
-						onclick={() => {
-							comparisonStore.clearScenes();
-						}}
-					>
-						Clear all
-					</Button>
-				{/if}
-			</div>
-			{#if selectedScenes.length === 0}
-				<p class="text-muted-foreground">
-					No scenes selected. Go to <a
-						href={resolve('/scenes')}
-						class="text-primary hover:underline">Scenes</a
-					> and check the ones you want to compare.
-				</p>
-			{:else}
-				<div class="flex flex-wrap gap-3">
-					{#each selectedScenes as scene (scene?.id)}
-						{#if scene}
-							<div class="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-								<img src={scene.thumbnail} alt={scene.name} class="h-8 w-8 rounded object-cover" />
-								<span class="text-sm font-medium">{scene.name}</span>
-								<button
-									onclick={() => {
-										comparisonStore.toggleScene(scene.id);
-									}}
-									class="ml-1 text-muted-foreground hover:text-foreground"
-									aria-label="Remove {scene.name} from comparison"
-								>
-									<svg
-										class="h-4 w-4"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="2"
-									>
-										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-									</svg>
-								</button>
-							</div>
-						{/if}
-					{/each}
-				</div>
-			{/if}
-		</div>
-	</div>
-
-	<!-- Comparison View -->
-	{#if selectedShaders.length >= 2}
-		<div class="animate-fade-in animation-delay-200">
-			<!-- Scene Selector -->
-			<div class="mb-6 flex items-center gap-4">
-				<span class="text-sm font-medium text-muted-foreground">Compare in scene:</span>
-				<select
-					bind:value={activeSceneId}
-					class="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
-				>
-					{#each scenes as scene (scene.id)}
-						<option value={scene.id}>{scene.name}</option>
-					{/each}
-				</select>
-			</div>
-
-			<!-- Comparison Grid -->
-			<div
-				class="grid gap-6"
-				style="grid-template-columns: repeat({Math.min(selectedShaders.length, 4)}, 1fr)"
+<div class="container mx-auto px-4 py-16">
+	<div class="mx-auto max-w-2xl text-center">
+		<div in:fly={{ y: -10, duration: 400 }} class="mb-8">
+			<svg
+				class="mx-auto mb-4 h-24 w-24 text-muted-foreground/30"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="1"
 			>
-				{#each comparisonCaptures as item (item?.shader.id)}
-					{#if item}
-						<div class="overflow-hidden rounded-xl bg-card">
-							<div class="relative aspect-video">
-								<img
-									src={item.capture?.image ?? item.shader.thumbnail}
-									alt="{item.shader.name} in {activeScene?.name}"
-									class="h-full w-full object-cover"
-								/>
-								{#if item.capture}
-									<div
-										class="absolute right-2 bottom-2 rounded bg-black/70 px-2 py-1 text-xs font-medium text-white"
-									>
-										{item.capture.fps} FPS
-									</div>
-								{/if}
-							</div>
-							<div class="p-4">
-								<h3 class="font-semibold">{item.shader.name}</h3>
-								<p class="text-sm text-muted-foreground">{item.shader.author}</p>
-								{#if item.capture}
-									<div class="mt-2 flex gap-4 text-xs text-muted-foreground">
-										<span>Frame: {item.capture.frameTimeMs}ms</span>
-										<span>GPU: {item.capture.gpuUsage}%</span>
-									</div>
-								{/if}
-							</div>
-						</div>
-					{/if}
-				{/each}
-			</div>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+				/>
+			</svg>
+			<h1 class="mb-3 text-3xl font-bold text-foreground">Compare Shaders & Scenes</h1>
+			<p class="text-lg text-muted-foreground">{message}</p>
 		</div>
-	{:else if selectedShaders.length === 1}
+
 		<div
-			class="animate-fade-in animation-delay-200 rounded-xl border border-dashed border-border p-12 text-center"
+			in:fly={{ y: 10, duration: 400, delay: 100 }}
+			class="mb-8 rounded-xl border border-border bg-card p-6 text-left"
 		>
-			<p class="text-muted-foreground">Select at least one more shader to compare</p>
+			<h2 class="mb-4 text-xl font-semibold text-card-foreground">Planned Features</h2>
+			<ul class="space-y-2 text-sm text-muted-foreground">
+				<li class="flex items-start gap-2">
+					<svg
+						class="mt-0.5 h-5 w-5 flex-shrink-0 text-primary"
+						fill="currentColor"
+						viewBox="0 0 20 20"
+					>
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<span>Side-by-side shader comparison in the same scene</span>
+				</li>
+				<li class="flex items-start gap-2">
+					<svg
+						class="mt-0.5 h-5 w-5 flex-shrink-0 text-primary"
+						fill="currentColor"
+						viewBox="0 0 20 20"
+					>
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<span>Performance metrics comparison (FPS, frame time, GPU usage)</span>
+				</li>
+				<li class="flex items-start gap-2">
+					<svg
+						class="mt-0.5 h-5 w-5 flex-shrink-0 text-primary"
+						fill="currentColor"
+						viewBox="0 0 20 20"
+					>
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<span>Interactive slider to compare screenshots</span>
+				</li>
+				<li class="flex items-start gap-2">
+					<svg
+						class="mt-0.5 h-5 w-5 flex-shrink-0 text-primary"
+						fill="currentColor"
+						viewBox="0 0 20 20"
+					>
+						<path
+							fill-rule="evenodd"
+							d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<span>Save and share comparison links</span>
+				</li>
+			</ul>
 		</div>
-	{:else}
+
 		<div
-			class="animate-fade-in animation-delay-200 rounded-xl border border-dashed border-border p-12 text-center"
+			in:fade={{ duration: 300, delay: 200 }}
+			class="flex flex-col gap-3 sm:flex-row sm:justify-center"
 		>
-			<p class="text-muted-foreground">
-				Select shaders from the <a href={resolve('/shaders')} class="text-primary hover:underline"
-					>Shaders page</a
-				> to start comparing
-			</p>
+			<Button href="/shaders" variant="default">Browse Shaders</Button>
+			<Button href="/scenes" variant="outline">View Scenes</Button>
 		</div>
-	{/if}
+	</div>
 </div>

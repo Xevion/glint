@@ -1,1 +1,10 @@
-target/
+# Rust build output (handled by workspace at root)
+/target/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Environment variables
+.env

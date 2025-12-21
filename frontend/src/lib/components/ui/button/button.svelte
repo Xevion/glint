@@ -51,6 +51,7 @@
 </script>
 
 {#if href}
+	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 	<a {href} class={cn(buttonVariants({ variant, size, class: className }))} {...restProps}>
 		{#if children}
 			{@render children()}

@@ -1,33 +1,72 @@
--- Shaders table
+--------------------------------------------------------------------------------
+-- WORLDS TABLE
+-- Downloadable world files containing scenes
+--------------------------------------------------------------------------------
+
+CREATE TABLE worlds (
+    id TEXT PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT,
+    minecraft_version TEXT NOT NULL,
+    file_url TEXT,
+    file_hash TEXT,
+    size_bytes INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
+);
+
+CREATE INDEX idx_worlds_slug ON worlds(slug);
+
+--------------------------------------------------------------------------------
+-- SHADERS TABLE
+-- Shader packs (identity, not version-specific)
+--------------------------------------------------------------------------------
+
 CREATE TABLE shaders (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
     description TEXT,
-    version TEXT NOT NULL,
-    source_url TEXT NOT NULL,
-    source_platform TEXT NOT NULL, -- 'modrinth' | 'curseforge'
-    source_id TEXT NOT NULL,
-    file_hash TEXT,
-
-    -- Feature flags
-    has_pbr BOOLEAN DEFAULT FALSE,
-    has_volumetrics BOOLEAN DEFAULT FALSE,
-    has_taa BOOLEAN DEFAULT FALSE,
-    has_raytracing BOOLEAN DEFAULT FALSE,
-
-    -- Metadata
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    modrinth_id TEXT,
+    curseforge_id TEXT,
+    website_url TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
 );
 
--- Scenes table
+CREATE INDEX idx_shaders_slug ON shaders(slug);
+
+--------------------------------------------------------------------------------
+-- SHADER_VERSIONS TABLE
+-- Specific releases of shader packs
+--------------------------------------------------------------------------------
+
+CREATE TABLE shader_versions (
+    id TEXT PRIMARY KEY,
+    shader_id TEXT NOT NULL REFERENCES shaders(id) ON DELETE CASCADE,
+    version TEXT NOT NULL,
+    modrinth_version_id TEXT,
+    download_url TEXT,
+    file_hash TEXT,
+    supported_profiles TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    UNIQUE(shader_id, version)
+);
+
+CREATE INDEX idx_shader_versions_shader ON shader_versions(shader_id);
+
+--------------------------------------------------------------------------------
+-- SCENES TABLE
+-- Camera positions and environment settings within worlds
+--------------------------------------------------------------------------------
+
 CREATE TABLE scenes (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
     description TEXT,
-    world_file TEXT NOT NULL,
+    world_id TEXT NOT NULL REFERENCES worlds(id) ON DELETE CASCADE,
 
     -- Camera settings
     x REAL NOT NULL,
@@ -37,25 +76,44 @@ CREATE TABLE scenes (
     yaw REAL NOT NULL DEFAULT 0,
 
     -- Environment
-    time_of_day TEXT NOT NULL DEFAULT 'noon', -- 'dawn' | 'noon' | 'sunset' | 'night'
-    weather TEXT NOT NULL DEFAULT 'clear', -- 'clear' | 'rain' | 'thunder'
+    dimension TEXT NOT NULL DEFAULT 'minecraft:overworld',
+    time_of_day_ticks INTEGER NOT NULL DEFAULT 6000,
+    weather TEXT NOT NULL DEFAULT 'clear',
+    weather_intensity REAL NOT NULL DEFAULT 0.0,
+    moon_phase INTEGER,
+    biome TEXT,
 
-    -- Tags
-    tags TEXT, -- JSON array of strings
+    -- Configuration
+    definition_json TEXT,
+    tags TEXT,
 
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
 );
 
--- Captures table (shader x scene combinations)
+CREATE INDEX idx_scenes_slug ON scenes(slug);
+CREATE INDEX idx_scenes_world ON scenes(world_id);
+
+--------------------------------------------------------------------------------
+-- CAPTURES TABLE
+-- Screenshots/videos for shader_version x scene x profile combinations
+--------------------------------------------------------------------------------
+
 CREATE TABLE captures (
     id TEXT PRIMARY KEY,
-    shader_id TEXT NOT NULL REFERENCES shaders(id) ON DELETE CASCADE,
+    shader_version_id TEXT NOT NULL REFERENCES shader_versions(id) ON DELETE CASCADE,
     scene_id TEXT NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+    profile TEXT,
 
     -- Media URLs
     screenshot_url TEXT,
+    screenshot_path TEXT,
     video_url TEXT,
     thumbnail_url TEXT,
+
+    -- Screenshot metadata
+    resolution_width INTEGER,
+    resolution_height INTEGER,
+    captured_at TEXT,
 
     -- Performance metrics
     avg_fps REAL,
@@ -70,38 +128,71 @@ CREATE TABLE captures (
     gpu_model TEXT,
 
     -- Status
-    status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'processing' | 'completed' | 'failed'
+    status TEXT NOT NULL DEFAULT 'pending',
     error_message TEXT,
 
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
 
-    UNIQUE(shader_id, scene_id)
+    UNIQUE(shader_version_id, scene_id, profile)
 );
 
--- Jobs table (capture job queue)
+CREATE INDEX idx_captures_shader_version ON captures(shader_version_id);
+CREATE INDEX idx_captures_scene ON captures(scene_id);
+CREATE INDEX idx_captures_status ON captures(status);
+
+--------------------------------------------------------------------------------
+-- JOBS TABLE
+-- Capture job queue for agent orchestration
+--------------------------------------------------------------------------------
+
 CREATE TABLE jobs (
     id TEXT PRIMARY KEY,
-    shader_id TEXT NOT NULL REFERENCES shaders(id) ON DELETE CASCADE,
+    shader_version_id TEXT NOT NULL REFERENCES shader_versions(id) ON DELETE CASCADE,
+    scene_ids TEXT,
+    profiles TEXT,
     priority INTEGER NOT NULL DEFAULT 0,
 
-    status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'running' | 'completed' | 'failed'
+    status TEXT NOT NULL DEFAULT 'pending',
     attempts INTEGER NOT NULL DEFAULT 0,
     max_attempts INTEGER NOT NULL DEFAULT 3,
 
+    agent_id TEXT,
+    claimed_at TEXT,
+    last_heartbeat TEXT,
     started_at TEXT,
     completed_at TEXT,
     error_message TEXT,
 
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
 );
 
--- Indexes
-CREATE INDEX idx_shaders_slug ON shaders(slug);
-CREATE INDEX idx_shaders_source ON shaders(source_platform, source_id);
-CREATE INDEX idx_scenes_slug ON scenes(slug);
-CREATE INDEX idx_captures_shader ON captures(shader_id);
-CREATE INDEX idx_captures_scene ON captures(scene_id);
-CREATE INDEX idx_captures_status ON captures(status);
 CREATE INDEX idx_jobs_status ON jobs(status);
 CREATE INDEX idx_jobs_priority ON jobs(priority DESC, created_at ASC);
+CREATE INDEX idx_jobs_agent ON jobs(agent_id);
+CREATE INDEX idx_jobs_heartbeat ON jobs(last_heartbeat);
+
+--------------------------------------------------------------------------------
+-- SEED: VANILLA SHADER
+-- Well-known shader entry for vanilla Minecraft captures
+--------------------------------------------------------------------------------
+
+-- Well-known vanilla shader constant ID
+INSERT INTO shaders (id, name, slug, description, website_url, created_at, updated_at)
+VALUES (
+    'vanilla',
+    'Vanilla',
+    'vanilla',
+    'Default Minecraft rendering without shaders',
+    'https://www.minecraft.net',
+    datetime('now', 'utc'),
+    datetime('now', 'utc')
+);
+
+INSERT INTO shader_versions (id, shader_id, version, created_at)
+VALUES (
+    'vanilla-1.21.4',
+    'vanilla',
+    '1.21.4',
+    datetime('now', 'utc')
+);

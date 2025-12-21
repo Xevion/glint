@@ -1,337 +1,256 @@
 <script lang="ts">
+	import { fly, fade, scale } from 'svelte/transition';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
-	import {
-		getSceneById,
-		getCapturesForScene,
-		getShaderById,
-		getTierColor,
-		getTierLabel,
-		getTimeColor,
-		getWeatherColor,
-		getDimensionColor,
-		type Capture,
-		type PerformanceTier
-	} from '$lib/data/mock';
-	import { cn } from '$lib/utils';
-	import TierIcon from '$lib/components/TierIcon.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import type { CaptureWithContext } from '$lib/api/types';
+	import type { SceneWithCaptures } from '$lib/api/types';
 
 	interface Props {
-		data: { id: string };
+		data: { scene: SceneWithCaptures };
 	}
 
 	let { data }: Props = $props();
-	const scene = $derived(getSceneById(data.id));
-	const captures = $derived(scene ? getCapturesForScene(data.id) : []);
+	const scene = $derived(data.scene);
+	const captures = $derived(scene.captures);
 
 	// Selected capture for the main preview
-	// eslint-disable-next-line svelte/prefer-writable-derived -- user can manually select captures, effect resets on navigation
-	let selectedCapture = $state<Capture | null>(null);
+	let selectedCapture = $derived.by(() => captures[0] || null);
 
-	$effect(() => {
-		selectedCapture = captures[0] || null;
-	});
-
-	// Get shader info for the selected capture
-	const selectedShader = $derived(() => {
-		if (!selectedCapture) return null;
-		return getShaderById(selectedCapture.shaderId);
-	});
-
-	// Group captures by performance tier
-	const capturesByTier = $derived(() => {
-		const groups: Record<PerformanceTier, number> = {
-			potato: 0,
-			low: 0,
-			medium: 0,
-			high: 0,
-			ultra: 0
-		};
+	// Group captures by shader
+	const capturesByShader = $derived(() => {
+		const map = new SvelteMap<string, CaptureWithContext>();
 		for (const capture of captures) {
-			const shader = getShaderById(capture.shaderId);
-			if (shader) {
-				groups[shader.tier]++;
+			if (!map.has(capture.shader_slug)) {
+				map.set(capture.shader_slug, capture);
 			}
 		}
-		return groups;
+		return Array.from(map.values());
+	});
+
+	// Weather display helper
+	const weatherLabel = $derived(() => {
+		if (scene.weather === 'clear') return 'Clear';
+		if (scene.weather === 'rain') return `Rain (${Math.round(scene.weather_intensity * 100)}%)`;
+		if (scene.weather === 'thunder')
+			return `Thunder (${Math.round(scene.weather_intensity * 100)}%)`;
+		return scene.weather;
+	});
+
+	// Time display helper
+	const timeLabel = $derived(() => {
+		const ticks = scene.time_of_day_ticks;
+		const hours = Math.floor(ticks / 1000);
+		if (hours < 6) return 'Night';
+		if (hours < 12) return 'Morning';
+		if (hours < 18) return 'Day';
+		return 'Evening';
 	});
 </script>
 
 {#if scene}
-	<div class="container mx-auto px-4 py-8">
-		<!-- Breadcrumb -->
-		<nav class="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-			<a href={resolve('/scenes')} class="transition-colors hover:text-foreground">Scenes</a>
-			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-			</svg>
-			<span class="font-medium text-foreground">{scene.name}</span>
-		</nav>
+	{#key scene.id}
+		<div class="container mx-auto px-4 py-8">
+			<!-- Breadcrumb -->
+			<nav
+				in:fly|local={{ y: -10, duration: 400 }}
+				class="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
+			>
+				<a href={resolve('/scenes')} class="transition-colors hover:text-foreground">Scenes</a>
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+				</svg>
+				<span class="font-medium text-foreground">{scene.name}</span>
+			</nav>
 
-		<!-- Hero: Preview + Info -->
-		<div class="mb-8 grid gap-6 lg:grid-cols-3">
-			<!-- Main Preview Area -->
-			<div class="space-y-4 lg:col-span-2">
-				<!-- Main Image -->
-				<div
-					class="shadow-theme-lg relative aspect-video w-full overflow-hidden rounded-xl bg-card"
-				>
-					{#if selectedCapture}
-						{@const shader = selectedShader()}
-						<img
-							src={selectedCapture.image}
-							alt="{scene.name} with {shader?.name}"
-							class="h-full w-full object-cover"
-						/>
+			<!-- Hero: Preview + Info -->
+			<div
+				in:fly|local={{ y: 10, duration: 400, delay: 100 }}
+				class="mb-8 grid gap-6 lg:grid-cols-3"
+			>
+				<!-- Main Preview Area -->
+				<div class="space-y-4 lg:col-span-2">
+					<!-- Main Image -->
+					<div
+						class="shadow-theme-lg relative aspect-video w-full overflow-hidden rounded-xl bg-card"
+					>
+						{#if selectedCapture}
+							<img
+								src={selectedCapture.screenshot_url}
+								alt="{scene.name} with {selectedCapture.shader_name}"
+								class="h-full w-full object-cover"
+							/>
 
-						<!-- Overlay with shader info -->
-						<div
-							class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"
-						>
-							<div class="absolute right-0 bottom-0 left-0 p-4">
-								<div class="flex items-end justify-between">
-									<div>
-										<h3 class="mb-2 text-xl font-bold text-white">{shader?.name}</h3>
-										<div class="flex items-center gap-2">
-											<span class="text-sm text-white/70">by {shader?.author}</span>
-											{#if shader}
-												<span
-													class={cn(
-														'inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold',
-														getTierColor(shader.tier)
-													)}
-												>
-													<TierIcon tier={shader.tier} size={12} />
-													{getTierLabel(shader.tier)}
-												</span>
-											{/if}
+							<!-- Overlay with shader info -->
+							<div
+								class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"
+							>
+								<div class="absolute right-0 bottom-0 left-0 p-4">
+									<div class="flex items-end justify-between">
+										<div>
+											<h3 class="mb-2 text-xl font-bold text-white">
+												{selectedCapture.shader_name}
+											</h3>
+											<div class="flex items-center gap-2">
+												{#if selectedCapture.profile}
+													<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">
+														{selectedCapture.profile}
+													</span>
+												{/if}
+												{#if selectedCapture.shader_version}
+													<span
+														class="rounded bg-white/20 px-2 py-0.5 text-xs font-bold text-white"
+													>
+														v{selectedCapture.shader_version}
+													</span>
+												{/if}
+											</div>
 										</div>
 									</div>
 								</div>
 							</div>
+						{:else}
+							<div class="flex h-full items-center justify-center text-muted-foreground">
+								<div class="text-center">
+									<svg
+										class="mx-auto mb-4 h-16 w-16"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="1.5"
+											d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+										/>
+									</svg>
+									<p class="text-sm">No captures available yet</p>
+								</div>
+							</div>
+						{/if}
+					</div>
+
+					<!-- Shader Thumbnails -->
+					{#if capturesByShader().length > 0}
+						<div class="grid grid-cols-4 gap-2">
+							{#each capturesByShader() as capture (capture.id)}
+								<button
+									type="button"
+									onclick={() => (selectedCapture = capture)}
+									class="aspect-video overflow-hidden rounded-lg border-2 transition-all hover:border-primary {// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+									selectedCapture?.id === capture.id ? 'border-primary' : 'border-transparent'}"
+								>
+									{#if capture.screenshot_url}
+										<img
+											src={capture.screenshot_url}
+											alt="{capture.shader_name} thumbnail"
+											class="h-full w-full object-cover"
+										/>
+									{/if}
+								</button>
+							{/each}
 						</div>
 					{/if}
 				</div>
 
-				<!-- Shader Thumbnails -->
-				<div class="scrollbar-thin flex gap-2 overflow-x-auto pb-2">
-					{#each captures as capture (capture.id)}
-						{@const shader = getShaderById(capture.shaderId)}
-						<button
-							onclick={() => (selectedCapture = capture)}
-							class={cn(
-								'relative aspect-video w-36 flex-shrink-0 overflow-hidden rounded-lg transition-all',
-								'hover:ring-2 hover:ring-primary/50',
-								selectedCapture?.id === capture.id
-									? 'shadow-lg ring-2 ring-primary'
-									: 'opacity-60 hover:opacity-100'
-							)}
-						>
-							<img
-								src={capture.image}
-								alt={shader?.name}
-								class="h-full w-full object-cover"
-								loading="lazy"
-							/>
-							<div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-							<div class="absolute right-2 bottom-1.5 left-2">
-								<div class="truncate text-xs font-medium text-white">{shader?.name}</div>
+				<!-- Scene Info Sidebar -->
+				<div class="space-y-4">
+					<!-- Basic Info -->
+					<div class="rounded-xl border border-border bg-card p-6">
+						<h2 class="mb-4 text-2xl font-bold text-card-foreground">{scene.name}</h2>
+						{#if scene.description}
+							<p class="mb-4 text-sm text-muted-foreground">{scene.description}</p>
+						{/if}
+
+						<!-- Environment -->
+						<div class="mb-4 space-y-2">
+							<div class="flex items-center justify-between text-sm">
+								<span class="text-muted-foreground">Time</span>
+								<span class="font-medium text-foreground">{timeLabel()}</span>
 							</div>
-						</button>
-					{/each}
+							<div class="flex items-center justify-between text-sm">
+								<span class="text-muted-foreground">Weather</span>
+								<span class="font-medium text-foreground">{weatherLabel()}</span>
+							</div>
+						</div>
+
+						<!-- Stats -->
+						<div class="border-t border-border pt-4">
+							<div class="text-2xl font-bold text-foreground">
+								{capturesByShader().length}
+							</div>
+							<div class="text-xs text-muted-foreground">Shaders</div>
+						</div>
+					</div>
 				</div>
 			</div>
 
-			<!-- Sidebar -->
-			<div class="space-y-4">
-				<!-- Scene Info Card -->
-				<div class="shadow-theme-sm rounded-xl bg-card p-6">
-					<h1 class="mb-3 text-2xl font-bold text-card-foreground">{scene.name}</h1>
-
-					<!-- Scene attributes -->
-					<div class="mb-4 flex flex-wrap items-center gap-2">
-						<span
-							class={cn(
-								'rounded-lg px-3 py-1 text-sm font-medium capitalize',
-								getDimensionColor(scene.dimension)
-							)}
-						>
-							{scene.dimension}
-						</span>
-						<span
-							class={cn(
-								'rounded-lg px-3 py-1 text-sm font-bold capitalize',
-								getTimeColor(scene.defaultTime)
-							)}
-						>
-							{scene.defaultTime}
-						</span>
-						<span
-							class={cn(
-								'rounded-lg px-3 py-1 text-sm font-bold capitalize',
-								getWeatherColor(scene.defaultWeather)
-							)}
-						>
-							{scene.defaultWeather}
-						</span>
-					</div>
-
-					<p class="mb-4 text-sm text-muted-foreground">{scene.description}</p>
-
-					<!-- Biome & complexity -->
-					<div class="mb-4 flex items-center gap-3 text-sm text-muted-foreground">
-						<span class="font-medium text-card-foreground">{scene.biome}</span>
-						<span>·</span>
-						<span class="capitalize">{scene.complexity} scene</span>
-					</div>
-
-					<!-- Stats -->
-					<div class="grid grid-cols-2 gap-3 border-y border-border py-4">
-						<div class="text-center">
-							<div class="text-xl font-bold text-card-foreground">{captures.length}</div>
-							<div class="text-xs text-muted-foreground">Shaders</div>
-						</div>
-						<div class="text-center">
-							<div class="text-xl font-bold text-card-foreground">{captures.length}</div>
-							<div class="text-xs text-muted-foreground">Captures</div>
-						</div>
-					</div>
-
-					<!-- Features -->
-					<div class="mt-4">
-						<h3 class="mb-2 text-sm font-medium text-muted-foreground">Scene Features</h3>
-						<div class="flex flex-wrap gap-1.5">
-							{#each scene.features as feature (feature)}
-								<span
-									class="rounded bg-muted/50 px-2 py-1 text-xs text-muted-foreground ring-1 ring-border/50"
-								>
-									{feature}
-								</span>
-							{/each}
-						</div>
-					</div>
-				</div>
-
-				<!-- Performance Tier Breakdown -->
-				<div class="shadow-theme-sm rounded-xl bg-card p-6">
-					<h2 class="mb-4 text-sm font-bold tracking-wider text-muted-foreground uppercase">
-						By Weight
-					</h2>
-					<div class="space-y-2">
-						{#each ['potato', 'low', 'medium', 'high', 'ultra'] as const as tier (tier)}
-							{@const count = capturesByTier()[tier]}
-							{@const percentage = (count / captures.length) * 100}
-							<div class="flex items-center gap-3">
-								<span
-									class={cn(
-										'w-24 rounded px-2 py-1 text-center text-xs font-bold',
-										getTierColor(tier)
-									)}
-								>
-									{getTierLabel(tier)}
-								</span>
-								<div class="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+			<!-- Captures Grid -->
+			{#if captures.length > 0}
+				<div in:fade|local={{ duration: 300, delay: 200 }} class="mb-8">
+					<h2 class="mb-4 text-2xl font-bold text-foreground">All Shader Renders</h2>
+					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{#each captures as capture, i (capture.id)}
+							<button
+								type="button"
+								onclick={() => (selectedCapture = capture)}
+								in:scale|local={{ duration: 350, delay: Math.min(i * 50, 400) + 250, start: 0.95 }}
+								class="group relative aspect-video overflow-hidden rounded-xl bg-card transition-transform hover:scale-[1.02]"
+							>
+								{#if capture.screenshot_url}
+									<img
+										src={capture.screenshot_url}
+										alt="{capture.shader_name} render"
+										class="h-full w-full object-cover"
+									/>
 									<div
-										class="h-full rounded-full bg-primary transition-all"
-										style="width: {percentage}%"
-									></div>
-								</div>
-								<span class="w-8 text-right text-xs text-muted-foreground">{count}</span>
-							</div>
+										class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+									>
+										<div class="absolute right-0 bottom-0 left-0 p-3">
+											<div class="mb-1 font-bold text-white">{capture.shader_name}</div>
+											<div class="flex items-center gap-2">
+												{#if capture.profile}
+													<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">
+														{capture.profile}
+													</span>
+												{/if}
+												{#if capture.shader_version}
+													<span
+														class="rounded bg-white/20 px-2 py-0.5 text-xs font-bold text-white"
+													>
+														v{capture.shader_version}
+													</span>
+												{/if}
+											</div>
+										</div>
+									</div>
+								{/if}
+							</button>
 						{/each}
 					</div>
 				</div>
-
-				<!-- Action -->
-				<Button
-					href={`${resolve('/compare')}?scene=${scene.id}`}
-					variant="outline"
-					class="w-full gap-2"
+			{:else}
+				<div
+					in:fade|local={{ duration: 300, delay: 200 }}
+					class="mb-8 rounded-xl border border-border bg-card p-12 text-center"
 				>
 					<svg
-						class="h-4 w-4"
+						class="mx-auto mb-4 h-16 w-16 text-muted-foreground/30"
 						fill="none"
 						viewBox="0 0 24 24"
 						stroke="currentColor"
-						stroke-width="2"
 					>
 						<path
 							stroke-linecap="round"
 							stroke-linejoin="round"
-							d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+							stroke-width="1.5"
+							d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
 						/>
 					</svg>
-					Compare Shaders in This Scene
-				</Button>
-			</div>
+					<h3 class="mb-2 text-lg font-semibold text-card-foreground">No Captures Yet</h3>
+					<p class="text-sm text-muted-foreground">Captures for this scene are being generated.</p>
+				</div>
+			{/if}
 		</div>
-
-		<!-- All Shader Renders Gallery -->
-		<div>
-			<div class="mb-4 flex items-center justify-between">
-				<h2 class="text-lg font-bold text-foreground">All Shader Renders</h2>
-			</div>
-			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-				{#each captures as capture (capture.id)}
-					{@const shader = getShaderById(capture.shaderId)}
-					<a
-						href={resolve('/shaders/[id]', { id: capture.shaderId })}
-						class="group shadow-theme-sm relative overflow-hidden rounded-xl bg-card transition-all hover:-translate-y-1 hover:ring-2 hover:ring-primary/50"
-					>
-						<div class="aspect-video overflow-hidden">
-							<img
-								src={capture.image}
-								alt="{shader?.name} in {scene.name}"
-								class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-								loading="lazy"
-							/>
-							<!-- Performance tier badge -->
-							{#if shader}
-								<div class="absolute top-2 right-2">
-									<span
-										class={cn(
-											'inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold shadow-sm',
-											getTierColor(shader.tier)
-										)}
-									>
-										<TierIcon tier={shader.tier} size={12} />
-										{getTierLabel(shader.tier)}
-									</span>
-								</div>
-							{/if}
-						</div>
-						<div class="p-3">
-							<div class="mb-1">
-								<h3
-									class="truncate font-medium text-card-foreground transition-colors group-hover:text-primary"
-								>
-									{shader?.name}
-								</h3>
-							</div>
-							<p class="text-xs text-muted-foreground">by {shader?.author}</p>
-						</div>
-					</a>
-				{/each}
-			</div>
-		</div>
-	</div>
-{:else}
-	<div class="container mx-auto px-4 py-16 text-center">
-		<svg
-			class="mx-auto mb-4 h-16 w-16 text-muted-foreground/50"
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke="currentColor"
-			stroke-width="1.5"
-		>
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-			/>
-		</svg>
-		<h1 class="mb-2 text-2xl font-bold text-foreground">Scene Not Found</h1>
-		<p class="mb-6 text-muted-foreground">The scene you're looking for doesn't exist.</p>
-		<Button href={resolve('/scenes')}>Back to Scenes</Button>
-	</div>
+	{/key}
 {/if}

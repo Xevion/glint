@@ -1,12 +1,10 @@
 <script lang="ts">
-	import type { Scene, Weather } from '$lib/data/mock';
+	import type { Scene } from '$lib/data/types';
 	import {
-		getTimeColor,
-		getTimeIconPath,
-		getWeatherColor,
-		getWeatherIconPath,
-		getBiomeColor
-	} from '$lib/data/mock';
+		getBiomeDisplayName,
+		getDimensionDisplayName,
+		getWeatherDisplayName
+	} from '$lib/utils/display';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { comparisonStore } from '$lib/stores/comparison.svelte';
@@ -19,9 +17,31 @@
 
 	let { scene, class: className }: Props = $props();
 
-	// Only show weather badge for weather types that significantly affect the scene
-	const significantWeathers: Weather[] = ['cloudy', 'rain', 'storm', 'snow', 'fog'];
-	const showWeather = $derived(significantWeathers.includes(scene.defaultWeather));
+	// Parse tags from JSON string
+	const tags = $derived<string[]>(scene.tags ? (JSON.parse(scene.tags) as string[]) : []);
+
+	// Determine time of day from ticks (0-24000, where 0=6am, 6000=noon, 18000=midnight)
+	function getTimeOfDay(ticks: number): string {
+		const normalizedTicks = ticks % 24000;
+		if (normalizedTicks < 1000) return 'dawn';
+		if (normalizedTicks < 11000) return 'day';
+		if (normalizedTicks < 13000) return 'dusk';
+		return 'night';
+	}
+
+	const timeOfDay = $derived(getTimeOfDay(scene.time_of_day_ticks));
+
+	// Deterministic wallpaper selection based on scene ID (avoids hydration mismatch)
+	function hashStringToNumber(str: string): number {
+		let hash = 0;
+		for (let i = 0; i < str.length; i++) {
+			hash = (hash << 5) - hash + str.charCodeAt(i);
+			hash = hash & hash; // Convert to 32-bit integer
+		}
+		return Math.abs(hash);
+	}
+
+	const wallpaperIndex = $derived(hashStringToNumber(scene.id) % 50);
 
 	let isHovered = $state(false);
 	const isSelected = $derived(comparisonStore.isSceneSelected(scene.id));
@@ -30,25 +50,17 @@
 	function handleCardClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
 
-		// Always allow checkbox interactions
-		if (target.closest('[data-checkbox]')) {
+		if (target.closest('[data-checkbox]') || target.closest('[data-clickable]')) {
 			return;
 		}
 
-		// Always allow clickable elements (title)
-		if (target.closest('[data-clickable]')) {
-			return;
-		}
-
-		// If any card is selected, clicking toggles this card's selection
 		if (hasAnySelection) {
 			e.preventDefault();
 			comparisonStore.toggleScene(scene.id);
 			return;
 		}
 
-		// Default: navigate to scene page
-		void goto(resolve('/scenes/[id]', { id: scene.id }));
+		void goto(resolve(`/scenes/${scene.slug}`), { invalidateAll: true });
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
@@ -57,7 +69,7 @@
 			if (hasAnySelection) {
 				comparisonStore.toggleScene(scene.id);
 			} else {
-				void goto(resolve('/scenes/[id]', { id: scene.id }));
+				void goto(resolve(`/scenes/${scene.slug}`), { invalidateAll: true });
 			}
 		}
 	}
@@ -77,19 +89,18 @@
 	onmouseleave={() => (isHovered = false)}
 	class={cn(
 		'group relative flex flex-col overflow-hidden rounded-xl bg-card transition-all duration-300',
-		'card-glow',
+		'border border-border shadow-sm',
 		'focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
 		hasAnySelection
 			? 'cursor-default'
-			: 'cursor-pointer hover:-translate-y-1 hover:ring-2 hover:ring-primary/50',
+			: 'cursor-pointer hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg',
 		className
 	)}
 >
-	<!-- Inset Image Container -->
+	<!-- Thumbnail Image -->
 	<div class="relative aspect-video w-full overflow-hidden">
-		<!-- Anti-aliasing fix for smooth zoom transforms -->
 		<img
-			src={scene.thumbnail}
+			src="/wallpapers/{wallpaperIndex}.jpg"
 			alt="{scene.name} scene preview"
 			class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
 			style="will-change: transform; backface-visibility: hidden;"
@@ -101,84 +112,48 @@
 			class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"
 		></div>
 
-		<!-- Time and Weather badges - top left (grouped together when both present) -->
+		<!-- Time badge - top left -->
 		<div class="absolute top-3 left-3 flex">
-			<!-- Time badge -->
 			<span
-				class={cn(
-					'inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium capitalize shadow-sm backdrop-blur-sm',
-					getTimeColor(scene.defaultTime),
-					// Rounded on left, flat on right when weather is shown
-					showWeather ? 'rounded-l-md' : 'rounded-md'
-				)}
+				class="inline-flex items-center gap-1.5 rounded-md bg-blue-500/80 px-2 py-1 text-xs font-medium text-white capitalize shadow-sm backdrop-blur-sm"
 			>
 				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path
 						stroke-linecap="round"
 						stroke-linejoin="round"
-						d={getTimeIconPath(scene.defaultTime)}
+						d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
 					/>
 				</svg>
-				{scene.defaultTime}
+				{timeOfDay}
 			</span>
-			<!-- Weather badge (only for significant weather) -->
-			{#if showWeather}
-				<span
-					class={cn(
-						'inline-flex items-center gap-1.5 rounded-r-md px-2 py-1 text-xs font-medium capitalize shadow-sm backdrop-blur-sm',
-						getWeatherColor(scene.defaultWeather)
-					)}
-				>
-					<svg
-						class="h-3 w-3"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d={getWeatherIconPath(scene.defaultWeather)}
-						/>
-					</svg>
-					{scene.defaultWeather}
-				</span>
-			{/if}
 		</div>
 
 		<!-- Compare checkbox - top right -->
-		<div class="absolute top-3 right-3">
-			<button
-				type="button"
-				data-checkbox
-				onclick={handleCheckboxClick}
-				class={cn(
-					'flex h-5 w-5 cursor-pointer items-center justify-center rounded border-2 transition-all duration-200',
-					isSelected
-						? 'border-primary bg-primary'
-						: 'border-gray-400 bg-gray-900/70 backdrop-blur-sm hover:border-gray-300',
-					// Visibility: show if selected, hovered, or any selection exists
-					isSelected || isHovered || hasAnySelection
-						? 'opacity-100'
-						: 'pointer-events-none opacity-0',
-					// Dim unchecked checkboxes when selection exists but not hovered
-					!isSelected && hasAnySelection && !isHovered && 'opacity-60'
-				)}
-			>
-				{#if isSelected}
-					<svg
-						class="h-3 w-3 text-primary-foreground"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="3"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-					</svg>
-				{/if}
-			</button>
-		</div>
+		<button
+			type="button"
+			data-checkbox
+			onclick={handleCheckboxClick}
+			class={cn(
+				'absolute top-3 right-3 flex h-5 w-5 cursor-pointer items-center justify-center rounded border-2 transition-all duration-200',
+				isSelected
+					? 'border-primary bg-primary'
+					: 'border-gray-400 bg-gray-900/70 backdrop-blur-sm hover:border-gray-300',
+				isSelected || isHovered || hasAnySelection ? 'opacity-100' : 'opacity-0',
+				!isSelected && hasAnySelection && !isHovered && 'opacity-60'
+			)}
+		>
+			{#if isSelected}
+				<svg
+					class="h-3 w-3 text-primary-foreground"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					stroke-width="3"
+				>
+					<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+				</svg>
+			{/if}
+		</button>
 	</div>
 
 	<!-- Card Body -->
@@ -186,7 +161,7 @@
 		<!-- Header -->
 		<div class="space-y-1.5">
 			<a
-				href={resolve('/scenes/[id]', { id: scene.id })}
+				href={resolve(`/scenes/${scene.slug}`)}
 				data-clickable
 				onclick={(e) => {
 					e.stopPropagation();
@@ -199,38 +174,57 @@
 				{scene.name}
 			</a>
 			<div class="flex items-center gap-2">
+				{#if scene.biome}
+					<span
+						class="inline-flex items-center rounded-md bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-500/20 dark:text-green-400"
+					>
+						{getBiomeDisplayName(scene.biome)}
+					</span>
+				{/if}
 				<span
-					class={cn(
-						'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium',
-						getBiomeColor(scene.biome)
-					)}
+					class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
 				>
-					{scene.biome}
+					{getDimensionDisplayName(scene.dimension)}
 				</span>
 			</div>
 		</div>
 
 		<!-- Description -->
-		<p class="line-clamp-2 flex-1 text-sm text-muted-foreground">
-			{scene.description}
-		</p>
+		{#if scene.description}
+			<p class="line-clamp-2 flex-1 text-sm text-muted-foreground">
+				{scene.description}
+			</p>
+		{:else}
+			<p class="flex-1 text-sm text-muted-foreground/50 italic">No description available</p>
+		{/if}
 
-		<!-- Features -->
-		<div class="flex flex-wrap gap-1.5">
-			{#each scene.features as feature (feature)}
-				<span
-					class="inline-flex items-center rounded-md bg-muted/50 px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/50"
-				>
-					{feature}
-				</span>
-			{/each}
-		</div>
+		<!-- Feature Tags -->
+		{#if tags.length > 0}
+			<div class="flex flex-wrap gap-1.5">
+				{#each tags.slice(0, 4) as tag (tag)}
+					<span
+						class="inline-flex items-center rounded-md bg-muted/50 px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/50"
+					>
+						{tag}
+					</span>
+				{/each}
+				{#if tags.length > 4}
+					<span
+						class="inline-flex items-center rounded-md bg-muted/50 px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/50"
+					>
+						+{tags.length - 4} more
+					</span>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Footer -->
 		<div class="mt-auto flex items-center justify-between border-t border-border pt-3">
-			<span class="text-xs text-muted-foreground capitalize">
-				{scene.complexity} scene
-			</span>
+			<div class="flex items-center gap-2 text-xs text-muted-foreground">
+				<span>{getWeatherDisplayName(scene.weather)}</span>
+				<span>•</span>
+				<span class="capitalize">Medium scene</span>
+			</div>
 			<span
 				class="inline-flex items-center gap-1 text-xs font-medium text-primary transition-transform group-hover:translate-x-1"
 			>

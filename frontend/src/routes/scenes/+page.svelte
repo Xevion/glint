@@ -1,51 +1,29 @@
 <script lang="ts">
-	import { getAllScenes, type TimeOfDay, type Weather, type Dimension } from '$lib/data/mock';
+	import { fly, fade, scale } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
 	import SceneCard from '$lib/components/SceneCard.svelte';
+	import type { PageData } from './$types';
 
-	const scenes = getAllScenes();
+	let { data } = $props<{ data: PageData }>();
+	const scenes = $derived(data.scenes);
 
 	// Filter state
-	let selectedTime = $state<TimeOfDay | null>(null);
-	let selectedWeather = $state<Weather | null>(null);
-	let selectedDimension = $state<Dimension | null>(null);
 	let searchQuery = $state('');
 
-	const times: TimeOfDay[] = [
-		'dawn',
-		'morning',
-		'noon',
-		'afternoon',
-		'sunset',
-		'dusk',
-		'night',
-		'midnight'
-	];
-	const weathers: Weather[] = ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog'];
-	const dimensions: Dimension[] = ['overworld', 'nether', 'end'];
-
 	const filteredScenes = $derived(() => {
-		return scenes.filter((scene) => {
-			if (selectedTime && scene.defaultTime !== selectedTime) return false;
-			if (selectedWeather && scene.defaultWeather !== selectedWeather) return false;
-			if (selectedDimension && scene.dimension !== selectedDimension) return false;
+		return scenes.filter((scene: (typeof scenes)[0]) => {
 			if (searchQuery && !scene.name.toLowerCase().includes(searchQuery.toLowerCase()))
 				return false;
 			return true;
 		});
 	});
 
-	const hasFilters = $derived(
-		selectedTime !== null ||
-			selectedWeather !== null ||
-			selectedDimension !== null ||
-			searchQuery !== ''
-	);
+	const hasFilters = $derived(searchQuery !== '');
 </script>
 
 <div class="container mx-auto px-4 py-8">
 	<!-- Header -->
-	<div class="animate-fade-in-down mb-8">
+	<div in:fly={{ y: -10, duration: 400 }} class="mb-8">
 		<h1 class="mb-2 text-4xl font-bold tracking-tight">Test Scenes</h1>
 		<p class="text-lg text-foreground/70 dark:text-muted-foreground">
 			{scenes.length} standardized environments for consistent shader comparison
@@ -53,7 +31,7 @@
 	</div>
 
 	<!-- Filters -->
-	<div class="animate-fade-in-up animation-delay-100 mb-6 space-y-4 rounded-xl bg-card p-4">
+	<div in:fly={{ y: 10, duration: 400, delay: 100 }} class="mb-6 space-y-4 rounded-xl bg-card p-4">
 		<div class="flex flex-wrap items-center gap-4">
 			<!-- Search -->
 			<div class="relative min-w-[200px] flex-1">
@@ -78,69 +56,11 @@
 				/>
 			</div>
 
-			<!-- Dimension filter -->
-			<div class="flex gap-1">
-				{#each dimensions as dimension (dimension)}
-					<button
-						onclick={() => (selectedDimension = selectedDimension === dimension ? null : dimension)}
-						class="rounded-lg px-3 py-2 text-xs font-medium capitalize transition-colors
-							{selectedDimension === dimension
-							? 'bg-primary text-primary-foreground'
-							: 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
-					>
-						{dimension}
-					</button>
-				{/each}
-			</div>
-		</div>
-
-		<div class="flex flex-wrap items-center gap-4">
-			<!-- Time of Day -->
-			<div class="flex items-center gap-2">
-				<span class="text-sm font-medium text-muted-foreground">Time:</span>
-				<div class="flex flex-wrap gap-1">
-					{#each times as time (time)}
-						<button
-							onclick={() => (selectedTime = selectedTime === time ? null : time)}
-							class="rounded-lg px-2.5 py-1.5 text-xs font-medium capitalize transition-colors
-								{selectedTime === time
-								? 'bg-primary text-primary-foreground'
-								: 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
-						>
-							{time}
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			<div class="hidden h-6 w-px bg-border md:block"></div>
-
-			<!-- Weather -->
-			<div class="flex items-center gap-2">
-				<span class="text-sm font-medium text-muted-foreground">Weather:</span>
-				<div class="flex flex-wrap gap-1">
-					{#each weathers as weather (weather)}
-						<button
-							onclick={() => (selectedWeather = selectedWeather === weather ? null : weather)}
-							class="rounded-lg px-2.5 py-1.5 text-xs font-medium capitalize transition-colors
-								{selectedWeather === weather
-								? 'bg-primary text-primary-foreground'
-								: 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
-						>
-							{weather}
-						</button>
-					{/each}
-				</div>
-			</div>
-
 			{#if hasFilters}
 				<Button
 					variant="ghost"
 					size="sm"
 					onclick={() => {
-						selectedTime = null;
-						selectedWeather = null;
-						selectedDimension = null;
 						searchQuery = '';
 					}}
 				>
@@ -151,7 +71,7 @@
 	</div>
 
 	<!-- Results count -->
-	<div class="animate-fade-in animation-delay-200 mb-4 text-sm text-muted-foreground">
+	<div in:fade={{ duration: 300, delay: 200 }} class="mb-4 text-sm text-muted-foreground">
 		{#if filteredScenes().length === scenes.length}
 			Showing all {scenes.length} scenes
 		{:else}
@@ -163,7 +83,7 @@
 	{#if filteredScenes().length > 0}
 		<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 			{#each filteredScenes() as scene, i (scene.id)}
-				<div class="animate-fade-in-scale" style="animation-delay: {Math.min(i * 50, 400) + 150}ms">
+				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>
 					<SceneCard {scene} />
 				</div>
 			{/each}

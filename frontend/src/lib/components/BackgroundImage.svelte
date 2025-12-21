@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
 	import type { Snippet } from 'svelte';
 
 	interface Props {
@@ -34,9 +33,10 @@
 	const WALLPAPER_WIDTH = 3840;
 	const WALLPAPER_HEIGHT = 2160;
 
-	let containerHeight = $state(0);
-	let viewportWidth = $state(browser ? window.innerWidth : 1920);
+	let containerHeight = $state(2160);
+	let viewportWidth = $state(1920);
 	let containerEl: HTMLDivElement | undefined = $state();
+	let mounted = $state(false);
 
 	// Calculate the displayed height of each wallpaper section based on scale
 	const sectionHeight = $derived(() => {
@@ -49,14 +49,28 @@
 	// Calculate how many wallpaper sections we need
 	const sectionsNeeded = $derived(() => {
 		const height = sectionHeight();
-		if (height <= 0) return 1;
-		return Math.ceil(containerHeight / height) + 1; // +1 for safety
+		if (height <= 0) return 3; // Start with minimum 3 sections
+		return Math.max(3, Math.ceil(containerHeight / height) + 1);
 	});
 
 	// Generate wallpaper URLs for a given theme
 	function getWallpaperUrl(index: number): string {
 		return `/wallpapers/${index}.jpg`;
 	}
+
+	// Shuffle array using Fisher-Yates algorithm
+	function shuffleArray<T>(array: T[]): T[] {
+		const shuffled = [...array];
+		for (let i = shuffled.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+		}
+		return shuffled;
+	}
+
+	// Cache for shuffled wallpaper arrays (initialized in onMount to prevent double-render)
+	let lightShuffled = $state<number[]>([]);
+	let darkShuffled = $state<number[]>([]);
 
 	// Get the wallpaper indices for the required sections (with looping)
 	function getWallpaperIndices(wallpapers: number[], count: number): number[] {
@@ -67,8 +81,11 @@
 		return indices;
 	}
 
-	const lightIndices = $derived(getWallpaperIndices(lightWallpapers, sectionsNeeded()));
-	const darkIndices = $derived(getWallpaperIndices(darkWallpapers, sectionsNeeded()));
+	const lightIndices = $derived(getWallpaperIndices(lightShuffled, sectionsNeeded()));
+	const darkIndices = $derived(getWallpaperIndices(darkShuffled, sectionsNeeded()));
+
+	// Track image loading state
+	let imagesLoaded = $state(false);
 
 	// Calculate background size based on scale
 	const backgroundSize = $derived(() => {
@@ -77,28 +94,84 @@
 	});
 
 	onMount(() => {
-		const updateDimensions = () => {
-			viewportWidth = window.innerWidth;
-			if (containerEl) {
-				containerHeight = containerEl.scrollHeight;
+		// Initialize shuffled arrays immediately on mount (before images load)
+		lightShuffled = shuffleArray(lightWallpapers);
+		darkShuffled = shuffleArray(darkWallpapers);
+
+		let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+		let previousHeight = 0;
+
+		const updateHeight = () => {
+			const newHeight = Math.max(
+				document.documentElement.scrollHeight,
+				document.documentElement.clientHeight,
+				window.innerHeight
+			);
+
+			// Only update if height changed by more than 50px to prevent micro-adjustments
+			if (Math.abs(newHeight - previousHeight) > 50) {
+				containerHeight = newHeight;
+				previousHeight = newHeight;
 			}
 		};
 
-		updateDimensions();
+		const updateDimensions = () => {
+			viewportWidth = window.innerWidth;
+			updateHeight();
+		};
 
-		// Use ResizeObserver for container height changes
-		const resizeObserver = new ResizeObserver(() => {
-			updateDimensions();
+		// Initial dimension capture - do this immediately to prevent layout shift
+		updateDimensions();
+		mounted = true;
+
+		const debouncedHeightUpdate = () => {
+			if (debounceTimer) clearTimeout(debounceTimer);
+			debounceTimer = setTimeout(updateHeight, 150);
+		};
+
+		// Preload all wallpaper images before showing them
+		const preloadImages = async () => {
+			const allIndices = [...new Set([...lightWallpapers, ...darkWallpapers])];
+			const promises = allIndices.map((index) => {
+				return new Promise<void>((resolve, reject) => {
+					const img = new Image();
+					img.onload = () => {
+						resolve();
+					};
+					img.onerror = () => {
+						reject(new Error(`Failed to load wallpaper ${index}`));
+					};
+					img.src = getWallpaperUrl(index);
+				});
+			});
+
+			try {
+				await Promise.all(promises);
+				imagesLoaded = true;
+			} catch (error) {
+				console.error('Failed to preload wallpaper images:', error);
+				imagesLoaded = true; // Show anyway even if some failed
+			}
+		};
+
+		void preloadImages();
+
+		// Use MutationObserver for height changes only (not width)
+		const observer = new MutationObserver(debouncedHeightUpdate);
+
+		observer.observe(document.body, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			attributeFilter: ['style', 'class']
 		});
 
-		if (containerEl) {
-			resizeObserver.observe(containerEl);
-		}
-
+		// Only update width on actual window resize
 		window.addEventListener('resize', updateDimensions);
 
 		return () => {
-			resizeObserver.disconnect();
+			if (debounceTimer) clearTimeout(debounceTimer);
+			observer.disconnect();
 			window.removeEventListener('resize', updateDimensions);
 		};
 	});
@@ -115,40 +188,44 @@
 
 <div class="background-container" bind:this={containerEl}>
 	<!-- Light theme wallpapers -->
-	{#each lightIndices as wallpaperIndex, i (i)}
-		{@const top = i * sectionHeight()}
-		{@const isFirst = i === 0}
-		{@const isLast = i === lightIndices.length - 1}
-		<div
-			class="wallpaper-section wallpaper-light"
-			style:top="{top}px"
-			style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
-			style:background-image="url({getWallpaperUrl(wallpaperIndex)})"
-			style:background-size={backgroundSize()}
-			style:filter={lightFilterStyle() ?? undefined}
-			style:--blend-height="{blendHeight}px"
-			class:has-fade-top={!isFirst}
-			class:has-fade-bottom={!isLast}
-		></div>
-	{/each}
+	{#if mounted && imagesLoaded}
+		{#each lightIndices as wallpaperIndex, i (i)}
+			{@const top = i * sectionHeight()}
+			{@const isFirst = i === 0}
+			{@const isLast = i === lightIndices.length - 1}
+			<div
+				class="wallpaper-section wallpaper-light"
+				style:top="{top}px"
+				style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
+				style:background-image="url({getWallpaperUrl(wallpaperIndex)})"
+				style:background-size={backgroundSize()}
+				style:filter={lightFilterStyle() ?? undefined}
+				style:--blend-height="{blendHeight}px"
+				class:has-fade-top={!isFirst}
+				class:has-fade-bottom={!isLast}
+			></div>
+		{/each}
+	{/if}
 
 	<!-- Dark theme wallpapers -->
-	{#each darkIndices as wallpaperIndex, i (i)}
-		{@const top = i * sectionHeight()}
-		{@const isFirst = i === 0}
-		{@const isLast = i === darkIndices.length - 1}
-		<div
-			class="wallpaper-section wallpaper-dark"
-			style:top="{top}px"
-			style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
-			style:background-image="url({getWallpaperUrl(wallpaperIndex)})"
-			style:background-size={backgroundSize()}
-			style:filter={darkFilterStyle ?? undefined}
-			style:--blend-height="{blendHeight}px"
-			class:has-fade-top={!isFirst}
-			class:has-fade-bottom={!isLast}
-		></div>
-	{/each}
+	{#if mounted && imagesLoaded}
+		{#each darkIndices as wallpaperIndex, i (i)}
+			{@const top = i * sectionHeight()}
+			{@const isFirst = i === 0}
+			{@const isLast = i === darkIndices.length - 1}
+			<div
+				class="wallpaper-section wallpaper-dark"
+				style:top="{top}px"
+				style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
+				style:background-image="url({getWallpaperUrl(wallpaperIndex)})"
+				style:background-size={backgroundSize()}
+				style:filter={darkFilterStyle ?? undefined}
+				style:--blend-height="{blendHeight}px"
+				class:has-fade-top={!isFirst}
+				class:has-fade-bottom={!isLast}
+			></div>
+		{/each}
+	{/if}
 
 	{#if overlay}
 		<div class="background-overlay" style:--overlay-opacity={overlayOpacity}></div>
@@ -178,6 +255,22 @@
 		background-position: center;
 		background-repeat: no-repeat;
 		z-index: 0;
+		opacity: 0;
+		animation: fade-in 800ms ease-out forwards;
+		transition:
+			top 300ms ease-out,
+			height 300ms ease-out;
+		will-change: top, height;
+	}
+
+	@keyframes fade-in {
+		from {
+			opacity: 0;
+		}
+
+		to {
+			opacity: 1;
+		}
 	}
 
 	/* Gradient masks for smooth blending */
@@ -204,19 +297,19 @@
 	}
 
 	.wallpaper-light {
-		opacity: 1;
+		display: block;
 	}
 
 	.wallpaper-dark {
-		opacity: 0;
+		display: none;
 	}
 
 	:global(.dark) .wallpaper-light {
-		opacity: 0;
+		display: none;
 	}
 
 	:global(.dark) .wallpaper-dark {
-		opacity: 1;
+		display: block;
 	}
 
 	.background-overlay {

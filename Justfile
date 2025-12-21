@@ -5,7 +5,7 @@ default:
 
 # Run both frontend and backend dev servers
 dev:
-    @just dev-fe & just dev-be & wait
+    bun concurrently -n fe,be -c cyan,magenta "just dev-fe" "just dev-be"
 
 # Start frontend dev server
 dev-fe:
@@ -48,6 +48,20 @@ bun *args:
 # Run cargo commands in backend (e.g., `just cargo build`)
 cargo *args:
     cd backend && cargo {{args}}
+
+# Database migration commands
+migrate-reset:
+    cd backend && cargo sqlx database reset -y
+
+migrate-run:
+    cd backend && cargo sqlx migrate run
+
+migrate-create name:
+    cd backend && cargo sqlx migrate add {{name}}
+
+# Seed database with sample data
+db-seed:
+    sqlite3 backend/glint.db < backend/scripts/seed.sql
 
 # Run any command in frontend
 fe *args:

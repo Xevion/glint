@@ -1,30 +1,18 @@
 <script lang="ts">
-	import { getAllShaders, type PerformanceTier, type ShaderStyle } from '$lib/data/mock';
+	import { fly, fade, scale } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
 	import ShaderCard from '$lib/components/ShaderCard.svelte';
+	import type { PageData } from './$types';
 
-	const shaders = getAllShaders();
+	let { data } = $props<{ data: PageData }>();
+	const shaders = $derived(data.shaders);
 
 	// Filter state
-	let selectedTier = $state<PerformanceTier | null>(null);
-	let selectedStyle = $state<ShaderStyle | null>(null);
 	let searchQuery = $state('');
-	let sortBy = $state<'name' | 'downloads' | 'updated'>('downloads');
-
-	const tiers: PerformanceTier[] = ['potato', 'low', 'medium', 'high', 'ultra'];
-	const styles: ShaderStyle[] = [
-		'realistic',
-		'fantasy',
-		'vibrant',
-		'minimal',
-		'retro',
-		'cinematic'
-	];
+	let sortBy = $state<'name' | 'updated'>('updated');
 
 	const filteredShaders = $derived(() => {
-		let result = shaders.filter((shader) => {
-			if (selectedTier && shader.tier !== selectedTier) return false;
-			if (selectedStyle && shader.style !== selectedStyle) return false;
+		let result = shaders.filter((shader: (typeof shaders)[0]) => {
 			if (searchQuery && !shader.name.toLowerCase().includes(searchQuery.toLowerCase()))
 				return false;
 			return true;
@@ -35,10 +23,8 @@
 			switch (sortBy) {
 				case 'name':
 					return a.name.localeCompare(b.name);
-				case 'downloads':
-					return b.downloadCount - a.downloadCount;
 				case 'updated':
-					return new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime();
+					return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
 				default:
 					return 0;
 			}
@@ -47,14 +33,12 @@
 		return result;
 	});
 
-	const hasFilters = $derived(
-		selectedTier !== null || selectedStyle !== null || searchQuery !== ''
-	);
+	const hasFilters = $derived(searchQuery !== '');
 </script>
 
 <div class="container mx-auto px-4 py-8">
 	<!-- Header -->
-	<div class="animate-fade-in-down mb-8">
+	<div in:fly={{ y: -10, duration: 400 }} class="mb-8">
 		<h1 class="mb-2 text-4xl font-bold tracking-tight">Shader Packs</h1>
 		<p class="text-lg text-muted-foreground">
 			Browse {shaders.length} shader packs with standardized captures and performance metrics
@@ -62,7 +46,7 @@
 	</div>
 
 	<!-- Filters -->
-	<div class="animate-fade-in-up animation-delay-100 mb-6 space-y-4 rounded-xl bg-card p-4">
+	<div in:fly={{ y: 10, duration: 400, delay: 100 }} class="mb-6 space-y-4 rounded-xl bg-card p-4">
 		<div class="flex flex-wrap items-center gap-4">
 			<!-- Search -->
 			<div class="relative min-w-[200px] flex-1">
@@ -92,58 +76,15 @@
 				bind:value={sortBy}
 				class="h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
 			>
-				<option value="downloads">Most Downloads</option>
 				<option value="updated">Recently Updated</option>
 				<option value="name">Name A-Z</option>
 			</select>
-		</div>
-
-		<div class="flex flex-wrap items-center gap-4">
-			<!-- Performance Tier -->
-			<div class="flex items-center gap-2">
-				<span class="text-sm font-medium text-muted-foreground">Performance:</span>
-				<div class="flex flex-wrap gap-1">
-					{#each tiers as tier (tier)}
-						<button
-							onclick={() => (selectedTier = selectedTier === tier ? null : tier)}
-							class="rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors
-								{selectedTier === tier
-								? 'bg-primary text-primary-foreground'
-								: 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
-						>
-							{tier}
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			<div class="hidden h-6 w-px bg-border sm:block"></div>
-
-			<!-- Style -->
-			<div class="flex items-center gap-2">
-				<span class="text-sm font-medium text-muted-foreground">Style:</span>
-				<div class="flex flex-wrap gap-1">
-					{#each styles as style (style)}
-						<button
-							onclick={() => (selectedStyle = selectedStyle === style ? null : style)}
-							class="rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors
-								{selectedStyle === style
-								? 'bg-primary text-primary-foreground'
-								: 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
-						>
-							{style}
-						</button>
-					{/each}
-				</div>
-			</div>
 
 			{#if hasFilters}
 				<Button
 					variant="ghost"
 					size="sm"
 					onclick={() => {
-						selectedTier = null;
-						selectedStyle = null;
 						searchQuery = '';
 					}}
 				>
@@ -154,7 +95,7 @@
 	</div>
 
 	<!-- Results count -->
-	<div class="animate-fade-in animation-delay-200 mb-4 text-sm text-muted-foreground">
+	<div in:fade={{ duration: 300, delay: 200 }} class="mb-4 text-sm text-muted-foreground">
 		{#if filteredShaders().length === shaders.length}
 			Showing all {shaders.length} shaders
 		{:else}
@@ -166,7 +107,7 @@
 	{#if filteredShaders().length > 0}
 		<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 			{#each filteredShaders() as shader, i (shader.id)}
-				<div class="animate-fade-in-scale" style="animation-delay: {Math.min(i * 50, 400) + 150}ms">
+				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>
 					<ShaderCard {shader} />
 				</div>
 			{/each}

@@ -76,8 +76,7 @@ export default defineConfig(
 			'@typescript-eslint/no-misused-promises': [
 				'error',
 				{ checksVoidReturn: { attributes: false } }
-			],
-			'svelte/no-navigation-without-resolve': ['error', { ignoreLinks: true }]
+			]
 		}
 	}
 );

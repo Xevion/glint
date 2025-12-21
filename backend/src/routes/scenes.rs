@@ -6,7 +6,7 @@ use axum::{
 
 use crate::{
     error::{AppError, AppResult},
-    models::{Capture, Scene, SceneWithCaptures},
+    models::{CaptureWithContext, Scene, SceneWithCaptures, World},
     state::AppState,
 };
 
@@ -34,12 +34,41 @@ async fn get_scene(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Scene '{slug}' not found")))?;
 
-    let captures = sqlx::query_as::<_, Capture>(
-        "SELECT * FROM captures WHERE scene_id = ? AND status = 'completed'",
+    // Fetch the associated world
+    let world = sqlx::query_as::<_, World>("SELECT * FROM worlds WHERE id = ?")
+        .bind(&scene.world_id)
+        .fetch_optional(state.db())
+        .await?;
+
+    // Fetch captures with shader/version context via JOIN
+    let captures = sqlx::query_as::<_, CaptureWithContext>(
+        r#"
+        SELECT 
+            c.id,
+            c.scene_id,
+            s.slug as shader_slug,
+            s.name as shader_name,
+            sv.version as shader_version,
+            c.profile,
+            c.screenshot_path,
+            c.screenshot_url,
+            c.captured_at,
+            c.resolution_width,
+            c.resolution_height
+        FROM captures c
+        JOIN shader_versions sv ON c.shader_version_id = sv.id
+        JOIN shaders s ON sv.shader_id = s.id
+        WHERE c.scene_id = ? AND c.status = 'completed'
+        ORDER BY s.name, sv.created_at DESC
+        "#,
     )
     .bind(&scene.id)
     .fetch_all(state.db())
     .await?;
 
-    Ok(Json(SceneWithCaptures { scene, captures }))
+    Ok(Json(SceneWithCaptures {
+        scene,
+        world,
+        captures,
+    }))
 }

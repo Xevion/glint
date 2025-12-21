@@ -12,8 +12,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
-		"lint": "concurrently \"prettier --check .\" \"eslint .\" \"stylelint '**/*.{css,svelte}'\"",
-		"lint:fix": "concurrently \"prettier --write .\" \"eslint --fix .\" \"stylelint --fix '**/*.{css,svelte}'\"",
+		"lint": "concurrently -n prettier,eslint,stylelint -c blue,yellow,green \"prettier --check .\" \"eslint .\" \"stylelint '**/*.{css,svelte}'\"",
+		"lint:fix": "concurrently -n prettier,eslint,stylelint -c blue,yellow,green \"prettier --write .\" \"eslint --fix .\" \"stylelint --fix '**/*.{css,svelte}'\"",
 		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"test": "bun run test:unit && bun run test:e2e",
 		"test:unit": "vitest run",
@@ -76,11 +76,13 @@
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.48.1",
 		"vite": "^7.2.6",
+		"vite-plugin-devtools-json": "^1.0.0",
 		"vitest": "^4.0.16"
 	},
 	"dependencies": {
 		"class-variance-authority": "^0.7.1",
 		"overlayscrollbars": "^2.13.0",
-		"overlayscrollbars-svelte": "^0.5.5"
+		"overlayscrollbars-svelte": "^0.5.5",
+		"true-myth": "^9.3.1"
 	}
 }

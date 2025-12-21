@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = [
+    "backend",
+    # "agent", # Uncomment when agent/ directory is created
+]
+
+[workspace.package]
+edition = "2024"
