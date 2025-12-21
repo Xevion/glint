@@ -1,10 +1,11 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Glint
+import com.xevion.glint.scene.SceneApplicator
+import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.screenshot.*
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
-import net.minecraft.world.level.chunk.EmptyLevelChunk
 import java.io.File
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -13,17 +14,18 @@ import java.time.format.DateTimeFormatter
  * Manages a multi-shader screenshot capture session.
  *
  * Workflow:
- * 1. Start session - captures current shader state
+ * 1. Start session - load and apply scene
  * 2. For each shader (including vanilla):
  *    a. Load shader (or disable for vanilla)
  *    b. Wait for stabilization (chunks, FPS)
  *    c. Take screenshot
  *    d. Wait a few ticks
- * 3. Restore original shader state
+ * 3. Restore original shader and world state
  */
 class CaptureSession(
     private val sceneId: String = "default",
 ) {
+    private val logger = Glint.LOGGER
     private var state: State = State.Idle
     private var ticksInState: Int = 0
 
@@ -36,6 +38,9 @@ class CaptureSession(
     private val screenshotEntries: MutableList<ScreenshotEntry> = mutableListOf()
 
     private val stabilizationDetector = StabilizationDetector()
+    private var resolvedScene: com.xevion.glint.scene.ResolvedScene? = null
+    private var sceneApplied: Boolean = false
+    private var originalState: CaptureState.SavedState? = null
 
     /**
      * Represents a shader configuration to capture (shader pack + optional profile).
@@ -56,16 +61,30 @@ class CaptureSession(
 
     /**
      * Starts a new capture session.
-     * @return true if session started, false if already running or Iris unavailable
+     * @return true if session started, false if already running or scene/Iris unavailable
      */
     fun start(): Boolean {
         if (state != State.Idle) {
-            Glint.LOGGER.warn("Capture session already in progress")
+            logger.warn("Capture session already in progress")
+            return false
+        }
+
+        val mc = Minecraft.getInstance()
+
+        // Capture system only works in single-player
+        if (mc.singleplayerServer == null) {
+            logger.error("Capture system is not available in multiplayer")
+            return false
+        }
+
+        // Load scene
+        resolvedScene = SceneManager.loadScene(sceneId)
+        if (resolvedScene == null) {
+            logger.error("Failed to load scene: $sceneId")
             return false
         }
 
         // Create session output directory
-        val mc = Minecraft.getInstance()
         startedAt = Instant.now()
         sessionId =
             DateTimeFormatter
@@ -74,14 +93,14 @@ class CaptureSession(
                 .format(startedAt)
         sessionDir = File(mc.gameDirectory, "glint_captures/$sessionId")
         if (!sessionDir!!.mkdirs()) {
-            Glint.LOGGER.error("Failed to create capture session directory: ${sessionDir!!.absolutePath}")
+            logger.error("Failed to create capture session directory: ${sessionDir!!.absolutePath}")
             return false
         }
-        Glint.LOGGER.info("Capture session directory: ${sessionDir!!.absolutePath}")
+        logger.info("Capture session directory: ${sessionDir!!.absolutePath}")
         screenshotEntries.clear()
 
         if (!IrisIntegration.isAvailable) {
-            Glint.LOGGER.warn("Iris is not available, capturing vanilla only")
+            logger.warn("Iris is not available, capturing vanilla only")
             shadersToCapture = listOf(ShaderConfig(packName = null))
             originalShaderPack = null
         } else {
@@ -110,19 +129,25 @@ class CaptureSession(
                                 }
                             }
                         } else {
-                            Glint.LOGGER.warn("Failed to load shader pack for profile discovery: $pack")
+                            logger.warn("Failed to load shader pack for profile discovery: $pack")
                         }
                     }
                 }
 
-            Glint.LOGGER.info(
+            logger.info(
                 "Starting capture session with ${shadersToCapture.size} configurations: " +
                     shadersToCapture.joinToString(", ") { it.displayName },
             )
         }
 
         currentIndex = 0
-        transitionTo(State.LoadingShader)
+
+        // Save original client state and mark capture as active
+        originalState = CaptureState.saveState()
+        CaptureState.startCapture()
+        logger.info("Original client state saved, capture mode activated")
+
+        transitionTo(State.ApplyingScene)
         return true
     }
 
@@ -136,6 +161,10 @@ class CaptureSession(
 
         when (state) {
             State.Idle -> {}
+
+            State.ApplyingScene -> {
+                handleApplyingScene()
+            }
 
             State.LoadingShader -> {
                 handleLoadingShader()
@@ -166,39 +195,69 @@ class CaptureSession(
         get() = state != State.Idle
 
     private fun transitionTo(newState: State) {
-        Glint.LOGGER.debug("Capture session: $state -> $newState")
+        logger.info("Capture session state: $state -> $newState")
         state = newState
         ticksInState = 0
 
         if (newState == State.WaitingForStabilization) {
             stabilizationDetector.reset()
         }
+
+        if (newState == State.ApplyingScene) {
+            sceneApplied = false
+        }
+    }
+
+    private fun handleApplyingScene() {
+        val scene = resolvedScene
+        if (scene == null) {
+            logger.error("Scene not loaded")
+            transitionTo(State.Finishing)
+            return
+        }
+
+        // Apply scene once when entering this state
+        if (!sceneApplied) {
+            logger.info("Applying scene: ${scene.scene.id}")
+            if (!SceneApplicator.apply(scene)) {
+                logger.error("Failed to apply scene")
+                transitionTo(State.Finishing)
+                return
+            }
+            sceneApplied = true
+            logger.debug("Scene applied successfully")
+        }
+
+        // Wait for scene to stabilize (chunks loaded, player positioned)
+        if (ticksInState >= SCENE_APPLICATION_WAIT_TICKS) {
+            transitionTo(State.LoadingShader)
+        }
     }
 
     private fun handleLoadingShader() {
         val config = shadersToCapture.getOrNull(currentIndex)
         if (config == null) {
-            Glint.LOGGER.error("Invalid shader config at index $currentIndex")
+            logger.error("Invalid shader config at index $currentIndex")
             advanceToNextShader()
             return
         }
 
         if (IrisIntegration.isAvailable) {
-            Glint.LOGGER.info("Loading shader configuration: ${config.displayName}")
+            logger.info("Loading shader configuration: ${config.displayName}")
 
             val result =
                 if (config.packName == null) {
                     IrisIntegration.disableShaders()
                 } else {
                     IrisIntegration.enableShaders(config.packName).onFailure {
-                        Glint.LOGGER.error("Failed to load shader pack: ${config.packName}")
+                        logger.error("Failed to load shader pack: ${config.packName}")
                         advanceToNextShader()
                         return
                     }
 
                     if (config.profile != null) {
                         IrisIntegration.applyShaderProfile(config.profile).onFailure {
-                            Glint.LOGGER.error("Failed to apply profile: ${config.profile}, skipping")
+                            logger.error("Failed to apply profile: ${config.profile}, skipping")
                             advanceToNextShader()
                             return
                         }
@@ -210,9 +269,19 @@ class CaptureSession(
                 }
 
             if (result.isFailure) {
-                Glint.LOGGER.error("Failed to load shader configuration: ${config.displayName}, skipping")
+                logger.error("Failed to load shader configuration: ${config.displayName}, skipping")
                 advanceToNextShader()
                 return
+            }
+        }
+
+        // Reapply scene settings to ensure consistency across shader switches
+        // Shaders may modify render settings, camera, or other options
+        val scene = resolvedScene
+        if (scene != null) {
+            logger.debug("Reapplying scene for shader: ${config.displayName}")
+            if (!SceneApplicator.apply(scene)) {
+                logger.warn("Failed to reapply scene for shader: ${config.displayName}")
             }
         }
 
@@ -234,13 +303,13 @@ class CaptureSession(
 
         val config = shadersToCapture.getOrNull(currentIndex)
         if (config == null) {
-            Glint.LOGGER.error("Invalid shader config at index $currentIndex")
+            logger.error("Invalid shader config at index $currentIndex")
             advanceToNextShader()
             return
         }
 
         val screenshotName = buildScreenshotFilename(config)
-        Glint.LOGGER.info("Capturing screenshot for: ${config.displayName} -> $screenshotName")
+        logger.info("Capturing screenshot for: ${config.displayName} -> $screenshotName")
 
         val timestamp = Instant.now().toString()
         val shaderInfo = config.packName?.let { parseShaderPackName(it) }
@@ -275,7 +344,7 @@ class CaptureSession(
             screenshotName,
             renderTarget,
         ) { message ->
-            Glint.LOGGER.info("Screenshot saved: ${message.string}")
+            logger.info("Screenshot saved: ${message.string}")
         }
 
         transitionTo(State.PostCaptureCooldown)
@@ -366,20 +435,26 @@ class CaptureSession(
     }
 
     private fun handleFinishing() {
-        Glint.LOGGER.info("Capture session complete, restoring original shader state")
+        logger.info("Capture session complete, restoring original state")
 
         // Write session manifest
         writeSessionManifest()
 
         // Restore original shader
         if (IrisIntegration.isAvailable) {
-            val shaderPack = originalShaderPack
-            if (shaderPack != null) {
+            originalShaderPack?.let { shaderPack ->
                 IrisIntegration.enableShaders(shaderPack)
-            } else {
-                IrisIntegration.disableShaders()
-            }
+            } ?: IrisIntegration.disableShaders()
         }
+
+        // Restore original client state (options, camera, etc.)
+        originalState?.let {
+            CaptureState.restoreState(it)
+            logger.info("Original client state restored")
+        }
+
+        // End capture mode
+        CaptureState.endCapture()
 
         // Reset state
         state = State.Idle
@@ -390,8 +465,9 @@ class CaptureSession(
         screenshotEntries.clear()
         sessionId = ""
         startedAt = null
+        originalState = null
 
-        Glint.LOGGER.info("Capture session finished")
+        logger.info("Capture session finished")
     }
 
     private fun writeSessionManifest() {
@@ -400,14 +476,8 @@ class CaptureSession(
 
         // Get player position and camera
         val player = mc.player
-        val position =
-            player?.let {
-                Position(x = it.x, y = it.y, z = it.z)
-            }
-        val camera =
-            player?.let {
-                Camera(yaw = it.yRot, pitch = it.xRot)
-            }
+        val position = player?.let { Position(x = it.x, y = it.y, z = it.z) }
+        val camera = player?.let { Camera(yaw = it.yRot, pitch = it.xRot) }
 
         // Get dimension
         val dimension =
@@ -440,14 +510,15 @@ class CaptureSession(
         val manifestFile = File(sessionDir!!, "session.json")
         try {
             manifestFile.writeText(JSON.encodeToString(SessionManifest.serializer(), manifest))
-            Glint.LOGGER.info("Session manifest written to: ${manifestFile.absolutePath}")
+            logger.info("Session manifest written to: ${manifestFile.absolutePath}")
         } catch (e: Exception) {
-            Glint.LOGGER.error("Failed to write session manifest", e)
+            logger.error("Failed to write session manifest", e)
         }
     }
 
     private enum class State {
         Idle,
+        ApplyingScene,
         LoadingShader,
         WaitingForStabilization,
         Capturing,
@@ -458,5 +529,6 @@ class CaptureSession(
     companion object {
         private val JSON = Json { prettyPrint = true }
         private const val POST_CAPTURE_COOLDOWN_TICKS = 10
+        private const val SCENE_APPLICATION_WAIT_TICKS = 40
     }
 }

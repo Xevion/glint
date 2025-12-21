@@ -6,7 +6,10 @@
   "mixins": [
     "ShaderPackAccessor"
   ],
-  "client": [],
+  "client": [
+    "MinecraftMixin",
+    "MouseHandlerMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

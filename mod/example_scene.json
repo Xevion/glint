@@ -1,0 +1,133 @@
+{
+  "world": "example_world",
+  "version": "1.21.4",
+  "description": "Example scene collection showing various configuration options",
+  "defaultConfig": {
+    "renderDistance": 20,
+    "graphicsMode": "FABULOUS",
+    "particles": "ALL",
+    "clouds": "FANCY",
+    "showHud": false,
+    "entityAiFrozen": true
+  },
+  "scenes": [
+    {
+      "id": "sunset_ocean",
+      "name": "Sunset Ocean",
+      "description": "Dramatic sunset over ocean with volumetric clouds",
+      "dimension": "minecraft:overworld",
+      "position": {
+        "x": 0.5,
+        "y": 80.0,
+        "z": 0.5
+      },
+      "camera": {
+        "yaw": 180.0,
+        "pitch": 10.0
+      },
+      "timeOfDay": 12500,
+      "weather": "clear",
+      "weatherIntensity": 0.0,
+      "moonPhase": 4,
+      "biome": "minecraft:ocean",
+      "tags": ["sunset", "ocean", "volumetrics", "dramatic"],
+      "config": {
+        "fov": 70,
+        "brightness": 0.5,
+        "cameraType": "FIRST_PERSON"
+      }
+    },
+    {
+      "id": "sunset_ocean_wide",
+      "name": "Sunset Ocean - Wide Angle",
+      "description": "Same location but with wider FOV for comparison",
+      "dimension": "minecraft:overworld",
+      "position": {
+        "x": 0.5,
+        "y": 80.0,
+        "z": 0.5
+      },
+      "camera": {
+        "yaw": 180.0,
+        "pitch": 10.0
+      },
+      "timeOfDay": 12500,
+      "weather": "clear",
+      "tags": ["sunset", "ocean", "wide"],
+      "config": {
+        "fov": 90,
+        "renderDistance": 24
+      }
+    },
+    {
+      "id": "nether_fortress",
+      "name": "Nether Fortress",
+      "description": "Fortress bridge with lava below",
+      "dimension": "minecraft:the_nether",
+      "position": {
+        "x": 100.0,
+        "y": 70.0,
+        "z": 50.0
+      },
+      "camera": {
+        "yaw": 0.0,
+        "pitch": -15.0
+      },
+      "timeOfDay": 18000,
+      "weather": "clear",
+      "tags": ["nether", "fortress", "lava"],
+      "config": {
+        "fov": 80,
+        "brightness": 0.3
+      }
+    },
+    {
+      "id": "rainy_village",
+      "name": "Rainy Village",
+      "description": "Village scene with heavy rain",
+      "dimension": "minecraft:overworld",
+      "position": {
+        "x": 250.0,
+        "y": 72.0,
+        "z": -150.0
+      },
+      "camera": {
+        "yaw": 45.0,
+        "pitch": 0.0
+      },
+      "timeOfDay": 6000,
+      "weather": "rain",
+      "weatherIntensity": 0.8,
+      "biome": "minecraft:plains",
+      "tags": ["village", "rain", "midday"]
+    }
+  ],
+  "entities": [
+    {
+      "type": "minecraft:cow",
+      "position": {
+        "x": 5.0,
+        "y": 80.0,
+        "z": 5.0
+      },
+      "rotation": {
+        "yaw": 90.0,
+        "pitch": 0.0
+      },
+      "frozenForScenes": ["sunset_ocean", "sunset_ocean_wide"]
+    },
+    {
+      "type": "minecraft:villager",
+      "position": {
+        "x": 252.0,
+        "y": 72.0,
+        "z": -148.0
+      },
+      "rotation": {
+        "yaw": 0.0,
+        "pitch": 0.0
+      },
+      "frozenForScenes": ["rainy_village"]
+    }
+  ]
+}
