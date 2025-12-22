@@ -50,6 +50,34 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	/**
+	 * Delete a job
+	 */
+	deleteJob(jobId: string): Promise<Result<null, ApiError>> {
+		return super.delete<null>(`/api/admin/jobs/${jobId}`);
+	}
+
+	/**
+	 * Cancel a job (pending/claimed only)
+	 */
+	cancelJob(jobId: string): Promise<Result<Job, ApiError>> {
+		return super.put<Job>(`/api/admin/jobs/${jobId}/cancel`, {});
+	}
+
+	/**
+	 * Retry a failed job
+	 */
+	retryJob(jobId: string): Promise<Result<Job, ApiError>> {
+		return super.put<Job>(`/api/admin/jobs/${jobId}/retry`, {});
+	}
+
+	/**
+	 * Release a claimed/running job
+	 */
+	releaseJob(jobId: string): Promise<Result<Job, ApiError>> {
+		return super.put<Job>(`/api/admin/jobs/${jobId}/release`, {});
+	}
+
+	/**
 	 * Get API health status
 	 */
 	health(): Promise<Result<string, ApiError>> {

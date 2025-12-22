@@ -6,7 +6,7 @@ use tower_http::{
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use glint_backend::{config::Config, db, routes, state::AppState};
+use glint_backend::{config::Config, db, routes, services, state::AppState};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -59,7 +59,13 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Build application state
-    let state = AppState::new(pool, config, s3_client);
+    let state = AppState::new(pool.clone(), config.clone(), s3_client);
+
+    // Start heartbeat monitoring background task
+    tokio::spawn(services::heartbeat::monitor_heartbeats(
+        pool,
+        config.heartbeat.clone(),
+    ));
 
     // Configure CORS
     let cors = CorsLayer::new()

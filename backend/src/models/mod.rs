@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use crate::db::UtcDateTime;
 
 /// Downloadable world files containing scenes
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -12,8 +13,8 @@ pub struct World {
     pub file_url: Option<String>,
     pub file_hash: Option<String>,
     pub size_bytes: Option<i64>,
-    pub created_at: String,
-    pub updated_at: String,
+    pub created_at: UtcDateTime,
+    pub updated_at: UtcDateTime,
 }
 
 /// Shader pack identity (not version-specific)
@@ -26,8 +27,8 @@ pub struct Shader {
     pub modrinth_id: Option<String>,
     pub curseforge_id: Option<String>,
     pub website_url: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
+    pub created_at: UtcDateTime,
+    pub updated_at: UtcDateTime,
 }
 
 /// Specific release of a shader pack
@@ -41,7 +42,7 @@ pub struct ShaderVersion {
     pub file_hash: Option<String>,
     /// JSON array of profile names, discovered after first capture
     pub supported_profiles: Option<String>,
-    pub created_at: String,
+    pub created_at: UtcDateTime,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -64,7 +65,7 @@ pub struct Scene {
     pub biome: Option<String>,
     pub definition_json: Option<String>,
     pub tags: Option<String>,
-    pub created_at: String,
+    pub created_at: UtcDateTime,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -87,8 +88,8 @@ pub struct Capture {
     pub gpu_model: Option<String>,
     pub status: String,
     pub error_message: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
+    pub created_at: UtcDateTime,
+    pub updated_at: UtcDateTime,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -102,12 +103,12 @@ pub struct Job {
     pub attempts: i32,
     pub max_attempts: i32,
     pub agent_id: Option<String>,
-    pub claimed_at: Option<String>,
-    pub last_heartbeat: Option<String>,
-    pub started_at: Option<String>,
-    pub completed_at: Option<String>,
+    pub claimed_at: Option<UtcDateTime>,
+    pub last_heartbeat: Option<UtcDateTime>,
+    pub started_at: Option<UtcDateTime>,
+    pub completed_at: Option<UtcDateTime>,
     pub error_message: Option<String>,
-    pub created_at: String,
+    pub created_at: UtcDateTime,
 }
 
 // =============================================================================
@@ -148,7 +149,7 @@ pub struct CaptureWithContext {
     pub profile: Option<String>,
     pub screenshot_path: Option<String>,
     pub screenshot_url: Option<String>,
-    pub captured_at: Option<String>,
+    pub captured_at: Option<UtcDateTime>,
     pub resolution_width: Option<i32>,
     pub resolution_height: Option<i32>,
 }

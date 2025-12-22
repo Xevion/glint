@@ -5,6 +5,7 @@
 	import TimeAgo from '$lib/components/time-ago.svelte';
 	import AdminTable from '$lib/components/admin-table.svelte';
 	import CreateJobDialog from '$lib/components/create-job-dialog.svelte';
+	import JobDetailsDialog from '$lib/components/job-details-dialog.svelte';
 	import { api } from '$lib/api';
 	import type { Shader, Scene, CaptureWithContext } from '$lib/api';
 	import type { JobWithDetails } from '$lib/api/endpoints/admin';
@@ -19,6 +20,8 @@
 	let refreshing = $state(false);
 	let healthStatus = $state<'ok' | 'error' | 'checking'>('checking');
 	let lastRefreshed = $state<Date | null>(null);
+	let selectedJob = $state<JobWithDetails | null>(null);
+	let showJobDetails = $state(false);
 
 	let refreshInterval: number | undefined;
 
@@ -182,8 +185,53 @@
 			key: 'completed_at',
 			name: 'Completed',
 			component: 'time' as const
+		},
+		{
+			id: 'actions',
+			key: 'id',
+			name: 'Actions',
+			component: 'job-actions' as const,
+			onAction: handleJobAction
 		}
 	];
+
+	async function handleJobAction(action: string, job: JobWithDetails) {
+		if (action === 'view-details') {
+			selectedJob = job;
+			showJobDetails = true;
+			return;
+		}
+
+		if (action === 'cancel') {
+			const result = await api.admin.cancelJob(job.id);
+			if (result.isOk) {
+				void loadJobs();
+			} else {
+				errors.jobs = result.error.message;
+			}
+		} else if (action === 'retry') {
+			const result = await api.admin.retryJob(job.id);
+			if (result.isOk) {
+				void loadJobs();
+			} else {
+				errors.jobs = result.error.message;
+			}
+		} else if (action === 'release') {
+			const result = await api.admin.releaseJob(job.id);
+			if (result.isOk) {
+				void loadJobs();
+			} else {
+				errors.jobs = result.error.message;
+			}
+		} else if (action === 'delete') {
+			const result = await api.admin.deleteJob(job.id);
+			if (result.isOk) {
+				void loadJobs();
+			} else {
+				errors.jobs = result.error.message;
+			}
+		}
+	}
 
 	async function loadShaders() {
 		const result = await api.shaders.list();
@@ -397,3 +445,7 @@
 		</div>
 	{/if}
 </div>
+
+{#if selectedJob}
+	<JobDetailsDialog job={selectedJob} bind:open={showJobDetails} />
+{/if}

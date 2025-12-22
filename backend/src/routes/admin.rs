@@ -2,8 +2,9 @@ use axum::{
     Json, Router,
     extract::{Path, State},
     http::StatusCode,
-    routing::{get, post},
+    routing::{get, post, delete, put},
 };
+use crate::db::UtcDateTime;
 use uuid::Uuid;
 
 use crate::{
@@ -23,6 +24,10 @@ pub fn router() -> Router<AppState> {
         .route("/worlds", post(create_world))
         .route("/scenes", post(create_scene))
         .route("/jobs", get(list_jobs).post(create_job))
+        .route("/jobs/{id}", delete(delete_job))
+        .route("/jobs/{id}/cancel", put(cancel_job))
+        .route("/jobs/{id}/retry", put(retry_job))
+        .route("/jobs/{id}/release", put(release_job))
 }
 
 /// POST /api/admin/shaders
@@ -35,7 +40,7 @@ async fn create_shader(
     let result = sqlx::query(
         r#"
         INSERT INTO shaders (id, name, slug, description, modrinth_id, curseforge_id, website_url, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'), datetime('now'))
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now', 'utc'), datetime('now', 'utc'))
         "#,
     )
     .bind(&id)
@@ -88,7 +93,7 @@ async fn create_shader_version(
     sqlx::query(
         r#"
         INSERT INTO shader_versions (id, shader_id, version, modrinth_version_id, download_url, file_hash, created_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now', 'utc'))
         "#,
     )
     .bind(&id)
@@ -118,7 +123,7 @@ async fn create_world(
     sqlx::query(
         r#"
         INSERT INTO worlds (id, name, slug, description, minecraft_version, file_url, file_hash, size_bytes, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'), datetime('now'))
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now', 'utc'), datetime('now', 'utc'))
         "#,
     )
     .bind(&id)
@@ -172,7 +177,7 @@ async fn create_scene(
             dimension, time_of_day_ticks, weather, weather_intensity, moon_phase, biome,
             definition_json, tags, created_at
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, datetime('now'))
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, datetime('now', 'utc'))
         "#,
     )
     .bind(&id)
@@ -258,7 +263,7 @@ async fn create_job(
     sqlx::query(
         r#"
         INSERT INTO jobs (id, shader_version_id, scene_ids, profiles, priority, status, attempts, max_attempts, created_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, 'pending', 0, 3, datetime('now'))
+        VALUES (?1, ?2, ?3, ?4, ?5, 'pending', 0, 3, datetime('now', 'utc'))
         "#,
     )
     .bind(&id)
@@ -362,14 +367,138 @@ struct JobWithDetails {
     attempts: i32,
     max_attempts: i32,
     agent_id: Option<String>,
-    claimed_at: Option<String>,
-    last_heartbeat: Option<String>,
-    started_at: Option<String>,
-    completed_at: Option<String>,
+    claimed_at: Option<UtcDateTime>,
+    last_heartbeat: Option<UtcDateTime>,
+    started_at: Option<UtcDateTime>,
+    completed_at: Option<UtcDateTime>,
     error_message: Option<String>,
-    created_at: String,
+    created_at: UtcDateTime,
     shader_name: String,
     shader_slug: String,
     shader_version: String,
     scene_count: i32,
+}
+
+/// DELETE /api/admin/jobs/{id}
+async fn delete_job(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+) -> AppResult<StatusCode> {
+    let result = sqlx::query("DELETE FROM jobs WHERE id = ?1")
+        .bind(&job_id)
+        .execute(state.db())
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(crate::error::AppError::NotFound("Job not found".into()));
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// PUT /api/admin/jobs/{id}/cancel
+async fn cancel_job(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+) -> AppResult<Json<Job>> {
+    // Only cancel pending or claimed jobs
+    let result = sqlx::query(
+        r#"
+        UPDATE jobs 
+        SET status = 'failed', 
+            error_message = 'Cancelled by admin',
+            completed_at = datetime('now', 'utc')
+        WHERE id = ?1 AND status IN ('pending', 'claimed')
+        "#,
+    )
+    .bind(&job_id)
+    .execute(state.db())
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(crate::error::AppError::Conflict(
+            "Job not found or cannot be cancelled (only pending/claimed jobs can be cancelled)"
+                .into(),
+        ));
+    }
+
+    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = ?1")
+        .bind(&job_id)
+        .fetch_one(state.db())
+        .await?;
+
+    Ok(Json(job))
+}
+
+/// PUT /api/admin/jobs/{id}/retry
+async fn retry_job(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+) -> AppResult<Json<Job>> {
+    // Only retry failed jobs
+    let result = sqlx::query(
+        r#"
+        UPDATE jobs 
+        SET status = 'pending',
+            attempts = 0,
+            error_message = NULL,
+            agent_id = NULL,
+            claimed_at = NULL,
+            last_heartbeat = NULL,
+            started_at = NULL,
+            completed_at = NULL
+        WHERE id = ?1 AND status = 'failed'
+        "#,
+    )
+    .bind(&job_id)
+    .execute(state.db())
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(crate::error::AppError::Conflict(
+            "Job not found or cannot be retried (only failed jobs can be retried)".into(),
+        ));
+    }
+
+    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = ?1")
+        .bind(&job_id)
+        .fetch_one(state.db())
+        .await?;
+
+    Ok(Json(job))
+}
+
+/// PUT /api/admin/jobs/{id}/release
+async fn release_job(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+) -> AppResult<Json<Job>> {
+    // Release claimed or running jobs
+    let result = sqlx::query(
+        r#"
+        UPDATE jobs 
+        SET status = 'pending',
+            agent_id = NULL,
+            claimed_at = NULL,
+            last_heartbeat = NULL
+        WHERE id = ?1 AND status IN ('claimed', 'running')
+        "#,
+    )
+    .bind(&job_id)
+    .execute(state.db())
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(crate::error::AppError::Conflict(
+            "Job not found or cannot be released (only claimed/running jobs can be released)"
+                .into(),
+        ));
+    }
+
+    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = ?1")
+        .bind(&job_id)
+        .fetch_one(state.db())
+        .await?;
+
+    Ok(Json(job))
 }

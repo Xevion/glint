@@ -34,8 +34,8 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
         UPDATE jobs
         SET status = 'claimed',
             agent_id = ?1,
-            claimed_at = datetime('now'),
-            last_heartbeat = datetime('now'),
+            claimed_at = datetime('now', 'utc'),
+            last_heartbeat = datetime('now', 'utc'),
             attempts = attempts + 1
         WHERE id = (
             SELECT id FROM jobs
@@ -174,7 +174,7 @@ async fn heartbeat(
     let result = sqlx::query(
         r#"
         UPDATE jobs
-        SET last_heartbeat = datetime('now'),
+        SET last_heartbeat = datetime('now', 'utc'),
             status = CASE WHEN status = 'claimed' THEN 'running' ELSE status END
         WHERE id = ?1 AND status IN ('claimed', 'running')
         "#,
@@ -321,7 +321,7 @@ async fn complete_job(
     sqlx::query(
         r#"
         UPDATE jobs
-        SET status = 'completed', completed_at = datetime('now')
+        SET status = 'completed', completed_at = datetime('now', 'utc')
         WHERE id = ?1
         "#,
     )
@@ -344,7 +344,7 @@ async fn fail_job(
         UPDATE jobs
         SET status = 'failed', 
             error_message = ?1, 
-            completed_at = datetime('now')
+            completed_at = datetime('now', 'utc')
         WHERE id = ?2 AND status IN ('claimed', 'running')
         "#,
     )
