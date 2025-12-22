@@ -1,6 +1,7 @@
 import { ShaderEndpoints } from './endpoints/shaders';
 import { SceneEndpoints } from './endpoints/scenes';
 import { CaptureEndpoints } from './endpoints/captures';
+import { AdminEndpoints } from './endpoints/admin';
 import { API_BASE_URL } from './config';
 
 /**
@@ -20,7 +21,8 @@ export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
 	return {
 		shaders: new ShaderEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
 		scenes: new SceneEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		captures: new CaptureEndpoints(baseUrl ?? API_BASE_URL, fetchFn)
+		captures: new CaptureEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
+		admin: new AdminEndpoints(baseUrl ?? API_BASE_URL, fetchFn)
 	};
 }
 

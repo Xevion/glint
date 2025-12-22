@@ -211,10 +211,12 @@
 				</span>
 			</div>
 
+			<!-- External links don't need resolve() - only internal app routes -->
+			<!-- eslint-disable svelte/no-navigation-without-resolve -->
 			<div class="flex items-center gap-1">
 				{#if modrinthUrl}
 					<a
-						href={resolve(modrinthUrl)}
+						href={modrinthUrl}
 						target="_blank"
 						rel="noopener noreferrer"
 						data-external-link
@@ -227,7 +229,7 @@
 				{/if}
 				{#if curseforgeUrl}
 					<a
-						href={resolve(curseforgeUrl)}
+						href={curseforgeUrl}
 						target="_blank"
 						rel="noopener noreferrer"
 						data-external-link
@@ -240,7 +242,7 @@
 				{/if}
 				{#if shader.website_url}
 					<a
-						href={resolve(shader.website_url)}
+						href={shader.website_url}
 						target="_blank"
 						rel="noopener noreferrer"
 						data-external-link
@@ -259,6 +261,7 @@
 					</a>
 				{/if}
 			</div>
+			<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		</div>
 	</div>
 </div>

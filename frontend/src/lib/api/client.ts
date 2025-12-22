@@ -69,6 +69,33 @@ export class ApiClient {
 	}
 
 	/**
+	 * GET request for plain text response
+	 */
+	protected async getText(path: string): Promise<Result<string, ApiError>> {
+		const url = `${this.baseUrl}${path}`;
+
+		try {
+			const response = await this.fetchFn(url, { method: 'GET' });
+
+			if (!response.ok) {
+				let body: unknown;
+				try {
+					body = await response.json();
+				} catch {
+					// Response body isn't JSON, ignore
+				}
+				return Result.err(ApiError.fromResponse(response, body));
+			}
+
+			const text = await response.text();
+			return Result.ok(text);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Network request failed';
+			return Result.err(ApiError.network(message));
+		}
+	}
+
+	/**
 	 * POST request
 	 */
 	protected post<T>(path: string, body?: unknown): Promise<Result<T, ApiError>> {

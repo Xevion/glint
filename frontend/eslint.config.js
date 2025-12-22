@@ -78,5 +78,15 @@ export default defineConfig(
 				{ checksVoidReturn: { attributes: false } }
 			]
 		}
+	},
+	{
+		files: ['src/lib/components/ui/**/*.svelte'],
+		rules: {
+			'@typescript-eslint/no-unsafe-assignment': 'off',
+			'@typescript-eslint/no-unsafe-argument': 'off',
+			'@typescript-eslint/no-unsafe-call': 'off',
+			'@typescript-eslint/no-redundant-type-constituents': 'off',
+			'@typescript-eslint/prefer-nullish-coalescing': 'off'
+		}
 	}
 );

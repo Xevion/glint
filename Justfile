@@ -113,6 +113,29 @@ smoke platform="fabric":
 orchestrate platform="fabric":
 	cd mod && GLINT_AUTONOMOUS=true ./gradlew :{{platform}}:runClient
 
+# --- Agent Development ---
+
+# Run agent in development mode (requires backend running)
+dev-agent:
+	cargo run --manifest-path agent/Cargo.toml
+
+# Run agent once and exit (for testing single job)
+dev-agent-once:
+	cargo run --manifest-path agent/Cargo.toml -- --once
+
+# Check agent code
+check-agent:
+	cargo fmt --manifest-path agent/Cargo.toml -- --check
+	cargo clippy --manifest-path agent/Cargo.toml -- --deny warnings
+
+# Format agent code
+format-agent:
+	cargo fmt --manifest-path agent/Cargo.toml
+
+# Test agent
+test-agent:
+	cargo nextest run --manifest-path agent/Cargo.toml
+
 # Query Minecraft source JAR
 # Usage:
 #   just mcjar list net/minecraft/client/renderer/        # List classes in package

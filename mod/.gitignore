@@ -5,33 +5,23 @@ build/
 out/
 classes/
 
-# IDEA
-.idea/
+# IDE
 *.iml
 *.ipr
 *.iws
-
-# VSCode
-.vscode/
 *.code-workspace
-
-# Eclipse
 .classpath
 .project
 .settings/
 
-# Fabric
+# Minecraft development
 run/
 runs/
-
-# macOS
-.DS_Store
 
 # Loom
 .loom-cache/
 remappedJars/
 remappedSrc/
 
-# Misc
+# Logs
 logs/
-*.log

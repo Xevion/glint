@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { resolve } from '$app/paths';
-	import { Sun, Moon } from '@lucide/svelte';
+	import { Sun, Moon, Settings } from '@lucide/svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
 
 	const navItems = [
@@ -35,23 +35,37 @@
 			{/each}
 		</div>
 
-		<button
-			onclick={() => {
-				themeStore.toggle();
-			}}
-			class="nav-icon rounded-md p-2 transition-colors"
-			aria-label="Toggle theme"
-		>
-			{#if themeStore.isDark}
-				<Sun class="size-5" />
-			{:else}
-				<Moon class="size-5" />
-			{/if}
-		</button>
+		<div class="flex gap-2">
+			<a
+				href={resolve('/admin')}
+				class="nav-icon rounded-md p-2 transition-colors"
+				aria-label="Admin panel"
+			>
+				<Settings class="size-5" />
+			</a>
+			<button
+				onclick={() => {
+					themeStore.toggle();
+				}}
+				class="nav-icon rounded-md p-2 transition-colors"
+				aria-label="Toggle theme"
+			>
+				{#if themeStore.isDark}
+					<Sun class="size-5" />
+				{:else}
+					<Moon class="size-5" />
+				{/if}
+			</button>
+		</div>
 	</div>
 </nav>
 
 <style>
+	:root {
+		--glint-color-1: oklch(0.65 0.25 300);
+		--glint-color-2: oklch(0.75 0.2 320);
+	}
+
 	.glint-title {
 		position: relative;
 		color: var(--foreground);
@@ -59,9 +73,9 @@
 			110deg,
 			var(--foreground) 0%,
 			var(--foreground) 92%,
-			oklch(0.65 0.25 300) 94%,
-			oklch(0.75 0.2 320) 96%,
-			oklch(0.65 0.25 300) 98%,
+			var(--glint-color-1) 94%,
+			var(--glint-color-2) 96%,
+			var(--glint-color-1) 98%,
 			var(--foreground) 100%
 		);
 		background-size: 900% 100%;

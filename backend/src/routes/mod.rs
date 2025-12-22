@@ -1,3 +1,5 @@
+mod admin;
+mod agent;
 mod captures;
 mod scenes;
 mod shaders;
@@ -18,6 +20,8 @@ fn api_router() -> Router<AppState> {
         .nest("/shaders", shaders::router())
         .nest("/scenes", scenes::router())
         .nest("/captures", captures::router())
+        .nest("/agent", agent::router())
+        .nest("/admin", admin::router())
 }
 
 async fn health() -> &'static str {

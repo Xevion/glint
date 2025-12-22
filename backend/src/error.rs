@@ -13,6 +13,9 @@ pub enum AppError {
     #[error("Bad request: {0}")]
     BadRequest(String),
 
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
@@ -22,26 +25,32 @@ pub enum AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let (status, message) = match &self {
-            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
-            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+        let (status, error_code, message) = match &self {
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone()),
+            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg.clone()),
+            AppError::Conflict(msg) => (StatusCode::CONFLICT, "CONFLICT", msg.clone()),
             AppError::Database(e) => {
                 tracing::error!("Database error: {e}");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "Database error".to_string(),
+                    "DATABASE_ERROR",
+                    "Database error occurred".to_string(),
                 )
             }
             AppError::Internal(e) => {
                 tracing::error!("Internal error: {e}");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "Internal error".to_string(),
+                    "INTERNAL_ERROR",
+                    "Internal server error occurred".to_string(),
                 )
             }
         };
 
-        let body = Json(json!({ "error": message }));
+        let body = Json(json!({
+            "error": message,
+            "code": error_code
+        }));
         (status, body).into_response()
     }
 }
