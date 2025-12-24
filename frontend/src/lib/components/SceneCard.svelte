@@ -1,9 +1,10 @@
 <script lang="ts">
-	import type { Scene } from '$lib/data/types';
+	import type { Scene } from '$lib/api/types';
 	import {
 		getBiomeDisplayName,
 		getDimensionDisplayName,
-		getWeatherDisplayName
+		getWeatherDisplayName,
+		hashStringToNumber
 	} from '$lib/utils/display';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -17,8 +18,23 @@
 
 	let { scene, class: className }: Props = $props();
 
-	// Parse tags from JSON string
-	const tags = $derived<string[]>(scene.tags ? (JSON.parse(scene.tags) as string[]) : []);
+	// Parse tags from JSON string (with error handling)
+	function parseTags(tagsJson: string | null): string[] {
+		if (!tagsJson) return [];
+		try {
+			const parsed: unknown = JSON.parse(tagsJson);
+			if (!Array.isArray(parsed)) {
+				console.warn('SceneCard: tags is not an array', typeof parsed);
+				return [];
+			}
+			return parsed as string[];
+		} catch (e) {
+			console.warn('SceneCard: failed to parse tags JSON', e);
+			return [];
+		}
+	}
+
+	const tags = $derived<string[]>(parseTags(scene.tags));
 
 	// Determine time of day from ticks (0-24000, where 0=6am, 6000=noon, 18000=midnight)
 	function getTimeOfDay(ticks: number): string {
@@ -30,16 +46,6 @@
 	}
 
 	const timeOfDay = $derived(getTimeOfDay(scene.time_of_day_ticks));
-
-	// Deterministic wallpaper selection based on scene ID (avoids hydration mismatch)
-	function hashStringToNumber(str: string): number {
-		let hash = 0;
-		for (let i = 0; i < str.length; i++) {
-			hash = (hash << 5) - hash + str.charCodeAt(i);
-			hash = hash & hash; // Convert to 32-bit integer
-		}
-		return Math.abs(hash);
-	}
 
 	const wallpaperIndex = $derived(hashStringToNumber(scene.id) % 50);
 

@@ -4,8 +4,27 @@ type Theme = 'light' | 'dark';
 
 function getInitialTheme(): Theme {
 	if (!browser) return 'light';
-	// Read from DOM - the blocking script in app.html already set this
-	return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+
+	// First try: Read from DOM (the blocking script in app.html should have set this)
+	if (document.documentElement.classList.contains('dark')) {
+		return 'dark';
+	}
+	if (document.documentElement.classList.contains('light')) {
+		return 'light';
+	}
+
+	// Fallback: Read from localStorage directly (in case blocking script failed)
+	const stored = localStorage.getItem('theme');
+	if (stored === 'dark' || stored === 'light') {
+		return stored;
+	}
+
+	// Final fallback: Check system preference
+	if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+		return 'dark';
+	}
+
+	return 'light';
 }
 
 function createThemeStore() {

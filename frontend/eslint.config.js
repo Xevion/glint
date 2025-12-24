@@ -86,7 +86,9 @@ export default defineConfig(
 			'@typescript-eslint/no-unsafe-argument': 'off',
 			'@typescript-eslint/no-unsafe-call': 'off',
 			'@typescript-eslint/no-redundant-type-constituents': 'off',
-			'@typescript-eslint/prefer-nullish-coalescing': 'off'
+			'@typescript-eslint/prefer-nullish-coalescing': 'off',
+			'@typescript-eslint/no-useless-default-assignment': 'off',
+			'svelte/no-navigation-without-resolve': 'off'
 		}
 	}
 );

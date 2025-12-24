@@ -10,7 +10,7 @@
 	// Filter state
 	let searchQuery = $state('');
 
-	const filteredScenes = $derived(() => {
+	const filteredScenes = $derived.by(() => {
 		return scenes.filter((scene: (typeof scenes)[0]) => {
 			if (searchQuery && !scene.name.toLowerCase().includes(searchQuery.toLowerCase()))
 				return false;
@@ -72,17 +72,17 @@
 
 	<!-- Results count -->
 	<div in:fade={{ duration: 300, delay: 200 }} class="mb-4 text-sm text-muted-foreground">
-		{#if filteredScenes().length === scenes.length}
+		{#if filteredScenes.length === scenes.length}
 			Showing all {scenes.length} scenes
 		{:else}
-			Showing {filteredScenes().length} of {scenes.length} scenes
+			Showing {filteredScenes.length} of {scenes.length} scenes
 		{/if}
 	</div>
 
 	<!-- Scene Grid -->
-	{#if filteredScenes().length > 0}
+	{#if filteredScenes.length > 0}
 		<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-			{#each filteredScenes() as scene, i (scene.id)}
+			{#each filteredScenes as scene, i (scene.id)}
 				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>
 					<SceneCard {scene} />
 				</div>

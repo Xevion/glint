@@ -9,6 +9,7 @@
 	import { api } from '$lib/api';
 	import type { Shader, Scene, CaptureWithContext } from '$lib/api';
 	import type { JobWithDetails } from '$lib/api/endpoints/admin';
+	import { escapeHtml } from '$lib/utils/display';
 
 	let shaders = $state<Shader[]>([]);
 	let scenes = $state<Scene[]>([]);
@@ -16,8 +17,10 @@
 	let jobs = $state<JobWithDetails[]>([]);
 	let loading = $state(true);
 	let errors = $state<Record<string, string>>({});
-	let autoRefresh = $state(false);
+	let autoRefresh = $state(true);
 	let refreshing = $state(false);
+	let refreshTimeout: number | undefined;
+	let isLoadingData = $state(false);
 	let healthStatus = $state<'ok' | 'error' | 'checking'>('checking');
 	let lastRefreshed = $state<Date | null>(null);
 	let selectedJob = $state<JobWithDetails | null>(null);
@@ -74,16 +77,6 @@
 			href: (row: Scene) => `/scenes/${row.slug}`
 		}
 	];
-
-	// Helper: Escape HTML to prevent XSS
-	function escapeHtml(str: string): string {
-		return str
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;');
-	}
 
 	// Capture table columns
 	const captureColumns = [
@@ -280,20 +273,30 @@
 	}
 
 	async function loadData() {
-		const prevRefreshing = refreshing;
+		// Prevent overlapping refresh calls
+		if (isLoadingData) return;
+		isLoadingData = true;
+
+		// Clear any pending timeout
+		if (refreshTimeout) {
+			clearTimeout(refreshTimeout);
+			refreshTimeout = undefined;
+		}
+
 		refreshing = true;
 		errors = {};
 
-		await Promise.all([loadShaders(), loadScenes(), loadCaptures(), loadJobs(), loadHealth()]);
-
-		loading = false;
-		lastRefreshed = new Date();
-		if (!prevRefreshing) {
-			refreshing = false;
+		try {
+			await Promise.all([loadShaders(), loadScenes(), loadCaptures(), loadJobs(), loadHealth()]);
+			lastRefreshed = new Date();
+		} finally {
+			loading = false;
+			isLoadingData = false;
+			// Keep spinner visible briefly for visual feedback
+			refreshTimeout = window.setTimeout(() => {
+				refreshing = false;
+			}, 500);
 		}
-		setTimeout(() => {
-			refreshing = false;
-		}, 500);
 	}
 
 	function toggleAutoRefresh() {
@@ -310,11 +313,20 @@
 
 	onMount(() => {
 		void loadData();
+		// Start auto-refresh since it's enabled by default
+		if (autoRefresh) {
+			refreshInterval = window.setInterval(() => {
+				void loadData();
+			}, 5000);
+		}
 	});
 
 	onDestroy(() => {
 		if (refreshInterval) {
 			clearInterval(refreshInterval);
+		}
+		if (refreshTimeout) {
+			clearTimeout(refreshTimeout);
 		}
 	});
 </script>

@@ -1,6 +1,11 @@
 <script lang="ts">
-	import type { Shader } from '$lib/data/types';
-	import { formatDate, getModrinthUrl, getCurseforgeUrl } from '$lib/utils/display';
+	import type { Shader } from '$lib/api/types';
+	import {
+		formatDate,
+		getModrinthUrl,
+		getCurseforgeUrl,
+		hashStringToNumber
+	} from '$lib/utils/display';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { comparisonStore } from '$lib/stores/comparison.svelte';
@@ -13,16 +18,6 @@
 	}
 
 	let { shader, class: className }: Props = $props();
-
-	// Deterministic wallpaper selection based on shader ID (avoids hydration mismatch)
-	function hashStringToNumber(str: string): number {
-		let hash = 0;
-		for (let i = 0; i < str.length; i++) {
-			hash = (hash << 5) - hash + str.charCodeAt(i);
-			hash = hash & hash; // Convert to 32-bit integer
-		}
-		return Math.abs(hash);
-	}
 
 	const wallpaperIndex = $derived(hashStringToNumber(shader.id) % 50);
 

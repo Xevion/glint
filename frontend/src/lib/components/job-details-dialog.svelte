@@ -10,23 +10,24 @@
 
 	let { job, open = $bindable(false) }: Props = $props();
 
-	function parseSceneIds(sceneIds: string | null): string[] {
-		if (!sceneIds) return [];
+	function parseJsonArray(json: string | null): string[] {
+		if (!json) return [];
 		try {
-			return JSON.parse(sceneIds) as string[];
-		} catch {
+			const parsed: unknown = JSON.parse(json);
+			if (!Array.isArray(parsed)) {
+				console.warn('parseJsonArray: expected array, got', typeof parsed);
+				return [];
+			}
+			return parsed as string[];
+		} catch (e) {
+			console.warn('parseJsonArray: failed to parse JSON', e);
 			return [];
 		}
 	}
 
-	function parseProfiles(profiles: string | null): string[] {
-		if (!profiles) return [];
-		try {
-			return JSON.parse(profiles) as string[];
-		} catch {
-			return [];
-		}
-	}
+	// Derive parsed values once to avoid redundant parsing
+	const sceneIds = $derived(job ? parseJsonArray(job.scene_ids) : []);
+	const profiles = $derived(job ? parseJsonArray(job.profiles) : []);
 </script>
 
 <Dialog bind:open>
@@ -76,9 +77,9 @@
 				<div>
 					<h3 class="mb-2 text-sm font-semibold">Scene IDs ({job.scene_count})</h3>
 					<div class="rounded-md border bg-muted p-2">
-						{#if parseSceneIds(job.scene_ids).length > 0}
+						{#if sceneIds.length > 0}
 							<ul class="space-y-1">
-								{#each parseSceneIds(job.scene_ids) as sceneId (sceneId)}
+								{#each sceneIds as sceneId (sceneId)}
 									<li class="font-mono text-xs">{sceneId}</li>
 								{/each}
 							</ul>
@@ -88,12 +89,12 @@
 					</div>
 				</div>
 
-				{#if job.profiles}
+				{#if profiles.length > 0}
 					<div>
 						<h3 class="mb-2 text-sm font-semibold">Profiles</h3>
 						<div class="rounded-md border bg-muted p-2">
 							<ul class="space-y-1">
-								{#each parseProfiles(job.profiles) as profile (profile)}
+								{#each profiles as profile (profile)}
 									<li class="font-mono text-xs">{profile}</li>
 								{/each}
 							</ul>

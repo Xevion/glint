@@ -1,4 +1,3 @@
-import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
 
 /**
@@ -8,8 +7,8 @@ import { env } from '$env/dynamic/public';
  * In production: Uses PUBLIC_API_URL env var or falls back to same origin
  */
 export function getApiUrl(): string {
-	// In browser, check for public env var
-	if (browser && env.PUBLIC_API_URL) {
+	// Check for public env var (works in both browser and SSR)
+	if (env.PUBLIC_API_URL) {
 		return env.PUBLIC_API_URL;
 	}
 

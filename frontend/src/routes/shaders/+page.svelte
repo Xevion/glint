@@ -11,7 +11,7 @@
 	let searchQuery = $state('');
 	let sortBy = $state<'name' | 'updated'>('updated');
 
-	const filteredShaders = $derived(() => {
+	const filteredShaders = $derived.by(() => {
 		let result = shaders.filter((shader: (typeof shaders)[0]) => {
 			if (searchQuery && !shader.name.toLowerCase().includes(searchQuery.toLowerCase()))
 				return false;
@@ -96,17 +96,17 @@
 
 	<!-- Results count -->
 	<div in:fade={{ duration: 300, delay: 200 }} class="mb-4 text-sm text-muted-foreground">
-		{#if filteredShaders().length === shaders.length}
+		{#if filteredShaders.length === shaders.length}
 			Showing all {shaders.length} shaders
 		{:else}
-			Showing {filteredShaders().length} of {shaders.length} shaders
+			Showing {filteredShaders.length} of {shaders.length} shaders
 		{/if}
 	</div>
 
 	<!-- Shader Grid -->
-	{#if filteredShaders().length > 0}
+	{#if filteredShaders.length > 0}
 		<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-			{#each filteredShaders() as shader, i (shader.id)}
+			{#each filteredShaders as shader, i (shader.id)}
 				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>
 					<ShaderCard {shader} />
 				</div>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { fly, fade } from 'svelte/transition';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 
 	const message = 'Comparison features coming soon in alpha development';
@@ -94,8 +95,8 @@
 			in:fade={{ duration: 300, delay: 200 }}
 			class="flex flex-col gap-3 sm:flex-row sm:justify-center"
 		>
-			<Button href="/shaders" variant="default">Browse Shaders</Button>
-			<Button href="/scenes" variant="outline">View Scenes</Button>
+			<Button href={resolve('/shaders')} variant="default">Browse Shaders</Button>
+			<Button href={resolve('/scenes')} variant="outline">View Scenes</Button>
 		</div>
 	</div>
 </div>

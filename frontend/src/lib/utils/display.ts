@@ -1,4 +1,30 @@
 /**
+ * Generate a deterministic number from a string (for consistent random-like selection).
+ * Useful for selecting wallpapers or other assets based on entity IDs.
+ */
+export function hashStringToNumber(str: string): number {
+	let hash = 0;
+	for (let i = 0; i < str.length; i++) {
+		hash = (hash << 5) - hash + str.charCodeAt(i);
+		hash = hash & hash; // Convert to 32-bit integer
+	}
+	return Math.abs(hash);
+}
+
+/**
+ * Escape HTML special characters to prevent XSS attacks.
+ * Use this when rendering user-provided or dynamic content in HTML strings.
+ */
+export function escapeHtml(str: string): string {
+	return str
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#039;');
+}
+
+/**
  * Format a number with K/M suffixes for compact display.
  * Returns '0' if null/undefined.
  */
@@ -53,7 +79,7 @@ export function getBiomeDisplayName(biome: string | null): string {
  * Convert Minecraft dimension ID to display name.
  */
 export function getDimensionDisplayName(dimension: string): string {
-	return dimension.replace('minecraft:', '').replace('_', ' ');
+	return dimension.replace('minecraft:', '').replace(/_/g, ' ');
 }
 
 /**

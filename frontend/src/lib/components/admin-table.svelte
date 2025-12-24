@@ -1,7 +1,7 @@
 <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
 <script lang="ts" generics="T extends Record<string, any>">
 	/* eslint-disable @typescript-eslint/no-explicit-any */
-	 
+
 	/* eslint-disable svelte/no-navigation-without-resolve */
 	import { DataTable } from '@careswitch/svelte-data-table';
 	import * as Table from '$lib/components/ui/table';
@@ -120,7 +120,11 @@
 										</DropdownMenu.Content>
 									</DropdownMenu.Root>
 								{:else if colDef?.render}
-									<!-- render functions must return safe HTML - sanitization is caller's responsibility -->
+									<!--
+									WARNING: XSS RISK - render functions return raw HTML.
+									All dynamic values MUST be escaped using escapeHtml() from '$lib/utils/display'.
+									Example: `<a href="${escapeHtml(url)}">${escapeHtml(name)}</a>`
+								-->
 									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 									{@html colDef.render(row[column.key], row)}
 								{:else}

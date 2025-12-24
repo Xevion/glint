@@ -28,7 +28,7 @@
 	// Form state
 	let selectedShaderId = $state<string>('');
 	let selectedVersionId = $state<string>('');
-	let selectedSceneIds = new SvelteSet<string>();
+	const selectedSceneIds = new SvelteSet<string>();
 	let profilesInput = $state<string>('');
 	let priority = $state<number>(0);
 
@@ -53,11 +53,14 @@
 			if (shadersResult.isOk) {
 				shaders = shadersResult.value;
 
-				// Load versions for each shader
-				for (const shader of shaders) {
-					const shaderDetail = await api.shaders.getBySlug(shader.slug);
-					if (shaderDetail.isOk) {
-						shaderVersions.set(shader.id, shaderDetail.value.versions);
+				// Load versions for all shaders in parallel
+				const versionResults = await Promise.all(
+					shaders.map((shader) => api.shaders.getBySlug(shader.slug))
+				);
+				for (let i = 0; i < shaders.length; i++) {
+					const result = versionResults[i];
+					if (result.isOk) {
+						shaderVersions.set(shaders[i].id, result.value.versions);
 					}
 				}
 			} else {
@@ -98,11 +101,22 @@
 		loading = true;
 		error = null;
 
+		// Parse and validate profiles (filter empty strings)
+		const parsedProfiles = profilesInput.trim()
+			? profilesInput
+					.split(',')
+					.map((p) => p.trim())
+					.filter(Boolean)
+			: undefined;
+
+		// Clamp priority to valid range
+		const clampedPriority = Math.max(0, Math.min(100, priority || 0)) || undefined;
+
 		const request: CreateJobRequest = {
 			shader_version_id: selectedVersionId,
 			scene_ids: Array.from(selectedSceneIds),
-			profiles: profilesInput.trim() ? profilesInput.split(',').map((p) => p.trim()) : undefined,
-			priority: priority || undefined
+			profiles: parsedProfiles?.length ? parsedProfiles : undefined,
+			priority: clampedPriority
 		};
 
 		const result = await api.admin.createJob(request);
@@ -122,7 +136,7 @@
 	function resetForm() {
 		selectedShaderId = '';
 		selectedVersionId = '';
-		selectedSceneIds = new SvelteSet();
+		selectedSceneIds.clear();
 		profilesInput = '';
 		priority = 0;
 		error = null;
@@ -216,7 +230,9 @@
 									type="checkbox"
 									class="h-4 w-4 rounded border-gray-300"
 									checked={selectedSceneIds.has(scene.id)}
-									onchange={() => { toggleScene(scene.id); }}
+									onchange={() => {
+										toggleScene(scene.id);
+									}}
 								/>
 								<span>{scene.name}</span>
 								<span class="text-xs text-muted-foreground">({scene.slug})</span>

@@ -13,14 +13,21 @@
 	const shader = $derived(data.shader);
 	const captures = $derived(shader.captures);
 
-	// Selected capture for the main preview
-	let selectedCapture = $derived.by(() => captures[0] || null);
+	// Selected capture for the main preview (state so user can change it)
+	let selectedCapture = $state<(typeof captures)[0] | null>(null);
+
+	// Initialize selected capture when captures change
+	$effect(() => {
+		if (captures.length > 0 && !selectedCapture) {
+			selectedCapture = captures[0];
+		}
+	});
 
 	// Get the latest version (assumes versions are sorted newest first)
 	const latestVersion = $derived(shader.versions[0]);
 
 	// Group captures by scene for thumbnail selector
-	const capturesByScene = $derived(() => {
+	const capturesByScene = $derived.by(() => {
 		const map = new SvelteMap<string, CaptureWithContext>();
 		for (const capture of captures) {
 			if (!map.has(capture.scene_id)) {
@@ -111,14 +118,16 @@
 					</div>
 
 					<!-- Scene Thumbnails -->
-					{#if capturesByScene().length > 0}
+					{#if capturesByScene.length > 0}
 						<div class="grid grid-cols-4 gap-2">
-							{#each capturesByScene() as capture (capture.id)}
+							{#each capturesByScene as capture (capture.id)}
 								<button
 									type="button"
 									onclick={() => (selectedCapture = capture)}
-									class="aspect-video overflow-hidden rounded-lg border-2 transition-all hover:border-primary {// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-									selectedCapture?.id === capture.id ? 'border-primary' : 'border-transparent'}"
+									class="aspect-video overflow-hidden rounded-lg border-2 transition-all hover:border-primary {selectedCapture?.id ===
+									capture.id
+										? 'border-primary'
+										: 'border-transparent'}"
 								>
 									{#if capture.screenshot_url}
 										<img
@@ -184,10 +193,19 @@
 									<div class="flex items-center justify-between text-sm">
 										<span class="font-mono text-foreground">{version.version}</span>
 										{#if version.supported_profiles}
-											{@const profiles = JSON.parse(version.supported_profiles) as string[]}
-											<span class="text-xs text-muted-foreground">
-												{profiles.length} profiles
-											</span>
+											{@const profiles = (() => {
+												try {
+													const parsed: unknown = JSON.parse(version.supported_profiles);
+													return Array.isArray(parsed) ? (parsed as string[]) : [];
+												} catch {
+													return [];
+												}
+											})()}
+											{#if profiles.length > 0}
+												<span class="text-xs text-muted-foreground">
+													{profiles.length} profiles
+												</span>
+											{/if}
 										{/if}
 									</div>
 								{/each}
