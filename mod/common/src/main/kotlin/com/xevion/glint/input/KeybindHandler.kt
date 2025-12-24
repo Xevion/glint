@@ -4,6 +4,7 @@ import com.xevion.glint.Glint
 import com.xevion.glint.capture.CaptureSession
 import com.xevion.glint.orchestration.AutonomousOrchestrator
 import com.xevion.glint.scene.SceneManager
+import com.xevion.glint.ui.SceneManagerScreen
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 
@@ -14,11 +15,13 @@ import org.lwjgl.glfw.GLFW
  * - GRAVE (`) - Start multi-shader capture session
  * - F8 - Save current state as scene JSON (copies to clipboard and logs to console)
  * - F9 - Start autonomous orchestration (for testing)
+ * - J - Open scene manager
  */
 object KeybindHandler {
     private var wasGravePressed = false
     private var wasF8Pressed = false
     private var wasF9Pressed = false
+    private var wasJPressed = false
     private var captureSession: CaptureSession? = null
     private var autonomousOrchestrator: AutonomousOrchestrator? = null
 
@@ -46,12 +49,14 @@ object KeybindHandler {
             wasGravePressed = false
             wasF8Pressed = false
             wasF9Pressed = false
+            wasJPressed = false
             return
         }
 
         val gravePressed = isKeyPressed(GLFW.GLFW_KEY_GRAVE_ACCENT)
         val f8Pressed = isKeyPressed(GLFW.GLFW_KEY_F8)
         val f9Pressed = isKeyPressed(GLFW.GLFW_KEY_F9)
+        val jPressed = isKeyPressed(GLFW.GLFW_KEY_J)
 
         if (gravePressed && !wasGravePressed) {
             startCaptureSession()
@@ -65,9 +70,14 @@ object KeybindHandler {
             startAutonomousOrchestration()
         }
 
+        if (jPressed && !wasJPressed) {
+            openSceneManager()
+        }
+
         wasGravePressed = gravePressed
         wasF8Pressed = f8Pressed
         wasF9Pressed = f9Pressed
+        wasJPressed = jPressed
     }
 
     private fun startCaptureSession() {
@@ -107,6 +117,12 @@ object KeybindHandler {
         if (!autonomousOrchestrator!!.start()) {
             autonomousOrchestrator = null
         }
+    }
+
+    private fun openSceneManager() {
+        val mc = Minecraft.getInstance()
+        mc.setScreen(SceneManagerScreen(null))
+        Glint.LOGGER.info("Opening Scene Manager")
     }
 
     /**

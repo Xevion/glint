@@ -61,7 +61,7 @@ object SceneManager {
     /**
      * Loads a scene collection from file.
      */
-    private fun loadCollection(worldName: String): SceneCollection? {
+    fun loadCollection(worldName: String): SceneCollection? {
         loadedCollections[worldName]?.let { return it }
 
         val mc = Minecraft.getInstance()
@@ -182,6 +182,66 @@ object SceneManager {
             )
 
         return JSON.encodeToString(SceneCollection.serializer(), collection)
+    }
+
+    /**
+     * Adds a scene to a collection and persists to disk.
+     * Creates the collection file if it doesn't exist.
+     */
+    fun addScene(
+        worldName: String,
+        scene: Scene,
+    ): Boolean {
+        val mc = Minecraft.getInstance()
+        val scenesDir = File(mc.gameDirectory, "glint/scenes")
+        scenesDir.mkdirs()
+
+        val collection =
+            loadCollection(worldName)?.let {
+                it.copy(scenes = it.scenes + scene)
+            } ?: SceneCollection(world = worldName, scenes = listOf(scene))
+
+        return saveCollection(worldName, collection)
+    }
+
+    /**
+     * Removes a scene from a collection by ID.
+     */
+    fun removeScene(
+        worldName: String,
+        sceneId: String,
+    ): Boolean {
+        val collection = loadCollection(worldName) ?: return false
+        val updatedScenes = collection.scenes.filter { it.id != sceneId }
+
+        if (updatedScenes.size == collection.scenes.size) {
+            Glint.LOGGER.warn("Scene not found for deletion: $sceneId")
+            return false
+        }
+
+        val updatedCollection = collection.copy(scenes = updatedScenes)
+        return saveCollection(worldName, updatedCollection)
+    }
+
+    /**
+     * Saves a collection to disk.
+     */
+    private fun saveCollection(
+        worldName: String,
+        collection: SceneCollection,
+    ): Boolean {
+        val mc = Minecraft.getInstance()
+        val sceneFile = File(mc.gameDirectory, "glint/scenes/$worldName.json")
+
+        return try {
+            sceneFile.writeText(JSON.encodeToString(SceneCollection.serializer(), collection))
+            loadedCollections[worldName] = collection
+            Glint.LOGGER.info("Saved scene collection: $worldName")
+            true
+        } catch (e: Exception) {
+            Glint.LOGGER.error("Failed to save scene collection: $worldName", e)
+            false
+        }
     }
 
     /**
