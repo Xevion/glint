@@ -1,11 +1,14 @@
 package com.xevion.glint.scene
 
 import com.xevion.glint.Glint
+import com.xevion.glint.io.AsyncFileIO
 import com.xevion.glint.screenshot.Camera
 import com.xevion.glint.screenshot.Position
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import java.io.File
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Manages loading and applying scene configurations.
@@ -17,7 +20,17 @@ object SceneManager {
             ignoreUnknownKeys = true
         }
 
-    private val loadedCollections = mutableMapOf<String, SceneCollection>()
+    private val loadedCollections = ConcurrentHashMap<String, SceneCollection>()
+
+    /**
+     * Normalizes a world name into a safe filename.
+     * Converts to lowercase, replaces spaces with underscores, removes unsafe characters.
+     */
+    private fun normalizeFileName(worldName: String): String =
+        worldName
+            .lowercase()
+            .replace(' ', '_')
+            .replace(Regex("[^a-z0-9_-]"), "")
 
     /**
      * Loads a scene by ID from available scene collections.
@@ -59,7 +72,8 @@ object SceneManager {
     }
 
     /**
-     * Loads a scene collection from file.
+     * Loads a scene collection from file synchronously (for legacy compatibility).
+     * Prefer loadCollectionAsync for non-blocking operations.
      */
     fun loadCollection(worldName: String): SceneCollection? {
         loadedCollections[worldName]?.let { return it }
@@ -81,6 +95,32 @@ object SceneManager {
             Glint.LOGGER.error("Failed to parse scene collection: ${sceneFile.absolutePath}", e)
             null
         }
+    }
+
+    /**
+     * Loads a scene collection from file asynchronously.
+     */
+    fun loadCollectionAsync(worldName: String): CompletableFuture<SceneCollection?> {
+        loadedCollections[worldName]?.let { return CompletableFuture.completedFuture(it) }
+
+        val mc = Minecraft.getInstance()
+        val sceneFile = File(mc.gameDirectory, "glint/scenes/$worldName.json")
+
+        if (!sceneFile.exists()) {
+            Glint.LOGGER.error("Scene collection not found: ${sceneFile.absolutePath}")
+            return CompletableFuture.completedFuture(null)
+        }
+
+        return AsyncFileIO
+            .readJson(sceneFile, SceneCollection.serializer())
+            .thenApply { collection ->
+                loadedCollections[worldName] = collection
+                Glint.LOGGER.info("Loaded scene collection: $worldName (${collection.scenes.size} scenes)")
+                collection
+            }.exceptionally { e ->
+                Glint.LOGGER.error("Failed to parse scene collection: ${sceneFile.absolutePath}", e)
+                null
+            }
     }
 
     /**
@@ -187,6 +227,9 @@ object SceneManager {
     /**
      * Adds a scene to a collection and persists to disk.
      * Creates the collection file if it doesn't exist.
+     *
+     * Uses normalized filename to prevent duplicate collections for the same world
+     * (e.g., "New World" and "new_world" would use the same file).
      */
     fun addScene(
         worldName: String,
@@ -196,22 +239,49 @@ object SceneManager {
         val scenesDir = File(mc.gameDirectory, "glint/scenes")
         scenesDir.mkdirs()
 
+        val fileName = normalizeFileName(worldName)
+
         val collection =
-            loadCollection(worldName)?.let {
+            loadCollection(fileName)?.let {
                 it.copy(scenes = it.scenes + scene)
             } ?: SceneCollection(world = worldName, scenes = listOf(scene))
 
-        return saveCollection(worldName, collection)
+        return saveCollection(fileName, collection)
+    }
+
+    /**
+     * Adds a scene to a collection and persists to disk asynchronously.
+     */
+    fun addSceneAsync(
+        worldName: String,
+        scene: Scene,
+    ): CompletableFuture<Boolean> {
+        val mc = Minecraft.getInstance()
+        val scenesDir = File(mc.gameDirectory, "glint/scenes")
+        scenesDir.mkdirs()
+
+        val fileName = normalizeFileName(worldName)
+
+        return loadCollectionAsync(fileName)
+            .thenCompose { existingCollection ->
+                val collection =
+                    existingCollection?.let {
+                        it.copy(scenes = it.scenes + scene)
+                    } ?: SceneCollection(world = worldName, scenes = listOf(scene))
+
+                saveCollectionAsync(fileName, collection)
+            }
     }
 
     /**
      * Removes a scene from a collection by ID.
+     * The fileName parameter should be the normalized filename (without .json extension).
      */
     fun removeScene(
-        worldName: String,
+        fileName: String,
         sceneId: String,
     ): Boolean {
-        val collection = loadCollection(worldName) ?: return false
+        val collection = loadCollection(fileName) ?: return false
         val updatedScenes = collection.scenes.filter { it.id != sceneId }
 
         if (updatedScenes.size == collection.scenes.size) {
@@ -220,11 +290,11 @@ object SceneManager {
         }
 
         val updatedCollection = collection.copy(scenes = updatedScenes)
-        return saveCollection(worldName, updatedCollection)
+        return saveCollection(fileName, updatedCollection)
     }
 
     /**
-     * Saves a collection to disk.
+     * Saves a collection to disk synchronously.
      */
     private fun saveCollection(
         worldName: String,
@@ -245,11 +315,57 @@ object SceneManager {
     }
 
     /**
+     * Saves a collection to disk asynchronously.
+     */
+    private fun saveCollectionAsync(
+        worldName: String,
+        collection: SceneCollection,
+    ): CompletableFuture<Boolean> {
+        val mc = Minecraft.getInstance()
+        val sceneFile = File(mc.gameDirectory, "glint/scenes/$worldName.json")
+
+        return AsyncFileIO
+            .writeJson(sceneFile, collection, SceneCollection.serializer())
+            .thenApply {
+                loadedCollections[worldName] = collection
+                Glint.LOGGER.info("Saved scene collection: $worldName")
+                true
+            }.exceptionally { e ->
+                Glint.LOGGER.error("Failed to save scene collection: $worldName", e)
+                false
+            }
+    }
+
+    /**
      * Clears cached scene collections (useful for reloading after file changes).
      */
     fun clearCache() {
         loadedCollections.clear()
         Glint.LOGGER.info("Scene cache cleared")
+    }
+
+    /**
+     * Checks if a scene ID already exists in any collection.
+     * Searches both base scenes and variants.
+     */
+    fun sceneIdExists(sceneId: String): Boolean {
+        val collections = discoverCollections()
+
+        for ((_, collection) in collections) {
+            // Check base scenes
+            if (collection.scenes.any { it.id == sceneId }) {
+                return true
+            }
+
+            // Check variants
+            for (scene in collection.scenes) {
+                if (scene.variants.any { it.id == sceneId }) {
+                    return true
+                }
+            }
+        }
+
+        return false
     }
 }
 

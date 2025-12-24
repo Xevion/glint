@@ -45,7 +45,7 @@ class SceneList(
         for ((fileName, collection) in collections) {
             addEntry(WorldEntry(collection.world, fileName, collection.scenes.size))
 
-            if (screen.isWorldExpanded(collection.world)) {
+            if (screen.isWorldExpanded(fileName)) {
                 for (scene in collection.scenes) {
                     addEntry(SceneEntry(scene, collection, fileName))
 
@@ -68,8 +68,8 @@ class SceneList(
     ) : Entry() {
         private val expandButton =
             Button
-                .builder(Component.literal(if (screen.isWorldExpanded(worldName)) "▼" else "▶")) {
-                    screen.toggleWorldExpanded(worldName)
+                .builder(Component.literal(if (screen.isWorldExpanded(fileName)) "▼" else "▶")) {
+                    screen.toggleWorldExpanded(fileName)
                 }.width(20)
                 .build()
 
@@ -115,6 +115,13 @@ class SceneList(
                     val resolved = resolveScene(scene, collection, fileName)
                     screen.teleportToScene(resolved)
                 }.width(40)
+                .build()
+
+        private val captureButton =
+            Button
+                .builder(Component.literal("Capture")) {
+                    screen.startCaptureScene(scene.id)
+                }.width(50)
                 .build()
 
         private val deleteButton =
@@ -167,17 +174,23 @@ class SceneList(
             deleteButton.setPosition(left + width - 24, buttonY)
             deleteButton.render(guiGraphics, mouseX, mouseY, delta)
 
-            teleportButton.setPosition(left + width - 68, buttonY)
+            captureButton.setPosition(left + width - 78, buttonY)
+            captureButton.render(guiGraphics, mouseX, mouseY, delta)
+
+            teleportButton.setPosition(left + width - 122, buttonY)
             teleportButton.render(guiGraphics, mouseX, mouseY, delta)
         }
 
-        override fun children() = listOfNotNull(expandButton, teleportButton, deleteButton)
+        override fun children() = listOfNotNull(expandButton, teleportButton, captureButton, deleteButton)
 
-        override fun narratables() = listOfNotNull(expandButton, teleportButton, deleteButton)
+        override fun narratables() = listOfNotNull(expandButton, teleportButton, captureButton, deleteButton)
 
         private fun formatSceneDetails(scene: Scene): String {
             val time = formatTime(scene.timeOfDay)
-            val weather = scene.weather.name.lowercase().replaceFirstChar { it.uppercase() }
+            val weather =
+                scene.weather.name
+                    .lowercase()
+                    .replaceFirstChar { it.uppercase() }
             val dimension = scene.dimension.substringAfter(":")
             return "$time | $weather | $dimension"
         }
@@ -240,8 +253,10 @@ class SceneList(
         collectionFileName: String,
     ): ResolvedScene {
         val mergedConfig =
-            (scene.config ?: com.xevion.glint.scene.SceneConfig())
-                .mergeWith(collection.defaultConfig)
+            (
+                scene.config ?: com.xevion.glint.scene
+                    .SceneConfig()
+            ).mergeWith(collection.defaultConfig)
                 .mergeWith(com.xevion.glint.scene.SceneConfig.DEFAULT)
 
         return ResolvedScene(

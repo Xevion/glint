@@ -1,6 +1,7 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Glint
+import com.xevion.glint.io.SessionDirectoryManager
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.screenshot.*
@@ -8,7 +9,6 @@ import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.time.Instant
-import java.time.format.DateTimeFormatter
 
 /**
  * Manages a multi-shader screenshot capture session.
@@ -23,9 +23,10 @@ import java.time.format.DateTimeFormatter
  * 3. Restore original shader and world state
  */
 class CaptureSession(
-    private val sceneId: String = "default",
+    private val sceneId: String? = null,
     private val outputDir: File? = null,
     private val worldName: String? = null,
+    private val orchestrated: Boolean = false,
 ) {
     private val logger = Glint.LOGGER
     private var state: State = State.Idle
@@ -42,7 +43,7 @@ class CaptureSession(
     private val stabilizationDetector = StabilizationDetector()
     private var resolvedScene: com.xevion.glint.scene.ResolvedScene? = null
     private var sceneApplied: Boolean = false
-    private var originalState: CaptureState.SavedState? = null
+    private var originalState: CaptureStateSnapshot? = null
 
     // Session data returned on completion (for autonomous orchestration)
     private var sessionData: CaptureSessionData? = null
@@ -82,30 +83,49 @@ class CaptureSession(
             return false
         }
 
-        // Load scene
-        resolvedScene = SceneManager.loadScene(sceneId)
-        if (resolvedScene == null) {
-            logger.error("Failed to load scene: $sceneId")
-            return false
+        // Load scene(s)
+        if (sceneId != null) {
+            // Single scene mode
+            resolvedScene = SceneManager.loadScene(sceneId)
+            if (resolvedScene == null) {
+                logger.error("Failed to load scene: $sceneId")
+                return false
+            }
+        } else {
+            // All scenes mode - for now, just get the first scene from current world
+            // TODO: Full multi-scene capture will iterate through all scenes
+            val collections = SceneManager.discoverAllCollections()
+            if (collections.isEmpty()) {
+                logger.error("No scene collections found")
+                return false
+            }
+            val (fileName, collection) = collections.first()
+            val firstScene = collection.scenes.firstOrNull()
+            if (firstScene == null) {
+                logger.error("No scenes found in collection: $fileName")
+                return false
+            }
+            resolvedScene = SceneManager.loadScene(firstScene.id)
+            if (resolvedScene == null) {
+                logger.error("Failed to load scene: ${firstScene.id}")
+                return false
+            }
+            logger.info("Capture All mode: using first scene '${firstScene.id}' from '$fileName'")
         }
 
         // Create session output directory
         startedAt = Instant.now()
-        sessionId =
-            DateTimeFormatter
-                .ofPattern("yyyy-MM-dd_HH-mm-ss")
-                .withZone(java.time.ZoneId.systemDefault())
-                .format(startedAt)
         sessionDir =
             outputDir?.also {
                 // Orchestrator provides parent directory, Screenshot.grab creates screenshots/ subdirectory
+                sessionId = it.name
                 logger.info("Using provided output directory: ${it.absolutePath}")
-            } ?: File(mc.gameDirectory, "glint/captures/$sessionId").also {
-                if (!it.mkdirs()) {
-                    logger.error("Failed to create capture session directory: ${it.absolutePath}")
-                    return false
-                }
-                logger.info("Created capture session directory: ${it.absolutePath}")
+            } ?: run {
+                val capturesDir = File(mc.gameDirectory, "glint/captures")
+                val (dir, id) = SessionDirectoryManager.createSessionDirectory(capturesDir, startedAt!!)
+                sessionId = id
+                logger.info("Created capture session directory: ${dir.absolutePath}")
+                dir
             }
         screenshotEntries.clear()
 
@@ -153,8 +173,8 @@ class CaptureSession(
         currentIndex = 0
 
         // Save original client state and mark capture as active
-        originalState = CaptureState.saveState()
-        CaptureState.startCapture()
+        originalState = CaptureStateSnapshot.capture()
+        CaptureStateManager.startCapture()
         logger.info("Original client state saved, capture mode activated")
 
         transitionTo(State.ApplyingScene)
@@ -166,6 +186,13 @@ class CaptureSession(
      */
     fun tick() {
         if (state == State.Idle) return
+
+        // Check for cancellation request from ESC key
+        if (CaptureStateManager.consumeCancelRequest()) {
+            logger.info("Capture session cancelled by user")
+            transitionTo(State.Finishing)
+            return
+        }
 
         ticksInState++
 
@@ -464,12 +491,14 @@ class CaptureSession(
 
         // Restore original client state (options, camera, etc.)
         originalState?.let {
-            CaptureState.restoreState(it)
+            it.restore()
             logger.info("Original client state restored")
         }
 
-        // End capture mode
-        CaptureState.endCapture()
+        // End capture mode (skip if orchestrated - orchestrator manages capture state)
+        if (!orchestrated) {
+            CaptureStateManager.endCapture()
+        }
 
         // Reset state (keep sessionData for retrieval)
         state = State.Idle
@@ -512,7 +541,7 @@ class CaptureSession(
 
         return CaptureSessionData(
             worldName = resolvedWorldName,
-            sceneId = sceneId,
+            sceneId = resolvedScene?.scene?.id ?: "unknown",
             sessionDir = sessionDirPath,
             startedAt = startedAt.toString(),
             completedAt = completedAt.toString(),

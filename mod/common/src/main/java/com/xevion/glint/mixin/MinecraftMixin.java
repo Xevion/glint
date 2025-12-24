@@ -1,6 +1,6 @@
 package com.xevion.glint.mixin;
 
-import com.xevion.glint.capture.CaptureState;
+import com.xevion.glint.capture.CaptureStateManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
 import org.spongepowered.asm.mixin.Mixin;
@@ -31,7 +31,7 @@ public class MinecraftMixin {
      */
     @Inject(method = "pauseGame", at = @At("HEAD"), cancellable = true)
     private void onPauseGame(boolean pauseOnly, CallbackInfo ci) {
-        if (CaptureState.INSTANCE.isActive()) {
+        if (CaptureStateManager.INSTANCE.isActive()) {
             ci.cancel();
         }
     }
@@ -41,7 +41,7 @@ public class MinecraftMixin {
      */
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
-        boolean isCapturing = CaptureState.INSTANCE.isActive();
+        boolean isCapturing = CaptureStateManager.INSTANCE.isActive();
         Minecraft mc = (Minecraft) (Object) this;
         
         if (isCapturing && !mouseReleasedForCapture) {

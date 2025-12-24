@@ -4,6 +4,7 @@ import com.xevion.glint.Glint
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneManager
+import com.xevion.glint.session.SessionRegistry
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout
 import net.minecraft.client.gui.layouts.LinearLayout
@@ -11,7 +12,9 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.CommonComponents
 import net.minecraft.network.chat.Component
 
-class SceneManagerScreen(private val lastScreen: Screen?) : Screen(Component.literal("Scene Manager")) {
+class SceneManagerScreen(
+    private val lastScreen: Screen?,
+) : Screen(Component.literal("Glint Menu")) {
     private val layout = HeaderAndFooterLayout(this)
     private lateinit var sceneList: SceneList
 
@@ -19,15 +22,31 @@ class SceneManagerScreen(private val lastScreen: Screen?) : Screen(Component.lit
     private val expandedScenes = mutableSetOf<String>()
 
     override fun init() {
-        addTitle()
+        addActionButtons()
         addContents()
         addFooter()
         layout.visitWidgets { addRenderableWidget(it) }
         repositionElements()
     }
 
-    private fun addTitle() {
-        layout.addTitleHeader(title, font)
+    private fun addActionButtons() {
+        val buttonRow = LinearLayout.horizontal().spacing(8)
+
+        buttonRow.addChild(
+            Button
+                .builder(Component.literal("Capture All")) { startOrchestration() }
+                .width(100)
+                .build(),
+        )
+
+        buttonRow.addChild(
+            Button
+                .builder(Component.literal("Save Scene")) { openSaveSceneDialog() }
+                .width(100)
+                .build(),
+        )
+
+        layout.addToHeader(buttonRow)
     }
 
     private fun addContents() {
@@ -38,12 +57,6 @@ class SceneManagerScreen(private val lastScreen: Screen?) : Screen(Component.lit
 
     private fun addFooter() {
         val footer = LinearLayout.horizontal().spacing(8)
-        footer.addChild(
-            Button
-                .builder(Component.literal("Create Scene")) { createNewScene() }
-                .width(100)
-                .build(),
-        )
         footer.addChild(
             Button
                 .builder(CommonComponents.GUI_DONE) { onClose() }
@@ -93,16 +106,33 @@ class SceneManagerScreen(private val lastScreen: Screen?) : Screen(Component.lit
         }
     }
 
-    private fun createNewScene() {
-        Glint.LOGGER.info("Create scene not yet implemented")
-        // TODO: Implement scene creation dialog or use existing saveCurrentStateAsScene
+    fun startCaptureScene(sceneId: String) {
+        if (SessionRegistry.startCaptureSession(sceneId = sceneId)) {
+            Glint.LOGGER.info("Starting capture for scene: $sceneId")
+            onClose()
+        } else {
+            Glint.LOGGER.error("Failed to start capture for scene: $sceneId")
+        }
     }
 
-    fun toggleWorldExpanded(worldName: String) {
-        if (expandedWorlds.contains(worldName)) {
-            expandedWorlds.remove(worldName)
+    private fun openSaveSceneDialog() {
+        minecraft?.setScreen(SaveSceneDialog(this))
+    }
+
+    private fun startOrchestration() {
+        if (SessionRegistry.startOrchestration()) {
+            Glint.LOGGER.info("Starting orchestration from menu")
+            onClose()
         } else {
-            expandedWorlds.add(worldName)
+            Glint.LOGGER.error("Failed to start orchestration")
+        }
+    }
+
+    fun toggleWorldExpanded(fileName: String) {
+        if (expandedWorlds.contains(fileName)) {
+            expandedWorlds.remove(fileName)
+        } else {
+            expandedWorlds.add(fileName)
         }
         refreshSceneList()
     }
@@ -116,7 +146,7 @@ class SceneManagerScreen(private val lastScreen: Screen?) : Screen(Component.lit
         refreshSceneList()
     }
 
-    fun isWorldExpanded(worldName: String): Boolean = expandedWorlds.contains(worldName)
+    fun isWorldExpanded(fileName: String): Boolean = expandedWorlds.contains(fileName)
 
     fun isSceneExpanded(sceneId: String): Boolean = expandedScenes.contains(sceneId)
 }

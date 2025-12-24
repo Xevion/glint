@@ -46,23 +46,37 @@ object SodiumIntegration {
 
     fun isAvailable(): Boolean {
         if (availability == AvailabilityState.UNKNOWN) {
-            availability =
-                try {
-                    sodiumWorldRendererClass = Class.forName("net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer")
-                    AvailabilityState.AVAILABLE
-                } catch (e: ClassNotFoundException) {
-                    Glint.LOGGER.debug("Sodium not detected, using vanilla chunk rendering detection")
-                    AvailabilityState.UNAVAILABLE
-                }
+            initializeSodium()
         }
         return availability == AvailabilityState.AVAILABLE
     }
 
-    private fun initReflection(): Boolean {
-        if (instanceNullableMethod != null) return true
+    /**
+     * Initialize Sodium integration on first access.
+     * Fails loudly if Sodium is detected but reflection setup fails.
+     */
+    private fun initializeSodium() {
+        try {
+            sodiumWorldRendererClass = Class.forName("net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer")
+            Glint.LOGGER.info("Sodium detected, initializing integration")
+
+            // Sodium is present, now try to set up reflection
+            initReflection()
+        } catch (e: ClassNotFoundException) {
+            Glint.LOGGER.debug("Sodium not detected, using vanilla chunk rendering detection")
+            availability = AvailabilityState.UNAVAILABLE
+        }
+    }
+
+    /**
+     * Sets up reflection for Sodium's rendering APIs.
+     * Throws exceptions if Sodium is present but API has changed.
+     */
+    private fun initReflection() {
+        if (instanceNullableMethod != null) return
 
         try {
-            val swrClass = sodiumWorldRendererClass ?: return false
+            val swrClass = sodiumWorldRendererClass ?: throw IllegalStateException("Sodium class not loaded")
 
             // Get SodiumWorldRenderer.instanceNullable()
             instanceNullableMethod = swrClass.getMethod("instanceNullable")
@@ -85,12 +99,32 @@ object SodiumIntegration {
             getTotalThreadCountMethod = chunkBuilderClass!!.getMethod("getTotalThreadCount")
             isBuildQueueEmptyMethod = chunkBuilderClass!!.getMethod("isBuildQueueEmpty")
 
-            Glint.LOGGER.debug("Sodium integration initialized successfully")
-            return true
-        } catch (e: Exception) {
-            Glint.LOGGER.warn("Failed to initialize Sodium reflection: ${e.message}")
+            Glint.LOGGER.info("Sodium integration initialized successfully")
+            availability = AvailabilityState.AVAILABLE
+        } catch (e: NoSuchMethodException) {
             availability = AvailabilityState.UNAVAILABLE
-            return false
+            throw IllegalStateException(
+                "Sodium is installed but its API has changed. " +
+                    "Method not found: ${e.message}. " +
+                    "This version of Glint may not be compatible with your Sodium version.",
+                e,
+            )
+        } catch (e: NoSuchFieldException) {
+            availability = AvailabilityState.UNAVAILABLE
+            throw IllegalStateException(
+                "Sodium is installed but its API has changed. " +
+                    "Field not found: ${e.message}. " +
+                    "This version of Glint may not be compatible with your Sodium version.",
+                e,
+            )
+        } catch (e: ClassNotFoundException) {
+            availability = AvailabilityState.UNAVAILABLE
+            throw IllegalStateException(
+                "Sodium is installed but its internal classes have changed. " +
+                    "Class not found: ${e.message}. " +
+                    "This version of Glint may not be compatible with your Sodium version.",
+                e,
+            )
         }
     }
 
@@ -110,7 +144,6 @@ object SodiumIntegration {
      */
     fun isRenderingComplete(): Boolean? {
         if (!isAvailable()) return null
-        if (!initReflection()) return null
 
         try {
             // Get SodiumWorldRenderer instance
@@ -156,7 +189,6 @@ object SodiumIntegration {
      */
     fun getScheduledJobCount(): Int? {
         if (!isAvailable()) return null
-        if (!initReflection()) return null
 
         try {
             val renderer = instanceNullableMethod!!.invoke(null) ?: return null
@@ -175,7 +207,6 @@ object SodiumIntegration {
      */
     fun needsGraphUpdate(): Boolean? {
         if (!isAvailable()) return null
-        if (!initReflection()) return null
 
         try {
             val renderer = instanceNullableMethod!!.invoke(null) ?: return null
@@ -193,7 +224,6 @@ object SodiumIntegration {
      */
     fun getBusyThreadCount(): Int? {
         if (!isAvailable()) return null
-        if (!initReflection()) return null
 
         try {
             val renderer = instanceNullableMethod!!.invoke(null) ?: return null
@@ -212,7 +242,6 @@ object SodiumIntegration {
      */
     fun getTotalThreadCount(): Int? {
         if (!isAvailable()) return null
-        if (!initReflection()) return null
 
         try {
             val renderer = instanceNullableMethod!!.invoke(null) ?: return null

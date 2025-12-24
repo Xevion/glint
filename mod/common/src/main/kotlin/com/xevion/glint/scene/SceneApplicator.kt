@@ -101,35 +101,49 @@ object SceneApplicator {
 
     private fun applyTimeAndWeather(scene: Scene) {
         val mc = Minecraft.getInstance()
-        val level = mc.level as? net.minecraft.client.multiplayer.ClientLevel
-        if (level == null) {
-            Glint.LOGGER.warn("Cannot apply time and weather - level is null")
+        val server = mc.singleplayerServer
+
+        if (server == null) {
+            Glint.LOGGER.warn("Cannot apply time and weather - not in single-player")
             return
         }
 
-        // Set time of day (uses the ClientLevelData inner class)
-        val levelData = level.levelData
-        if (levelData is net.minecraft.world.level.storage.WritableLevelData) {
-            // Time cannot be set directly on client, but we can request it from server
-            // For now, just log a warning - this needs server-side support
-            Glint.LOGGER.warn("Time setting on client requires server-side support")
-        }
+        // Set time of day on server
+        val overworld = server.overworld()
+        overworld.dayTime = scene.timeOfDay.toLong()
+        Glint.LOGGER.debug("Set server time to: ${scene.timeOfDay}")
 
-        // Set weather (client-side is limited - only rain can be toggled)
-        // Note: Thunder and weather intensity require server-side control
+        // Set weather on server using the public API
         when (scene.weather) {
             Weather.CLEAR -> {
-                level.levelData.setRaining(false)
+                // setWeatherParameters(clearWeatherTime, rainTime, isRaining, isThundering)
+                overworld.setWeatherParameters(6000, 0, false, false)
+                Glint.LOGGER.debug("Set weather to: CLEAR")
             }
 
-            Weather.RAIN, Weather.THUNDER -> {
-                level.levelData.setRaining(true)
-                // Note: Cannot distinguish rain from thunder on client
-                // Note: Weather intensity cannot be set on client
+            Weather.RAIN -> {
+                // setWeatherParameters(clearWeatherTime, rainTime, isRaining, isThundering)
+                overworld.setWeatherParameters(0, 6000, true, false)
+                Glint.LOGGER.debug("Set weather to: RAIN")
+
+                // Note: Weather intensity (rainLevel/thunderLevel) is protected in Level class
+                // It's automatically calculated by the game based on isRaining/isThundering state
+                // Manual intensity control would require mixins or reflection
+                if (scene.weatherIntensity != null) {
+                    Glint.LOGGER.warn("Weather intensity setting not supported (requires protected field access)")
+                }
+            }
+
+            Weather.THUNDER -> {
+                // setWeatherParameters(clearWeatherTime, rainTime, isRaining, isThundering)
+                overworld.setWeatherParameters(0, 6000, true, true)
+                Glint.LOGGER.debug("Set weather to: THUNDER")
+
+                if (scene.weatherIntensity != null) {
+                    Glint.LOGGER.warn("Weather intensity setting not supported (requires protected field access)")
+                }
             }
         }
-
-        Glint.LOGGER.debug("Set time: ${scene.timeOfDay}, weather: ${scene.weather.toMinecraftString()}")
     }
 
     private fun applyRenderSettings(config: SceneConfig) {
