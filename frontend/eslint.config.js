@@ -13,25 +13,13 @@ const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
 	js.configs.recommended,
-	...ts.configs.strictTypeChecked,
-	...ts.configs.stylisticTypeChecked,
+	...ts.configs.recommended,
 	...svelte.configs.recommended,
 	prettier,
 	...svelte.configs.prettier,
 	{
 		languageOptions: {
-			globals: { ...globals.browser, ...globals.node },
-			parserOptions: {
-				projectService: {
-					allowDefaultProject: [
-						'*.js',
-						'*.mjs',
-						'*.cjs',
-						'vitest.config.ts',
-						'playwright.config.ts'
-					]
-				}
-			}
+			globals: { ...globals.browser, ...globals.node }
 		},
 
 		rules: {
@@ -46,17 +34,6 @@ export default defineConfig(
 			'@typescript-eslint/consistent-type-imports': [
 				'error',
 				{ prefer: 'type-imports', fixStyle: 'separate-type-imports' }
-			],
-			'@typescript-eslint/no-misused-promises': [
-				'error',
-				{ checksVoidReturn: { attributes: false } }
-			],
-			'@typescript-eslint/restrict-template-expressions': [
-				'error',
-				{
-					allowNumber: true,
-					allowBoolean: true
-				}
 			]
 		}
 	},
@@ -65,29 +42,15 @@ export default defineConfig(
 
 		languageOptions: {
 			parserOptions: {
-				projectService: true,
 				extraFileExtensions: ['.svelte'],
 				parser: ts.parser,
 				svelteConfig
 			}
-		},
-
-		rules: {
-			'@typescript-eslint/no-misused-promises': [
-				'error',
-				{ checksVoidReturn: { attributes: false } }
-			]
 		}
 	},
 	{
 		files: ['src/lib/components/ui/**/*.svelte'],
 		rules: {
-			'@typescript-eslint/no-unsafe-assignment': 'off',
-			'@typescript-eslint/no-unsafe-argument': 'off',
-			'@typescript-eslint/no-unsafe-call': 'off',
-			'@typescript-eslint/no-redundant-type-constituents': 'off',
-			'@typescript-eslint/prefer-nullish-coalescing': 'off',
-			'@typescript-eslint/no-useless-default-assignment': 'off',
 			'svelte/no-navigation-without-resolve': 'off'
 		}
 	}

@@ -137,8 +137,10 @@
 								<button
 									type="button"
 									onclick={() => (selectedCapture = capture)}
-									class="aspect-video overflow-hidden rounded-lg border-2 transition-all hover:border-primary {// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-									selectedCapture?.id === capture.id ? 'border-primary' : 'border-transparent'}"
+									class="aspect-video overflow-hidden rounded-lg border-2 transition-all hover:border-primary {selectedCapture?.id ===
+									capture.id
+										? 'border-primary'
+										: 'border-transparent'}"
 								>
 									{#if capture.screenshot_url}
 										<img
