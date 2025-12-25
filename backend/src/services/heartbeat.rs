@@ -88,11 +88,10 @@ async fn reset_stale_jobs(pool: &SqlitePool, timeout_seconds: u64) -> anyhow::Re
 
 /// Check if there are any active (claimed or running) jobs
 async fn check_active_jobs(pool: &SqlitePool) -> anyhow::Result<bool> {
-    let result: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM jobs WHERE status IN ('claimed', 'running')",
-    )
-    .fetch_one(pool)
-    .await?;
+    let result: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM jobs WHERE status IN ('claimed', 'running')")
+            .fetch_one(pool)
+            .await?;
 
     Ok(result.0 > 0)
 }

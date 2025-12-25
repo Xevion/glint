@@ -114,14 +114,16 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
             };
 
             // Add world to map if not already present
-            worlds_map.entry(scene.world_id.clone()).or_insert(WorldInfo {
-                id: scene.world_id.clone(),
-                slug: scene.world_slug.clone(),
-                name: scene.world_name.clone(),
-                file_url: world_file_url.clone(),
-                file_hash: world_file_hash.clone(),
-                size_bytes: scene.world_size_bytes.unwrap_or(0),
-            });
+            worlds_map
+                .entry(scene.world_id.clone())
+                .or_insert(WorldInfo {
+                    id: scene.world_id.clone(),
+                    slug: scene.world_slug.clone(),
+                    name: scene.world_name.clone(),
+                    file_url: Some(world_file_url.clone()),
+                    file_hash: Some(world_file_hash.clone()),
+                    size_bytes: scene.world_size_bytes,
+                });
 
             scenes.push(SceneInfo {
                 id: scene.id,

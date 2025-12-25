@@ -6,13 +6,15 @@
 	import AdminTable from '$lib/components/admin-table.svelte';
 	import CreateJobDialog from '$lib/components/create-job-dialog.svelte';
 	import JobDetailsDialog from '$lib/components/job-details-dialog.svelte';
+	import WorldUploadDialog from '$lib/components/world-upload-dialog.svelte';
 	import { api } from '$lib/api';
-	import type { Shader, Scene, CaptureWithContext } from '$lib/api';
+	import type { Shader, Scene, CaptureWithContext, World } from '$lib/api';
 	import type { JobWithDetails } from '$lib/api/endpoints/admin';
-	import { escapeHtml } from '$lib/utils/display';
+	import { escapeHtml, formatBytes } from '$lib/utils/display';
 
 	let shaders = $state<Shader[]>([]);
 	let scenes = $state<Scene[]>([]);
+	let worlds = $state<World[]>([]);
 	let captures = $state<CaptureWithContext[]>([]);
 	let jobs = $state<JobWithDetails[]>([]);
 	let loading = $state(true);
@@ -75,6 +77,37 @@
 			name: 'Actions',
 			component: 'link-button' as const,
 			href: (row: Scene) => `/scenes/${row.slug}`
+		}
+	];
+
+	// World table columns
+	const worldColumns = [
+		{ id: 'name', key: 'name', name: 'Name' },
+		{ id: 'slug', key: 'slug', name: 'Slug' },
+		{
+			id: 'minecraft_version',
+			key: 'minecraft_version',
+			name: 'MC Version',
+			render: (v: string) =>
+				`<code class="rounded bg-muted px-1.5 py-0.5 text-xs">${escapeHtml(v)}</code>`
+		},
+		{
+			id: 'size',
+			key: 'size_bytes',
+			name: 'Size',
+			render: (bytes: number | null) => (bytes ? formatBytes(bytes) : '-')
+		},
+		{
+			id: 'description',
+			key: 'description',
+			name: 'Description',
+			render: (value: string | null) => value ?? 'No description'
+		},
+		{
+			id: 'created_at',
+			key: 'created_at',
+			name: 'Created',
+			component: 'time' as const
 		}
 	];
 
@@ -244,6 +277,15 @@
 		}
 	}
 
+	async function loadWorlds() {
+		const result = await api.worlds.listWorlds();
+		if (result.isOk) {
+			worlds = result.value;
+		} else {
+			errors.worlds = result.error.message;
+		}
+	}
+
 	async function loadCaptures() {
 		const result = await api.captures.list();
 		if (result.isOk) {
@@ -287,7 +329,14 @@
 		errors = {};
 
 		try {
-			await Promise.all([loadShaders(), loadScenes(), loadCaptures(), loadJobs(), loadHealth()]);
+			await Promise.all([
+				loadShaders(),
+				loadScenes(),
+				loadWorlds(),
+				loadCaptures(),
+				loadJobs(),
+				loadHealth()
+			]);
 			lastRefreshed = new Date();
 		} finally {
 			loading = false;
@@ -359,10 +408,9 @@
 			{/if}
 			<div class="flex gap-2">
 				<Button
-					variant="outline"
+					variant={autoRefresh ? 'default' : 'outline'}
 					size="icon"
 					onclick={toggleAutoRefresh}
-					class={autoRefresh ? 'bg-primary text-primary-foreground' : ''}
 					title={autoRefresh ? 'Disable auto-refresh (5s)' : 'Enable auto-refresh (5s)'}
 				>
 					{#if autoRefresh}
@@ -415,6 +463,26 @@
 					</div>
 				{:else}
 					<AdminTable columns={sceneColumns} data={scenes} />
+				{/if}
+			</section>
+
+			<!-- Worlds Section -->
+			<section class="rounded-lg border bg-card p-6">
+				<div class="mb-4 flex items-center justify-between">
+					<div class="flex items-baseline gap-3">
+						<h2 class="text-2xl font-semibold">Worlds</h2>
+						<span class="text-lg text-muted-foreground">{worlds.length}</span>
+					</div>
+					<WorldUploadDialog onWorldCreated={loadData} />
+				</div>
+				{#if errors.worlds}
+					<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
+						Error: {errors.worlds}
+					</div>
+				{:else if worlds.length === 0}
+					<p class="text-muted-foreground">No worlds uploaded yet.</p>
+				{:else}
+					<AdminTable columns={worldColumns} data={worlds} />
 				{/if}
 			</section>
 

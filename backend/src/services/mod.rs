@@ -1,6 +1,2 @@
 pub mod heartbeat;
-
-// Services module - future home for:
-// - Modrinth/CurseForge polling
-// - Job queue processing
-// - R2 storage integration
+pub mod upload_cleanup;

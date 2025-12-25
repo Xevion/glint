@@ -20,10 +20,27 @@ export class ApiError extends Error {
 	}
 
 	static fromResponse(response: Response, body?: unknown): ApiError {
-		const message =
-			typeof body === 'object' && body && 'message' in body
-				? String(body.message)
-				: `HTTP ${response.status}: ${response.statusText}`;
+		let message: string;
+
+		if (typeof body === 'object' && body && 'message' in body && body.message) {
+			message = String(body.message);
+		} else if (response.statusText) {
+			message = `HTTP ${response.status}: ${response.statusText}`;
+		} else {
+			// Fallback when statusText is empty
+			const statusMessages: Record<number, string> = {
+				400: 'Bad Request',
+				401: 'Unauthorized',
+				403: 'Forbidden',
+				404: 'Not Found',
+				500: 'Internal Server Error',
+				502: 'Bad Gateway',
+				503: 'Service Unavailable',
+				504: 'Gateway Timeout'
+			};
+			const statusName = statusMessages[response.status] || 'Unknown Error';
+			message = `HTTP ${response.status}: ${statusName}`;
+		}
 
 		switch (response.status) {
 			case 400:

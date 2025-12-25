@@ -1,6 +1,3 @@
-// See https://svelte.dev/docs/kit/types#app.d.ts
-// for information about these interfaces
-
 interface FileSystemHandle {
 	readonly kind: 'file' | 'directory';
 	readonly name: string;
@@ -44,14 +41,6 @@ interface WriteParams {
 }
 
 declare global {
-	namespace App {
-		// interface Error {}
-		// interface Locals {}
-		// interface PageData {}
-		// interface PageState {}
-		// interface Platform {}
-	}
-
 	interface Window {
 		showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;
 	}

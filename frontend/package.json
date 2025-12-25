@@ -84,6 +84,8 @@
 	"dependencies": {
 		"@careswitch/svelte-data-table": "^0.6.3",
 		"class-variance-authority": "^0.7.1",
+		"fflate": "^0.8.2",
+		"lucide-svelte": "^0.562.0",
 		"overlayscrollbars": "^2.13.0",
 		"overlayscrollbars-svelte": "^0.5.5",
 		"svelte-relative-time": "^0.0.6",

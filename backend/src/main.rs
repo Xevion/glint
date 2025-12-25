@@ -42,16 +42,26 @@ async fn main() -> anyhow::Result<()> {
             "glint",
         );
 
+        let timeout_config = aws_sdk_s3::config::timeout::TimeoutConfig::builder()
+            .operation_timeout(std::time::Duration::from_secs(120))
+            .operation_attempt_timeout(std::time::Duration::from_secs(60))
+            .build();
+
         let s3_config = aws_sdk_s3::Config::builder()
             .behavior_version_latest()
             .region(aws_sdk_s3::config::Region::new("auto"))
             .endpoint_url(r2_config.endpoint().unwrap_or_default())
             .credentials_provider(credentials)
+            .timeout_config(timeout_config)
             .force_path_style(true)
             .build();
 
         let client = aws_sdk_s3::Client::from_conf(s3_config);
-        tracing::info!("R2/S3 client initialized");
+        tracing::info!(
+            "R2/S3 client initialized (endpoint: {}, bucket: {})",
+            r2_config.endpoint().unwrap_or_default(),
+            r2_config.bucket.as_deref().unwrap_or("glint")
+        );
         Some(client)
     } else {
         tracing::warn!("R2 not configured - upload functionality will be disabled");
@@ -59,12 +69,24 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Build application state
-    let state = AppState::new(pool.clone(), config.clone(), s3_client);
+    let state = AppState::new(pool.clone(), config.clone(), s3_client.clone());
 
     // Start heartbeat monitoring background task
     tokio::spawn(services::heartbeat::monitor_heartbeats(
-        pool,
+        pool.clone(),
         config.heartbeat.clone(),
+    ));
+
+    // Start upload cleanup background task
+    let cleanup_bucket = config
+        .r2
+        .bucket
+        .clone()
+        .unwrap_or_else(|| "glint".to_string());
+    tokio::spawn(services::upload_cleanup::cleanup_expired_uploads(
+        pool,
+        s3_client.clone(),
+        cleanup_bucket,
     ));
 
     // Configure CORS

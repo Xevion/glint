@@ -1,6 +1,6 @@
+use crate::db::UtcDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use crate::db::UtcDateTime;
 
 /// Downloadable world files containing scenes
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -15,6 +15,21 @@ pub struct World {
     pub size_bytes: Option<i64>,
     pub created_at: UtcDateTime,
     pub updated_at: UtcDateTime,
+}
+
+/// Tracks pending world uploads (presigned URL workflow)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PendingUpload {
+    pub upload_id: String,
+    pub slug: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub minecraft_version: String,
+    pub file_hash: String,
+    pub size_bytes: i64,
+    pub upload_key: String,
+    pub expires_at: UtcDateTime,
+    pub created_at: UtcDateTime,
 }
 
 /// Shader pack identity (not version-specific)
@@ -178,15 +193,30 @@ pub struct CreateShaderVersionRequest {
     pub file_hash: Option<String>,
 }
 
+/// Request to initiate a world upload (returns presigned URL)
 #[derive(Debug, Deserialize)]
-pub struct CreateWorldRequest {
+pub struct CreateWorldUploadRequest {
     pub name: String,
     pub slug: String,
     pub description: Option<String>,
     pub minecraft_version: String,
-    pub file_url: Option<String>,
-    pub file_hash: Option<String>,
-    pub size_bytes: Option<i64>,
+    /// SHA256 hash with algorithm prefix (e.g., "sha256:abc123...")
+    pub file_hash: String,
+    pub file_size_bytes: i64,
+}
+
+/// Response with presigned URL for world upload
+#[derive(Debug, Serialize)]
+pub struct CreateWorldUploadResponse {
+    pub upload_id: String,
+    pub presigned_url: String,
+    pub expires_at: UtcDateTime,
+}
+
+/// Request to complete a world upload
+#[derive(Debug, Deserialize)]
+pub struct CompleteWorldUploadRequest {
+    pub upload_id: String,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,27 +1,33 @@
+use crate::db::UtcDateTime;
 use axum::{
     Json, Router,
     extract::{Path, State},
     http::StatusCode,
-    routing::{get, post, delete, put},
+    routing::{delete, get, post, put},
 };
-use crate::db::UtcDateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 use crate::{
-    error::AppResult,
+    error::{AppError, AppResult},
     models::{
-        CreateJobRequest, CreateSceneRequest, CreateShaderRequest, CreateShaderVersionRequest,
-        CreateWorldRequest, Job, Scene, Shader, ShaderVersion, World,
+        CompleteWorldUploadRequest, CreateJobRequest, CreateSceneRequest, CreateShaderRequest,
+        CreateShaderVersionRequest, CreateWorldUploadRequest, CreateWorldUploadResponse, Job,
+        PendingUpload, Scene, Shader, ShaderVersion, World,
     },
     state::AppState,
 };
 use serde::Serialize;
 
+/// Presigned URL expiry time (5 minutes)
+const PRESIGN_EXPIRY_SECS: u64 = 300;
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/shaders", post(create_shader))
         .route("/shaders/{id}/versions", post(create_shader_version))
-        .route("/worlds", post(create_world))
+        .route("/worlds", get(list_worlds).post(create_world_upload))
+        .route("/worlds/{slug}/complete", post(complete_world_upload))
         .route("/scenes", post(create_scene))
         .route("/jobs", get(list_jobs).post(create_job))
         .route("/jobs/{id}", delete(delete_job))
@@ -113,38 +119,322 @@ async fn create_shader_version(
     Ok((StatusCode::CREATED, Json(version)))
 }
 
-/// POST /api/admin/worlds
-async fn create_world(
-    State(state): State<AppState>,
-    Json(request): Json<CreateWorldRequest>,
-) -> AppResult<(StatusCode, Json<World>)> {
-    let id = Uuid::new_v4().to_string();
+/// GET /api/admin/worlds
+async fn list_worlds(State(state): State<AppState>) -> AppResult<Json<Vec<World>>> {
+    let worlds = sqlx::query_as::<_, World>("SELECT * FROM worlds ORDER BY created_at DESC")
+        .fetch_all(state.db())
+        .await?;
 
+    Ok(Json(worlds))
+}
+
+/// POST /api/admin/worlds
+/// Initiates a world upload by returning a presigned URL
+async fn create_world_upload(
+    State(state): State<AppState>,
+    Json(request): Json<CreateWorldUploadRequest>,
+) -> AppResult<(StatusCode, Json<CreateWorldUploadResponse>)> {
+    tracing::info!(
+        "Starting world upload preparation for slug: {}",
+        request.slug
+    );
+
+    // Validate hash format (must have algorithm prefix)
+    if !request.file_hash.starts_with("sha256:") {
+        return Err(AppError::BadRequest(
+            "file_hash must have algorithm prefix (e.g., 'sha256:abc123...')".into(),
+        ));
+    }
+
+    // Validate file size (max 512 MiB)
+    const MAX_UPLOAD_SIZE: i64 = 512 * 1024 * 1024;
+    if request.file_size_bytes > MAX_UPLOAD_SIZE {
+        return Err(AppError::BadRequest(format!(
+            "File too large: {} bytes (max {} MiB)",
+            request.file_size_bytes,
+            MAX_UPLOAD_SIZE / 1024 / 1024
+        )));
+    }
+
+    // Check if world with this slug already exists
+    let exists = sqlx::query_scalar::<_, i32>("SELECT 1 FROM worlds WHERE slug = ?1")
+        .bind(&request.slug)
+        .fetch_optional(state.db())
+        .await?;
+
+    if exists.is_some() {
+        return Err(AppError::Conflict(format!(
+            "World with slug '{}' already exists",
+            request.slug
+        )));
+    }
+
+    // Require R2/S3 to be configured
+    let s3 = state
+        .s3()
+        .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))?;
+
+    let r2_config = &state.config().r2;
+    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+
+    // Generate upload ID and key
+    let upload_id = Uuid::new_v4().to_string();
+    let upload_key = format!("_uploads/{}.zip", upload_id);
+    let expires_at = Utc::now() + chrono::Duration::seconds(PRESIGN_EXPIRY_SECS as i64);
+
+    // Generate presigned PUT URL with hash metadata requirement
+    let presigned = s3
+        .put_object()
+        .bucket(bucket)
+        .key(&upload_key)
+        .content_type("application/zip")
+        .metadata("sha256", request.file_hash.strip_prefix("sha256:").unwrap())
+        .presigned(
+            aws_sdk_s3::presigning::PresigningConfig::builder()
+                .expires_in(std::time::Duration::from_secs(PRESIGN_EXPIRY_SECS))
+                .build()
+                .expect("valid presigning config"),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to generate presigned URL: {}", e);
+            AppError::Internal(anyhow::anyhow!("Failed to generate presigned URL: {}", e))
+        })?;
+
+    // Store pending upload record
     sqlx::query(
+        r#"
+        INSERT INTO pending_uploads (upload_id, slug, name, description, minecraft_version, file_hash, size_bytes, upload_key, expires_at, created_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now', 'utc'))
+        "#,
+    )
+    .bind(&upload_id)
+    .bind(&request.slug)
+    .bind(&request.name)
+    .bind(&request.description)
+    .bind(&request.minecraft_version)
+    .bind(&request.file_hash)
+    .bind(request.file_size_bytes)
+    .bind(&upload_key)
+    .bind(expires_at.format("%Y-%m-%d %H:%M:%S").to_string())
+    .execute(state.db())
+    .await?;
+
+    tracing::info!(
+        "Created pending upload {} for world '{}' (expires: {})",
+        upload_id,
+        request.slug,
+        expires_at
+    );
+
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateWorldUploadResponse {
+            upload_id,
+            presigned_url: presigned.uri().to_string(),
+            expires_at: crate::db::UtcDateTime::from(
+                expires_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+            ),
+        }),
+    ))
+}
+
+/// POST /api/admin/worlds/{slug}/complete
+/// Completes a world upload after file has been uploaded to R2
+async fn complete_world_upload(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Json(request): Json<CompleteWorldUploadRequest>,
+) -> AppResult<(StatusCode, Json<World>)> {
+    tracing::info!(
+        "Completing world upload for slug: {}, upload_id: {}",
+        slug,
+        request.upload_id
+    );
+
+    // Fetch pending upload record
+    let pending =
+        sqlx::query_as::<_, PendingUpload>("SELECT * FROM pending_uploads WHERE upload_id = ?1")
+            .bind(&request.upload_id)
+            .fetch_optional(state.db())
+            .await?;
+
+    let pending = pending.ok_or_else(|| {
+        AppError::NotFound(format!("Upload ID '{}' not found", request.upload_id))
+    })?;
+
+    // Verify slug matches
+    if pending.slug != slug {
+        return Err(AppError::BadRequest(format!(
+            "Upload ID '{}' does not match slug '{}'",
+            request.upload_id, slug
+        )));
+    }
+
+    // Check if expired
+    if pending.expires_at.is_before(&Utc::now()) {
+        // Clean up expired record
+        sqlx::query("DELETE FROM pending_uploads WHERE upload_id = ?1")
+            .bind(&request.upload_id)
+            .execute(state.db())
+            .await?;
+
+        return Err(AppError::Gone(
+            "Upload has expired. Please start a new upload.".into(),
+        ));
+    }
+
+    // Require R2/S3
+    let s3 = state
+        .s3()
+        .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))?;
+
+    let r2_config = &state.config().r2;
+    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+
+    // Verify file exists in R2 via head_object
+    let head_result = s3
+        .head_object()
+        .bucket(bucket)
+        .key(&pending.upload_key)
+        .send()
+        .await;
+
+    let head = match head_result {
+        Ok(h) => h,
+        Err(e) => {
+            tracing::warn!(
+                "File not found in R2 for upload {}: {}",
+                request.upload_id,
+                e
+            );
+            return Err(AppError::NotFound(
+                "Uploaded file not found in storage. Please retry the upload.".into(),
+            ));
+        }
+    };
+
+    // Verify hash from metadata
+    let stored_hash = head.metadata().and_then(|m| m.get("sha256").cloned());
+    let expected_hash = pending
+        .file_hash
+        .strip_prefix("sha256:")
+        .unwrap_or(&pending.file_hash);
+
+    if stored_hash.as_deref() != Some(expected_hash) {
+        tracing::warn!(
+            "Hash mismatch for upload {}: expected {}, got {:?}",
+            request.upload_id,
+            expected_hash,
+            stored_hash
+        );
+        return Err(AppError::BadRequest(
+            "File hash mismatch. The uploaded file may be corrupted.".into(),
+        ));
+    }
+
+    // Move file to final location: _uploads/{uuid}.zip -> worlds/{slug}.zip
+    let final_key = format!("worlds/{}.zip", pending.slug);
+
+    // Copy to final location
+    let copy_source = format!("{}/{}", bucket, pending.upload_key);
+    s3.copy_object()
+        .bucket(bucket)
+        .copy_source(&copy_source)
+        .key(&final_key)
+        .metadata_directive(aws_sdk_s3::types::MetadataDirective::Copy)
+        .send()
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to copy file to final location: {}", e);
+            AppError::Internal(anyhow::anyhow!("Failed to finalize upload: {}", e))
+        })?;
+
+    // Delete original upload file
+    if let Err(e) = s3
+        .delete_object()
+        .bucket(bucket)
+        .key(&pending.upload_key)
+        .send()
+        .await
+    {
+        // Log but don't fail - cleanup will handle it
+        tracing::warn!("Failed to delete temporary upload file: {}", e);
+    }
+
+    // Generate public URL
+    let file_url = if let Some(ref public_url_prefix) = r2_config.public_url {
+        format!("{}/{}", public_url_prefix, final_key)
+    } else {
+        format!("https://{}.r2.cloudflarestorage.com/{}", bucket, final_key)
+    };
+
+    // Create world record (atomic - first to complete wins)
+    let world_id = Uuid::new_v4().to_string();
+
+    let result = sqlx::query(
         r#"
         INSERT INTO worlds (id, name, slug, description, minecraft_version, file_url, file_hash, size_bytes, created_at, updated_at)
         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now', 'utc'), datetime('now', 'utc'))
         "#,
     )
-    .bind(&id)
-    .bind(&request.name)
-    .bind(&request.slug)
-    .bind(&request.description)
-    .bind(&request.minecraft_version)
-    .bind(&request.file_url)
-    .bind(&request.file_hash)
-    .bind(request.size_bytes)
+    .bind(&world_id)
+    .bind(&pending.name)
+    .bind(&pending.slug)
+    .bind(&pending.description)
+    .bind(&pending.minecraft_version)
+    .bind(&file_url)
+    .bind(&pending.file_hash)
+    .bind(pending.size_bytes)
     .execute(state.db())
-    .await?;
+    .await;
 
+    // Handle conflict (another upload completed first)
+    if let Err(sqlx::Error::Database(db_err)) = &result
+        && let Some(code) = db_err.code()
+        && code == "2067"
+    {
+        // Clean up the file we just copied
+        if let Err(e) = s3
+            .delete_object()
+            .bucket(bucket)
+            .key(&final_key)
+            .send()
+            .await
+        {
+            tracing::warn!("Failed to clean up conflicting upload file: {}", e);
+        }
+
+        // Delete pending record
+        sqlx::query("DELETE FROM pending_uploads WHERE upload_id = ?1")
+            .bind(&request.upload_id)
+            .execute(state.db())
+            .await?;
+
+        return Err(AppError::Conflict(format!(
+            "World with slug '{}' was created by another upload",
+            slug
+        )));
+    }
+    result?;
+
+    // Delete pending upload record
+    sqlx::query("DELETE FROM pending_uploads WHERE upload_id = ?1")
+        .bind(&request.upload_id)
+        .execute(state.db())
+        .await?;
+
+    // Fetch created world
     let world = sqlx::query_as::<_, World>("SELECT * FROM worlds WHERE id = ?1")
-        .bind(&id)
+        .bind(&world_id)
         .fetch_one(state.db())
         .await?;
 
+    tracing::info!("World created successfully: {} ({})", world.name, world.id);
     Ok((StatusCode::CREATED, Json(world)))
 }
 
+/// POST /api/admin/worlds/{id}/upload
 /// POST /api/admin/scenes
 async fn create_scene(
     State(state): State<AppState>,

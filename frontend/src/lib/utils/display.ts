@@ -88,3 +88,14 @@ export function getDimensionDisplayName(dimension: string): string {
 export function getWeatherDisplayName(weather: string): string {
 	return weather.charAt(0).toUpperCase() + weather.slice(1);
 }
+
+/**
+ * Format bytes to human-readable size with KiB/MiB/GiB units.
+ */
+export function formatBytes(bytes: number): string {
+	if (bytes === 0) return '0 B';
+	const k = 1024;
+	const sizes = ['B', 'KiB', 'MiB', 'GiB'];
+	const i = Math.floor(Math.log(bytes) / Math.log(k));
+	return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}

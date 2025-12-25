@@ -59,9 +59,9 @@ pub struct WorldInfo {
     pub id: String,
     pub slug: String,
     pub name: String,
-    pub file_url: String,
-    pub file_hash: String,
-    pub size_bytes: i64,
+    pub file_url: Option<String>,
+    pub file_hash: Option<String>,
+    pub size_bytes: Option<i64>,
 }
 
 // Agent Request Types

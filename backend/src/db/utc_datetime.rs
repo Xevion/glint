@@ -1,17 +1,17 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{
-    sqlite::{SqliteArgumentValue, SqliteTypeInfo, SqliteValueRef},
     Decode, Encode, Sqlite, Type,
+    sqlite::{SqliteArgumentValue, SqliteTypeInfo, SqliteValueRef},
 };
 use std::fmt;
 
 /// UTC datetime wrapper that ensures proper ISO8601 serialization with Z suffix
-/// 
+///
 /// SQLite stores datetimes as TEXT without timezone info. This type ensures:
 /// - Storage: ISO8601 format (e.g., "2025-01-15 10:30:00")
 /// - Serialization: ISO8601 with Z suffix (e.g., "2025-01-15T10:30:00Z")
 /// - Parsing: Accepts both formats, always treats as UTC
-/// 
+///
 /// Note: Do NOT add #[derive(Serialize, Deserialize)] - we have custom impls below
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UtcDateTime(String);
@@ -25,6 +25,23 @@ impl UtcDateTime {
     /// Get the underlying string value (for database queries)
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Check if this datetime is before the given chrono DateTime
+    pub fn is_before(&self, other: &chrono::DateTime<chrono::Utc>) -> bool {
+        // Parse the stored string and compare
+        // Format: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DDTHH:MM:SSZ"
+        let normalized = self.0.replace(' ', "T");
+        let with_tz = if normalized.ends_with('Z') {
+            normalized
+        } else {
+            format!("{}Z", normalized)
+        };
+
+        match chrono::DateTime::parse_from_rfc3339(&with_tz) {
+            Ok(parsed) => parsed < *other,
+            Err(_) => true, // If we can't parse, treat as expired
+        }
     }
 }
 
@@ -48,7 +65,10 @@ impl Type<Sqlite> for UtcDateTime {
 }
 
 impl<'q> Encode<'q, Sqlite> for UtcDateTime {
-    fn encode_by_ref(&self, args: &mut Vec<SqliteArgumentValue<'q>>) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<SqliteArgumentValue<'q>>,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         <String as Encode<'q, Sqlite>>::encode_by_ref(&self.0, args)
     }
 }

@@ -28,14 +28,14 @@ async fn get_scene(
     State(state): State<AppState>,
     Path(slug): Path<String>,
 ) -> AppResult<Json<SceneWithCaptures>> {
-    let scene = sqlx::query_as::<_, Scene>("SELECT * FROM scenes WHERE slug = ?")
+    let scene = sqlx::query_as::<_, Scene>("SELECT * FROM scenes WHERE slug = ?1")
         .bind(&slug)
         .fetch_optional(state.db())
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Scene '{slug}' not found")))?;
 
     // Fetch the associated world
-    let world = sqlx::query_as::<_, World>("SELECT * FROM worlds WHERE id = ?")
+    let world = sqlx::query_as::<_, World>("SELECT * FROM worlds WHERE id = ?1")
         .bind(&scene.world_id)
         .fetch_optional(state.db())
         .await?;
