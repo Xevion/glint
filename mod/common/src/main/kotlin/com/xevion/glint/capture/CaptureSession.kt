@@ -5,7 +5,6 @@ import com.xevion.glint.io.SessionDirectoryManager
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.screenshot.*
-import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.time.Instant
@@ -373,10 +372,10 @@ class CaptureSession(
                 timestamp = timestamp,
                 shader = shaderMeta,
                 resolution =
-                    Resolution(
-                        width = renderTarget.width,
-                        height = renderTarget.height,
-                    ),
+                Resolution(
+                    width = renderTarget.width,
+                    height = renderTarget.height,
+                ),
             ),
         )
 
@@ -548,12 +547,12 @@ class CaptureSession(
             totalScreenshots = screenshotEntries.size,
             shaderPacks = shadersToCapture.mapNotNull { it.packName }.distinct(),
             minecraft =
-                MinecraftInfo(
-                    version = mc.launchedVersion,
-                    dimension = dimension,
-                    position = position,
-                    camera = camera,
-                ),
+            MinecraftInfo(
+                version = mc.launchedVersion,
+                dimension = dimension,
+                position = position,
+                camera = camera,
+            ),
             screenshots = screenshotEntries.toList(),
         )
     }

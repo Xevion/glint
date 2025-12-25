@@ -11,16 +11,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Blocks keyboard input during capture sessions.
  *
- * During capture:
- * - ESC cancels the session (first press only)
- * - All other keys are blocked (T for chat, F1-F5, F2 screenshot, F3 debug, etc.)
+ * <p>During capture: - ESC cancels the session (first press only) - All other keys are blocked (T
+ * for chat, F1-F5, F2 screenshot, F3 debug, etc.)
  */
 @Mixin(KeyboardHandler.class)
 public class KeyboardHandlerMixin {
 
     /**
-     * Intercepts keyPress() to block keyboard input during capture.
-     * ESC key cancels the session; all other keys are blocked.
+     * Intercepts keyPress() to block keyboard input during capture. ESC key cancels the session;
+     * all other keys are blocked.
      *
      * @param window The window handle
      * @param key The GLFW key code
@@ -30,7 +29,8 @@ public class KeyboardHandlerMixin {
      * @param ci Callback info for cancelling the method
      */
     @Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
-    private void onKeyPress(long window, int key, int scancode, int action, int mods, CallbackInfo ci) {
+    private void onKeyPress(
+            long window, int key, int scancode, int action, int mods, CallbackInfo ci) {
         if (!CaptureStateManager.INSTANCE.isActive()) {
             return;
         }

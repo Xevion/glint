@@ -58,19 +58,18 @@ data class SceneVariant(
     /**
      * Applies this variant's overrides to a base scene, creating a new Scene instance.
      */
-    fun applyTo(base: Scene): Scene =
-        base.copy(
-            id = id,
-            name = name,
-            description = description ?: base.description,
-            timeOfDay = timeOfDay ?: base.timeOfDay,
-            weather = weather ?: base.weather,
-            weatherIntensity = weatherIntensity ?: base.weatherIntensity,
-            moonPhase = moonPhase ?: base.moonPhase,
-            tags = if (tags.isNotEmpty()) tags else base.tags,
-            config = config?.mergeWith(base.config) ?: base.config,
-            variants = emptyList(),
-        )
+    fun applyTo(base: Scene): Scene = base.copy(
+        id = id,
+        name = name,
+        description = description ?: base.description,
+        timeOfDay = timeOfDay ?: base.timeOfDay,
+        weather = weather ?: base.weather,
+        weatherIntensity = weatherIntensity ?: base.weatherIntensity,
+        moonPhase = moonPhase ?: base.moonPhase,
+        tags = if (tags.isNotEmpty()) tags else base.tags,
+        config = config?.mergeWith(base.config) ?: base.config,
+        variants = emptyList(),
+    )
 }
 
 /**
@@ -210,13 +209,12 @@ enum class Weather {
     fun toMinecraftString(): String = name.lowercase()
 
     companion object {
-        fun fromString(value: String): Weather =
-            when (value.lowercase()) {
-                "clear" -> CLEAR
-                "rain" -> RAIN
-                "thunder" -> THUNDER
-                else -> CLEAR
-            }
+        fun fromString(value: String): Weather = when (value.lowercase()) {
+            "clear" -> CLEAR
+            "rain" -> RAIN
+            "thunder" -> THUNDER
+            else -> CLEAR
+        }
     }
 }
 

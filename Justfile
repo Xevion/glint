@@ -123,6 +123,11 @@ dev-agent:
 dev-agent-once:
 	cargo run --manifest-path agent/Cargo.toml -- --once
 
+# Run agent in dev mode - direct shader+scene capture (bypasses job queue)
+# Usage: just dev-agent-direct bsl-shaders mountain-noon,village-sunset
+dev-agent-direct shader scenes:
+	cargo run --manifest-path agent/Cargo.toml -- --dev-shader {{shader}} --dev-scenes {{scenes}}
+
 # Check agent code
 check-agent:
 	cargo fmt --manifest-path agent/Cargo.toml -- --check

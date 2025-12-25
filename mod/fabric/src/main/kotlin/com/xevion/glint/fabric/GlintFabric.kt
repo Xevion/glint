@@ -7,7 +7,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 class GlintFabric : ClientModInitializer {
     override fun onInitializeClient() {
         Glint.init()
-        
+
         // Register client tick handler for keybind polling
         ClientTickEvents.END_CLIENT_TICK.register { Glint.onClientTick() }
     }

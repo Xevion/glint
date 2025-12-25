@@ -12,10 +12,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Prevents automatic pausing and enables mouse interaction during capture sessions.
  *
- * During capture:
- * - Blocks pause screen from opening on window focus loss
- * - Releases mouse cursor for multi-tasking
- * - Keeps game rendering while window is unfocused
+ * <p>During capture: - Blocks pause screen from opening on window focus loss - Releases mouse
+ * cursor for multi-tasking - Keeps game rendering while window is unfocused
  */
 @Mixin(Minecraft.class)
 public class MinecraftMixin {
@@ -36,20 +34,18 @@ public class MinecraftMixin {
         }
     }
 
-    /**
-     * Releases mouse cursor and closes pause screen when capture session starts.
-     */
+    /** Releases mouse cursor and closes pause screen when capture session starts. */
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
         boolean isCapturing = CaptureStateManager.INSTANCE.isActive();
         Minecraft mc = (Minecraft) (Object) this;
-        
+
         if (isCapturing && !mouseReleasedForCapture) {
             // Close pause screen if it's currently open
             if (mc.screen != null && mc.screen.isPauseScreen()) {
                 mc.setScreen(null);
             }
-            
+
             // Release mouse to allow user to interact with other windows
             if (mouseHandler.isMouseGrabbed()) {
                 mouseHandler.releaseMouse();

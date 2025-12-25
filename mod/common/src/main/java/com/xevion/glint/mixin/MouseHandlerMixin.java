@@ -11,9 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Controls mouse behavior during screenshot capture sessions.
  *
- * During capture:
- * - Blocks camera rotation (turnPlayer)
- * - Prevents mouse re-grabbing (grabMouse)
+ * <p>During capture: - Blocks camera rotation (turnPlayer) - Prevents mouse re-grabbing (grabMouse)
  */
 @Mixin(MouseHandler.class)
 public class MouseHandlerMixin {
@@ -38,8 +36,8 @@ public class MouseHandlerMixin {
     }
 
     /**
-     * Intercepts grabMouse() to prevent mouse re-grabbing during capture.
-     * This ensures clicking during a session doesn't refocus the game.
+     * Intercepts grabMouse() to prevent mouse re-grabbing during capture. This ensures clicking
+     * during a session doesn't refocus the game.
      *
      * @param ci Callback info for cancelling the method
      */

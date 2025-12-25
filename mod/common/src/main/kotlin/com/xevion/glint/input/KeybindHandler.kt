@@ -1,7 +1,6 @@
 package com.xevion.glint.input
 
 import com.xevion.glint.Glint
-import com.xevion.glint.session.SessionRegistry
 import com.xevion.glint.ui.SceneManagerScreen
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW

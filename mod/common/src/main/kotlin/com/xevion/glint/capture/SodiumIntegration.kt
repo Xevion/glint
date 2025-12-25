@@ -1,7 +1,6 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Glint
-import net.minecraft.client.Minecraft
 
 /**
  * Integration with Sodium's chunk rendering system.

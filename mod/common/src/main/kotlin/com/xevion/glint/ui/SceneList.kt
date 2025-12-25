@@ -3,27 +3,24 @@ package com.xevion.glint.ui
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneCollection
-import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.scene.SceneVariant
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.ContainerObjectSelectionList
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout
-import net.minecraft.client.gui.narration.NarratableEntry
-import net.minecraft.client.gui.navigation.CommonInputs
 import net.minecraft.network.chat.Component
 
 class SceneList(
     minecraft: Minecraft,
     private val screen: SceneManagerScreen,
 ) : ContainerObjectSelectionList<SceneList.Entry>(
-        minecraft,
-        screen.width,
-        screen.height - 64,
-        32,
-        ITEM_HEIGHT,
-    ) {
+    minecraft,
+    screen.width,
+    screen.height - 64,
+    32,
+    ITEM_HEIGHT,
+) {
     companion object {
         const val ITEM_HEIGHT = 36
     }
@@ -256,7 +253,7 @@ class SceneList(
             (
                 scene.config ?: com.xevion.glint.scene
                     .SceneConfig()
-            ).mergeWith(collection.defaultConfig)
+                ).mergeWith(collection.defaultConfig)
                 .mergeWith(com.xevion.glint.scene.SceneConfig.DEFAULT)
 
         return ResolvedScene(
