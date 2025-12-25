@@ -1,11 +1,12 @@
 use crate::db::UtcDateTime;
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post, put},
 };
 use chrono::Utc;
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
@@ -13,7 +14,7 @@ use crate::{
     models::{
         CompleteWorldUploadRequest, CreateJobRequest, CreateSceneRequest, CreateShaderRequest,
         CreateShaderVersionRequest, CreateWorldUploadRequest, CreateWorldUploadResponse, Job,
-        PendingUpload, Scene, Shader, ShaderVersion, World,
+        PendingUpload, Scene, Shader, ShaderVersion, UpdateSceneRequest, World,
     },
     state::AppState,
 };
@@ -29,6 +30,7 @@ pub fn router() -> Router<AppState> {
         .route("/worlds", get(list_worlds).post(create_world_upload))
         .route("/worlds/{slug}/complete", post(complete_world_upload))
         .route("/scenes", post(create_scene))
+        .route("/scenes/{slug}", put(update_scene).delete(disable_scene))
         .route("/jobs", get(list_jobs).post(create_job))
         .route("/jobs/{id}", delete(delete_job))
         .route("/jobs/{id}/cancel", put(cancel_job))
@@ -434,7 +436,6 @@ async fn complete_world_upload(
     Ok((StatusCode::CREATED, Json(world)))
 }
 
-/// POST /api/admin/worlds/{id}/upload
 /// POST /api/admin/scenes
 async fn create_scene(
     State(state): State<AppState>,
@@ -447,47 +448,52 @@ async fn create_scene(
         .await?;
 
     if exists.is_none() {
-        return Err(crate::error::AppError::NotFound("World not found".into()));
+        return Err(AppError::NotFound("World not found".into()));
+    }
+
+    // Check world-scoped slug uniqueness (only active scenes)
+    let slug_exists = sqlx::query_scalar::<_, i32>(
+        "SELECT 1 FROM scenes WHERE world_id = ?1 AND slug = ?2 AND active = 1",
+    )
+    .bind(&request.world_id)
+    .bind(&request.slug)
+    .fetch_optional(state.db())
+    .await?;
+
+    if slug_exists.is_some() {
+        return Err(AppError::Conflict(format!(
+            "Scene with slug '{}' already exists in this world",
+            request.slug
+        )));
     }
 
     let id = Uuid::new_v4().to_string();
 
-    // Parse definition_json to extract scene properties
-    let scene_props = parse_scene_definition(&request.definition_json);
-
-    let tags_json = request
-        .tags
-        .as_ref()
-        .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "[]".to_string()));
-
     sqlx::query(
         r#"
         INSERT INTO scenes (
-            id, name, slug, description, world_id, x, y, z, pitch, yaw,
+            id, name, slug, world_id, x, y, z, pitch, yaw,
             dimension, time_of_day_ticks, weather, weather_intensity, moon_phase, biome,
-            definition_json, tags, created_at
+            active, created_at
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, datetime('now', 'utc'))
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 1, datetime('now', 'utc'))
         "#,
     )
     .bind(&id)
     .bind(&request.name)
     .bind(&request.slug)
-    .bind(&request.description)
     .bind(&request.world_id)
-    .bind(scene_props.x)
-    .bind(scene_props.y)
-    .bind(scene_props.z)
-    .bind(scene_props.pitch)
-    .bind(scene_props.yaw)
-    .bind(scene_props.dimension)
-    .bind(scene_props.time_of_day_ticks)
-    .bind(scene_props.weather)
-    .bind(scene_props.weather_intensity)
-    .bind(scene_props.moon_phase)
-    .bind(scene_props.biome)
-    .bind(&request.definition_json)
-    .bind(&tags_json)
+    .bind(request.position.x)
+    .bind(request.position.y)
+    .bind(request.position.z)
+    .bind(request.camera.pitch)
+    .bind(request.camera.yaw)
+    .bind(&request.dimension)
+    .bind(request.time_of_day)
+    .bind(&request.weather)
+    .bind(request.weather_intensity)
+    .bind(request.moon_phase)
+    .bind(&request.biome)
     .execute(state.db())
     .await?;
 
@@ -497,6 +503,83 @@ async fn create_scene(
         .await?;
 
     Ok((StatusCode::CREATED, Json(scene)))
+}
+
+/// PUT /api/admin/scenes/{slug}
+async fn update_scene(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Json(request): Json<UpdateSceneRequest>,
+) -> AppResult<Json<Scene>> {
+    // Find scene (world-scoped, active only)
+    let scene = sqlx::query_as::<_, Scene>(
+        "SELECT * FROM scenes WHERE slug = ?1 AND world_id = ?2 AND active = 1",
+    )
+    .bind(&slug)
+    .bind(&request.world_id)
+    .fetch_optional(state.db())
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("Scene '{}' not found in this world", slug)))?;
+
+    // Update position/camera/environment fields only (preserve name, description, tags)
+    sqlx::query(
+        r#"
+        UPDATE scenes 
+        SET x = ?1, y = ?2, z = ?3, pitch = ?4, yaw = ?5,
+            dimension = ?6, time_of_day_ticks = ?7, weather = ?8, 
+            weather_intensity = ?9, moon_phase = ?10, biome = ?11
+        WHERE id = ?12
+        "#,
+    )
+    .bind(request.position.x)
+    .bind(request.position.y)
+    .bind(request.position.z)
+    .bind(request.camera.pitch)
+    .bind(request.camera.yaw)
+    .bind(&request.dimension)
+    .bind(request.time_of_day)
+    .bind(&request.weather)
+    .bind(request.weather_intensity)
+    .bind(request.moon_phase)
+    .bind(&request.biome)
+    .bind(&scene.id)
+    .execute(state.db())
+    .await?;
+
+    // Mark captures as outdated
+    sqlx::query("UPDATE captures SET outdated = 1 WHERE scene_id = ?1 AND status = 'completed'")
+        .bind(&scene.id)
+        .execute(state.db())
+        .await?;
+
+    // Fetch updated scene
+    let updated = sqlx::query_as::<_, Scene>("SELECT * FROM scenes WHERE id = ?1")
+        .bind(&scene.id)
+        .fetch_one(state.db())
+        .await?;
+
+    Ok(Json(updated))
+}
+
+/// DELETE /api/admin/scenes/{slug}
+async fn disable_scene(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Query(params): Query<WorldIdParam>,
+) -> AppResult<StatusCode> {
+    let result = sqlx::query(
+        "UPDATE scenes SET active = 0 WHERE slug = ?1 AND world_id = ?2 AND active = 1",
+    )
+    .bind(&slug)
+    .bind(&params.world_id)
+    .execute(state.db())
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("Scene '{}' not found", slug)));
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// GET /api/admin/jobs
@@ -572,78 +655,9 @@ async fn create_job(
     Ok((StatusCode::CREATED, Json(job)))
 }
 
-/// Helper to parse scene definition JSON into structured properties
-fn parse_scene_definition(definition_json: &str) -> SceneProperties {
-    let definition: serde_json::Value =
-        serde_json::from_str(definition_json).unwrap_or(serde_json::json!({}));
-
-    SceneProperties {
-        x: definition
-            .get("position")
-            .and_then(|p| p.get("x"))
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0),
-        y: definition
-            .get("position")
-            .and_then(|p| p.get("y"))
-            .and_then(|v| v.as_f64())
-            .unwrap_or(64.0),
-        z: definition
-            .get("position")
-            .and_then(|p| p.get("z"))
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0),
-        pitch: definition
-            .get("camera")
-            .and_then(|c| c.get("pitch"))
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0),
-        yaw: definition
-            .get("camera")
-            .and_then(|c| c.get("yaw"))
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0),
-        dimension: definition
-            .get("dimension")
-            .and_then(|v| v.as_str())
-            .unwrap_or("minecraft:overworld")
-            .to_string(),
-        time_of_day_ticks: definition
-            .get("timeOfDay")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(6000),
-        weather: definition
-            .get("weather")
-            .and_then(|v| v.as_str())
-            .unwrap_or("CLEAR")
-            .to_string(),
-        weather_intensity: definition
-            .get("weatherIntensity")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0),
-        moon_phase: definition
-            .get("moonPhase")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32),
-        biome: definition
-            .get("biome")
-            .and_then(|v| v.as_str())
-            .map(String::from),
-    }
-}
-
-struct SceneProperties {
-    x: f64,
-    y: f64,
-    z: f64,
-    pitch: f64,
-    yaw: f64,
-    dimension: String,
-    time_of_day_ticks: i64,
-    weather: String,
-    weather_intensity: f64,
-    moon_phase: Option<i32>,
-    biome: Option<String>,
+#[derive(Deserialize)]
+struct WorldIdParam {
+    world_id: String,
 }
 
 #[derive(sqlx::FromRow, Serialize)]

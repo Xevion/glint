@@ -286,13 +286,14 @@ async fn complete_job(
             r#"
             INSERT INTO captures (
                 id, shader_version_id, scene_id, profile, screenshot_path,
-                resolution_width, resolution_height, status, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'completed', ?8, ?8)
+                resolution_width, resolution_height, outdated, status, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 'completed', ?8, ?8)
             ON CONFLICT (shader_version_id, scene_id, profile) 
             DO UPDATE SET 
                 screenshot_path = excluded.screenshot_path,
                 resolution_width = excluded.resolution_width,
                 resolution_height = excluded.resolution_height,
+                outdated = 0,
                 status = 'completed',
                 updated_at = excluded.updated_at
             "#,

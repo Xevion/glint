@@ -1,11 +1,14 @@
 package com.xevion.glint.ui
 
 import com.xevion.glint.Glint
+import com.xevion.glint.api.ApiConfig
+import com.xevion.glint.api.SceneSyncManager
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.session.SessionRegistry
 import net.minecraft.client.gui.components.Button
+import net.minecraft.client.gui.components.toasts.SystemToast
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout
 import net.minecraft.client.gui.layouts.LinearLayout
 import net.minecraft.client.gui.screens.Screen
@@ -42,6 +45,20 @@ class SceneManagerScreen(
         buttonRow.addChild(
             Button
                 .builder(Component.literal("Save Scene")) { openSaveSceneDialog() }
+                .width(100)
+                .build(),
+        )
+
+        buttonRow.addChild(
+            Button
+                .builder(Component.literal("Sync All")) { syncAllScenes() }
+                .width(100)
+                .build(),
+        )
+
+        buttonRow.addChild(
+            Button
+                .builder(Component.literal("API Config")) { openApiConfig() }
                 .width(100)
                 .build(),
         )
@@ -149,4 +166,74 @@ class SceneManagerScreen(
     fun isWorldExpanded(fileName: String): Boolean = expandedWorlds.contains(fileName)
 
     fun isSceneExpanded(sceneId: String): Boolean = expandedScenes.contains(sceneId)
+
+    private fun openApiConfig() {
+        val config = ApiConfig.load()
+        val showConnectionFirst = config.needsValidation()
+        minecraft?.setScreen(ApiConfigWizardScreen(this, showConnectionFirst))
+    }
+
+    private fun syncAllScenes() {
+        val config = ApiConfig.load()
+
+        if (!config.isValid()) {
+            Glint.LOGGER.warn("API config not valid - open API Config to set it up")
+            SystemToast.add(
+                minecraft!!.toastManager,
+                SystemToast.SystemToastId.WORLD_ACCESS_FAILURE,
+                Component.literal("Cannot sync scenes"),
+                Component.literal("API config not set up"),
+            )
+            return
+        }
+
+        val collections = SceneManager.discoverAllCollections()
+        var totalScenes = 0
+
+        for ((_, collection) in collections) {
+            totalScenes += collection.scenes.size
+            SceneSyncManager
+                .syncCollection(collection, config)
+                .thenAccept { results ->
+                    val successes = results.count { it is com.xevion.glint.api.SyncResult.Success }
+                    val failures = results.count { it is com.xevion.glint.api.SyncResult.Failure }
+
+                    if (failures > 0) {
+                        val failureResults = results.filterIsInstance<com.xevion.glint.api.SyncResult.Failure>()
+                        val firstError = failureResults.firstOrNull()?.userMessage ?: "Unknown error"
+
+                        SystemToast.addOrUpdate(
+                            minecraft!!.toastManager,
+                            SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
+                            Component.literal("${collection.world}: $successes/$totalScenes synced"),
+                            Component.literal(firstError),
+                        )
+                    } else {
+                        SystemToast.addOrUpdate(
+                            minecraft!!.toastManager,
+                            SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
+                            Component.literal("${collection.world} synced"),
+                            Component.literal("$successes scenes updated"),
+                        )
+                    }
+                }.exceptionally { e ->
+                    Glint.LOGGER.error("Failed to sync scenes for ${collection.world}", e)
+                    SystemToast.add(
+                        minecraft!!.toastManager,
+                        SystemToast.SystemToastId.WORLD_ACCESS_FAILURE,
+                        Component.literal("Sync failed: ${collection.world}"),
+                        Component.literal(e.message ?: "Unknown error"),
+                    )
+                    null
+                }
+        }
+
+        Glint.LOGGER.info("Started sync for $totalScenes scenes across ${collections.size} worlds")
+        SystemToast.add(
+            minecraft!!.toastManager,
+            SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
+            Component.literal("Syncing scenes..."),
+            Component.literal("$totalScenes scenes across ${collections.size} worlds"),
+        )
+    }
 }

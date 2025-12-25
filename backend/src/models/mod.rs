@@ -80,6 +80,7 @@ pub struct Scene {
     pub biome: Option<String>,
     pub definition_json: Option<String>,
     pub tags: Option<String>,
+    pub active: bool,
     pub created_at: UtcDateTime,
 }
 
@@ -103,6 +104,7 @@ pub struct Capture {
     pub gpu_model: Option<String>,
     pub status: String,
     pub error_message: Option<String>,
+    pub outdated: bool,
     pub created_at: UtcDateTime,
     pub updated_at: UtcDateTime,
 }
@@ -219,14 +221,54 @@ pub struct CompleteWorldUploadRequest {
     pub upload_id: String,
 }
 
+/// Helper types for scene position and camera
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Position {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Camera {
+    pub yaw: f64,
+    pub pitch: f64,
+}
+
+/// Create scene request (from mod - includes name, no description/tags)
 #[derive(Debug, Deserialize)]
 pub struct CreateSceneRequest {
-    pub name: String,
-    pub slug: String,
-    pub description: Option<String>,
     pub world_id: String,
-    pub definition_json: String,
-    pub tags: Option<Vec<String>>,
+    pub slug: String,
+    pub name: String,
+    pub position: Position,
+    pub camera: Camera,
+    pub dimension: String,
+    #[serde(rename = "timeOfDay")]
+    pub time_of_day: i64,
+    pub weather: String,
+    #[serde(rename = "weatherIntensity", default)]
+    pub weather_intensity: f64,
+    #[serde(rename = "moonPhase")]
+    pub moon_phase: Option<i32>,
+    pub biome: Option<String>,
+}
+
+/// Update scene request (from mod - no name/description/tags, only positioning)
+#[derive(Debug, Deserialize)]
+pub struct UpdateSceneRequest {
+    pub world_id: String,
+    pub position: Position,
+    pub camera: Camera,
+    pub dimension: String,
+    #[serde(rename = "timeOfDay")]
+    pub time_of_day: i64,
+    pub weather: String,
+    #[serde(rename = "weatherIntensity", default)]
+    pub weather_intensity: f64,
+    #[serde(rename = "moonPhase")]
+    pub moon_phase: Option<i32>,
+    pub biome: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
