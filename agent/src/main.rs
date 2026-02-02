@@ -58,6 +58,14 @@ struct Args {
     /// Agent identifier (for logging/tracking)
     #[arg(long, env = "GLINT_AGENT_ID", default_value = "agent-001")]
     agent_id: String,
+
+    /// Development mode: shader slug to capture (bypasses job queue)
+    #[arg(long, env = "GLINT_DEV_SHADER")]
+    dev_shader: Option<String>,
+
+    /// Development mode: scene slugs to capture (comma-separated)
+    #[arg(long, env = "GLINT_DEV_SCENES")]
+    dev_scenes: Option<String>,
 }
 
 #[tokio::main]
@@ -89,7 +97,19 @@ async fn main() -> Result<()> {
         heartbeat_interval: std::time::Duration::from_secs(args.heartbeat_interval),
     };
 
-    if args.once {
+    // Check for dev mode (direct shader/scene invocation)
+    if let (Some(shader_slug), Some(scenes_csv)) = (args.dev_shader, args.dev_scenes) {
+        let scene_slugs: Vec<String> = scenes_csv
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect();
+        info!(
+            shader = %shader_slug,
+            scenes = ?scene_slugs,
+            "Running in development mode (bypassing job queue)"
+        );
+        worker::run_dev_direct(&config, &shader_slug, &scene_slugs).await
+    } else if args.once {
         worker::run_once(&config).await
     } else {
         worker::run_loop(&config).await

@@ -24,6 +24,11 @@ impl ApiClient {
         }
     }
 
+    /// Get the base URL
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
     /// Claim the next available job
     #[instrument(skip(self))]
     pub async fn claim_job(&self) -> Result<Option<JobPayload>> {

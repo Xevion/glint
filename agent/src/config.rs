@@ -19,6 +19,7 @@ pub struct Config {
     pub java_path: PathBuf,
 
     /// Minecraft launcher path (optional, uses java directly if not set)
+    #[allow(dead_code)]
     pub mc_launcher: Option<PathBuf>,
 
     /// Poll interval when no jobs available
@@ -28,6 +29,7 @@ pub struct Config {
     pub heartbeat_interval: Duration,
 
     /// Agent identifier
+    #[allow(dead_code)]
     pub agent_id: String,
 }
 
@@ -55,5 +57,10 @@ impl Config {
     /// Path to capture output
     pub fn captures_dir(&self) -> PathBuf {
         self.glint_dir().join("captures")
+    }
+
+    /// Path to the libraries directory (Maven-style, managed by portablemc)
+    pub fn libraries_dir(&self) -> PathBuf {
+        self.minecraft_dir.join("libraries")
     }
 }

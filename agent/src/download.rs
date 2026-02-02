@@ -26,40 +26,56 @@ impl Downloader {
 
     /// Download a world if not already cached
     pub async fn download_world(&mut self, world: &WorldInfo, saves_dir: &Path) -> Result<()> {
+        let world_path = saves_dir.join(&world.slug);
+
+        // If world has no download URL, check if it exists locally
+        let Some(ref file_url) = world.file_url else {
+            if world_path.exists() {
+                debug!(world_slug = %world.slug, "World has no download URL, using existing local directory");
+                return Ok(());
+            }
+            anyhow::bail!(
+                "World '{}' has no download URL and does not exist locally at {:?}",
+                world.slug,
+                world_path
+            );
+        };
+
+        let Some(ref file_hash) = world.file_hash else {
+            anyhow::bail!(
+                "World '{}' has download URL but missing file_hash",
+                world.slug
+            );
+        };
+
         // Check if already downloaded this session
-        if self.world_cache.contains(&world.file_hash) {
+        if self.world_cache.contains(file_hash) {
             debug!(world_slug = %world.slug, "World already cached");
             return Ok(());
         }
 
-        let world_path = saves_dir.join(&world.slug);
-
         // Check if world exists and hash matches
         if world_path.exists() {
             debug!(world_slug = %world.slug, "World directory exists, assuming valid");
-            self.world_cache.insert(world.file_hash.clone());
+            self.world_cache.insert(file_hash.clone());
             return Ok(());
         }
 
         info!(
             world_slug = %world.slug,
-            size_bytes = world.size_bytes,
+            size_bytes = ?world.size_bytes,
             "Downloading world"
         );
 
         // Download to temp file
         let temp_path = saves_dir.join(format!(".{}.zip.tmp", world.slug));
-        self.download_file(&world.file_url, &temp_path).await?;
+        self.download_file(file_url, &temp_path).await?;
 
         // Verify hash
         let hash = hash_file(&temp_path).await?;
-        if hash != world.file_hash {
+        if &hash != file_hash {
             fs::remove_file(&temp_path).await.ok();
-            anyhow::bail!(
-                "World hash mismatch: expected {}, got {}",
-                world.file_hash,
-                hash
-            );
+            anyhow::bail!("World hash mismatch: expected {}, got {}", file_hash, hash);
         }
 
         // Extract zip
@@ -68,7 +84,7 @@ impl Downloader {
         // Clean up temp file
         fs::remove_file(&temp_path).await.ok();
 
-        self.world_cache.insert(world.file_hash.clone());
+        self.world_cache.insert(file_hash.clone());
         info!(world_slug = %world.slug, "World downloaded and extracted");
 
         Ok(())
@@ -143,6 +159,8 @@ impl Downloader {
             fs::create_dir_all(parent).await?;
         }
 
+        info!(url = %url, "Starting download");
+
         let response = self
             .client
             .get(url)
@@ -154,7 +172,13 @@ impl Downloader {
             anyhow::bail!("Download failed: {}", response.status());
         }
 
+        let content_length = response.content_length();
+        if let Some(size) = content_length {
+            info!(size_bytes = size, "Download size");
+        }
+
         let bytes = response.bytes().await.context("Failed to read response")?;
+        info!(bytes_received = bytes.len(), "Download complete");
 
         let mut file = fs::File::create(path).await?;
         file.write_all(&bytes).await?;

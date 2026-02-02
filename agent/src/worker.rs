@@ -32,6 +32,51 @@ pub async fn run_loop(config: &Config) -> Result<()> {
     }
 }
 
+/// Run development mode - directly capture shader/scenes without job queue
+pub async fn run_dev_direct(
+    config: &Config,
+    shader_slug: &str,
+    scene_slugs: &[String],
+) -> Result<()> {
+    let client = ApiClient::new(&config.api_url, &config.api_key);
+
+    info!("Fetching shader and scene data from backend...");
+
+    // Fetch shader version (use latest version for the shader)
+    let shader_version = fetch_shader_version(&client, shader_slug).await?;
+
+    // Fetch scenes by slugs (includes world data)
+    let (scenes, worlds) = fetch_scenes_with_worlds(&client, scene_slugs).await?;
+
+    if scenes.is_empty() {
+        anyhow::bail!("No scenes found for slugs: {:?}", scene_slugs);
+    }
+
+    info!(
+        shader = %shader_version.slug,
+        version = %shader_version.version,
+        scene_count = scenes.len(),
+        world_count = worlds.len(),
+        "Starting direct capture"
+    );
+
+    // Create a synthetic job payload
+    let job = JobPayload {
+        id: format!("dev-{}", chrono::Utc::now().timestamp()),
+        shader: shader_version,
+        scenes,
+        worlds,
+        profiles: Vec::new(),
+        priority: 0,
+    };
+
+    // Run the capture (without backend job tracking)
+    process_job(config, &client, &job).await?;
+
+    info!("Direct capture complete!");
+    Ok(())
+}
+
 /// Run a single job (or return if none available)
 pub async fn run_once(config: &Config) -> Result<()> {
     let client = ApiClient::new(&config.api_url, &config.api_key);
@@ -68,6 +113,7 @@ pub async fn run_once(config: &Config) -> Result<()> {
 
 /// Process a single job
 async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> Result<()> {
+    info!("Setting up directories...");
     // Ensure directories exist
     fs::create_dir_all(config.saves_dir()).await?;
     fs::create_dir_all(config.shaderpacks_dir()).await?;
@@ -75,20 +121,27 @@ async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> R
     fs::create_dir_all(config.captures_dir()).await?;
 
     // Download resources
+    info!("Downloading resources...");
     let mut downloader = Downloader::new();
 
     for world in &job.worlds {
+        info!(world_slug = %world.slug, "Downloading world");
         downloader
             .download_world(world, &config.saves_dir())
             .await?;
     }
 
+    info!(shader = %job.shader.slug, version = %job.shader.version, "Downloading shader");
     downloader
         .download_shader(&job.shader, &config.shaderpacks_dir())
         .await?;
 
     // Write scene definitions
+    info!(scene_count = job.scenes.len(), "Writing scene definitions");
     minecraft::write_scene_definitions(&config.scenes_dir(), &job.scenes, &job.worlds).await?;
+
+    // Remove duplicate library versions to prevent classpath conflicts
+    minecraft::deduplicate_libraries(&config.libraries_dir()).await?;
 
     // Launch Minecraft with heartbeat
     let mc = MinecraftProcess::launch(&config.minecraft_dir, &config.java_path).await?;
@@ -109,6 +162,7 @@ async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> R
     });
 
     // Wait for Minecraft to complete
+    info!("Waiting for Minecraft to complete...");
     let result = mc.wait().await?;
 
     // Stop heartbeat
@@ -116,7 +170,9 @@ async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> R
 
     // Check result
     match result {
-        MinecraftResult::Success => {}
+        MinecraftResult::Success => {
+            info!("Minecraft completed successfully");
+        }
         MinecraftResult::Failed { code } => {
             anyhow::bail!("Minecraft exited with code {}", code);
         }
@@ -126,9 +182,11 @@ async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> R
     }
 
     // Find and parse manifest
+    info!("Looking for capture manifest...");
     let manifest = find_and_parse_manifest(&config.captures_dir()).await?;
 
     // Upload screenshots and report completion
+    info!("Uploading screenshots and reporting completion...");
     upload_and_complete(config, client, job, &manifest).await?;
 
     Ok(())
@@ -152,7 +210,7 @@ async fn find_and_parse_manifest(captures_dir: &Path) -> Result<OrchestrationMan
         }
 
         let modified = metadata.modified()?;
-        if latest.as_ref().map_or(true, |(_, t)| modified > *t) {
+        if latest.as_ref().is_none_or(|(_, t)| modified > *t) {
             latest = Some((name, modified));
         }
     }
@@ -279,15 +337,19 @@ async fn upload_and_complete(
     let mut seen_profiles = std::collections::HashSet::new();
     for session in &manifest.sessions {
         for screenshot in &session.screenshots {
-            if let Some(profile) = screenshot.shader.as_ref().and_then(|sh| sh.profile.clone()) {
-                if seen_profiles.insert(profile.clone()) {
-                    discovered_profiles.push(profile);
-                }
+            if let Some(profile) = screenshot.shader.as_ref().and_then(|sh| sh.profile.clone())
+                && seen_profiles.insert(profile.clone())
+            {
+                discovered_profiles.push(profile);
             }
         }
     }
 
     // Report completion
+    info!(
+        capture_count = captures.len(),
+        "Reporting job completion to backend"
+    );
     client
         .complete_job(
             &job.id,
@@ -302,5 +364,131 @@ async fn upload_and_complete(
         )
         .await?;
 
+    info!("Job processing complete!");
     Ok(())
+}
+
+// =============================================================================
+// Development mode helpers - fetch data directly from backend API
+// =============================================================================
+
+#[derive(Debug, serde::Deserialize)]
+struct ShaderResponse {
+    id: String,
+    slug: String,
+    name: String,
+    versions: Vec<ShaderVersionResponse>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct ShaderVersionResponse {
+    id: String,
+    version: String,
+    download_url: Option<String>,
+    file_hash: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct SceneDetailResponse {
+    id: String,
+    slug: String,
+    name: String,
+    world_id: String,
+    definition_json: Option<String>,
+    world: Option<WorldResponse>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct WorldResponse {
+    id: String,
+    slug: String,
+    name: String,
+    file_url: Option<String>,
+    file_hash: Option<String>,
+    size_bytes: Option<i64>,
+}
+
+async fn fetch_shader_version(
+    client: &ApiClient,
+    shader_slug: &str,
+) -> Result<glint_shared::ShaderInfo> {
+    let url = format!("{}/api/shaders/{}", client.base_url(), shader_slug);
+    let response = reqwest::get(&url).await?;
+
+    if !response.status().is_success() {
+        anyhow::bail!(
+            "Failed to fetch shader '{}': {}",
+            shader_slug,
+            response.status()
+        );
+    }
+
+    let shader: ShaderResponse = response.json().await?;
+
+    // Use the first version (latest)
+    let version = shader
+        .versions
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("Shader '{}' has no versions", shader_slug))?;
+
+    Ok(glint_shared::ShaderInfo {
+        id: shader.id,
+        slug: shader.slug,
+        name: shader.name,
+        version_id: version.id.clone(),
+        version: version.version.clone(),
+        download_url: version.download_url.clone(),
+        file_hash: version.file_hash.clone(),
+    })
+}
+
+async fn fetch_scenes_with_worlds(
+    client: &ApiClient,
+    scene_slugs: &[String],
+) -> Result<(Vec<glint_shared::SceneInfo>, Vec<glint_shared::WorldInfo>)> {
+    let mut scenes = Vec::new();
+    let mut worlds = Vec::new();
+    let mut seen_world_ids = std::collections::HashSet::new();
+
+    for slug in scene_slugs {
+        let url = format!("{}/api/scenes/{}", client.base_url(), slug);
+        let response = reqwest::get(&url).await?;
+
+        if !response.status().is_success() {
+            anyhow::bail!("Failed to fetch scene '{}': {}", slug, response.status());
+        }
+
+        let details: Vec<SceneDetailResponse> = response.json().await?;
+
+        // Scenes are world-scoped, so a slug may match multiple scenes across worlds.
+        // In dev mode, use the first match.
+        let detail = details
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("No scenes found for slug '{}'", slug))?;
+
+        scenes.push(glint_shared::SceneInfo {
+            id: detail.id.clone(),
+            slug: detail.slug.clone(),
+            name: detail.name.clone(),
+            world_id: detail.world_id.clone(),
+            definition_json: detail.definition_json.unwrap_or_else(|| "{}".to_string()),
+        });
+
+        // Add world if not already seen
+        if let Some(world) = detail.world
+            && seen_world_ids.insert(world.id.clone())
+        {
+            worlds.push(glint_shared::WorldInfo {
+                id: world.id,
+                slug: world.slug,
+                name: world.name,
+                file_url: world.file_url,
+                file_hash: world.file_hash,
+                size_bytes: world.size_bytes,
+            });
+        }
+    }
+
+    Ok((scenes, worlds))
 }

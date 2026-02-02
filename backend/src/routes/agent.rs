@@ -91,6 +91,9 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
             r#"
             SELECT 
                 sc.id, sc.slug, sc.name, sc.definition_json,
+                sc.x, sc.y, sc.z, sc.pitch, sc.yaw,
+                sc.dimension, sc.time_of_day_ticks, sc.weather, sc.weather_intensity,
+                sc.moon_phase, sc.biome, sc.tags,
                 w.id as world_id, w.slug as world_slug, w.name as world_name,
                 w.file_url as world_file_url, w.file_hash as world_file_hash, 
                 w.size_bytes as world_size_bytes
@@ -104,11 +107,11 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
         .await?;
 
         if let Some(scene) = scene {
-            let Some(world_file_url) = scene.world_file_url else {
+            let Some(ref world_file_url) = scene.world_file_url else {
                 tracing::error!(scene_id = %scene.id, "Scene has no world file URL");
                 continue;
             };
-            let Some(world_file_hash) = scene.world_file_hash else {
+            let Some(ref world_file_hash) = scene.world_file_hash else {
                 tracing::error!(scene_id = %scene.id, "Scene has no world file hash");
                 continue;
             };
@@ -125,12 +128,13 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
                     size_bytes: scene.world_size_bytes,
                 });
 
+            let definition_json = build_scene_definition_json(&scene);
             scenes.push(SceneInfo {
                 id: scene.id,
                 slug: scene.slug,
                 name: scene.name,
                 world_id: scene.world_id,
-                definition_json: scene.definition_json.unwrap_or_else(|| "{}".to_string()),
+                definition_json,
             });
         }
     }
@@ -398,10 +402,68 @@ struct SceneRow {
     slug: String,
     name: String,
     definition_json: Option<String>,
+    x: f64,
+    y: f64,
+    z: f64,
+    pitch: f64,
+    yaw: f64,
+    dimension: String,
+    time_of_day_ticks: i64,
+    weather: String,
+    weather_intensity: f64,
+    moon_phase: Option<i32>,
+    biome: Option<String>,
+    tags: Option<String>,
     world_id: String,
     world_slug: String,
     world_name: String,
     world_file_url: Option<String>,
     world_file_hash: Option<String>,
     world_size_bytes: Option<i64>,
+}
+
+/// Builds definition JSON from SceneRow columns, matching the mod's Scene data class format.
+fn build_scene_definition_json(scene: &SceneRow) -> String {
+    if let Some(ref json) = scene.definition_json
+        && json != "{}"
+    {
+        return json.clone();
+    }
+
+    let weather = scene.weather.to_uppercase();
+
+    let mut json = serde_json::json!({
+        "id": scene.slug,
+        "name": scene.name,
+        "position": {
+            "x": scene.x,
+            "y": scene.y,
+            "z": scene.z
+        },
+        "camera": {
+            "yaw": scene.yaw,
+            "pitch": scene.pitch
+        },
+        "timeOfDay": scene.time_of_day_ticks,
+        "dimension": scene.dimension,
+        "weather": weather,
+        "weatherIntensity": scene.weather_intensity
+    });
+
+    if let Some(ref biome) = scene.biome {
+        json["biome"] = serde_json::Value::String(biome.clone());
+    }
+
+    if let Some(moon_phase) = scene.moon_phase {
+        json["moonPhase"] = serde_json::Value::Number(moon_phase.into());
+    }
+
+    if let Some(ref tags) = scene.tags
+        && let Ok(parsed) = serde_json::from_str::<Vec<String>>(tags)
+    {
+        json["tags"] =
+            serde_json::Value::Array(parsed.into_iter().map(serde_json::Value::String).collect());
+    }
+
+    json.to_string()
 }

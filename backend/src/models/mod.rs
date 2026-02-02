@@ -132,6 +132,57 @@ pub struct Job {
 // API Response Types
 // =============================================================================
 
+impl Scene {
+    /// Builds a definition JSON matching the Minecraft mod's Scene data class format.
+    /// Uses the explicit `definition_json` column if set, otherwise constructs it
+    /// from the individual columns.
+    pub fn build_definition_json(&self) -> String {
+        if let Some(ref json) = self.definition_json
+            && json != "{}"
+        {
+            return json.clone();
+        }
+
+        let weather = self.weather.to_uppercase();
+
+        let mut json = serde_json::json!({
+            "id": self.slug,
+            "name": self.name,
+            "position": {
+                "x": self.x,
+                "y": self.y,
+                "z": self.z
+            },
+            "camera": {
+                "yaw": self.yaw,
+                "pitch": self.pitch
+            },
+            "timeOfDay": self.time_of_day_ticks,
+            "dimension": self.dimension,
+            "weather": weather,
+            "weatherIntensity": self.weather_intensity
+        });
+
+        if let Some(ref biome) = self.biome {
+            json["biome"] = serde_json::Value::String(biome.clone());
+        }
+
+        if let Some(moon_phase) = self.moon_phase {
+            json["moonPhase"] = serde_json::Value::Number(moon_phase.into());
+        }
+
+        if let Some(ref tags) = self.tags
+            && let Ok(parsed) = serde_json::from_str::<Vec<String>>(tags)
+        {
+            json["tags"] = serde_json::Value::Array(
+                parsed.into_iter().map(serde_json::Value::String).collect(),
+            );
+        }
+
+        json.to_string()
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct ShaderWithVersions {
     #[serde(flatten)]

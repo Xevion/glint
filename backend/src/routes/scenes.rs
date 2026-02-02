@@ -91,6 +91,9 @@ async fn get_scene(
         .fetch_all(state.db())
         .await?;
 
+        let mut scene = scene;
+        scene.definition_json = Some(scene.build_definition_json());
+
         results.push(SceneWithCaptures {
             scene,
             world,
