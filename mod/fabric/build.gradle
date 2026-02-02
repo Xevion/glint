@@ -1,5 +1,6 @@
 plugins {
     id 'org.jetbrains.kotlin.jvm'
+    alias libs.plugins.shadow
 }
 
 architectury {
@@ -9,6 +10,7 @@ architectury {
 
 configurations {
     common
+    shadowCommon // Don't use shadow from the plugin, allows distinct configurations
     compileClasspath.extendsFrom common
     runtimeClasspath.extendsFrom common
     developmentFabric.extendsFrom common
@@ -16,6 +18,7 @@ configurations {
 
 dependencies {
     common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
+    shadowCommon(project(path: ':common', configuration: 'transformProductionFabric')) { transitive = false }
 
     modImplementation libs.fabric.loader
     modApi libs.fabric.api
@@ -44,4 +47,14 @@ processResources {
     filesMatching('fabric.mod.json') {
         expand 'version': project.version
     }
+}
+
+shadowJar {
+    configurations = [project.configurations.shadowCommon]
+    archiveClassifier = 'dev-shadow'
+}
+
+remapJar {
+    input.set shadowJar.archiveFile
+    dependsOn shadowJar
 }
