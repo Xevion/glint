@@ -1,5 +1,7 @@
 # Glint - Shader Preview Catalog
 
+set positional-arguments := true
+
 default:
     @just --list
 
@@ -149,5 +151,7 @@ test-agent:
 #   just mcjar grep-all startUseItem 'net/minecraft/client/*.java'  # Search multiple files
 #   just mcjar asset rendertype_lines.vsh  # Read shader/asset file
 #   just mcjar asset-list shaders/  # List asset files
-mcjar cmd *args:
-	bun ./scripts/mcjar.ts {{cmd}} {{args}}
+mcjar +args='':
+	#!/usr/bin/env bash
+	set -euo pipefail
+	exec bun ./scripts/mcjar.ts "$@"

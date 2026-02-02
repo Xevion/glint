@@ -167,8 +167,42 @@ async function listEntries(jar: string, filter: string): Promise<string[]> {
   return stdout.split("\n").filter(Boolean);
 }
 
+async function findSimilarPaths(jar: string, target: string): Promise<string[]> {
+  // Get all entries from JAR
+  const { code, stdout } = await runCommand("unzip", ["-Z", "-1", jar]);
+  if (code !== 0) return [];
+
+  const allEntries = stdout.split("\n").filter(Boolean);
+  
+  // Normalize the target path
+  const normalized = target.replace(/\/+$/, ""); // remove trailing slashes
+  
+  // Find entries that start with the target path
+  const matches = allEntries.filter((entry) => 
+    entry.startsWith(normalized)
+  );
+
+  // If no matches, try to find parent directory suggestions
+  if (matches.length === 0) {
+    const parts = normalized.split("/");
+    const parentPath = parts.slice(0, -1).join("/");
+    if (parentPath) {
+      return allEntries.filter((entry) => entry.startsWith(parentPath));
+    }
+  }
+
+  return matches;
+}
+
 function grepText(text: string, pattern: string, context: number): string[] {
-  const regex = new RegExp(pattern);
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Invalid regex pattern: ${message}\n\nPattern: ${pattern}\n\nTip: Escape special characters like ( ) [ ] { } . * + ? ^ $ \\ |`);
+  }
+
   const lines = text.split("\n");
   const matches: string[] = [];
 
@@ -188,41 +222,146 @@ function grepText(text: string, pattern: string, context: number): string[] {
 
 async function handleList(target: string): Promise<void> {
   const jar = await findJar("sources");
-  const { code, stdout, stderr } = await runCommand("unzip", [
-    "-l",
-    jar,
-    target,
-  ]);
-  if (code !== 0) {
-    throw new Error(stderr || `No entries matching ${target}`);
+  
+  // Try adding wildcard if not present and path looks like a directory
+  let patterns = [target];
+  if (!target.includes("*") && target.endsWith("/")) {
+    patterns.push(`${target}*`);
+  } else if (!target.includes("*") && !target.includes(".")) {
+    // Might be a directory without trailing slash
+    patterns.push(`${target}/*`, `${target}*`);
   }
-  console.log(stdout.trim());
+
+  for (const pattern of patterns) {
+    const { code, stdout } = await runCommand("unzip", ["-l", jar, pattern]);
+    if (code === 0) {
+      console.log(stdout.trim());
+      return;
+    }
+  }
+
+  // No matches found - provide suggestions
+  const suggestions = await findSimilarPaths(jar, target);
+  if (suggestions.length > 0) {
+    console.error(`No entries matching ${target}\n`);
+    console.error("Did you mean one of these?\n");
+    
+    // Group by directory and show unique directories
+    const directories = new Set<string>();
+    const files = new Set<string>();
+    
+    for (const entry of suggestions.slice(0, 20)) {
+      if (entry.endsWith(".java") || entry.endsWith(".class")) {
+        files.add(entry);
+      } else {
+        const dirMatch = entry.match(/^(.+?\/)[^/]*$/);
+        if (dirMatch) directories.add(dirMatch[1]);
+      }
+    }
+
+    if (directories.size > 0) {
+      console.error("Directories:");
+      for (const dir of Array.from(directories).slice(0, 10)) {
+        console.error(`  ${dir}`);
+      }
+    }
+    
+    if (files.size > 0) {
+      console.error("\nFiles:");
+      for (const file of Array.from(files).slice(0, 10)) {
+        console.error(`  ${file}`);
+      }
+    }
+    
+    if (suggestions.length > 20) {
+      console.error(`\n... and ${suggestions.length - 20} more`);
+    }
+  } else {
+    console.error(`No entries matching ${target}`);
+    console.error("\nTip: Try removing trailing slashes or use wildcards like 'path/*'");
+  }
+  
+  process.exit(1);
 }
 
 async function handleCat(file: string): Promise<void> {
   const jar = await findJar("sources");
-  const content = await readEntry(jar, file);
-  process.stdout.write(content);
+  try {
+    const content = await readEntry(jar, file);
+    process.stdout.write(content);
+  } catch (err) {
+    // Try to find similar files
+    const suggestions = await findSimilarPaths(jar, file);
+    if (suggestions.length > 0) {
+      console.error(`File not found: ${file}\n`);
+      console.error("Did you mean one of these?");
+      for (const suggestion of suggestions.slice(0, 10)) {
+        console.error(`  ${suggestion}`);
+      }
+      if (suggestions.length > 10) {
+        console.error(`\n... and ${suggestions.length - 10} more`);
+      }
+    } else {
+      console.error(`File not found: ${file}`);
+    }
+    process.exit(1);
+  }
 }
 
 async function handleGrep(pattern: string, file: string): Promise<void> {
   const jar = await findJar("sources");
-  const content = await readEntry(jar, file);
-  const results = grepText(content, pattern, config.context);
+  try {
+    const content = await readEntry(jar, file);
+    const results = grepText(content, pattern, config.context);
 
-  if (results.length === 0) {
-    console.log(`No matches for "${pattern}" in ${file}.`);
-    return;
-  }
+    if (results.length === 0) {
+      console.log(`No matches for "${pattern}" in ${file}.`);
+      return;
+    }
 
-  for (const block of results) {
-    console.log(block);
-    console.log("--");
+    for (const block of results) {
+      console.log(block);
+      console.log("--");
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    
+    // Check if it's a regex error
+    if (errorMessage.includes("Invalid regex pattern")) {
+      console.error(errorMessage);
+      process.exit(1);
+    }
+    
+    // Otherwise, assume it's a file-not-found error
+    const suggestions = await findSimilarPaths(jar, file);
+    if (suggestions.length > 0) {
+      console.error(`File not found: ${file}\n`);
+      console.error("Did you mean one of these?");
+      for (const suggestion of suggestions.slice(0, 10)) {
+        console.error(`  ${suggestion}`);
+      }
+      if (suggestions.length > 10) {
+        console.error(`\n... and ${suggestions.length - 10} more`);
+      }
+    } else {
+      console.error(`File not found: ${file}`);
+    }
+    process.exit(1);
   }
 }
 
 async function handleGrepAll(pattern: string, glob: string): Promise<void> {
   const jar = await findJar("sources");
+  
+  // Validate regex pattern before processing files
+  try {
+    new RegExp(pattern);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`Invalid regex pattern: ${message}\n\nPattern: ${pattern}\n\nTip: Escape special characters like ( ) [ ] { } . * + ? ^ $ \\ |`);
+    process.exit(1);
+  }
+  
   const entries = await listEntries(jar, glob);
   let printed = false;
 
@@ -257,14 +396,43 @@ async function handleAsset(file: string): Promise<void> {
 
 async function handleAssetList(target: string): Promise<void> {
   const jar = await findJar("merged");
-  for (const entry of [target, `assets/minecraft/${target}`]) {
-    const { code, stdout } = await runCommand("unzip", ["-l", jar, entry]);
+  
+  // Try multiple variations
+  const patterns = [
+    target,
+    `assets/minecraft/${target}`,
+    target.endsWith("/") ? `${target}*` : `${target}/*`,
+    `assets/minecraft/${target.endsWith("/") ? `${target}*` : `${target}/*`}`,
+  ];
+
+  for (const pattern of patterns) {
+    const { code, stdout } = await runCommand("unzip", ["-l", jar, pattern]);
     if (code === 0) {
       console.log(stdout.trim());
       return;
     }
   }
-  throw new Error(`No assets matching ${target}`);
+
+  // No matches - provide suggestions
+  const suggestions = await findSimilarPaths(jar, `assets/minecraft/${target}`);
+  if (suggestions.length > 0) {
+    console.error(`No assets matching ${target}\n`);
+    console.error("Did you mean one of these?");
+    for (const suggestion of suggestions.slice(0, 10)) {
+      // Show path relative to assets/minecraft/ if possible
+      const display = suggestion.startsWith("assets/minecraft/")
+        ? suggestion.substring("assets/minecraft/".length)
+        : suggestion;
+      console.error(`  ${display}`);
+    }
+    if (suggestions.length > 10) {
+      console.error(`\n... and ${suggestions.length - 10} more`);
+    }
+  } else {
+    console.error(`No assets matching ${target}`);
+  }
+  
+  process.exit(1);
 }
 
 async function main(): Promise<void> {
