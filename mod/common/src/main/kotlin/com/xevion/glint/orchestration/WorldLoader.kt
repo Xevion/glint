@@ -75,13 +75,30 @@ class WorldLoader {
     }
 
     /**
-     * Checks if a world directory exists in saves/.
+     * Checks if a world directory exists in saves/ or glint/worlds/.
      */
     fun worldExists(worldName: String): Boolean {
+        val worldPath = resolveWorldPath(worldName)
+        return worldPath != null && worldPath.exists() && worldPath.isDirectory
+    }
+
+    /**
+     * Resolves world path, checking glint/worlds/ first, then saves/.
+     */
+    private fun resolveWorldPath(worldName: String): File? {
         val mc = Minecraft.getInstance()
-        val savesDir = File(mc.gameDirectory, "saves")
-        val worldDir = File(savesDir, worldName)
-        return worldDir.exists() && worldDir.isDirectory
+
+        val glintWorld = File(mc.gameDirectory, "glint/worlds/$worldName")
+        if (glintWorld.exists() && glintWorld.isDirectory) {
+            return glintWorld
+        }
+
+        val savesWorld = File(mc.gameDirectory, "saves/$worldName")
+        if (savesWorld.exists() && savesWorld.isDirectory) {
+            return savesWorld
+        }
+
+        return null
     }
 
     fun reset() {

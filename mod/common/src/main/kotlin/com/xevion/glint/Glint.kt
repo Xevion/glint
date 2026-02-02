@@ -11,15 +11,45 @@ object Glint {
     const val MOD_ID = "glint"
     val LOGGER = LoggerFactory.getLogger(MOD_ID)
 
+    /**
+     * Whether the mod was launched by the agent in autonomous capture mode.
+     * Set via the GLINT_AUTONOMOUS environment variable.
+     */
+    var isAutonomous: Boolean = false
+        private set
+
     fun init() {
         LOGGER.info("Initializing Glint mod")
         LogConfig.setupDebugLogging(MOD_ID)
+
+        isAutonomous = System.getenv("GLINT_AUTONOMOUS")?.equals("true", ignoreCase = true) == true
+        if (isAutonomous) {
+            LOGGER.info("Autonomous mode enabled - will auto-start orchestration on title screen")
+        }
+
         validateApiConfig()
+        registerShutdownHook()
     }
 
     fun onClientTick() {
         SessionRegistry.tick()
         KeybindHandler.onTick()
+    }
+
+    private fun registerShutdownHook() {
+        Runtime.getRuntime().addShutdownHook(
+            Thread {
+                onShutdown()
+            },
+        )
+    }
+
+    private fun onShutdown() {
+        LOGGER.info("Shutting down Glint mod")
+        com.xevion.glint.download.WorldDownloader
+            .cleanupAllDownloads()
+        com.xevion.glint.api.SceneSyncManager
+            .shutdown()
     }
 
     /**

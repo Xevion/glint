@@ -65,7 +65,7 @@ class StabilizationDetector(
         ticksSinceStable++
         if (ticksSinceStable >= settlingTicks) {
             val loadedChunks = countLoadedChunks(mc)
-            Glint.LOGGER.debug(
+            Glint.LOGGER.info(
                 "Stabilization complete after $ticksInState ticks total ($ticksSinceStable ticks stable, $loadedChunks chunks loaded)",
             )
             return true

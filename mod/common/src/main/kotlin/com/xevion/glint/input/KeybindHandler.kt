@@ -3,7 +3,7 @@ package com.xevion.glint.input
 import com.xevion.glint.Glint
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.ui.ApiConfigWizardScreen
-import com.xevion.glint.ui.SceneManagerScreen
+import com.xevion.glint.ui.GlintHubScreen
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 
@@ -34,7 +34,7 @@ object KeybindHandler {
     fun onTick() {
         val mc = Minecraft.getInstance()
 
-        if (mc.screen != null || mc.level == null) {
+        if (mc.screen != null) {
             inputTracker.reset()
             return
         }
@@ -51,14 +51,13 @@ object KeybindHandler {
         val mc = Minecraft.getInstance()
         val config = ApiConfig.load()
 
-        // Show connection screen first if connection needs validation
         if (config.needsValidation()) {
             Glint.LOGGER.info("Opening API configuration (needs validation)")
-            val sceneManager = SceneManagerScreen(null)
-            mc.setScreen(ApiConfigWizardScreen(sceneManager, showConnectionFirst = true))
+            val hub = GlintHubScreen(null)
+            mc.setScreen(ApiConfigWizardScreen(hub, showConnectionFirst = true))
         } else {
-            Glint.LOGGER.info("Opening Glint Menu")
-            mc.setScreen(SceneManagerScreen(null))
+            Glint.LOGGER.info("Opening Glint Hub")
+            mc.setScreen(GlintHubScreen(null))
         }
     }
 

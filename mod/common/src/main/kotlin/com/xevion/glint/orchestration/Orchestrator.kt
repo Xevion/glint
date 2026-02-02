@@ -259,6 +259,11 @@ class Orchestrator {
     private fun handleFinishing() {
         logger.info("Orchestration finished")
         cleanup()
+
+        if (Glint.isAutonomous) {
+            logger.info("Autonomous mode: capture complete, shutting down Minecraft")
+            Minecraft.getInstance().stop()
+        }
     }
 
     private fun finishWithError(reason: String) {
@@ -269,6 +274,11 @@ class Orchestrator {
         }
 
         cleanup()
+
+        if (Glint.isAutonomous) {
+            logger.info("Autonomous mode: orchestration failed, shutting down Minecraft")
+            Minecraft.getInstance().stop()
+        }
     }
 
     private fun cleanup() {

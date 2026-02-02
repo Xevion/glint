@@ -9,7 +9,8 @@
   "client": [
     "KeyboardHandlerMixin",
     "MinecraftMixin",
-    "MouseHandlerMixin"
+    "MouseHandlerMixin",
+    "TitleScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

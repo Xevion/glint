@@ -11,14 +11,13 @@ class ConfirmDeleteScreen(
     private val worldName: String,
     private val sceneId: String,
     private val sceneName: String,
-) : Screen(Component.literal("Delete Scene?")) {
+) : Screen(Component.literal("Disable Scene?")) {
     override fun init() {
-        val message = "Delete '$sceneName'?"
         val yPos = height / 2 - 20
 
         addRenderableWidget(
             Button
-                .builder(CommonComponents.GUI_YES) {
+                .builder(Component.literal("Disable Scene")) {
                     parent.executeDeleteScene(worldName, sceneId)
                     minecraft?.setScreen(parent)
                 }.bounds(width / 2 - 105, yPos, 100, 20)
@@ -27,7 +26,7 @@ class ConfirmDeleteScreen(
 
         addRenderableWidget(
             Button
-                .builder(CommonComponents.GUI_NO) {
+                .builder(CommonComponents.GUI_CANCEL) {
                     minecraft?.setScreen(parent)
                 }.bounds(width / 2 + 5, yPos, 100, 20)
                 .build(),
@@ -43,8 +42,20 @@ class ConfirmDeleteScreen(
         renderBackground(guiGraphics, mouseX, mouseY, delta)
         guiGraphics.drawCenteredString(font, title, width / 2, height / 2 - 50, 0xFFFFFF)
 
-        val message = "Delete '$sceneName'?"
-        guiGraphics.drawCenteredString(font, message, width / 2, height / 2 - 30, 0xAAAAAA)
+        guiGraphics.drawCenteredString(
+            font,
+            "Are you sure you want to disable '$sceneName'?",
+            width / 2,
+            height / 2 - 30,
+            0xFFFFFF,
+        )
+        guiGraphics.drawCenteredString(
+            font,
+            "This will remove it locally and mark it inactive on the API.",
+            width / 2,
+            height / 2 - 18,
+            0x888888,
+        )
 
         super.render(guiGraphics, mouseX, mouseY, delta)
     }

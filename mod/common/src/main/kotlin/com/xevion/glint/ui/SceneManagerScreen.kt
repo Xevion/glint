@@ -108,19 +108,25 @@ class SceneManagerScreen(
         sceneId: String,
         sceneName: String,
     ) {
-        minecraft?.setScreen(ConfirmDeleteScreen(this, worldName, sceneId, sceneName))
+        minecraft?.setScreen(ConfirmDisableScreen(this, worldName, sceneId, sceneName))
     }
 
     fun executeDeleteScene(
         worldName: String,
         sceneId: String,
     ) {
-        if (SceneManager.removeScene(worldName, sceneId)) {
-            Glint.LOGGER.info("Deleted scene: $sceneId from world: $worldName")
-            refreshSceneList()
-        } else {
-            Glint.LOGGER.error("Failed to delete scene: $sceneId")
-        }
+        SceneManager
+            .disableScene(worldName, sceneId)
+            .thenAccept { success ->
+                minecraft?.execute {
+                    if (success) {
+                        Glint.LOGGER.info("Disabled scene: $sceneId from world: $worldName")
+                        refreshSceneList()
+                    } else {
+                        Glint.LOGGER.error("Failed to disable scene: $sceneId")
+                    }
+                }
+            }
     }
 
     fun startCaptureScene(sceneId: String) {
