@@ -15,7 +15,7 @@ import { Button } from '$lib/components/ui/button';
 
 		<div in:fade={{ duration: 300, delay: 200 }} class="mb-12 grid gap-6 md:grid-cols-2">
 			<a
-				href={resolve('/shaders')}
+				href={resolve('/shaders', {})}
 				class="glass group block rounded-lg border p-8 transition hover:border-primary"
 			>
 				<h2 class="mb-2 text-2xl font-semibold">Browse by Shader</h2>
@@ -25,7 +25,7 @@ import { Button } from '$lib/components/ui/button';
 			</a>
 
 			<a
-				href={resolve('/scenes')}
+				href={resolve('/scenes', {})}
 				class="glass group block rounded-lg border p-8 transition hover:border-primary"
 			>
 				<h2 class="mb-2 text-2xl font-semibold">Browse by Scene</h2>
@@ -36,8 +36,8 @@ import { Button } from '$lib/components/ui/button';
 		</div>
 
 		<div in:fade={{ duration: 300, delay: 300 }} class="flex justify-center gap-4">
-			<Button href={resolve('/compare')} variant="default" size="lg">Start Comparing</Button>
-			<Button href={resolve('/shaders')} variant="outline" size="lg">View All Shaders</Button>
+			<Button href={resolve('/compare', {})} variant="default" size="lg">Start Comparing</Button>
+			<Button href={resolve('/shaders', {})} variant="outline" size="lg">View All Shaders</Button>
 		</div>
 	</div>
 </div>

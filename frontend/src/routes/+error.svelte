@@ -48,7 +48,7 @@ $: message = statusMessages[status] ?? {
 		</p>
 
 		<div in:fade={{ duration: 300, delay: 300 }}>
-			<Button href={resolve('/')} variant="default" size="lg">Go Home</Button>
+			<Button href={resolve('/', {})} variant="default" size="lg">Go Home</Button>
 		</div>
 	</div>
 </div>

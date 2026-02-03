@@ -98,7 +98,7 @@ function validateZipFile(file: File): boolean {
 	return true;
 }
 
-async function handleFileSelect(event: Event) {
+function handleFileSelect(event: Event) {
 	const input = event.target as HTMLInputElement;
 	const file = input.files?.[0];
 	if (!file) return;
@@ -156,7 +156,7 @@ async function handleSubmit() {
 		return;
 	}
 
-	const fileToUpload = selectedFile || compressedBlob;
+	const fileToUpload = selectedFile ?? compressedBlob;
 	if (!fileToUpload) {
 		error = 'No file to upload';
 		return;
@@ -409,7 +409,7 @@ function getStepDescription(currentStep: Step): string {
 					class="space-y-2 rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive"
 				>
 					<p class="font-semibold">Upload Failed</p>
-					<p class="text-sm">{error || 'An unknown error occurred'}</p>
+					<p class="text-sm">{error ?? 'An unknown error occurred'}</p>
 					<p class="text-xs text-destructive/80">
 						Please check your input and try again, or contact support if the issue persists.
 					</p>

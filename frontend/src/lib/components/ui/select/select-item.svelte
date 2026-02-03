@@ -30,9 +30,10 @@ let {
 			{/if}
 		</span>
 		{#if childrenProp}
+			<!-- eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -->
 			{@render childrenProp({ selected, highlighted })}
 		{:else}
-			{label || value}
+			{label ?? value}
 		{/if}
 	{/snippet}
 </SelectPrimitive.Item>

@@ -45,7 +45,7 @@ function handleCardClick(e: MouseEvent) {
 		return;
 	}
 
-	void goto(resolve(`/shaders/${shader.slug}`), { invalidateAll: true });
+	void goto(resolve('/shaders/[id]', { id: shader.slug }), { invalidateAll: true });
 }
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -54,7 +54,7 @@ function handleKeyDown(e: KeyboardEvent) {
 		if (hasAnySelection) {
 			comparisonStore.toggleShader(shader.id);
 		} else {
-			void goto(resolve(`/shaders/${shader.slug}`), { invalidateAll: true });
+			void goto(resolve('/shaders/[id]', { id: shader.slug }), { invalidateAll: true });
 		}
 	}
 }
@@ -130,7 +130,7 @@ function handleCheckboxClick(e: MouseEvent) {
 		<!-- Header -->
 		<div class="space-y-1">
 			<a
-				href={resolve(`/shaders/${shader.slug}`)}
+				href={resolve('/shaders/[id]', { id: shader.slug })}
 				data-clickable
 				onclick={(e) => {
 					e.stopPropagation();

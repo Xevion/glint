@@ -53,7 +53,7 @@ const timeLabel = $derived(() => {
 				in:fly|local={{ y: -10, duration: 400 }}
 				class="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
 			>
-				<a href={resolve('/scenes')} class="transition-colors hover:text-foreground">Scenes</a>
+				<a href={resolve('/scenes', {})} class="transition-colors hover:text-foreground">Scenes</a>
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
 				</svg>

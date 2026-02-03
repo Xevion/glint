@@ -61,5 +61,10 @@ export default tseslint.config(
 	{
 		files: ['**/*.js'],
 		...tseslint.configs.disableTypeChecked
+	},
+	// Disable type-checked rules for config files not in project
+	{
+		files: ['playwright.config.ts', 'vitest.config.ts'],
+		...tseslint.configs.disableTypeChecked
 	}
 );

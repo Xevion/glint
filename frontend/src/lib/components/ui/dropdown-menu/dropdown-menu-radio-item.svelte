@@ -30,6 +30,7 @@ let {
 				<CircleIcon class="size-2 fill-current" />
 			{/if}
 		</span>
+		<!-- eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -->
 		{@render childrenProp?.({ checked })}
 	{/snippet}
 </DropdownMenuPrimitive.RadioItem>

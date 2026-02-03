@@ -22,8 +22,8 @@ export class ApiError extends Error {
 	static fromResponse(response: Response, body?: unknown): ApiError {
 		let message: string;
 
-		if (typeof body === 'object' && body && 'message' in body && body.message) {
-			message = String(body.message);
+		if (typeof body === 'object' && body && 'message' in body && typeof body.message === 'string') {
+			message = body.message;
 		} else if (response.statusText) {
 			message = `HTTP ${response.status}: ${response.statusText}`;
 		} else {

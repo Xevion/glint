@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/public';
+import { browser } from '$app/environment';
 
 /**
  * Get the API base URL.
@@ -7,9 +7,12 @@ import { env } from '$env/dynamic/public';
  * In production: Uses PUBLIC_API_URL env var or falls back to same origin
  */
 export function getApiUrl(): string {
-	// Check for public env var (works in both browser and SSR)
-	if (env.PUBLIC_API_URL) {
-		return env.PUBLIC_API_URL;
+	// In browser, check for public env var
+	if (browser && typeof window !== 'undefined') {
+		const publicApiUrl = import.meta.env?.PUBLIC_API_URL;
+		if (publicApiUrl) {
+			return publicApiUrl;
+		}
 	}
 
 	// Default to relative URLs (works with Vite proxy in dev, same-origin in prod)

@@ -2,7 +2,6 @@
 <script lang="ts" generics="T extends Record<string, any>">
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/* eslint-disable svelte/no-navigation-without-resolve */
 import { DataTable } from '@careswitch/svelte-data-table';
 import * as Table from '$lib/components/ui/table';
 import TimeAgo from './time-ago.svelte';

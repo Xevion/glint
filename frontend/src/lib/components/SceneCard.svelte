@@ -66,7 +66,7 @@ function handleCardClick(e: MouseEvent) {
 		return;
 	}
 
-	void goto(resolve(`/scenes/${scene.slug}`), { invalidateAll: true });
+	void goto(resolve('/scenes/[id]', { id: scene.slug }), { invalidateAll: true });
 }
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -75,7 +75,7 @@ function handleKeyDown(e: KeyboardEvent) {
 		if (hasAnySelection) {
 			comparisonStore.toggleScene(scene.id);
 		} else {
-			void goto(resolve(`/scenes/${scene.slug}`), { invalidateAll: true });
+			void goto(resolve('/scenes/[id]', { id: scene.slug }), { invalidateAll: true });
 		}
 	}
 }
@@ -167,7 +167,7 @@ function handleCheckboxClick(e: MouseEvent) {
 		<!-- Header -->
 		<div class="space-y-1.5">
 			<a
-				href={resolve(`/scenes/${scene.slug}`)}
+				href={resolve('/scenes/[id]', { id: scene.slug })}
 				data-clickable
 				onclick={(e) => {
 					e.stopPropagation();

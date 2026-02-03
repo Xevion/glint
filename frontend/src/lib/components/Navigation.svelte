@@ -21,12 +21,12 @@ function isActive(href: string): boolean {
 
 <nav class="nav-header dark:border-b">
 	<div class="container mx-auto flex h-16 items-center px-4">
-		<a href={resolve('/')} class="glint-title mr-8 text-xl font-bold">Glint</a>
+		<a href={resolve('/', {})} class="glint-title mr-8 text-xl font-bold">Glint</a>
 
 		<div class="flex flex-1 gap-6">
 			{#each navItems as item (item.href)}
 				<a
-					href={resolve(item.href)}
+					href={resolve(item.href, {})}
 					class="nav-link text-sm font-medium transition-colors"
 					class:active={isActive(item.href)}
 				>
@@ -37,7 +37,7 @@ function isActive(href: string): boolean {
 
 		<div class="flex gap-2">
 			<a
-				href={resolve('/admin')}
+				href={resolve('/admin', {})}
 				class="nav-icon rounded-md p-2 transition-colors"
 				aria-label="Admin panel"
 			>

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument */
+// FileSystem API types are not fully available, so we need to disable some type checking
 import { zip } from 'fflate';
 
 const MAX_SIZE = 512 * 1024 * 1024; // 512 MiB
