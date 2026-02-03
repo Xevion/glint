@@ -1,39 +1,38 @@
 <script lang="ts">
-	import { fly, fade, scale } from 'svelte/transition';
-	import { Button } from '$lib/components/ui/button';
-	import ShaderCard from '$lib/components/ShaderCard.svelte';
-	import type { PageData } from './$types';
+import { fly, fade, scale } from 'svelte/transition';
+import { Button } from '$lib/components/ui/button';
+import ShaderCard from '$lib/components/ShaderCard.svelte';
+import type { PageData } from './$types';
 
-	let { data } = $props<{ data: PageData }>();
-	const shaders = $derived(data.shaders);
+let { data } = $props<{ data: PageData }>();
+const shaders = $derived(data.shaders);
 
-	// Filter state
-	let searchQuery = $state('');
-	let sortBy = $state<'name' | 'updated'>('updated');
+// Filter state
+let searchQuery = $state('');
+let sortBy = $state<'name' | 'updated'>('updated');
 
-	const filteredShaders = $derived.by(() => {
-		let result = shaders.filter((shader: (typeof shaders)[0]) => {
-			if (searchQuery && !shader.name.toLowerCase().includes(searchQuery.toLowerCase()))
-				return false;
-			return true;
-		});
-
-		// Sort
-		result = [...result].sort((a, b) => {
-			switch (sortBy) {
-				case 'name':
-					return a.name.localeCompare(b.name);
-				case 'updated':
-					return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-				default:
-					return 0;
-			}
-		});
-
-		return result;
+const filteredShaders = $derived.by(() => {
+	let result = shaders.filter((shader: (typeof shaders)[0]) => {
+		if (searchQuery && !shader.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+		return true;
 	});
 
-	const hasFilters = $derived(searchQuery !== '');
+	// Sort
+	result = [...result].sort((a, b) => {
+		switch (sortBy) {
+			case 'name':
+				return a.name.localeCompare(b.name);
+			case 'updated':
+				return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+			default:
+				return 0;
+		}
+	});
+
+	return result;
+});
+
+const hasFilters = $derived(searchQuery !== '');
 </script>
 
 <div class="container mx-auto px-4 py-8">

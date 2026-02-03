@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
-	import { fly, fade } from 'svelte/transition';
-	import { Button } from '$lib/components/ui/button';
+import { resolve } from '$app/paths';
+import { fly, fade } from 'svelte/transition';
+import { Button } from '$lib/components/ui/button';
 </script>
 
 <div class="container mx-auto px-4 py-16">

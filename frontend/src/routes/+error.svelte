@@ -1,33 +1,33 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { resolve } from '$app/paths';
-	import { fly, fade } from 'svelte/transition';
-	import { Button } from '$lib/components/ui/button';
+import { page } from '$app/stores';
+import { resolve } from '$app/paths';
+import { fly, fade } from 'svelte/transition';
+import { Button } from '$lib/components/ui/button';
 
-	const statusMessages: Record<number, { title: string; description: string }> = {
-		404: {
-			title: 'Page Not Found',
-			description: "The page you're looking for doesn't exist or has been moved."
-		},
-		403: {
-			title: 'Forbidden',
-			description: "You don't have permission to access this resource."
-		},
-		500: {
-			title: 'Internal Server Error',
-			description: 'Something went wrong on our end. Please try again later.'
-		},
-		503: {
-			title: 'Service Unavailable',
-			description: 'The service is temporarily unavailable. Please try again later.'
-		}
-	};
+const statusMessages: Record<number, { title: string; description: string }> = {
+	404: {
+		title: 'Page Not Found',
+		description: "The page you're looking for doesn't exist or has been moved."
+	},
+	403: {
+		title: 'Forbidden',
+		description: "You don't have permission to access this resource."
+	},
+	500: {
+		title: 'Internal Server Error',
+		description: 'Something went wrong on our end. Please try again later.'
+	},
+	503: {
+		title: 'Service Unavailable',
+		description: 'The service is temporarily unavailable. Please try again later.'
+	}
+};
 
-	$: status = $page.status;
-	$: message = statusMessages[status] ?? {
-		title: 'Error',
-		description: $page.error?.message ?? 'An unexpected error occurred.'
-	};
+$: status = $page.status;
+$: message = statusMessages[status] ?? {
+	title: 'Error',
+	description: $page.error?.message ?? 'An unexpected error occurred.'
+};
 </script>
 
 <div class="container mx-auto px-4 py-16">

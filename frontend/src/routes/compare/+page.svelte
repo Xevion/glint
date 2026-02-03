@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { fly, fade } from 'svelte/transition';
-	import { resolve } from '$app/paths';
-	import { Button } from '$lib/components/ui/button';
+import { fly, fade } from 'svelte/transition';
+import { resolve } from '$app/paths';
+import { Button } from '$lib/components/ui/button';
 
-	const message = 'Comparison features coming soon in alpha development';
+const message = 'Comparison features coming soon in alpha development';
 </script>
 
 <div class="container mx-auto px-4 py-16">

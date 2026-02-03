@@ -1,158 +1,155 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Plus, LoaderCircle, CircleAlert } from '@lucide/svelte';
-	import { api } from '$lib/api';
-	import type { Shader, ShaderVersion, Scene } from '$lib/bindings';
-	import type { CreateJobRequest } from '$lib/api/endpoints/admin';
-	import { SvelteSet } from 'svelte/reactivity';
+import { Button } from '$lib/components/ui/button';
+import * as Dialog from '$lib/components/ui/dialog';
+import { Input } from '$lib/components/ui/input';
+import { Label } from '$lib/components/ui/label';
+import { Plus, LoaderCircle, CircleAlert } from '@lucide/svelte';
+import { api } from '$lib/api';
+import type { Shader, ShaderVersion, Scene } from '$lib/bindings';
+import type { CreateJobRequest } from '$lib/api/endpoints/admin';
+import { SvelteSet } from 'svelte/reactivity';
 
-	interface Props {
-		onJobCreated?: () => void;
+interface Props {
+	onJobCreated?: () => void;
+}
+
+let { onJobCreated }: Props = $props();
+
+// Dialog state
+let open = $state(false);
+let loading = $state(false);
+let error = $state<string | null>(null);
+
+// Data
+let shaders = $state<Shader[]>([]);
+let shaderVersions = $state<Map<string, ShaderVersion[]>>(new Map());
+let scenes = $state<Scene[]>([]);
+
+// Form state
+let selectedShaderId = $state<string>('');
+let selectedVersionId = $state<string>('');
+const selectedSceneIds = new SvelteSet<string>();
+let profilesInput = $state<string>('');
+let priority = $state<number>(0);
+
+// Load data when dialog opens
+$effect(() => {
+	if (open && shaders.length === 0) {
+		void loadData();
 	}
+});
 
-	let { onJobCreated }: Props = $props();
+async function loadData() {
+	loading = true;
+	error = null;
 
-	// Dialog state
-	let open = $state(false);
-	let loading = $state(false);
-	let error = $state<string | null>(null);
+	try {
+		// Load shaders and scenes
+		const [shadersResult, scenesResult] = await Promise.all([api.shaders.list(), api.scenes.list()]);
 
-	// Data
-	let shaders = $state<Shader[]>([]);
-	let shaderVersions = $state<Map<string, ShaderVersion[]>>(new Map());
-	let scenes = $state<Scene[]>([]);
+		if (shadersResult.isOk) {
+			shaders = shadersResult.value;
 
-	// Form state
-	let selectedShaderId = $state<string>('');
-	let selectedVersionId = $state<string>('');
-	const selectedSceneIds = new SvelteSet<string>();
-	let profilesInput = $state<string>('');
-	let priority = $state<number>(0);
-
-	// Load data when dialog opens
-	$effect(() => {
-		if (open && shaders.length === 0) {
-			void loadData();
-		}
-	});
-
-	async function loadData() {
-		loading = true;
-		error = null;
-
-		try {
-			// Load shaders and scenes
-			const [shadersResult, scenesResult] = await Promise.all([
-				api.shaders.list(),
-				api.scenes.list()
-			]);
-
-			if (shadersResult.isOk) {
-				shaders = shadersResult.value;
-
-				// Load versions for all shaders in parallel
-				const versionResults = await Promise.all(
-					shaders.map((shader) => api.shaders.getBySlug(shader.slug))
-				);
-				for (let i = 0; i < shaders.length; i++) {
-					const result = versionResults[i];
-					if (result.isOk) {
-						shaderVersions.set(shaders[i].id, result.value.versions);
-					}
+			// Load versions for all shaders in parallel
+			const versionResults = await Promise.all(
+				shaders.map((shader) => api.shaders.getBySlug(shader.slug))
+			);
+			for (let i = 0; i < shaders.length; i++) {
+				const result = versionResults[i];
+				if (result.isOk) {
+					shaderVersions.set(shaders[i].id, result.value.versions);
 				}
-			} else {
-				error = 'Failed to load shaders: ' + shadersResult.error.message;
 			}
-
-			if (scenesResult.isOk) {
-				scenes = scenesResult.value;
-			} else {
-				error = 'Failed to load scenes: ' + scenesResult.error.message;
-			}
-		} catch (e) {
-			error = 'Failed to load data: ' + String(e);
-		} finally {
-			loading = false;
-		}
-	}
-
-	function toggleScene(sceneId: string) {
-		if (selectedSceneIds.has(sceneId)) {
-			selectedSceneIds.delete(sceneId);
 		} else {
-			selectedSceneIds.add(sceneId);
-		}
-	}
-
-	async function handleSubmit() {
-		if (!selectedVersionId) {
-			error = 'Please select a shader version';
-			return;
+			error = 'Failed to load shaders: ' + shadersResult.error.message;
 		}
 
-		if (selectedSceneIds.size === 0) {
-			error = 'Please select at least one scene';
-			return;
-		}
-
-		loading = true;
-		error = null;
-
-		// Parse and validate profiles (filter empty strings)
-		const parsedProfiles = profilesInput.trim()
-			? profilesInput
-					.split(',')
-					.map((p) => p.trim())
-					.filter(Boolean)
-			: undefined;
-
-		// Clamp priority to valid range
-		const clampedPriority = Math.max(0, Math.min(100, priority || 0)) || undefined;
-
-		const request: CreateJobRequest = {
-			shader_version_id: selectedVersionId,
-			scene_ids: Array.from(selectedSceneIds),
-			profiles: parsedProfiles?.length ? parsedProfiles : undefined,
-			priority: clampedPriority
-		};
-
-		const result = await api.admin.createJob(request);
-
-		if (result.isOk) {
-			// Success! Reset and close
-			resetForm();
-			open = false;
-			onJobCreated?.();
+		if (scenesResult.isOk) {
+			scenes = scenesResult.value;
 		} else {
-			error = 'Failed to create job: ' + result.error.message;
+			error = 'Failed to load scenes: ' + scenesResult.error.message;
 		}
-
+	} catch (e) {
+		error = 'Failed to load data: ' + String(e);
+	} finally {
 		loading = false;
 	}
+}
 
-	function resetForm() {
-		selectedShaderId = '';
-		selectedVersionId = '';
-		selectedSceneIds.clear();
-		profilesInput = '';
-		priority = 0;
-		error = null;
+function toggleScene(sceneId: string) {
+	if (selectedSceneIds.has(sceneId)) {
+		selectedSceneIds.delete(sceneId);
+	} else {
+		selectedSceneIds.add(sceneId);
+	}
+}
+
+async function handleSubmit() {
+	if (!selectedVersionId) {
+		error = 'Please select a shader version';
+		return;
 	}
 
-	function handleOpenChange(newOpen: boolean) {
-		open = newOpen;
-		if (!newOpen) {
-			resetForm();
-		}
+	if (selectedSceneIds.size === 0) {
+		error = 'Please select at least one scene';
+		return;
 	}
 
-	// Get versions for selected shader
-	let availableVersions = $derived(
-		selectedShaderId ? (shaderVersions.get(selectedShaderId) ?? []) : []
-	);
+	loading = true;
+	error = null;
+
+	// Parse and validate profiles (filter empty strings)
+	const parsedProfiles = profilesInput.trim()
+		? profilesInput
+				.split(',')
+				.map((p) => p.trim())
+				.filter(Boolean)
+		: undefined;
+
+	// Clamp priority to valid range
+	const clampedPriority = Math.max(0, Math.min(100, priority || 0)) || undefined;
+
+	const request: CreateJobRequest = {
+		shader_version_id: selectedVersionId,
+		scene_ids: Array.from(selectedSceneIds),
+		profiles: parsedProfiles?.length ? parsedProfiles : undefined,
+		priority: clampedPriority
+	};
+
+	const result = await api.admin.createJob(request);
+
+	if (result.isOk) {
+		// Success! Reset and close
+		resetForm();
+		open = false;
+		onJobCreated?.();
+	} else {
+		error = 'Failed to create job: ' + result.error.message;
+	}
+
+	loading = false;
+}
+
+function resetForm() {
+	selectedShaderId = '';
+	selectedVersionId = '';
+	selectedSceneIds.clear();
+	profilesInput = '';
+	priority = 0;
+	error = null;
+}
+
+function handleOpenChange(newOpen: boolean) {
+	open = newOpen;
+	if (!newOpen) {
+		resetForm();
+	}
+}
+
+// Get versions for selected shader
+let availableVersions = $derived(
+	selectedShaderId ? (shaderVersions.get(selectedShaderId) ?? []) : []
+);
 </script>
 
 <Dialog.Root {open} onOpenChange={handleOpenChange}>

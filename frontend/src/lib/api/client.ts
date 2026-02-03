@@ -46,12 +46,7 @@ export class ApiClient {
 				return Result.ok(data);
 			} catch (error) {
 				return Result.err(
-					new ApiError(
-						ApiErrorType.Unknown,
-						'Failed to parse response JSON',
-						response.status,
-						error
-					)
+					new ApiError(ApiErrorType.Unknown, 'Failed to parse response JSON', response.status, error)
 				);
 			}
 		} catch (error) {

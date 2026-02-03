@@ -1,22 +1,22 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { resolve } from '$app/paths';
-	import { Sun, Moon, Settings } from '@lucide/svelte';
-	import { themeStore } from '$lib/stores/theme.svelte';
+import { page } from '$app/stores';
+import { resolve } from '$app/paths';
+import { Sun, Moon, Settings } from '@lucide/svelte';
+import { themeStore } from '$lib/stores/theme.svelte';
 
-	const navItems = [
-		{ href: '/' as const, label: 'Home' },
-		{ href: '/shaders' as const, label: 'Shaders' },
-		{ href: '/scenes' as const, label: 'Scenes' },
-		{ href: '/compare' as const, label: 'Compare' }
-	];
+const navItems = [
+	{ href: '/' as const, label: 'Home' },
+	{ href: '/shaders' as const, label: 'Shaders' },
+	{ href: '/scenes' as const, label: 'Scenes' },
+	{ href: '/compare' as const, label: 'Compare' }
+];
 
-	function isActive(href: string): boolean {
-		if (href === '/') {
-			return $page.url.pathname === '/';
-		}
-		return $page.url.pathname.startsWith(href);
+function isActive(href: string): boolean {
+	if (href === '/') {
+		return $page.url.pathname === '/';
 	}
+	return $page.url.pathname.startsWith(href);
+}
 </script>
 
 <nav class="nav-header dark:border-b">

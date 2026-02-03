@@ -1,89 +1,89 @@
 <script lang="ts">
-	import type { Scene } from '$lib/bindings';
-	import {
-		getBiomeDisplayName,
-		getDimensionDisplayName,
-		getWeatherDisplayName,
-		hashStringToNumber
-	} from '$lib/utils/display';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { comparisonStore } from '$lib/stores/comparison.svelte';
-	import { cn } from '$lib/utils';
+import type { Scene } from '$lib/bindings';
+import {
+	getBiomeDisplayName,
+	getDimensionDisplayName,
+	getWeatherDisplayName,
+	hashStringToNumber
+} from '$lib/utils/display';
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
+import { comparisonStore } from '$lib/stores/comparison.svelte';
+import { cn } from '$lib/utils';
 
-	interface Props {
-		scene: Scene;
-		class?: string;
-	}
+interface Props {
+	scene: Scene;
+	class?: string;
+}
 
-	let { scene, class: className }: Props = $props();
+let { scene, class: className }: Props = $props();
 
-	// Parse tags from JSON string (with error handling)
-	function parseTags(tagsJson: string | null): string[] {
-		if (!tagsJson) return [];
-		try {
-			const parsed: unknown = JSON.parse(tagsJson);
-			if (!Array.isArray(parsed)) {
-				console.warn('SceneCard: tags is not an array', typeof parsed);
-				return [];
-			}
-			return parsed as string[];
-		} catch (e) {
-			console.warn('SceneCard: failed to parse tags JSON', e);
+// Parse tags from JSON string (with error handling)
+function parseTags(tagsJson: string | null): string[] {
+	if (!tagsJson) return [];
+	try {
+		const parsed: unknown = JSON.parse(tagsJson);
+		if (!Array.isArray(parsed)) {
+			console.warn('SceneCard: tags is not an array', typeof parsed);
 			return [];
 		}
+		return parsed as string[];
+	} catch (e) {
+		console.warn('SceneCard: failed to parse tags JSON', e);
+		return [];
+	}
+}
+
+const tags = $derived<string[]>(parseTags(scene.tags));
+
+// Determine time of day from ticks (0-24000, where 0=6am, 6000=noon, 18000=midnight)
+function getTimeOfDay(ticks: number): string {
+	const normalizedTicks = ticks % 24000;
+	if (normalizedTicks < 1000) return 'dawn';
+	if (normalizedTicks < 11000) return 'day';
+	if (normalizedTicks < 13000) return 'dusk';
+	return 'night';
+}
+
+const timeOfDay = $derived(getTimeOfDay(scene.time_of_day_ticks));
+
+const wallpaperIndex = $derived(hashStringToNumber(scene.id) % 50);
+
+let isHovered = $state(false);
+const isSelected = $derived(comparisonStore.isSceneSelected(scene.id));
+const hasAnySelection = $derived(comparisonStore.hasSceneSelection);
+
+function handleCardClick(e: MouseEvent) {
+	const target = e.target as HTMLElement;
+
+	if (target.closest('[data-checkbox]') || target.closest('[data-clickable]')) {
+		return;
 	}
 
-	const tags = $derived<string[]>(parseTags(scene.tags));
-
-	// Determine time of day from ticks (0-24000, where 0=6am, 6000=noon, 18000=midnight)
-	function getTimeOfDay(ticks: number): string {
-		const normalizedTicks = ticks % 24000;
-		if (normalizedTicks < 1000) return 'dawn';
-		if (normalizedTicks < 11000) return 'day';
-		if (normalizedTicks < 13000) return 'dusk';
-		return 'night';
-	}
-
-	const timeOfDay = $derived(getTimeOfDay(scene.time_of_day_ticks));
-
-	const wallpaperIndex = $derived(hashStringToNumber(scene.id) % 50);
-
-	let isHovered = $state(false);
-	const isSelected = $derived(comparisonStore.isSceneSelected(scene.id));
-	const hasAnySelection = $derived(comparisonStore.hasSceneSelection);
-
-	function handleCardClick(e: MouseEvent) {
-		const target = e.target as HTMLElement;
-
-		if (target.closest('[data-checkbox]') || target.closest('[data-clickable]')) {
-			return;
-		}
-
-		if (hasAnySelection) {
-			e.preventDefault();
-			comparisonStore.toggleScene(scene.id);
-			return;
-		}
-
-		void goto(resolve(`/scenes/${scene.slug}`), { invalidateAll: true });
-	}
-
-	function handleKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Enter' || e.key === ' ') {
-			e.preventDefault();
-			if (hasAnySelection) {
-				comparisonStore.toggleScene(scene.id);
-			} else {
-				void goto(resolve(`/scenes/${scene.slug}`), { invalidateAll: true });
-			}
-		}
-	}
-
-	function handleCheckboxClick(e: MouseEvent) {
-		e.stopPropagation();
+	if (hasAnySelection) {
+		e.preventDefault();
 		comparisonStore.toggleScene(scene.id);
+		return;
 	}
+
+	void goto(resolve(`/scenes/${scene.slug}`), { invalidateAll: true });
+}
+
+function handleKeyDown(e: KeyboardEvent) {
+	if (e.key === 'Enter' || e.key === ' ') {
+		e.preventDefault();
+		if (hasAnySelection) {
+			comparisonStore.toggleScene(scene.id);
+		} else {
+			void goto(resolve(`/scenes/${scene.slug}`), { invalidateAll: true });
+		}
+	}
+}
+
+function handleCheckboxClick(e: MouseEvent) {
+	e.stopPropagation();
+	comparisonStore.toggleScene(scene.id);
+}
 </script>
 
 <div

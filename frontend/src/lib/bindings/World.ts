@@ -3,15 +3,4 @@
 /**
  * Downloadable world files containing scenes
  */
-export type World = {
-	id: string;
-	slug: string;
-	name: string;
-	description: string | null;
-	minecraft_version: string;
-	file_url: string | null;
-	file_hash: string | null;
-	size_bytes: number | null;
-	created_at: string;
-	updated_at: string;
-};
+export type World = { id: string, slug: string, name: string, description: string | null, minecraft_version: string, file_url: string | null, file_hash: string | null, size_bytes: number | null, created_at: string, updated_at: string, };

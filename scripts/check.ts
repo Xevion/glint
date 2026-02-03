@@ -81,8 +81,8 @@ if (fix) {
         "\n",
     );
 
-    // Format generated files so they pass prettier checks
-    runPiped(["bun", "run", "--cwd", "frontend", "prettier", "--", "--write", "src/lib/bindings/"]);
+    // Format generated files so they pass biome checks
+    runPiped(["bun", "run", "--cwd", "frontend", "format", "src/lib/bindings/"]);
 
     process.stdout.write(c("32", "✓ bindings") + ` (${elapsed(t)}s, ${types.length} types)\n`);
   } else {

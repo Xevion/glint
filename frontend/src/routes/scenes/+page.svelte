@@ -1,24 +1,23 @@
 <script lang="ts">
-	import { fly, fade, scale } from 'svelte/transition';
-	import { Button } from '$lib/components/ui/button';
-	import SceneCard from '$lib/components/SceneCard.svelte';
-	import type { PageData } from './$types';
+import { fly, fade, scale } from 'svelte/transition';
+import { Button } from '$lib/components/ui/button';
+import SceneCard from '$lib/components/SceneCard.svelte';
+import type { PageData } from './$types';
 
-	let { data } = $props<{ data: PageData }>();
-	const scenes = $derived(data.scenes);
+let { data } = $props<{ data: PageData }>();
+const scenes = $derived(data.scenes);
 
-	// Filter state
-	let searchQuery = $state('');
+// Filter state
+let searchQuery = $state('');
 
-	const filteredScenes = $derived.by(() => {
-		return scenes.filter((scene: (typeof scenes)[0]) => {
-			if (searchQuery && !scene.name.toLowerCase().includes(searchQuery.toLowerCase()))
-				return false;
-			return true;
-		});
+const filteredScenes = $derived.by(() => {
+	return scenes.filter((scene: (typeof scenes)[0]) => {
+		if (searchQuery && !scene.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+		return true;
 	});
+});
 
-	const hasFilters = $derived(searchQuery !== '');
+const hasFilters = $derived(searchQuery !== '');
 </script>
 
 <div class="container mx-auto px-4 py-8">

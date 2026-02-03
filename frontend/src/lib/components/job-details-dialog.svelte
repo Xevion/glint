@@ -1,33 +1,33 @@
 <script lang="ts">
-	import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
-	import TimeAgo from '$lib/components/time-ago.svelte';
-	import type { JobWithDetails } from '$lib/api/endpoints/admin';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
+import TimeAgo from '$lib/components/time-ago.svelte';
+import type { JobWithDetails } from '$lib/api/endpoints/admin';
 
-	interface Props {
-		job: JobWithDetails | null;
-		open?: boolean;
-	}
+interface Props {
+	job: JobWithDetails | null;
+	open?: boolean;
+}
 
-	let { job, open = $bindable(false) }: Props = $props();
+let { job, open = $bindable(false) }: Props = $props();
 
-	function parseJsonArray(json: string | null): string[] {
-		if (!json) return [];
-		try {
-			const parsed: unknown = JSON.parse(json);
-			if (!Array.isArray(parsed)) {
-				console.warn('parseJsonArray: expected array, got', typeof parsed);
-				return [];
-			}
-			return parsed as string[];
-		} catch (e) {
-			console.warn('parseJsonArray: failed to parse JSON', e);
+function parseJsonArray(json: string | null): string[] {
+	if (!json) return [];
+	try {
+		const parsed: unknown = JSON.parse(json);
+		if (!Array.isArray(parsed)) {
+			console.warn('parseJsonArray: expected array, got', typeof parsed);
 			return [];
 		}
+		return parsed as string[];
+	} catch (e) {
+		console.warn('parseJsonArray: failed to parse JSON', e);
+		return [];
 	}
+}
 
-	// Derive parsed values once to avoid redundant parsing
-	const sceneIds = $derived(job ? parseJsonArray(job.scene_ids) : []);
-	const profiles = $derived(job ? parseJsonArray(job.profiles) : []);
+// Derive parsed values once to avoid redundant parsing
+const sceneIds = $derived(job ? parseJsonArray(job.scene_ids) : []);
+const profiles = $derived(job ? parseJsonArray(job.profiles) : []);
 </script>
 
 <Dialog bind:open>

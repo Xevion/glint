@@ -1,47 +1,39 @@
 <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
 <script lang="ts" generics="T extends Record<string, any>">
-	/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-	/* eslint-disable svelte/no-navigation-without-resolve */
-	import { DataTable } from '@careswitch/svelte-data-table';
-	import * as Table from '$lib/components/ui/table';
-	import TimeAgo from './time-ago.svelte';
-	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import {
-		ExternalLink,
-		Trash2,
-		Ellipsis,
-		CircleX,
-		RotateCcw,
-		LockOpen,
-		Info
-	} from '@lucide/svelte';
+/* eslint-disable svelte/no-navigation-without-resolve */
+import { DataTable } from '@careswitch/svelte-data-table';
+import * as Table from '$lib/components/ui/table';
+import TimeAgo from './time-ago.svelte';
+import { goto } from '$app/navigation';
+import { Button } from '$lib/components/ui/button';
+import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+import { ExternalLink, Trash2, Ellipsis, CircleX, RotateCcw, LockOpen, Info } from '@lucide/svelte';
 
-	interface Column {
-		id: string;
-		key: string;
-		name: string;
-		render?: (value: any, row: T) => any;
-		component?: 'time' | 'link-button' | 'delete-button' | 'job-actions';
-		href?: (row: T) => string;
-		onAction?: (action: string, row: T) => void;
-	}
+interface Column {
+	id: string;
+	key: string;
+	name: string;
+	render?: (value: any, row: T) => any;
+	component?: 'time' | 'link-button' | 'delete-button' | 'job-actions';
+	href?: (row: T) => string;
+	onAction?: (action: string, row: T) => void;
+}
 
-	interface Props {
-		data: T[];
-		columns: Column[];
-	}
+interface Props {
+	data: T[];
+	columns: Column[];
+}
 
-	let { data, columns }: Props = $props();
+let { data, columns }: Props = $props();
 
-	const table = $derived(
-		new DataTable({
-			data,
-			columns
-		})
-	);
+const table = $derived(
+	new DataTable({
+		data,
+		columns
+	})
+);
 </script>
 
 <div class="rounded-md border">

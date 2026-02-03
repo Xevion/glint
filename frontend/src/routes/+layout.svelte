@@ -1,55 +1,55 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
-	import { OverlayScrollbars } from 'overlayscrollbars';
-	import type { OverlayScrollbars as OverlayScrollbarsInstance } from 'overlayscrollbars';
-	import 'overlayscrollbars/overlayscrollbars.css';
-	import { themeStore } from '$lib/stores/theme.svelte';
-	import BackgroundImage from '$lib/components/BackgroundImage.svelte';
-	import Navigation from '$lib/components/Navigation.svelte';
-	import './layout.css';
+import type { Snippet } from 'svelte';
+import { onMount } from 'svelte';
+import { browser } from '$app/environment';
+import { OverlayScrollbars } from 'overlayscrollbars';
+import type { OverlayScrollbars as OverlayScrollbarsInstance } from 'overlayscrollbars';
+import 'overlayscrollbars/overlayscrollbars.css';
+import { themeStore } from '$lib/stores/theme.svelte';
+import BackgroundImage from '$lib/components/BackgroundImage.svelte';
+import Navigation from '$lib/components/Navigation.svelte';
+import './layout.css';
 
-	interface Props {
-		children: Snippet;
-	}
+interface Props {
+	children: Snippet;
+}
 
-	let { children }: Props = $props();
+let { children }: Props = $props();
 
-	let osInstance: OverlayScrollbarsInstance | null = null;
+let osInstance: OverlayScrollbarsInstance | null = null;
 
-	// Update favicon when theme changes (client-side only to avoid hydration mismatch)
-	$effect(() => {
-		if (!browser) return;
-		const favicon = themeStore.isDark ? '/favicon-dark.ico' : '/favicon-light.ico';
-		const link = document.querySelector('link[rel="icon"]');
-		if (link && link instanceof HTMLLinkElement) link.href = favicon;
+// Update favicon when theme changes (client-side only to avoid hydration mismatch)
+$effect(() => {
+	if (!browser) return;
+	const favicon = themeStore.isDark ? '/favicon-dark.ico' : '/favicon-light.ico';
+	const link = document.querySelector('link[rel="icon"]');
+	if (link && link instanceof HTMLLinkElement) link.href = favicon;
+});
+
+// Reactively update scrollbar theme when theme changes
+$effect(() => {
+	const scrollbarTheme = themeStore.isDark ? 'os-theme-light' : 'os-theme-dark';
+	osInstance?.options({ scrollbars: { theme: scrollbarTheme } });
+});
+
+onMount(() => {
+	// Set up system preference listener (theme is already applied by blocking script)
+	themeStore.init();
+
+	// Initialize OverlayScrollbars on the body for full-page scrolling
+	osInstance = OverlayScrollbars(document.body, {
+		scrollbars: {
+			theme: themeStore.isDark ? 'os-theme-light' : 'os-theme-dark',
+			autoHide: 'leave',
+			autoHideDelay: 400
+		}
 	});
 
-	// Reactively update scrollbar theme when theme changes
-	$effect(() => {
-		const scrollbarTheme = themeStore.isDark ? 'os-theme-light' : 'os-theme-dark';
-		osInstance?.options({ scrollbars: { theme: scrollbarTheme } });
-	});
-
-	onMount(() => {
-		// Set up system preference listener (theme is already applied by blocking script)
-		themeStore.init();
-
-		// Initialize OverlayScrollbars on the body for full-page scrolling
-		osInstance = OverlayScrollbars(document.body, {
-			scrollbars: {
-				theme: themeStore.isDark ? 'os-theme-light' : 'os-theme-dark',
-				autoHide: 'leave',
-				autoHideDelay: 400
-			}
-		});
-
-		return () => {
-			osInstance?.destroy();
-			osInstance = null;
-		};
-	});
+	return () => {
+		osInstance?.destroy();
+		osInstance = null;
+	};
+});
 </script>
 
 <svelte:head><link rel="icon" href="/favicon-light.ico" /></svelte:head>

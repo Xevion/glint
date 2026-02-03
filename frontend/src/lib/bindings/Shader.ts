@@ -3,14 +3,4 @@
 /**
  * Shader pack identity (not version-specific)
  */
-export type Shader = {
-	id: string;
-	name: string;
-	slug: string;
-	description: string | null;
-	modrinth_id: string | null;
-	curseforge_id: string | null;
-	website_url: string | null;
-	created_at: string;
-	updated_at: string;
-};
+export type Shader = { id: string, name: string, slug: string, description: string | null, modrinth_id: string | null, curseforge_id: string | null, website_url: string | null, created_at: string, updated_at: string, };

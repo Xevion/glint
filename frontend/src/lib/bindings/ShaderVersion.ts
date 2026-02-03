@@ -3,16 +3,8 @@
 /**
  * Specific release of a shader pack
  */
-export type ShaderVersion = {
-	id: string;
-	shader_id: string;
-	version: string;
-	modrinth_version_id: string | null;
-	download_url: string | null;
-	file_hash: string | null;
-	/**
-	 * JSON array of profile names, discovered after first capture
-	 */
-	supported_profiles: string | null;
-	created_at: string;
-};
+export type ShaderVersion = { id: string, shader_id: string, version: string, modrinth_version_id: string | null, download_url: string | null, file_hash: string | null, 
+/**
+ * JSON array of profile names, discovered after first capture
+ */
+supported_profiles: string | null, created_at: string, };

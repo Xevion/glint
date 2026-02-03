@@ -1,68 +1,68 @@
 <script lang="ts">
-	import type { Shader } from '$lib/bindings';
-	import {
-		formatDate,
-		getModrinthUrl,
-		getCurseforgeUrl,
-		hashStringToNumber
-	} from '$lib/utils/display';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { comparisonStore } from '$lib/stores/comparison.svelte';
-	import { cn } from '$lib/utils';
-	import BrandIcon from './icons/BrandIcon.svelte';
+import type { Shader } from '$lib/bindings';
+import {
+	formatDate,
+	getModrinthUrl,
+	getCurseforgeUrl,
+	hashStringToNumber
+} from '$lib/utils/display';
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
+import { comparisonStore } from '$lib/stores/comparison.svelte';
+import { cn } from '$lib/utils';
+import BrandIcon from './icons/BrandIcon.svelte';
 
-	interface Props {
-		shader: Shader;
-		class?: string;
+interface Props {
+	shader: Shader;
+	class?: string;
+}
+
+let { shader, class: className }: Props = $props();
+
+const wallpaperIndex = $derived(hashStringToNumber(shader.id) % 50);
+
+let isHovered = $state(false);
+const isSelected = $derived(comparisonStore.isShaderSelected(shader.id));
+const hasAnySelection = $derived(comparisonStore.hasShaderSelection);
+
+const modrinthUrl = $derived(getModrinthUrl(shader.modrinth_id));
+const curseforgeUrl = $derived(getCurseforgeUrl(shader.curseforge_id));
+
+function handleCardClick(e: MouseEvent) {
+	const target = e.target as HTMLElement;
+
+	if (target.closest('[data-external-link]') || target.closest('[data-checkbox]')) {
+		return;
 	}
 
-	let { shader, class: className }: Props = $props();
-
-	const wallpaperIndex = $derived(hashStringToNumber(shader.id) % 50);
-
-	let isHovered = $state(false);
-	const isSelected = $derived(comparisonStore.isShaderSelected(shader.id));
-	const hasAnySelection = $derived(comparisonStore.hasShaderSelection);
-
-	const modrinthUrl = $derived(getModrinthUrl(shader.modrinth_id));
-	const curseforgeUrl = $derived(getCurseforgeUrl(shader.curseforge_id));
-
-	function handleCardClick(e: MouseEvent) {
-		const target = e.target as HTMLElement;
-
-		if (target.closest('[data-external-link]') || target.closest('[data-checkbox]')) {
-			return;
-		}
-
-		if (target.closest('[data-clickable]')) {
-			return;
-		}
-
-		if (hasAnySelection) {
-			e.preventDefault();
-			comparisonStore.toggleShader(shader.id);
-			return;
-		}
-
-		void goto(resolve(`/shaders/${shader.slug}`), { invalidateAll: true });
+	if (target.closest('[data-clickable]')) {
+		return;
 	}
 
-	function handleKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Enter' || e.key === ' ') {
-			e.preventDefault();
-			if (hasAnySelection) {
-				comparisonStore.toggleShader(shader.id);
-			} else {
-				void goto(resolve(`/shaders/${shader.slug}`), { invalidateAll: true });
-			}
-		}
-	}
-
-	function handleCheckboxClick(e: MouseEvent) {
-		e.stopPropagation();
+	if (hasAnySelection) {
+		e.preventDefault();
 		comparisonStore.toggleShader(shader.id);
+		return;
 	}
+
+	void goto(resolve(`/shaders/${shader.slug}`), { invalidateAll: true });
+}
+
+function handleKeyDown(e: KeyboardEvent) {
+	if (e.key === 'Enter' || e.key === ' ') {
+		e.preventDefault();
+		if (hasAnySelection) {
+			comparisonStore.toggleShader(shader.id);
+		} else {
+			void goto(resolve(`/shaders/${shader.slug}`), { invalidateAll: true });
+		}
+	}
+}
+
+function handleCheckboxClick(e: MouseEvent) {
+	e.stopPropagation();
+	comparisonStore.toggleShader(shader.id);
+}
 </script>
 
 <div

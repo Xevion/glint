@@ -1,41 +1,41 @@
 <script lang="ts">
-	import { fly, fade, scale } from 'svelte/transition';
-	import { SvelteMap } from 'svelte/reactivity';
-	import { resolve } from '$app/paths';
-	import { Button } from '$lib/components/ui/button';
-	import type { CaptureWithContext, ShaderWithCaptures } from '$lib/bindings';
+import { fly, fade, scale } from 'svelte/transition';
+import { SvelteMap } from 'svelte/reactivity';
+import { resolve } from '$app/paths';
+import { Button } from '$lib/components/ui/button';
+import type { CaptureWithContext, ShaderWithCaptures } from '$lib/bindings';
 
-	interface Props {
-		data: { shader: ShaderWithCaptures };
+interface Props {
+	data: { shader: ShaderWithCaptures };
+}
+
+let { data }: Props = $props();
+const shader = $derived(data.shader);
+const captures = $derived(shader.captures);
+
+// Selected capture for the main preview (state so user can change it)
+let selectedCapture = $state<(typeof captures)[0] | null>(null);
+
+// Initialize selected capture when captures change
+$effect(() => {
+	if (captures.length > 0 && !selectedCapture) {
+		selectedCapture = captures[0];
 	}
+});
 
-	let { data }: Props = $props();
-	const shader = $derived(data.shader);
-	const captures = $derived(shader.captures);
+// Get the latest version (assumes versions are sorted newest first)
+const latestVersion = $derived(shader.versions[0]);
 
-	// Selected capture for the main preview (state so user can change it)
-	let selectedCapture = $state<(typeof captures)[0] | null>(null);
-
-	// Initialize selected capture when captures change
-	$effect(() => {
-		if (captures.length > 0 && !selectedCapture) {
-			selectedCapture = captures[0];
+// Group captures by scene for thumbnail selector
+const capturesByScene = $derived.by(() => {
+	const map = new SvelteMap<string, CaptureWithContext>();
+	for (const capture of captures) {
+		if (!map.has(capture.scene_id)) {
+			map.set(capture.scene_id, capture);
 		}
-	});
-
-	// Get the latest version (assumes versions are sorted newest first)
-	const latestVersion = $derived(shader.versions[0]);
-
-	// Group captures by scene for thumbnail selector
-	const capturesByScene = $derived.by(() => {
-		const map = new SvelteMap<string, CaptureWithContext>();
-		for (const capture of captures) {
-			if (!map.has(capture.scene_id)) {
-				map.set(capture.scene_id, capture);
-			}
-		}
-		return Array.from(map.values());
-	});
+	}
+	return Array.from(map.values());
+});
 </script>
 
 {#if shader}

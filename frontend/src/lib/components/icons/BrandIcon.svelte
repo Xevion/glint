@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { icons, type IconName } from './index';
+import { icons, type IconName } from './index';
 
-	interface Props {
-		name: IconName;
-		class?: string;
-		/** Whether to show the brand color on hover */
-		colorOnHover?: boolean;
-	}
+interface Props {
+	name: IconName;
+	class?: string;
+	/** Whether to show the brand color on hover */
+	colorOnHover?: boolean;
+}
 
-	let { name, class: className = 'h-4 w-4', colorOnHover = false }: Props = $props();
+let { name, class: className = 'h-4 w-4', colorOnHover = false }: Props = $props();
 
-	const icon = $derived(icons[name]);
+const icon = $derived(icons[name]);
 </script>
 
 <svg class={className} viewBox={icon.viewBox} fill="currentColor">

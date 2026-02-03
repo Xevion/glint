@@ -1,6 +1,6 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
-@import 'tw-animate-css';
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -138,27 +138,19 @@
 
 /* Theme-aware shadows: dark shadows in light mode, light shadows in dark mode */
 .shadow-theme-sm {
-	box-shadow:
-		0 1px 2px 0 rgb(0 0 0 / 5%),
-		0 1px 3px 0 rgb(0 0 0 / 10%);
+	box-shadow: 0 1px 2px 0 rgb(0 0 0 / 5%), 0 1px 3px 0 rgb(0 0 0 / 10%);
 }
 
 .shadow-theme-lg {
-	box-shadow:
-		0 10px 15px -3px rgb(0 0 0 / 10%),
-		0 4px 6px -4px rgb(0 0 0 / 10%);
+	box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%), 0 4px 6px -4px rgb(0 0 0 / 10%);
 }
 
 .dark .shadow-theme-sm {
-	box-shadow:
-		0 1px 2px 0 rgb(255 255 255 / 3%),
-		0 1px 3px 0 rgb(255 255 255 / 6%);
+	box-shadow: 0 1px 2px 0 rgb(255 255 255 / 3%), 0 1px 3px 0 rgb(255 255 255 / 6%);
 }
 
 .dark .shadow-theme-lg {
-	box-shadow:
-		0 10px 15px -3px rgb(255 255 255 / 6%),
-		0 4px 6px -4px rgb(255 255 255 / 6%);
+	box-shadow: 0 10px 15px -3px rgb(255 255 255 / 6%), 0 4px 6px -4px rgb(255 255 255 / 6%);
 }
 
 /* Card glow effect - subtle base glow that intensifies on hover */
@@ -167,18 +159,16 @@
 	--glow-opacity: 0.02;
 	--glow-size: 0 10px 15px -3px, 0 4px 6px -4px;
 
-	box-shadow:
-		0 10px 15px -3px oklch(from var(--glow-color) l c h / var(--glow-opacity)),
-		0 4px 6px -4px oklch(from var(--glow-color) l c h / var(--glow-opacity));
+	box-shadow: 0 10px 15px -3px oklch(from var(--glow-color) l c h / var(--glow-opacity)), 0 4px 6px
+		-4px oklch(from var(--glow-color) l c h / var(--glow-opacity));
 	transition: box-shadow 0.3s ease;
 }
 
 .card-glow:hover {
 	--glow-opacity: 0.08;
 
-	box-shadow:
-		0 20px 25px -5px oklch(from var(--glow-color) l c h / var(--glow-opacity)),
-		0 8px 10px -6px oklch(from var(--glow-color) l c h / var(--glow-opacity));
+	box-shadow: 0 20px 25px -5px oklch(from var(--glow-color) l c h / var(--glow-opacity)), 0 8px 10px
+		-6px oklch(from var(--glow-color) l c h / var(--glow-opacity));
 }
 
 .dark .card-glow {

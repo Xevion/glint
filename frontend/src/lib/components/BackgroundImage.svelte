@@ -1,189 +1,189 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import type { Snippet } from 'svelte';
+import { onMount } from 'svelte';
+import type { Snippet } from 'svelte';
 
-	interface Props {
-		lightWallpapers: number[];
-		darkWallpapers: number[];
-		blur?: number;
-		overlay?: boolean;
-		overlayOpacity?: number;
-		children?: Snippet;
-		/** Scale factor for wallpapers (1.75 = 175% zoom) */
-		scale?: number;
-		/** Height of the gradient blend zone between wallpapers in pixels */
-		blendHeight?: number;
-		/** Brightness adjustment for light mode wallpapers (1.0 = normal, 1.1 = 10% brighter) */
-		lightBrightness?: number;
+interface Props {
+	lightWallpapers: number[];
+	darkWallpapers: number[];
+	blur?: number;
+	overlay?: boolean;
+	overlayOpacity?: number;
+	children?: Snippet;
+	/** Scale factor for wallpapers (1.75 = 175% zoom) */
+	scale?: number;
+	/** Height of the gradient blend zone between wallpapers in pixels */
+	blendHeight?: number;
+	/** Brightness adjustment for light mode wallpapers (1.0 = normal, 1.1 = 10% brighter) */
+	lightBrightness?: number;
+}
+
+const {
+	lightWallpapers,
+	darkWallpapers,
+	blur = 0,
+	overlay = true,
+	overlayOpacity = 0.5,
+	children,
+	scale = 1.75,
+	blendHeight = 150,
+	lightBrightness = 1.0
+}: Props = $props();
+
+// 4K wallpaper dimensions
+const WALLPAPER_WIDTH = 3840;
+const WALLPAPER_HEIGHT = 2160;
+
+let containerHeight = $state(2160);
+let viewportWidth = $state(1920);
+let containerEl: HTMLDivElement | undefined = $state();
+let mounted = $state(false);
+
+// Calculate the displayed height of each wallpaper section based on scale
+const sectionHeight = $derived(() => {
+	// At scale 1.75, the wallpaper is zoomed in 175%
+	// The displayed width is viewport width, so displayed height maintains aspect ratio
+	const displayedHeight = (viewportWidth * WALLPAPER_HEIGHT) / WALLPAPER_WIDTH / scale;
+	return displayedHeight;
+});
+
+// Calculate how many wallpaper sections we need
+const sectionsNeeded = $derived(() => {
+	const height = sectionHeight();
+	if (height <= 0) return 3; // Start with minimum 3 sections
+	return Math.max(3, Math.ceil(containerHeight / height) + 1);
+});
+
+// Generate wallpaper URLs for a given theme
+function getWallpaperUrl(index: number): string {
+	return `/wallpapers/${index}.jpg`;
+}
+
+// Shuffle array using Fisher-Yates algorithm
+function shuffleArray<T>(array: T[]): T[] {
+	const shuffled = [...array];
+	for (let i = shuffled.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
 	}
+	return shuffled;
+}
 
-	const {
-		lightWallpapers,
-		darkWallpapers,
-		blur = 0,
-		overlay = true,
-		overlayOpacity = 0.5,
-		children,
-		scale = 1.75,
-		blendHeight = 150,
-		lightBrightness = 1.0
-	}: Props = $props();
+// Cache for shuffled wallpaper arrays (initialized in onMount to prevent double-render)
+let lightShuffled = $state<number[]>([]);
+let darkShuffled = $state<number[]>([]);
 
-	// 4K wallpaper dimensions
-	const WALLPAPER_WIDTH = 3840;
-	const WALLPAPER_HEIGHT = 2160;
-
-	let containerHeight = $state(2160);
-	let viewportWidth = $state(1920);
-	let containerEl: HTMLDivElement | undefined = $state();
-	let mounted = $state(false);
-
-	// Calculate the displayed height of each wallpaper section based on scale
-	const sectionHeight = $derived(() => {
-		// At scale 1.75, the wallpaper is zoomed in 175%
-		// The displayed width is viewport width, so displayed height maintains aspect ratio
-		const displayedHeight = (viewportWidth * WALLPAPER_HEIGHT) / WALLPAPER_WIDTH / scale;
-		return displayedHeight;
-	});
-
-	// Calculate how many wallpaper sections we need
-	const sectionsNeeded = $derived(() => {
-		const height = sectionHeight();
-		if (height <= 0) return 3; // Start with minimum 3 sections
-		return Math.max(3, Math.ceil(containerHeight / height) + 1);
-	});
-
-	// Generate wallpaper URLs for a given theme
-	function getWallpaperUrl(index: number): string {
-		return `/wallpapers/${index}.jpg`;
+// Get the wallpaper indices for the required sections (with looping)
+function getWallpaperIndices(wallpapers: number[], count: number): number[] {
+	const indices: number[] = [];
+	for (let i = 0; i < count; i++) {
+		indices.push(wallpapers[i % wallpapers.length]);
 	}
+	return indices;
+}
 
-	// Shuffle array using Fisher-Yates algorithm
-	function shuffleArray<T>(array: T[]): T[] {
-		const shuffled = [...array];
-		for (let i = shuffled.length - 1; i > 0; i--) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+const lightIndices = $derived(getWallpaperIndices(lightShuffled, sectionsNeeded()));
+const darkIndices = $derived(getWallpaperIndices(darkShuffled, sectionsNeeded()));
+
+// Track image loading state
+let imagesLoaded = $state(false);
+
+// Calculate background size based on scale
+const backgroundSize = $derived(() => {
+	// Scale is how much we zoom in, so 1.75 means the image is 175% of viewport width
+	return `${scale * 100}%`;
+});
+
+onMount(() => {
+	// Initialize shuffled arrays immediately on mount (before images load)
+	lightShuffled = shuffleArray(lightWallpapers);
+	darkShuffled = shuffleArray(darkWallpapers);
+
+	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+	let previousHeight = 0;
+
+	const updateHeight = () => {
+		const newHeight = Math.max(
+			document.documentElement.scrollHeight,
+			document.documentElement.clientHeight,
+			window.innerHeight
+		);
+
+		// Only update if height changed by more than 50px to prevent micro-adjustments
+		if (Math.abs(newHeight - previousHeight) > 50) {
+			containerHeight = newHeight;
+			previousHeight = newHeight;
 		}
-		return shuffled;
-	}
+	};
 
-	// Cache for shuffled wallpaper arrays (initialized in onMount to prevent double-render)
-	let lightShuffled = $state<number[]>([]);
-	let darkShuffled = $state<number[]>([]);
+	const updateDimensions = () => {
+		viewportWidth = window.innerWidth;
+		updateHeight();
+	};
 
-	// Get the wallpaper indices for the required sections (with looping)
-	function getWallpaperIndices(wallpapers: number[], count: number): number[] {
-		const indices: number[] = [];
-		for (let i = 0; i < count; i++) {
-			indices.push(wallpapers[i % wallpapers.length]);
-		}
-		return indices;
-	}
+	// Initial dimension capture - do this immediately to prevent layout shift
+	updateDimensions();
+	mounted = true;
 
-	const lightIndices = $derived(getWallpaperIndices(lightShuffled, sectionsNeeded()));
-	const darkIndices = $derived(getWallpaperIndices(darkShuffled, sectionsNeeded()));
+	const debouncedHeightUpdate = () => {
+		if (debounceTimer) clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(updateHeight, 150);
+	};
 
-	// Track image loading state
-	let imagesLoaded = $state(false);
-
-	// Calculate background size based on scale
-	const backgroundSize = $derived(() => {
-		// Scale is how much we zoom in, so 1.75 means the image is 175% of viewport width
-		return `${scale * 100}%`;
-	});
-
-	onMount(() => {
-		// Initialize shuffled arrays immediately on mount (before images load)
-		lightShuffled = shuffleArray(lightWallpapers);
-		darkShuffled = shuffleArray(darkWallpapers);
-
-		let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-		let previousHeight = 0;
-
-		const updateHeight = () => {
-			const newHeight = Math.max(
-				document.documentElement.scrollHeight,
-				document.documentElement.clientHeight,
-				window.innerHeight
-			);
-
-			// Only update if height changed by more than 50px to prevent micro-adjustments
-			if (Math.abs(newHeight - previousHeight) > 50) {
-				containerHeight = newHeight;
-				previousHeight = newHeight;
-			}
-		};
-
-		const updateDimensions = () => {
-			viewportWidth = window.innerWidth;
-			updateHeight();
-		};
-
-		// Initial dimension capture - do this immediately to prevent layout shift
-		updateDimensions();
-		mounted = true;
-
-		const debouncedHeightUpdate = () => {
-			if (debounceTimer) clearTimeout(debounceTimer);
-			debounceTimer = setTimeout(updateHeight, 150);
-		};
-
-		// Preload all wallpaper images before showing them
-		const preloadImages = async () => {
-			const allIndices = [...new Set([...lightWallpapers, ...darkWallpapers])];
-			const promises = allIndices.map((index) => {
-				return new Promise<void>((resolve, reject) => {
-					const img = new Image();
-					img.onload = () => {
-						resolve();
-					};
-					img.onerror = () => {
-						reject(new Error(`Failed to load wallpaper ${index}`));
-					};
-					img.src = getWallpaperUrl(index);
-				});
+	// Preload all wallpaper images before showing them
+	const preloadImages = async () => {
+		const allIndices = [...new Set([...lightWallpapers, ...darkWallpapers])];
+		const promises = allIndices.map((index) => {
+			return new Promise<void>((resolve, reject) => {
+				const img = new Image();
+				img.onload = () => {
+					resolve();
+				};
+				img.onerror = () => {
+					reject(new Error(`Failed to load wallpaper ${index}`));
+				};
+				img.src = getWallpaperUrl(index);
 			});
-
-			try {
-				await Promise.all(promises);
-				imagesLoaded = true;
-			} catch (error) {
-				console.error('Failed to preload wallpaper images:', error);
-				imagesLoaded = true; // Show anyway even if some failed
-			}
-		};
-
-		void preloadImages();
-
-		// Use MutationObserver for height changes only (not width)
-		const observer = new MutationObserver(debouncedHeightUpdate);
-
-		observer.observe(document.body, {
-			childList: true,
-			subtree: true,
-			attributes: true,
-			attributeFilter: ['style', 'class']
 		});
 
-		// Only update width on actual window resize
-		window.addEventListener('resize', updateDimensions);
+		try {
+			await Promise.all(promises);
+			imagesLoaded = true;
+		} catch (error) {
+			console.error('Failed to preload wallpaper images:', error);
+			imagesLoaded = true; // Show anyway even if some failed
+		}
+	};
 
-		return () => {
-			if (debounceTimer) clearTimeout(debounceTimer);
-			observer.disconnect();
-			window.removeEventListener('resize', updateDimensions);
-		};
+	void preloadImages();
+
+	// Use MutationObserver for height changes only (not width)
+	const observer = new MutationObserver(debouncedHeightUpdate);
+
+	observer.observe(document.body, {
+		childList: true,
+		subtree: true,
+		attributes: true,
+		attributeFilter: ['style', 'class']
 	});
 
-	const lightFilterStyle = $derived(() => {
-		const filters: string[] = [];
-		if (blur > 0) filters.push(`blur(${blur}px)`);
-		if (lightBrightness !== 1.0) filters.push(`brightness(${lightBrightness})`);
-		return filters.length > 0 ? filters.join(' ') : undefined;
-	});
+	// Only update width on actual window resize
+	window.addEventListener('resize', updateDimensions);
 
-	const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
+	return () => {
+		if (debounceTimer) clearTimeout(debounceTimer);
+		observer.disconnect();
+		window.removeEventListener('resize', updateDimensions);
+	};
+});
+
+const lightFilterStyle = $derived(() => {
+	const filters: string[] = [];
+	if (blur > 0) filters.push(`blur(${blur}px)`);
+	if (lightBrightness !== 1.0) filters.push(`brightness(${lightBrightness})`);
+	return filters.length > 0 ? filters.join(' ') : undefined;
+});
+
+const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 </script>
 
 <div class="background-container" bind:this={containerEl}>

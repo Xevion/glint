@@ -1,49 +1,48 @@
 <script lang="ts">
-	import { fly, fade, scale } from 'svelte/transition';
-	import { SvelteMap } from 'svelte/reactivity';
-	import { resolve } from '$app/paths';
-	import type { CaptureWithContext, SceneWithCaptures } from '$lib/bindings';
+import { fly, fade, scale } from 'svelte/transition';
+import { SvelteMap } from 'svelte/reactivity';
+import { resolve } from '$app/paths';
+import type { CaptureWithContext, SceneWithCaptures } from '$lib/bindings';
 
-	interface Props {
-		data: { scene: SceneWithCaptures };
-	}
+interface Props {
+	data: { scene: SceneWithCaptures };
+}
 
-	let { data }: Props = $props();
-	const scene = $derived(data.scene);
-	const captures = $derived(scene.captures);
+let { data }: Props = $props();
+const scene = $derived(data.scene);
+const captures = $derived(scene.captures);
 
-	// Selected capture for the main preview
-	let selectedCapture = $derived.by(() => captures[0] || null);
+// Selected capture for the main preview
+let selectedCapture = $derived.by(() => captures[0] || null);
 
-	// Group captures by shader
-	const capturesByShader = $derived(() => {
-		const map = new SvelteMap<string, CaptureWithContext>();
-		for (const capture of captures) {
-			if (!map.has(capture.shader_slug)) {
-				map.set(capture.shader_slug, capture);
-			}
+// Group captures by shader
+const capturesByShader = $derived(() => {
+	const map = new SvelteMap<string, CaptureWithContext>();
+	for (const capture of captures) {
+		if (!map.has(capture.shader_slug)) {
+			map.set(capture.shader_slug, capture);
 		}
-		return Array.from(map.values());
-	});
+	}
+	return Array.from(map.values());
+});
 
-	// Weather display helper
-	const weatherLabel = $derived(() => {
-		if (scene.weather === 'clear') return 'Clear';
-		if (scene.weather === 'rain') return `Rain (${Math.round(scene.weather_intensity * 100)}%)`;
-		if (scene.weather === 'thunder')
-			return `Thunder (${Math.round(scene.weather_intensity * 100)}%)`;
-		return scene.weather;
-	});
+// Weather display helper
+const weatherLabel = $derived(() => {
+	if (scene.weather === 'clear') return 'Clear';
+	if (scene.weather === 'rain') return `Rain (${Math.round(scene.weather_intensity * 100)}%)`;
+	if (scene.weather === 'thunder') return `Thunder (${Math.round(scene.weather_intensity * 100)}%)`;
+	return scene.weather;
+});
 
-	// Time display helper
-	const timeLabel = $derived(() => {
-		const ticks = scene.time_of_day_ticks;
-		const hours = Math.floor(ticks / 1000);
-		if (hours < 6) return 'Night';
-		if (hours < 12) return 'Morning';
-		if (hours < 18) return 'Day';
-		return 'Evening';
-	});
+// Time display helper
+const timeLabel = $derived(() => {
+	const ticks = scene.time_of_day_ticks;
+	const hours = Math.floor(ticks / 1000);
+	if (hours < 6) return 'Night';
+	if (hours < 12) return 'Morning';
+	if (hours < 18) return 'Day';
+	return 'Evening';
+});
 </script>
 
 {#if scene}

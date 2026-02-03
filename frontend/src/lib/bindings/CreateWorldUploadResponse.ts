@@ -3,8 +3,4 @@
 /**
  * Response with presigned URL for world upload
  */
-export type CreateWorldUploadResponse = {
-	upload_id: string;
-	presigned_url: string;
-	expires_at: string;
-};
+export type CreateWorldUploadResponse = { upload_id: string, presigned_url: string, expires_at: string, };
