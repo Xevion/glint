@@ -1,0 +1,329 @@
+/**
+ * Run all project checks in parallel. Auto-fixes formatting when safe.
+ *
+ * Usage: bun scripts/check.ts [--fix|-f]
+ */
+
+import { c, elapsed, isStderrTTY } from "./lib/fmt";
+import { run, runPiped, spawnCollect, raceInOrder, type CollectResult } from "./lib/proc";
+import { existsSync, statSync, readdirSync, writeFileSync, rmSync } from "fs";
+
+const args = process.argv.slice(2);
+let fix = false;
+
+for (const arg of args) {
+  if (arg === "-f" || arg === "--fix") {
+    fix = true;
+  } else {
+    console.error(`Unknown flag: ${arg}`);
+    process.exit(1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fix path: format all subsystems, then fall through to verification
+// ---------------------------------------------------------------------------
+
+if (fix) {
+  console.log(c("1;36", "→ Fixing..."));
+  run(["bun", "run", "--cwd", "frontend", "format"]);
+  run(["cargo", "fmt", "--manifest-path", "backend/Cargo.toml"]);
+  runPiped(["sh", "-c", "cd mod && ./gradlew spotlessApply ktlintFormat --quiet"]);
+  console.log(c("1;36", "→ Verifying..."));
+}
+
+// ---------------------------------------------------------------------------
+// Ensure TypeScript bindings are up-to-date before frontend checks
+// ---------------------------------------------------------------------------
+
+{
+  const BINDINGS_DIR = "frontend/src/lib/bindings";
+
+  let newestSrcMtime = 0;
+  for (const file of new Bun.Glob("**/*.rs").scanSync("backend/src")) {
+    const mt = statSync(`backend/src/${file}`).mtimeMs;
+    if (mt > newestSrcMtime) newestSrcMtime = mt;
+  }
+  for (const f of ["backend/Cargo.toml", "Cargo.lock"]) {
+    if (existsSync(f)) {
+      const mt = statSync(f).mtimeMs;
+      if (mt > newestSrcMtime) newestSrcMtime = mt;
+    }
+  }
+
+  let newestBindingMtime = 0;
+  if (existsSync(BINDINGS_DIR)) {
+    for (const file of new Bun.Glob("**/*").scanSync(BINDINGS_DIR)) {
+      const mt = statSync(`${BINDINGS_DIR}/${file}`).mtimeMs;
+      if (mt > newestBindingMtime) newestBindingMtime = mt;
+    }
+  }
+
+  const stale = newestBindingMtime === 0 || newestSrcMtime > newestBindingMtime;
+  if (stale) {
+    const t = Date.now();
+    process.stdout.write(
+      c("1;36", "→ Regenerating TypeScript bindings (Rust sources changed)...") + "\n",
+    );
+    run(["cargo", "test", "--manifest-path", "backend/Cargo.toml", "--no-run", "--quiet"]);
+    rmSync(BINDINGS_DIR, { recursive: true, force: true });
+    run(["cargo", "test", "--manifest-path", "backend/Cargo.toml", "export_bindings", "--quiet"]);
+
+    const types = readdirSync(BINDINGS_DIR)
+      .filter((f) => f.endsWith(".ts") && f !== "index.ts")
+      .map((f) => f.replace(/\.ts$/, ""))
+      .sort();
+    writeFileSync(
+      `${BINDINGS_DIR}/index.ts`,
+      "// Auto-generated barrel file — do not edit manually.\n" +
+        "// Regenerate with: cargo test --manifest-path backend/Cargo.toml export_bindings\n" +
+        types.map((t) => `export type { ${t} } from "./${t}";`).join("\n") +
+        "\n",
+    );
+
+    // Format generated files so they pass prettier checks
+    runPiped(["bun", "run", "--cwd", "frontend", "prettier", "--", "--write", "src/lib/bindings/"]);
+
+    process.stdout.write(c("32", "✓ bindings") + ` (${elapsed(t)}s, ${types.length} types)\n`);
+  } else {
+    process.stdout.write(c("2", "· bindings up-to-date, skipped") + "\n");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Check definitions - 9 checks across 3 subsystems
+// ---------------------------------------------------------------------------
+
+interface Check {
+  name: string;
+  cmd: string[];
+  hint?: string;
+  subsystem: "frontend" | "backend" | "mod";
+}
+
+const checks: Check[] = [
+  // Frontend checks (3)
+  {
+    name: "frontend-check",
+    subsystem: "frontend",
+    cmd: ["bun", "run", "--cwd", "frontend", "check"],
+  },
+  {
+    name: "frontend-lint",
+    subsystem: "frontend",
+    cmd: ["bun", "run", "--cwd", "frontend", "lint"],
+  },
+  {
+    name: "frontend-format",
+    subsystem: "frontend",
+    cmd: ["bun", "run", "--cwd", "frontend", "format:check"],
+    hint: "Run 'bun run --cwd frontend format' to fix formatting.",
+  },
+  // Backend checks (3)
+  {
+    name: "backend-format",
+    subsystem: "backend",
+    cmd: ["cargo", "fmt", "--manifest-path", "backend/Cargo.toml", "--", "--check"],
+    hint: "Run 'cargo fmt --manifest-path backend/Cargo.toml' to fix formatting.",
+  },
+  {
+    name: "backend-lint",
+    subsystem: "backend",
+    cmd: ["cargo", "clippy", "--manifest-path", "backend/Cargo.toml", "--", "--deny", "warnings"],
+  },
+  {
+    name: "backend-test",
+    subsystem: "backend",
+    cmd: [
+      "cargo", "nextest", "run", "--manifest-path", "backend/Cargo.toml",
+      "-E", "not test(export_bindings)",
+    ],
+  },
+  // Mod checks (3)
+  {
+    name: "mod-format",
+    subsystem: "mod",
+    cmd: ["sh", "-c", "cd mod && ./gradlew spotlessCheck ktlintCheck --quiet"],
+    hint: "Run 'cd mod && ./gradlew spotlessApply ktlintFormat --quiet' to fix formatting.",
+  },
+  {
+    name: "mod-lint",
+    subsystem: "mod",
+    cmd: ["sh", "-c", "cd mod && ./gradlew spotlessCheck ktlintCheck --quiet"],
+  },
+  {
+    name: "mod-check",
+    subsystem: "mod",
+    cmd: ["sh", "-c", "cd mod && ./gradlew :common:compileKotlin :common:compileJava --quiet"],
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Domain groups: formatter → { peers, format command, sanity rechecks }
+// ---------------------------------------------------------------------------
+
+const domains: Record<
+  string,
+  {
+    peers: string[];
+    format: () => ReturnType<typeof runPiped>;
+    recheck: Check[];
+  }
+> = {
+  "frontend-format": {
+    peers: ["frontend-check", "frontend-lint"],
+    format: () => runPiped(["bun", "run", "--cwd", "frontend", "format"]),
+    recheck: [
+      {
+        name: "frontend-format",
+        subsystem: "frontend",
+        cmd: ["bun", "run", "--cwd", "frontend", "format:check"],
+      },
+      {
+        name: "frontend-check",
+        subsystem: "frontend",
+        cmd: ["bun", "run", "--cwd", "frontend", "check"],
+      },
+    ],
+  },
+  "backend-format": {
+    peers: ["backend-lint", "backend-test"],
+    format: () => runPiped(["cargo", "fmt", "--manifest-path", "backend/Cargo.toml"]),
+    recheck: [
+      {
+        name: "backend-format",
+        subsystem: "backend",
+        cmd: ["cargo", "fmt", "--manifest-path", "backend/Cargo.toml", "--", "--check"],
+      },
+      {
+        name: "backend-lint",
+        subsystem: "backend",
+        cmd: ["cargo", "clippy", "--manifest-path", "backend/Cargo.toml", "--", "--deny", "warnings"],
+      },
+    ],
+  },
+  "mod-format": {
+    peers: ["mod-lint", "mod-check"],
+    format: () => runPiped(["sh", "-c", "cd mod && ./gradlew spotlessApply ktlintFormat --quiet"]),
+    recheck: [
+      {
+        name: "mod-format",
+        subsystem: "mod",
+        cmd: ["sh", "-c", "cd mod && ./gradlew spotlessCheck ktlintCheck --quiet"],
+      },
+      {
+        name: "mod-check",
+        subsystem: "mod",
+        cmd: ["sh", "-c", "cd mod && ./gradlew :common:compileKotlin :common:compileJava --quiet"],
+      },
+    ],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Phase 1: run all checks in parallel, display in completion order
+// ---------------------------------------------------------------------------
+
+const start = Date.now();
+const remaining = new Set(checks.map((ch) => ch.name));
+
+const promises = checks.map(async (check) => ({
+  ...check,
+  ...(await spawnCollect(check.cmd, start)),
+}));
+
+const interval = isStderrTTY
+  ? setInterval(() => {
+      process.stderr.write(`\r\x1b[K${elapsed(start)}s [${Array.from(remaining).join(", ")}]`);
+    }, 100)
+  : null;
+
+const results: Record<string, Check & CollectResult> = {};
+
+await raceInOrder(promises, checks, (r) => {
+  results[r.name] = r;
+  remaining.delete(r.name);
+  if (isStderrTTY) process.stderr.write("\r\x1b[K");
+
+  const subsystemLabel = c("2", `[${r.subsystem}]`);
+  if (r.exitCode !== 0) {
+    process.stdout.write(c("31", `✗ ${r.name}`) + ` ${subsystemLabel} (${r.elapsed}s)\n`);
+    if (r.hint) {
+      process.stdout.write(c("2", `  ${r.hint}`) + "\n");
+    } else {
+      if (r.stdout) process.stdout.write(r.stdout);
+      if (r.stderr) process.stderr.write(r.stderr);
+    }
+  } else {
+    process.stdout.write(c("32", `✓ ${r.name}`) + ` ${subsystemLabel} (${r.elapsed}s)\n`);
+  }
+});
+
+if (interval) clearInterval(interval);
+if (isStderrTTY) process.stderr.write("\r\x1b[K");
+
+// ---------------------------------------------------------------------------
+// Phase 2: auto-fix formatting if it's the only failure in its domain
+// ---------------------------------------------------------------------------
+
+const autoFixedDomains = new Set<string>();
+
+for (const [fmtName, domain] of Object.entries(domains)) {
+  const fmtResult = results[fmtName];
+  if (!fmtResult || fmtResult.exitCode === 0) continue;
+  if (!domain.peers.every((p) => results[p]?.exitCode === 0)) continue;
+
+  process.stdout.write(
+    "\n" +
+      c("1;36", `→ Auto-formatting ${fmtName} (peers passed, only formatting failed)...`) +
+      "\n",
+  );
+  const fmtOut = domain.format();
+  if (fmtOut.exitCode !== 0) {
+    process.stdout.write(c("31", `  ✗ ${fmtName} formatter failed`) + "\n");
+    if (fmtOut.stdout) process.stdout.write(fmtOut.stdout);
+    if (fmtOut.stderr) process.stderr.write(fmtOut.stderr);
+    continue;
+  }
+
+  const recheckStart = Date.now();
+  const recheckPromises = domain.recheck.map(async (ch) => ({
+    ...ch,
+    ...(await spawnCollect(ch.cmd, recheckStart)),
+  }));
+
+  let recheckFailed = false;
+  await raceInOrder(recheckPromises, domain.recheck, (r) => {
+    if (r.exitCode !== 0) {
+      recheckFailed = true;
+      process.stdout.write(c("31", `  ✗ ${r.name}`) + ` (${r.elapsed}s)\n`);
+      if (r.stdout) process.stdout.write(r.stdout);
+      if (r.stderr) process.stderr.write(r.stderr);
+    } else {
+      process.stdout.write(c("32", `  ✓ ${r.name}`) + ` (${r.elapsed}s)\n`);
+    }
+  });
+
+  if (!recheckFailed) {
+    process.stdout.write(c("32", `  ✓ ${fmtName} auto-fix succeeded`) + "\n");
+    autoFixedDomains.add(fmtName);
+  } else {
+    process.stdout.write(c("31", `  ✗ ${fmtName} auto-fix failed sanity check`) + "\n");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Final verdict
+// ---------------------------------------------------------------------------
+
+const finalFailed = Object.entries(results).some(
+  ([name, r]) => r.exitCode !== 0 && !autoFixedDomains.has(name),
+);
+
+if (autoFixedDomains.size > 0 && !finalFailed) {
+  process.stdout.write(
+    "\n" + c("1;32", "✓ All checks passed (formatting was auto-fixed)") + "\n",
+  );
+}
+
+process.exit(finalFailed ? 1 : 0);
