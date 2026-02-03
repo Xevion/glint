@@ -154,7 +154,7 @@ const checks: Check[] = [
   {
     name: "agent-test",
     subsystem: "backend",
-    cmd: ["cargo", "nextest", "run", "--manifest-path", "agent/Cargo.toml", "--no-tests=pass"],
+    cmd: ["cargo", "nextest", "run", "--manifest-path", "agent/Cargo.toml"],
   },
   // Mod checks (4)
   {

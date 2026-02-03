@@ -1,0 +1,19 @@
+# Cargo audit configuration
+# See: https://github.com/rustsec/rustsec/blob/main/cargo-audit/audit.toml.example
+
+[advisories]
+# Ignore advisories for specific IDs
+ignore = [
+    # RSA PKCS#1 v1.5 signature validation - Marvin Attack
+    # No fix available, comes from sqlx-mysql dependency
+    # Risk is low for our use case (internal database connections)
+    "RUSTSEC-2023-0071",
+]
+
+[yanked]
+# Warn on yanked crates but don't fail
+enabled = "warn"
+
+[warnings]
+# Treat unsound advisories as warnings, not errors
+unsound = "warn"

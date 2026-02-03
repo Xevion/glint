@@ -115,3 +115,38 @@ async fn main() -> Result<()> {
         worker::run_loop(&config).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_args_parsing() {
+        let args = Args::parse_from(["glint-agent"]);
+        assert_eq!(args.api_url, "http://localhost:8080");
+        assert_eq!(args.api_key, "dev-agent-key");
+        assert_eq!(args.minecraft_dir, ".minecraft");
+        assert_eq!(args.java_path, "java");
+        assert_eq!(args.poll_interval, 30);
+        assert_eq!(args.heartbeat_interval, 30);
+        assert_eq!(args.agent_id, "agent-001");
+        assert!(!args.once);
+        assert!(args.dev_shader.is_none());
+        assert!(args.dev_scenes.is_none());
+    }
+
+    #[test]
+    fn test_args_custom_values() {
+        let args = Args::parse_from([
+            "glint-agent",
+            "--api-url",
+            "http://example.com",
+            "--api-key",
+            "test-key",
+            "--once",
+        ]);
+        assert_eq!(args.api_url, "http://example.com");
+        assert_eq!(args.api_key, "test-key");
+        assert!(args.once);
+    }
+}

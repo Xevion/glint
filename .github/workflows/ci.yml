@@ -27,6 +27,10 @@ jobs:
         working-directory: frontend
         run: bun install --frozen-lockfile
 
+      - name: Sync SvelteKit
+        working-directory: frontend
+        run: bunx svelte-kit sync
+
       - name: Check formatting
         working-directory: frontend
         run: |
@@ -120,6 +124,10 @@ jobs:
         working-directory: frontend
         run: bun install --frozen-lockfile
 
+      - name: Sync SvelteKit
+        working-directory: frontend
+        run: bunx svelte-kit sync
+
       - name: Run tests
         working-directory: frontend
         run: bun run test
@@ -169,8 +177,11 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Run smoke test
-        run: bun scripts/smoke.ts fabric
+        run: xvfb-run -a bun scripts/smoke.ts fabric
 
   security:
     name: Security Scan
@@ -186,7 +197,7 @@ jobs:
         uses: taiki-e/install-action@cargo-audit
 
       - name: Rust security audit
-        run: cargo audit
+        run: cargo audit --file audit.toml
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
