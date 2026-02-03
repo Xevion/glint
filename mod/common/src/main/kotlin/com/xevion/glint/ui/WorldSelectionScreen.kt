@@ -181,12 +181,12 @@ class WorldSelectionScreen(
         top: Int,
         itemHeight: Int,
     ) : ObjectSelectionList<WorldSelectionScreen.WorldListWidget.WorldEntry>(
-        minecraft,
-        width,
-        height,
-        top,
-        itemHeight,
-    ) {
+            minecraft,
+            width,
+            height,
+            top,
+            itemHeight,
+        ) {
         var selected: WorldInfo? = null
             private set
 

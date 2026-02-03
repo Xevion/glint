@@ -24,12 +24,12 @@ class WorldListWidget(
     minecraft: Minecraft,
     private val screen: GlintHubScreen,
 ) : ContainerObjectSelectionList<WorldListWidget.Entry>(
-    minecraft,
-    screen.width,
-    screen.height - 64,
-    32,
-    ITEM_HEIGHT,
-) {
+        minecraft,
+        screen.width,
+        screen.height - 64,
+        32,
+        ITEM_HEIGHT,
+    ) {
     companion object {
         const val ITEM_HEIGHT = 36
     }
@@ -86,28 +86,30 @@ class WorldListWidget(
         val apiWorld: WorldInfo?,
     ) {
         companion object {
-            fun fromApi(worldInfo: WorldInfo): WorldEntry = WorldEntry(
-                id = worldInfo.id,
-                name = worldInfo.name,
-                description = worldInfo.description,
-                scenes = emptyList(), // Scenes loaded separately from API
-                collection = null,
-                collectionFileName = null,
-                apiWorld = worldInfo,
-            )
+            fun fromApi(worldInfo: WorldInfo): WorldEntry =
+                WorldEntry(
+                    id = worldInfo.id,
+                    name = worldInfo.name,
+                    description = worldInfo.description,
+                    scenes = emptyList(), // Scenes loaded separately from API
+                    collection = null,
+                    collectionFileName = null,
+                    apiWorld = worldInfo,
+                )
 
             fun fromLocal(
                 fileName: String,
                 collection: SceneCollection,
-            ): WorldEntry = WorldEntry(
-                id = fileName,
-                name = collection.world,
-                description = "Local scenes (${collection.scenes.size} scenes)",
-                scenes = collection.scenes,
-                collection = collection,
-                collectionFileName = fileName,
-                apiWorld = null,
-            )
+            ): WorldEntry =
+                WorldEntry(
+                    id = fileName,
+                    name = collection.world,
+                    description = "Local scenes (${collection.scenes.size} scenes)",
+                    scenes = collection.scenes,
+                    collection = collection,
+                    collectionFileName = fileName,
+                    apiWorld = null,
+                )
         }
 
         val isLocal: Boolean get() = apiWorld == null
@@ -390,7 +392,7 @@ class WorldListWidget(
                 (
                     scene.config ?: com.xevion.glint.scene
                         .SceneConfig()
-                    ).mergeWith(collection.defaultConfig)
+                ).mergeWith(collection.defaultConfig)
                     .mergeWith(com.xevion.glint.scene.SceneConfig.DEFAULT)
 
             return ResolvedScene(

@@ -17,23 +17,25 @@ object SessionRegistry {
      * @param sceneId The scene to capture, or null to capture all scenes
      * @return true if session started successfully, false if already running
      */
-    fun startCaptureSession(sceneId: String? = null): Boolean = captureSessionManager.start(
-        name = "Capture session",
-        factory = { CaptureSession(sceneId = sceneId) },
-        starter = { it.start() },
-        isRunning = { it.isRunning },
-    )
+    fun startCaptureSession(sceneId: String? = null): Boolean =
+        captureSessionManager.start(
+            name = "Capture session",
+            factory = { CaptureSession(sceneId = sceneId) },
+            starter = { it.start() },
+            isRunning = { it.isRunning },
+        )
 
     /**
      * Starts orchestration of all scenes across all worlds.
      * @return true if orchestration started successfully, false if already running
      */
-    fun startOrchestration(): Boolean = orchestratorManager.start(
-        name = "Orchestration",
-        factory = { Orchestrator() },
-        starter = { it.start() },
-        isRunning = { it.isRunning },
-    )
+    fun startOrchestration(): Boolean =
+        orchestratorManager.start(
+            name = "Orchestration",
+            factory = { Orchestrator() },
+            starter = { it.start() },
+            isRunning = { it.isRunning },
+        )
 
     /**
      * Ticks active sessions. Must be called every client tick.

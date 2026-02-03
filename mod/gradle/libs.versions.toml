@@ -21,6 +21,7 @@ kotlinx-serialization = "1.8.0"
 
 slf4j = "2.0.17"
 spotless = "7.0.2"
+ktlint = "14.0.1"
 shadow = "9.0.0-beta4"
 
 [libraries]
@@ -53,4 +54,5 @@ architectury-loom = { id = "dev.architectury.loom", version.ref = "architectury-
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

@@ -26,10 +26,11 @@ object SceneManager {
      * Normalizes a world name into a safe filename.
      * Converts to lowercase, replaces spaces with underscores, removes unsafe characters.
      */
-    private fun normalizeFileName(worldName: String): String = worldName
-        .lowercase()
-        .replace(' ', '_')
-        .replace(Regex("[^a-z0-9_-]"), "")
+    private fun normalizeFileName(worldName: String): String =
+        worldName
+            .lowercase()
+            .replace(' ', '_')
+            .replace(Regex("[^a-z0-9_-]"), "")
 
     /**
      * Loads a scene by ID from available scene collections.

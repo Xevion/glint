@@ -15,12 +15,12 @@ class SceneList(
     minecraft: Minecraft,
     private val screen: SceneManagerScreen,
 ) : ContainerObjectSelectionList<SceneList.Entry>(
-    minecraft,
-    screen.width,
-    screen.height - 64,
-    32,
-    ITEM_HEIGHT,
-) {
+        minecraft,
+        screen.width,
+        screen.height - 64,
+        32,
+        ITEM_HEIGHT,
+    ) {
     companion object {
         const val ITEM_HEIGHT = 36
     }
@@ -253,7 +253,7 @@ class SceneList(
             (
                 scene.config ?: com.xevion.glint.scene
                     .SceneConfig()
-                ).mergeWith(collection.defaultConfig)
+            ).mergeWith(collection.defaultConfig)
                 .mergeWith(com.xevion.glint.scene.SceneConfig.DEFAULT)
 
         return ResolvedScene(

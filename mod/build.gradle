@@ -4,6 +4,7 @@ plugins {
     alias libs.plugins.architectury.loom apply false
     alias libs.plugins.kotlin.jvm apply false
     alias libs.plugins.spotless apply false
+    alias libs.plugins.ktlint apply false
 }
 
 architectury {
@@ -49,6 +50,7 @@ subprojects {
     apply plugin: 'dev.architectury.loom'
     apply plugin: 'org.jetbrains.kotlin.jvm'
     apply plugin: 'com.diffplug.spotless'
+    apply plugin: 'org.jlleitschuh.gradle.ktlint'
 
     loom {
         silentMojangMappingsLicense()
@@ -62,6 +64,7 @@ subprojects {
         }
     }
 
+    // Spotless handles Java formatting only; ktlint plugin handles Kotlin
     spotless {
         java {
             target 'src/*/java/**/*.java'
@@ -70,14 +73,11 @@ subprojects {
             trimTrailingWhitespace()
             endWithNewline()
         }
+    }
 
-        kotlin {
-            target 'src/*/kotlin/**/*.kt'
-            ktlint().editorConfigOverride([
-                'ktlint_standard_no-wildcard-imports': 'disabled'
-            ])
-            trimTrailingWhitespace()
-            endWithNewline()
+    ktlint {
+        filter {
+            exclude { it.file.path.contains("/build/") }
         }
     }
 }

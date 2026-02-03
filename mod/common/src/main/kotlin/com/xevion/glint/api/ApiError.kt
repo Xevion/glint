@@ -65,14 +65,15 @@ sealed class ApiError : Exception() {
     }
 
     companion object {
-        fun fromException(e: Exception): ApiError = when (e) {
-            is ConnectException, is UnknownHostException, is SocketTimeoutException -> {
-                NetworkError(e.message ?: "Network error", e)
-            }
+        fun fromException(e: Exception): ApiError =
+            when (e) {
+                is ConnectException, is UnknownHostException, is SocketTimeoutException -> {
+                    NetworkError(e.message ?: "Network error", e)
+                }
 
-            else -> {
-                UnknownError(e.message ?: "Unknown error", e)
+                else -> {
+                    UnknownError(e.message ?: "Unknown error", e)
+                }
             }
-        }
     }
 }

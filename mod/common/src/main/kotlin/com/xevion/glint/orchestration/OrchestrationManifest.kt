@@ -23,13 +23,13 @@ data class OrchestrationManifest(
 
             return OrchestrationManifest(
                 orchestration =
-                OrchestrationInfo(
-                    id = sessionId,
-                    startedAt = startedAt.toString(),
-                    completedAt = completedAt.toString(),
-                    totalSessions = sessions.size,
-                    status = OrchestrationStatus.COMPLETE,
-                ),
+                    OrchestrationInfo(
+                        id = sessionId,
+                        startedAt = startedAt.toString(),
+                        completedAt = completedAt.toString(),
+                        totalSessions = sessions.size,
+                        status = OrchestrationStatus.COMPLETE,
+                    ),
                 sessions = sessions,
             )
         }

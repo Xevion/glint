@@ -36,48 +36,49 @@ object WorldDownloader {
         fileUrl: String,
         expectedHash: String?,
         progressCallback: (DownloadProgress) -> Unit,
-    ): CompletableFuture<String> = CompletableFuture.supplyAsync {
-        var worldDir: File? = null
-        try {
-            val folderName = generateFolderName(worldSlug)
-            val worldsDir = getWorldsDirectory()
-            worldDir = File(worldsDir, folderName)
+    ): CompletableFuture<String> =
+        CompletableFuture.supplyAsync {
+            var worldDir: File? = null
+            try {
+                val folderName = generateFolderName(worldSlug)
+                val worldsDir = getWorldsDirectory()
+                worldDir = File(worldsDir, folderName)
 
-            worldDir.mkdirs()
+                worldDir.mkdirs()
 
-            Glint.LOGGER.info("Downloading world {} to {}", worldSlug, worldDir.absolutePath)
+                Glint.LOGGER.info("Downloading world {} to {}", worldSlug, worldDir.absolutePath)
 
-            val zipFile = File(worldDir, "world.zip")
+                val zipFile = File(worldDir, "world.zip")
 
-            downloadFile(fileUrl, zipFile, progressCallback)
+                downloadFile(fileUrl, zipFile, progressCallback)
 
-            if (expectedHash != null) {
-                verifyHash(zipFile, expectedHash)
+                if (expectedHash != null) {
+                    verifyHash(zipFile, expectedHash)
+                }
+
+                progressCallback(DownloadProgress.extracting())
+                extractZip(zipFile, worldDir)
+
+                zipFile.delete()
+
+                progressCallback(DownloadProgress.complete())
+
+                downloadedWorlds.add(folderName)
+
+                "glint/worlds/$folderName"
+            } catch (e: WorldDownloadException) {
+                Glint.LOGGER.error("World download failed", e)
+                progressCallback(DownloadProgress.failed(e.message ?: "Unknown error"))
+                worldDir?.deleteRecursively()
+                throw e
+            } catch (e: Exception) {
+                val message = "Unexpected error downloading world: ${e.message}"
+                Glint.LOGGER.error(message, e)
+                progressCallback(DownloadProgress.failed(message))
+                worldDir?.deleteRecursively()
+                throw WorldDownloadException.DownloadInterrupted(message, e)
             }
-
-            progressCallback(DownloadProgress.extracting())
-            extractZip(zipFile, worldDir)
-
-            zipFile.delete()
-
-            progressCallback(DownloadProgress.complete())
-
-            downloadedWorlds.add(folderName)
-
-            "glint/worlds/$folderName"
-        } catch (e: WorldDownloadException) {
-            Glint.LOGGER.error("World download failed", e)
-            progressCallback(DownloadProgress.failed(e.message ?: "Unknown error"))
-            worldDir?.deleteRecursively()
-            throw e
-        } catch (e: Exception) {
-            val message = "Unexpected error downloading world: ${e.message}"
-            Glint.LOGGER.error(message, e)
-            progressCallback(DownloadProgress.failed(message))
-            worldDir?.deleteRecursively()
-            throw WorldDownloadException.DownloadInterrupted(message, e)
         }
-    }
 
     /**
      * Checks if a world has been downloaded this session.

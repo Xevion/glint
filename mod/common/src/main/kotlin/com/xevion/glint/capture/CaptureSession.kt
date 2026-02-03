@@ -372,10 +372,10 @@ class CaptureSession(
                 timestamp = timestamp,
                 shader = shaderMeta,
                 resolution =
-                Resolution(
-                    width = renderTarget.width,
-                    height = renderTarget.height,
-                ),
+                    Resolution(
+                        width = renderTarget.width,
+                        height = renderTarget.height,
+                    ),
             ),
         )
 
@@ -547,12 +547,12 @@ class CaptureSession(
             totalScreenshots = screenshotEntries.size,
             shaderPacks = shadersToCapture.mapNotNull { it.packName }.distinct(),
             minecraft =
-            MinecraftInfo(
-                version = mc.launchedVersion,
-                dimension = dimension,
-                position = position,
-                camera = camera,
-            ),
+                MinecraftInfo(
+                    version = mc.launchedVersion,
+                    dimension = dimension,
+                    position = position,
+                    camera = camera,
+                ),
             screenshots = screenshotEntries.toList(),
         )
     }

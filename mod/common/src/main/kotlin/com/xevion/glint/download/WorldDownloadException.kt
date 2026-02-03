@@ -16,9 +16,9 @@ sealed class WorldDownloadException(
         url: String,
         cause: Throwable,
     ) : WorldDownloadException(
-        "Failed to connect to $url: ${cause.message}",
-        cause,
-    )
+            "Failed to connect to $url: ${cause.message}",
+            cause,
+        )
 
     /**
      * Download interrupted or incomplete.
@@ -35,8 +35,8 @@ sealed class WorldDownloadException(
         expected: String,
         actual: String,
     ) : WorldDownloadException(
-        "World file corrupted: expected hash $expected but got $actual",
-    )
+            "World file corrupted: expected hash $expected but got $actual",
+        )
 
     /**
      * ZIP extraction failed.

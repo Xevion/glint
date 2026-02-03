@@ -32,14 +32,15 @@ object AsyncFileIO {
     fun <T> readJson(
         file: File,
         serializer: KSerializer<T>,
-    ): CompletableFuture<T> = CompletableFuture.supplyAsync({
-        try {
-            json.decodeFromString(serializer, file.readText())
-        } catch (e: Exception) {
-            Glint.LOGGER.error("Failed to read JSON file: ${file.absolutePath}", e)
-            throw e
-        }
-    }, executor)
+    ): CompletableFuture<T> =
+        CompletableFuture.supplyAsync({
+            try {
+                json.decodeFromString(serializer, file.readText())
+            } catch (e: Exception) {
+                Glint.LOGGER.error("Failed to read JSON file: ${file.absolutePath}", e)
+                throw e
+            }
+        }, executor)
 
     /**
      * Serializes and writes a JSON file asynchronously.
@@ -48,18 +49,19 @@ object AsyncFileIO {
         file: File,
         data: T,
         serializer: KSerializer<T>,
-    ): CompletableFuture<Unit> = CompletableFuture
-        .runAsync(
-            {
-                try {
-                    file.writeText(json.encodeToString(serializer, data))
-                } catch (e: Exception) {
-                    Glint.LOGGER.error("Failed to write JSON file: ${file.absolutePath}", e)
-                    throw e
-                }
-            },
-            executor,
-        ).thenApply { }
+    ): CompletableFuture<Unit> =
+        CompletableFuture
+            .runAsync(
+                {
+                    try {
+                        file.writeText(json.encodeToString(serializer, data))
+                    } catch (e: Exception) {
+                        Glint.LOGGER.error("Failed to write JSON file: ${file.absolutePath}", e)
+                        throw e
+                    }
+                },
+                executor,
+            ).thenApply { }
 
     /**
      * Lists files in a directory asynchronously.
@@ -67,9 +69,10 @@ object AsyncFileIO {
     fun listFiles(
         dir: File,
         filter: (File) -> Boolean = { true },
-    ): CompletableFuture<List<File>> = CompletableFuture.supplyAsync({
-        dir.listFiles()?.filter(filter)?.toList() ?: emptyList()
-    }, executor)
+    ): CompletableFuture<List<File>> =
+        CompletableFuture.supplyAsync({
+            dir.listFiles()?.filter(filter)?.toList() ?: emptyList()
+        }, executor)
 
     /**
      * Shuts down the executor pool. Call on mod shutdown.
