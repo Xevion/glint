@@ -19,4 +19,5 @@ tokio = { version = "1.48.0", features = ["full"] }
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+ts-rs = { version = "12.0.1", features = ["serde-compat", "no-serde-warnings"] }
 uuid = { version = "1.19.0", features = ["v4"] }

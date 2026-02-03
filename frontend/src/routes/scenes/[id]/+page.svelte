@@ -2,8 +2,7 @@
 	import { fly, fade, scale } from 'svelte/transition';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
-	import type { CaptureWithContext } from '$lib/api/types';
-	import type { SceneWithCaptures } from '$lib/api/types';
+	import type { CaptureWithContext, SceneWithCaptures } from '$lib/bindings';
 
 	interface Props {
 		data: { scene: SceneWithCaptures };

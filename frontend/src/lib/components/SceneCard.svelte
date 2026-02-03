@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Scene } from '$lib/api/types';
+	import type { Scene } from '$lib/bindings';
 	import {
 		getBiomeDisplayName,
 		getDimensionDisplayName,

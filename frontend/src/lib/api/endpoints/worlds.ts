@@ -3,7 +3,9 @@ import type { ApiError } from '../errors';
 import { API_BASE_URL } from '../config';
 import { ApiError as ApiErrorClass, ApiErrorType } from '../errors';
 import { Result as TrueMythResult } from 'true-myth';
-import type { World } from '../types';
+import type { World, CreateWorldUploadResponse } from '$lib/bindings';
+
+export type { CreateWorldUploadResponse };
 
 export interface CreateWorldUploadRequest {
 	name: string;
@@ -12,12 +14,6 @@ export interface CreateWorldUploadRequest {
 	minecraft_version: string;
 	file_hash: string;
 	file_size_bytes: number;
-}
-
-export interface CreateWorldUploadResponse {
-	upload_id: string;
-	presigned_url: string;
-	expires_at: string;
 }
 
 export interface CompleteWorldUploadRequest {

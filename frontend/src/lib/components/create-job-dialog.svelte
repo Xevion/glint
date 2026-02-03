@@ -5,7 +5,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Plus, LoaderCircle, CircleAlert } from '@lucide/svelte';
 	import { api } from '$lib/api';
-	import type { Shader, ShaderVersion, Scene } from '$lib/api/types';
+	import type { Shader, ShaderVersion, Scene } from '$lib/bindings';
 	import type { CreateJobRequest } from '$lib/api/endpoints/admin';
 	import { SvelteSet } from 'svelte/reactivity';
 

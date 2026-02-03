@@ -1,9 +1,11 @@
 use crate::db::UtcDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use ts_rs::TS;
 
 /// Downloadable world files containing scenes
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
 pub struct World {
     pub id: String,
     pub slug: String,
@@ -13,7 +15,9 @@ pub struct World {
     pub file_url: Option<String>,
     pub file_hash: Option<String>,
     pub size_bytes: Option<i64>,
+    #[ts(type = "string")]
     pub created_at: UtcDateTime,
+    #[ts(type = "string")]
     pub updated_at: UtcDateTime,
 }
 
@@ -33,7 +37,8 @@ pub struct PendingUpload {
 }
 
 /// Shader pack identity (not version-specific)
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
 pub struct Shader {
     pub id: String,
     pub name: String,
@@ -42,12 +47,15 @@ pub struct Shader {
     pub modrinth_id: Option<String>,
     pub curseforge_id: Option<String>,
     pub website_url: Option<String>,
+    #[ts(type = "string")]
     pub created_at: UtcDateTime,
+    #[ts(type = "string")]
     pub updated_at: UtcDateTime,
 }
 
 /// Specific release of a shader pack
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
 pub struct ShaderVersion {
     pub id: String,
     pub shader_id: String,
@@ -57,10 +65,12 @@ pub struct ShaderVersion {
     pub file_hash: Option<String>,
     /// JSON array of profile names, discovered after first capture
     pub supported_profiles: Option<String>,
+    #[ts(type = "string")]
     pub created_at: UtcDateTime,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
 pub struct Scene {
     pub id: String,
     pub name: String,
@@ -81,10 +91,12 @@ pub struct Scene {
     pub definition_json: Option<String>,
     pub tags: Option<String>,
     pub active: bool,
+    #[ts(type = "string")]
     pub created_at: UtcDateTime,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
 pub struct Capture {
     pub id: String,
     pub shader_version_id: String,
@@ -105,11 +117,14 @@ pub struct Capture {
     pub status: String,
     pub error_message: Option<String>,
     pub outdated: bool,
+    #[ts(type = "string")]
     pub created_at: UtcDateTime,
+    #[ts(type = "string")]
     pub updated_at: UtcDateTime,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
 pub struct Job {
     pub id: String,
     pub shader_version_id: String,
@@ -120,11 +135,16 @@ pub struct Job {
     pub attempts: i32,
     pub max_attempts: i32,
     pub agent_id: Option<String>,
+    #[ts(type = "string | null")]
     pub claimed_at: Option<UtcDateTime>,
+    #[ts(type = "string | null")]
     pub last_heartbeat: Option<UtcDateTime>,
+    #[ts(type = "string | null")]
     pub started_at: Option<UtcDateTime>,
+    #[ts(type = "string | null")]
     pub completed_at: Option<UtcDateTime>,
     pub error_message: Option<String>,
+    #[ts(type = "string")]
     pub created_at: UtcDateTime,
 }
 
@@ -183,14 +203,16 @@ impl Scene {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct ShaderWithVersions {
     #[serde(flatten)]
     pub shader: Shader,
     pub versions: Vec<ShaderVersion>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct ShaderWithCaptures {
     #[serde(flatten)]
     pub shader: Shader,
@@ -198,7 +220,8 @@ pub struct ShaderWithCaptures {
     pub captures: Vec<CaptureWithContext>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct SceneWithCaptures {
     #[serde(flatten)]
     pub scene: Scene,
@@ -207,7 +230,8 @@ pub struct SceneWithCaptures {
 }
 
 /// Capture with denormalized shader/version info for API responses
-#[derive(Debug, Serialize, FromRow)]
+#[derive(Debug, Serialize, FromRow, TS)]
+#[ts(export)]
 pub struct CaptureWithContext {
     pub id: String,
     pub scene_id: String,
@@ -217,6 +241,7 @@ pub struct CaptureWithContext {
     pub profile: Option<String>,
     pub screenshot_path: Option<String>,
     pub screenshot_url: Option<String>,
+    #[ts(type = "string | null")]
     pub captured_at: Option<UtcDateTime>,
     pub resolution_width: Option<i32>,
     pub resolution_height: Option<i32>,
@@ -259,10 +284,12 @@ pub struct CreateWorldUploadRequest {
 }
 
 /// Response with presigned URL for world upload
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct CreateWorldUploadResponse {
     pub upload_id: String,
     pub presigned_url: String,
+    #[ts(type = "string")]
     pub expires_at: UtcDateTime,
 }
 

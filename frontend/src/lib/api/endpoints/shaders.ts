@@ -1,7 +1,7 @@
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
-import type { Shader, ShaderWithCaptures } from '../types';
+import type { Shader, ShaderWithCaptures } from '$lib/bindings';
 
 export class ShaderEndpoints extends ApiClient {
 	/**

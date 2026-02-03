@@ -3,7 +3,7 @@
 	import { SvelteMap } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
-	import type { CaptureWithContext, ShaderWithCaptures } from '$lib/api/types';
+	import type { CaptureWithContext, ShaderWithCaptures } from '$lib/bindings';
 
 	interface Props {
 		data: { shader: ShaderWithCaptures };

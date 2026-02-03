@@ -1,7 +1,7 @@
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
-import type { Scene, SceneWithCaptures } from '../types';
+import type { Scene, SceneWithCaptures } from '$lib/bindings';
 
 export class SceneEndpoints extends ApiClient {
 	/**

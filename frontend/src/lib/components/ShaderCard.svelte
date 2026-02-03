@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Shader } from '$lib/api/types';
+	import type { Shader } from '$lib/bindings';
 	import {
 		formatDate,
 		getModrinthUrl,

@@ -34,5 +34,5 @@ export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
 export const api = createApiClient();
 
 // Re-export types for convenience
-export type * from './types';
+export type * from '$lib/bindings';
 export { ApiError, ApiErrorType } from './errors';

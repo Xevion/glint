@@ -1,24 +1,9 @@
 import type { Result } from 'true-myth';
 import type { ApiError } from '../errors';
 import { ApiClient } from '../client';
+import type { Job } from '$lib/bindings';
 
-export interface Job {
-	id: string;
-	shader_version_id: string;
-	scene_ids: string | null;
-	profiles: string | null;
-	priority: number;
-	status: string;
-	attempts: number;
-	max_attempts: number;
-	agent_id: string | null;
-	claimed_at: string | null;
-	last_heartbeat: string | null;
-	started_at: string | null;
-	completed_at: string | null;
-	error_message: string | null;
-	created_at: string;
-}
+export type { Job };
 
 export interface JobWithDetails extends Job {
 	shader_name: string;
