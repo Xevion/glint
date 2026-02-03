@@ -4,9 +4,15 @@
  * Provides utilities for synchronous/asynchronous process execution,
  * coordinated process groups, and parallel command execution with
  * result ordering.
+ *
+ * All spawn functions set CI=1 to prevent interactive prompts in tools
+ * like vitest, npm, etc.
  */
 
 import { elapsed } from "./fmt";
+
+/** Base environment for all spawned processes - prevents interactive prompts */
+const baseEnv = { ...process.env, CI: "1" };
 
 /**
  * Result from collecting process output asynchronously.
@@ -25,9 +31,9 @@ export interface CollectResult {
 /**
  * Spawn a command synchronously with inherited stdio.
  *
- * The process will inherit stdin, stdout, and stderr, allowing
- * interactive commands and preserving color output. Exits the
- * parent process if the command fails.
+ * The process will inherit stdout and stderr, preserving color output.
+ * Stdin is ignored to prevent interactive prompts from blocking.
+ * Exits the parent process if the command fails.
  *
  * @param cmd - Command array [program, ...args]
  * @throws Exits process with child's exit code on failure
@@ -37,7 +43,10 @@ export interface CollectResult {
  * run(["bun", "run", "test"]);
  */
 export function run(cmd: string[]): void {
-	const proc = Bun.spawnSync(cmd, { stdio: ["inherit", "inherit", "inherit"] });
+	const proc = Bun.spawnSync(cmd, {
+		stdio: ["ignore", "inherit", "inherit"],
+		env: baseEnv,
+	});
 	if (proc.exitCode !== 0) process.exit(proc.exitCode);
 }
 
@@ -62,7 +71,11 @@ export function runPiped(cmd: string[]): {
 	stdout: string;
 	stderr: string;
 } {
-	const proc = Bun.spawnSync(cmd, { stdout: "pipe", stderr: "pipe" });
+	const proc = Bun.spawnSync(cmd, {
+		stdout: "pipe",
+		stderr: "pipe",
+		env: baseEnv,
+	});
 	return {
 		exitCode: proc.exitCode,
 		stdout: proc.stdout?.toString() ?? "",
@@ -74,6 +87,7 @@ export function runPiped(cmd: string[]): {
  * Spawn a command asynchronously and collect output.
  *
  * Enables FORCE_COLOR=1 to preserve colored output in piped processes.
+ * Sets CI=1 to prevent interactive prompts in tools like vitest.
  * Catches spawn failures (e.g., command not found) and returns them as
  * CollectResult instead of throwing.
  *
@@ -94,7 +108,7 @@ export async function spawnCollect(
 ): Promise<CollectResult> {
 	try {
 		const proc = Bun.spawn(cmd, {
-			env: { ...process.env, FORCE_COLOR: "1" },
+			env: { ...baseEnv, FORCE_COLOR: "1" },
 			stdout: "pipe",
 			stderr: "pipe",
 		});
@@ -175,7 +189,7 @@ export async function raceInOrder<T extends { name: string }>(
  * Managed process group with coordinated lifecycle and cleanup.
  *
  * Spawns multiple processes and ensures they are all killed when:
- * - Any process exits (via waitForFirst)
+ * - Any process exits (via waitForFirst / waitForAll)
  * - Parent receives SIGINT/SIGTERM
  * - Explicit killAll() is called
  *
@@ -191,21 +205,42 @@ export async function raceInOrder<T extends { name: string }>(
  */
 export class ProcessGroup {
 	private procs: ReturnType<typeof Bun.spawn>[] = [];
-	private cleanupRegistered = false;
+	private signalHandlers: { signal: NodeJS.Signals; handler: () => void }[] = [];
 
 	constructor() {
 		// Register cleanup handlers to kill all processes on exit
-		const cleanup = async () => {
-			await this.killAll();
-			process.exit(0);
+		const cleanup = () => {
+			// Synchronously kill all processes - don't await in signal handler
+			for (const p of this.procs) {
+				try {
+					p.kill("SIGTERM");
+				} catch {
+					// Process may already be dead
+				}
+			}
+			// Remove our signal handlers
+			this.removeSignalHandlers();
+			process.exit(130); // 128 + SIGINT(2)
 		};
-		process.on("SIGINT", cleanup);
-		process.on("SIGTERM", cleanup);
-		this.cleanupRegistered = true;
+		for (const sig of ["SIGINT", "SIGTERM"] as const) {
+			process.on(sig, cleanup);
+			this.signalHandlers.push({ signal: sig, handler: cleanup });
+		}
+	}
+
+	private removeSignalHandlers(): void {
+		for (const { signal, handler } of this.signalHandlers) {
+			process.off(signal, handler);
+		}
+		this.signalHandlers = [];
 	}
 
 	/**
-	 * Spawn a new process in the group with inherited stdio.
+	 * Spawn a new process in the group.
+	 *
+	 * By default, stdin is set to "ignore" to prevent child processes from
+	 * blocking on interactive prompts or causing I/O errors on parent exit.
+	 * Use inheritStdin: true for processes that need user input.
 	 *
 	 * @param cmd - Command array [program, ...args]
 	 * @param options - Optional spawn options (overrides defaults)
@@ -213,11 +248,11 @@ export class ProcessGroup {
 	 */
 	spawn(
 		cmd: string[],
-		options?: { env?: Record<string, string>; cwd?: string },
+		options?: { env?: Record<string, string>; cwd?: string; inheritStdin?: boolean },
 	): ReturnType<typeof Bun.spawn> {
 		const proc = Bun.spawn(cmd, {
-			stdio: ["inherit", "inherit", "inherit"],
-			env: { ...process.env, ...options?.env },
+			stdio: [options?.inheritStdin ? "inherit" : "ignore", "inherit", "inherit"],
+			env: { ...baseEnv, ...options?.env },
 			cwd: options?.cwd,
 		});
 		this.procs.push(proc);
@@ -228,10 +263,36 @@ export class ProcessGroup {
 	 * Kill all processes in the group and wait for them to exit.
 	 *
 	 * Sends SIGTERM to all processes and waits for clean shutdown.
+	 * Uses a timeout to avoid hanging on unresponsive processes.
 	 */
 	async killAll(): Promise<void> {
-		for (const p of this.procs) p.kill();
-		await Promise.all(this.procs.map((p) => p.exited));
+		// First, send SIGTERM to all
+		for (const p of this.procs) {
+			try {
+				p.kill("SIGTERM");
+			} catch {
+				// Process may already be dead
+			}
+		}
+
+		// Wait for all with a timeout
+		const timeout = 5000;
+		const exitPromises = this.procs.map((p) => p.exited);
+		const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, timeout));
+
+		await Promise.race([Promise.all(exitPromises), timeoutPromise]);
+
+		// Force kill any remaining processes
+		for (const p of this.procs) {
+			try {
+				p.kill("SIGKILL");
+			} catch {
+				// Process may already be dead
+			}
+		}
+
+		// Clean up signal handlers
+		this.removeSignalHandlers();
 	}
 
 	/**
@@ -247,5 +308,19 @@ export class ProcessGroup {
 		const first = await Promise.race(results);
 		await this.killAll();
 		return first.code;
+	}
+
+	/**
+	 * Wait for all processes to complete.
+	 *
+	 * Returns the highest exit code (0 if all succeeded). Useful for
+	 * parallel test execution where all tests should run to completion.
+	 *
+	 * @returns Highest exit code from all processes (0 = all passed)
+	 */
+	async waitForAll(): Promise<number> {
+		const codes = await Promise.all(this.procs.map((p) => p.exited));
+		this.removeSignalHandlers();
+		return Math.max(0, ...codes);
 	}
 }

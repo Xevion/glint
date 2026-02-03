@@ -27,7 +27,7 @@ if (input === "web") {
   group.spawn(["cargo", "nextest", "run", "--manifest-path", "backend/Cargo.toml"]);
   group.spawn(["sh", "-c", "cd mod && ./gradlew test --quiet"]);
   group.spawn(["cargo", "nextest", "run", "--manifest-path", "agent/Cargo.toml"]);
-  const code = await group.waitForFirst();
+  const code = await group.waitForAll();
   process.exit(code);
 } else {
   // Assume nextest filter args for backend tests

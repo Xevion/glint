@@ -91,7 +91,7 @@ if (fix) {
 }
 
 // ---------------------------------------------------------------------------
-// Check definitions - 9 checks across 3 subsystems
+// Check definitions - 11 checks across 3 subsystems
 // ---------------------------------------------------------------------------
 
 interface Check {
@@ -139,7 +139,7 @@ const checks: Check[] = [
       "-E", "not test(export_bindings)",
     ],
   },
-  // Mod checks (3)
+  // Mod checks (4)
   {
     name: "mod-format",
     subsystem: "mod",
@@ -156,6 +156,17 @@ const checks: Check[] = [
     subsystem: "mod",
     cmd: ["sh", "-c", "cd mod && ./gradlew :common:compileKotlin :common:compileJava --quiet"],
   },
+  {
+    name: "mod-test",
+    subsystem: "mod",
+    cmd: ["sh", "-c", "cd mod && ./gradlew test --quiet"],
+  },
+  // Frontend unit tests
+  {
+    name: "frontend-test",
+    subsystem: "frontend",
+    cmd: ["bun", "run", "--cwd", "frontend", "test:unit"],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -171,7 +182,7 @@ const domains: Record<
   }
 > = {
   "frontend-format": {
-    peers: ["frontend-check", "frontend-lint"],
+    peers: ["frontend-check", "frontend-lint", "frontend-test"],
     format: () => runPiped(["bun", "run", "--cwd", "frontend", "format"]),
     recheck: [
       {
@@ -203,7 +214,7 @@ const domains: Record<
     ],
   },
   "mod-format": {
-    peers: ["mod-lint", "mod-check"],
+    peers: ["mod-lint", "mod-check", "mod-test"],
     format: () => runPiped(["sh", "-c", "cd mod && ./gradlew spotlessApply ktlintFormat --quiet"]),
     recheck: [
       {
