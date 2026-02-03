@@ -58,59 +58,19 @@ build:
 
 # === Frontend ===
 
-# Start frontend dev server
-dev-fe:
-    bun scripts/dev.ts -f
-
-# Run any command in frontend directory
-fe *args:
-    cd frontend && {{args}}
-
 # Run bun commands in frontend (e.g., `just bun run test`)
 bun *args:
     cd frontend && bun {{args}}
 
 # === Backend ===
-
-# Start backend dev server
-dev-be:
-    bun scripts/dev.ts -b
-
-# Run any command in backend directory
-be *args:
-    cd backend && {{args}}
-
-# Run cargo commands in backend (e.g., `just cargo build`)
-cargo *args:
-    cd backend && cargo {{args}}
+# (Use `just dev -b` for backend dev server)
 
 # === Agent ===
 
 # Run agent in development mode (requires backend running)
-dev-agent:
-    cargo run --manifest-path agent/Cargo.toml
-
-# Run agent once and exit (for testing single job)
-dev-agent-once:
-    cargo run --manifest-path agent/Cargo.toml -- --once
-
-# Run agent in dev mode - direct shader+scene capture (bypasses job queue)
-# Usage: just dev-agent-direct bsl-shaders mountain-noon,village-sunset
-dev-agent-direct shader scenes:
-    cargo run --manifest-path agent/Cargo.toml -- --dev-shader {{shader}} --dev-scenes {{scenes}}
-
-# Check agent code
-check-agent:
-    cargo fmt --manifest-path agent/Cargo.toml -- --check
-    cargo clippy --manifest-path agent/Cargo.toml -- --deny warnings
-
-# Format agent code
-format-agent:
-    cargo fmt --manifest-path agent/Cargo.toml
-
-# Test agent
-test-agent:
-    cargo nextest run --manifest-path agent/Cargo.toml
+# Usage: just dev-agent [--once] [--dev-shader SHADER --dev-scenes SCENES]
+dev-agent *args:
+    cargo run --manifest-path agent/Cargo.toml -- {{args}}
 
 # === Mod Development ===
 
@@ -122,22 +82,6 @@ dev-mod platform="fabric":
 check-mod:
     cd mod && ./gradlew :common:compileKotlin :common:compileJava --quiet
 
-# Format mod code
-format-mod:
-    cd mod && ./gradlew spotlessApply ktlintFormat --quiet
-
-# Check mod code formatting
-format-check-mod:
-    cd mod && ./gradlew spotlessCheck ktlintCheck --quiet
-
-# Run mod tests
-test-mod:
-    cd mod && ./gradlew test --quiet
-
-# Build mod production artifacts
-build-mod:
-    cd mod && ./gradlew build --quiet
-
 # Integration test - verify client starts and mixins load
 smoke platform="fabric":
     bun ./scripts/smoke.ts {{platform}}
@@ -146,11 +90,7 @@ smoke platform="fabric":
 orchestrate platform="fabric":
     cd mod && GLINT_AUTONOMOUS=true ./gradlew :{{platform}}:runClient
 
-# Clean mod build
-clean-mod:
-    cd mod && ./gradlew clean
-
-# Run any command in mod directory
+# Run any command in mod directory (e.g., `just mod ./gradlew clean`)
 mod *args:
     cd mod && {{args}}
 
