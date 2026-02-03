@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: bun install --frozen-lockfile
+        run: bun ci --frozen-lockfile
 
       - name: Sync SvelteKit
         working-directory: frontend
@@ -122,7 +122,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: bun install --frozen-lockfile
+        run: bun ci --frozen-lockfile
 
       - name: Sync SvelteKit
         working-directory: frontend
@@ -206,9 +206,8 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: bun install --frozen-lockfile
+        run: bun ci --frozen-lockfile
 
       - name: Frontend security audit
         working-directory: frontend
         run: bun audit --audit-level=moderate
-        continue-on-error: true
