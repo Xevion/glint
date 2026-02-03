@@ -30,14 +30,19 @@ check *flags:
 dev *flags:
     bun scripts/dev.ts {{flags}}
 
-# Run all tests (parallel). Usage: just test [web|rust|mod|agent|<nextest filter>]
+# Run all unit tests (parallel). Usage: just test [web|web-e2e|rust|mod|agent|<nextest filter>]
 test *args:
     bun scripts/test.ts {{args}}
+
+# Run E2E tests (Playwright)
+test-e2e:
+    bun run --cwd frontend test:e2e
 
 # Auto-format all code
 format:
     bun run --cwd frontend format
     cargo fmt --manifest-path backend/Cargo.toml
+    cargo fmt --manifest-path agent/Cargo.toml
     cd mod && ./gradlew spotlessApply ktlintFormat --quiet
 
 # Lint all code

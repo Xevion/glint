@@ -1,7 +1,7 @@
 /**
  * Run project tests across all subsystems.
  *
- * Usage: bun scripts/test.ts [web|rust|mod|agent|<nextest filter args>]
+ * Usage: bun scripts/test.ts [web|web-e2e|rust|mod|agent|<nextest filter args>]
  */
 
 import { run, ProcessGroup } from "./lib/proc";
@@ -9,8 +9,11 @@ import { run, ProcessGroup } from "./lib/proc";
 const input = process.argv.slice(2).join(" ").trim();
 
 if (input === "web") {
-  // Frontend tests only
-  run(["bun", "run", "--cwd", "frontend", "test"]);
+  // Frontend unit tests only
+  run(["bun", "run", "--cwd", "frontend", "test:unit"]);
+} else if (input === "web-e2e") {
+  // Frontend E2E tests only
+  run(["bun", "run", "--cwd", "frontend", "test:e2e"]);
 } else if (input === "rust") {
   // Backend tests only
   run(["cargo", "nextest", "run", "--manifest-path", "backend/Cargo.toml"]);
@@ -19,14 +22,14 @@ if (input === "web") {
   run(["sh", "-c", "cd mod && ./gradlew test --quiet"]);
 } else if (input === "agent") {
   // Agent tests only
-  run(["cargo", "nextest", "run", "--manifest-path", "agent/Cargo.toml"]);
+  run(["cargo", "nextest", "run", "--manifest-path", "agent/Cargo.toml", "--no-tests=pass"]);
 } else if (input === "") {
-  // All tests in parallel
+  // All unit tests in parallel (no E2E)
   const group = new ProcessGroup();
-  group.spawn(["bun", "run", "--cwd", "frontend", "test"]);
+  group.spawn(["bun", "run", "--cwd", "frontend", "test:unit"]);
   group.spawn(["cargo", "nextest", "run", "--manifest-path", "backend/Cargo.toml"]);
   group.spawn(["sh", "-c", "cd mod && ./gradlew test --quiet"]);
-  group.spawn(["cargo", "nextest", "run", "--manifest-path", "agent/Cargo.toml"]);
+  group.spawn(["cargo", "nextest", "run", "--manifest-path", "agent/Cargo.toml", "--no-tests=pass"]);
   const code = await group.waitForAll();
   process.exit(code);
 } else {

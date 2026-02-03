@@ -135,15 +135,12 @@ impl MinecraftProcess {
                 biased;
 
                 line = self.log_rx.recv() => {
-                    match line {
-                        Some(line) => {
-                            if FATAL_PATTERNS.iter().any(|p| line.contains(p)) {
-                                fatal_lines.push(line);
-                            }
-                        }
-                        // Channel closed — writers finished, child is likely
-                        // about to (or already has) exited.
-                        None => {}
+                    // Channel closed — writers finished, child is likely
+                    // about to (or already has) exited.
+                    if let Some(line) = line
+                        && FATAL_PATTERNS.iter().any(|p| line.contains(p))
+                    {
+                        fatal_lines.push(line);
                     }
                 }
 
@@ -168,9 +165,7 @@ impl MinecraftProcess {
                 first_line = %summary,
                 "Minecraft crashed (detected via log output)"
             );
-            return Ok(MinecraftResult::Crashed {
-                message: summary,
-            });
+            return Ok(MinecraftResult::Crashed { message: summary });
         }
 
         if status.success() {
@@ -245,7 +240,11 @@ async fn deduplicate_walk(dir: &Path, removed: &mut u32) -> Result<()> {
         // Check if this child looks like a version directory (contains ≥1 .jar)
         if dir_contains_jar(&path).await {
             let modified = meta.modified().unwrap_or(std::time::UNIX_EPOCH);
-            children.push((entry.file_name().to_string_lossy().to_string(), path, modified));
+            children.push((
+                entry.file_name().to_string_lossy().to_string(),
+                path,
+                modified,
+            ));
         } else {
             has_non_version_subdirs = true;
         }
@@ -291,10 +290,10 @@ async fn dir_contains_jar(dir: &Path) -> bool {
     };
 
     while let Ok(Some(entry)) = entries.next_entry().await {
-        if let Some(ext) = entry.path().extension() {
-            if ext == "jar" {
-                return true;
-            }
+        if let Some(ext) = entry.path().extension()
+            && ext == "jar"
+        {
+            return true;
         }
     }
 

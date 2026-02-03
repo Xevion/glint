@@ -15,7 +15,7 @@
 		"lint": "eslint --cache .",
 		"lint:fix": "eslint --cache --fix .",
 		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"test": "bun run test:unit && bun run test:e2e",
+		"test": "vitest run",
 		"test:unit": "vitest run",
 		"test:unit:ui": "vitest --ui",
 		"test:unit:watch": "vitest",
