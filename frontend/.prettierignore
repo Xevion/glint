@@ -7,3 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Auto-generated TypeScript bindings
+src/lib/bindings/
