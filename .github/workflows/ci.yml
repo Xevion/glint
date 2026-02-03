@@ -1,0 +1,197 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  frontend-quality:
+    name: Frontend Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+
+      - name: Check formatting
+        working-directory: frontend
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bun run format:check
+          else
+            bun run format:check || echo "::warning::Frontend formatting issues found (not failing on push)"
+          fi
+
+      - name: Type check
+        working-directory: frontend
+        run: bun run check
+
+      - name: Lint
+        working-directory: frontend
+        run: bun run lint
+
+  backend-quality:
+    name: Backend Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Check formatting
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            cargo fmt --all -- --check
+          else
+            cargo fmt --all -- --check || echo "::warning::Rust formatting issues found (not failing on push)"
+          fi
+
+      - name: Clippy (backend)
+        run: cargo clippy --manifest-path backend/Cargo.toml --all-features -- -D warnings
+
+      - name: Clippy (agent)
+        run: cargo clippy --manifest-path agent/Cargo.toml --all-features -- -D warnings
+
+  mod-quality:
+    name: Mod Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Check formatting
+        working-directory: mod
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ./gradlew spotlessCheck ktlintCheck --quiet
+          else
+            ./gradlew spotlessCheck ktlintCheck --quiet || echo "::warning::Mod formatting issues found (not failing on push)"
+          fi
+
+      - name: Compilation check
+        working-directory: mod
+        run: ./gradlew :common:compileKotlin :common:compileJava --quiet
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        working-directory: frontend
+        run: bun run test
+
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@cargo-nextest
+
+      - name: Run backend tests
+        run: cargo nextest run --manifest-path backend/Cargo.toml -E 'not test(export_bindings)'
+
+      - name: Run agent tests
+        run: cargo nextest run --manifest-path agent/Cargo.toml
+
+  mod-smoke:
+    name: Mod Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Run smoke test
+        run: bun scripts/smoke.ts fabric
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Rust security audit
+        run: cargo audit
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+
+      - name: Frontend security audit
+        working-directory: frontend
+        run: bun audit --audit-level=moderate
+        continue-on-error: true
