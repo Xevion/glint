@@ -1,12 +1,13 @@
 use std::net::SocketAddr;
 
+use clap::Parser;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use glint_backend::{config::Config, db, routes, services, state::AppState};
+use glint_backend::{cli, config::Config, db, routes, services, state::AppState};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -23,6 +24,9 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // Parse CLI arguments
+    let cli = cli::Cli::parse();
+
     // Load configuration
     let config = Config::load()?;
     tracing::info!("Configuration loaded");
@@ -30,6 +34,16 @@ async fn main() -> anyhow::Result<()> {
     // Initialize database
     let pool = db::init_pool(&config.database_url).await?;
     tracing::info!("Database initialized");
+
+    // Handle subcommands
+    if let Some(command) = cli.command {
+        match command {
+            cli::Command::Seed => {
+                cli::seed::run(&pool).await?;
+                return Ok(());
+            }
+        }
+    }
 
     // Initialize S3/R2 client if configured
     let s3_client = if config.r2.is_configured() {

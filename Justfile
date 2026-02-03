@@ -170,7 +170,7 @@ migrate-create name:
 
 # Seed database with sample data
 db-seed:
-    sqlite3 backend/glint.db < backend/scripts/seed.sql
+    cargo run --manifest-path backend/Cargo.toml --quiet -- seed
 
 # === Utilities ===
 
