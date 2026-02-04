@@ -186,7 +186,12 @@ class WorldListWidget(
 
         private fun openWorld(world: WorldEntry) {
             if (world.isLocal) {
-                Glint.LOGGER.info("Opening local world: ${world.name}")
+                val worldFolder = world.collectionFileName ?: return
+                Glint.LOGGER.info("Opening local world: ${world.name} (folder: $worldFolder)")
+                val mc = Minecraft.getInstance()
+                mc.createWorldOpenFlows().openWorld(worldFolder) {
+                    Glint.LOGGER.debug("World load cancelled for: $worldFolder")
+                }
             } else {
                 val apiWorld = world.apiWorld ?: return
                 val fileUrl = apiWorld.fileUrl
@@ -244,6 +249,9 @@ class WorldListWidget(
                 }.width(20)
                 .tooltip(Tooltip.create(Component.literal("Test capture for this scene (must be in world)")))
                 .build()
+                .apply {
+                    active = isInCorrectWorld()
+                }
 
         private val syncButton =
             Button
@@ -306,8 +314,9 @@ class WorldListWidget(
             val mc = Minecraft.getInstance()
             if (mc.level == null || mc.singleplayerServer == null) return false
 
+            val expectedFolder = world.collectionFileName ?: return false
             val currentWorldName = mc.singleplayerServer?.worldData?.levelName
-            return currentWorldName == world.name
+            return currentWorldName == expectedFolder
         }
 
         private fun teleportToScene() {
