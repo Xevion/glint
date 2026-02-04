@@ -224,6 +224,7 @@ function handleSliderChange(event: Event) {
 
 <style>
 	.shader-compare {
+		display: grid;
 		width: 100%;
 		max-width: 100%;
 		border-radius: var(--radius);
@@ -235,19 +236,15 @@ function handleSliderChange(event: Event) {
 		opacity: 1;
 	}
 
-	/* Mode wrapper for CSS fade transitions */
+	/* Mode wrapper for CSS fade transitions - all modes overlap in same grid cell */
 	.mode-wrapper {
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
+		grid-area: 1 / 1;
 		opacity: 0;
 		pointer-events: none;
 		transition: opacity 200ms ease;
 	}
 
 	.mode-wrapper.active {
-		position: relative;
 		opacity: 1;
 		pointer-events: auto;
 	}

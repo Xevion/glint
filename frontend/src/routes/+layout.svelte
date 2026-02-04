@@ -67,8 +67,8 @@ onMount(() => {
 >
 	<div class="flex min-h-screen flex-col overflow-x-hidden px-3 md:px-5">
 		<div class="w-full max-w-6xl mx-auto flex flex-col flex-1">
-			<!-- Navbar -->
-			<div class="pt-5 pb-5" style="view-transition-name: navbar">
+			<!-- Navbar - excluded from view transitions to avoid ghost highlights -->
+			<div class="pt-5 pb-5">
 				<Navigation />
 			</div>
 

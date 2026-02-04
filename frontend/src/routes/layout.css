@@ -190,13 +190,10 @@
  * Navbar is excluded from transitions entirely.
  */
 
-/* Suppress root and navbar animations - only content should animate */
+/* Suppress root animations - only content should animate */
 ::view-transition-group(root),
-::view-transition-group(navbar),
 ::view-transition-old(root),
-::view-transition-new(root),
-::view-transition-old(navbar),
-::view-transition-new(navbar) {
+::view-transition-new(root) {
 	animation: none !important;
 }
 

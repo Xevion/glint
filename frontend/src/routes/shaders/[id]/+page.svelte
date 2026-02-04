@@ -27,8 +27,8 @@ $effect(() => {
 // Get the latest version (assumes versions are sorted newest first)
 const latestVersion = $derived(shader.versions[0]);
 
-// Group captures by scene for thumbnail selector
-const capturesByScene = $derived.by(() => {
+// One capture per scene for quick selector
+const uniqueSceneCaptures = $derived.by(() => {
 	const map = new SvelteMap<string, CaptureWithContext>();
 	for (const capture of captures) {
 		if (!map.has(capture.scene_id)) {
@@ -104,29 +104,29 @@ const capturesByScene = $derived.by(() => {
 						{/if}
 					</div>
 
-					<!-- Scene Thumbnails -->
-					{#if capturesByScene.length > 0}
-						<div class="grid grid-cols-4 gap-2">
-							{#each capturesByScene as capture (capture.id)}
-								<button
-									type="button"
-									onclick={() => (selectedCapture = capture)}
-									class="aspect-video overflow-hidden rounded-lg border-2 transition-all hover:border-primary {selectedCapture?.id ===
-									capture.id
-										? 'border-primary'
-										: 'border-transparent'}"
-								>
-									{#if capture.screenshot_url}
-										<img
-											src={capture.screenshot_url}
-											alt="Scene thumbnail"
-											class="h-full w-full object-cover"
-										/>
-									{/if}
-								</button>
-							{/each}
-						</div>
-					{/if}
+				<!-- Scene Thumbnails -->
+				{#if uniqueSceneCaptures.length > 0}
+					<div class="grid grid-cols-4 gap-2">
+						{#each uniqueSceneCaptures as capture (capture.id)}
+							<button
+								type="button"
+								onclick={() => (selectedCapture = capture)}
+								class="aspect-video overflow-hidden rounded-lg border-2 transition-all hover:border-primary {selectedCapture?.id ===
+								capture.id
+									? 'border-primary'
+									: 'border-transparent'}"
+							>
+								{#if capture.screenshot_url}
+									<img
+										src={capture.screenshot_url}
+										alt="Scene thumbnail"
+										class="h-full w-full object-cover"
+									/>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				{/if}
 				</div>
 
 				<!-- Shader Info Sidebar -->

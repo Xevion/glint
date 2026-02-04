@@ -54,7 +54,7 @@ function handleToggle(event: MouseEvent) {
 	type="button"
 	onclick={(e) => handleToggle(e)}
 	aria-label={themeStore.isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-	class="relative z-10 flex items-center rounded-md p-2 text-muted-foreground hover:text-foreground transition-colors"
+	class="relative z-10 flex items-center rounded-md p-2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
 >
 	<div class="relative size-[15px]">
 		<Sun

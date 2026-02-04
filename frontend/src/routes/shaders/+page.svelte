@@ -1,5 +1,5 @@
 <script lang="ts">
-import { fly, fade, scale } from 'svelte/transition';
+import { fly, scale } from 'svelte/transition';
 import { Button } from '$lib/components/ui/button';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import { Search } from 'lucide-svelte';
@@ -36,39 +36,37 @@ const filteredShaders = $derived.by(() => {
 const hasFilters = $derived(searchQuery !== '');
 </script>
 
-<div class="container mx-auto px-4 py-8">
-	<!-- Header -->
-	<div in:fly={{ y: -10, duration: 400 }} class="mb-8">
-		<h1 class="mb-2 text-4xl font-bold tracking-tight">Shader Packs</h1>
-		<p class="text-lg text-muted-foreground">
-			Browse {shaders.length} shader packs with standardized captures and performance metrics
-		</p>
-	</div>
+<div class="py-6">
+	<!-- Minimal inline header -->
+	<div in:fly={{ y: -10, duration: 400 }} class="mb-6 flex flex-wrap items-center gap-4">
+		<!-- Title with count -->
+		<h1 class="text-2xl font-semibold tracking-tight">
+			Shaders
+			<span class="ml-1 text-lg font-normal text-muted-foreground">({filteredShaders.length})</span>
+		</h1>
 
-	<!-- Filters -->
-	<div in:fly={{ y: 10, duration: 400, delay: 100 }} class="mb-6 space-y-4 rounded-xl bg-card p-4">
-		<div class="flex flex-wrap items-center gap-4">
+		<div class="ml-auto flex items-center gap-3">
 			<!-- Search -->
-			<div class="relative min-w-50 flex-1">
+			<div class="relative">
 				<Search
 					class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
 					strokeWidth={2}
 				/>
 				<input
 					type="text"
-					placeholder="Search shaders..."
+					placeholder="Search..."
 					bind:value={searchQuery}
-					class="h-10 w-full rounded-lg border border-input bg-background pr-4 pl-10 text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+					class="h-9 w-48 rounded-lg border border-input bg-background/50 backdrop-blur-sm pr-3 pl-9 text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none focus:w-64 transition-all"
 				/>
 			</div>
 
 			<!-- Sort -->
 			<select
 				bind:value={sortBy}
-				class="h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
+				class="h-9 rounded-lg border border-input bg-background/50 backdrop-blur-sm px-3 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
 			>
-				<option value="updated">Recently Updated</option>
-				<option value="name">Name A-Z</option>
+				<option value="updated">Recent</option>
+				<option value="name">A-Z</option>
 			</select>
 
 			{#if hasFilters}
@@ -79,24 +77,15 @@ const hasFilters = $derived(searchQuery !== '');
 						searchQuery = '';
 					}}
 				>
-					Clear filters
+					Clear
 				</Button>
 			{/if}
 		</div>
 	</div>
 
-	<!-- Results count -->
-	<div in:fade={{ duration: 300, delay: 200 }} class="mb-4 text-sm text-muted-foreground">
-		{#if filteredShaders.length === shaders.length}
-			Showing all {shaders.length} shaders
-		{:else}
-			Showing {filteredShaders.length} of {shaders.length} shaders
-		{/if}
-	</div>
-
 	<!-- Shader Grid -->
 	{#if filteredShaders.length > 0}
-		<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+		<div class="grid gap-5" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
 			{#each filteredShaders as shader, i (shader.id)}
 				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>
 					<ShaderCard {shader} />

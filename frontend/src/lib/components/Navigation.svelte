@@ -166,7 +166,7 @@ $effect(() => {
 
 <nav class="w-full flex items-center justify-between">
 	<div
-		class="relative flex items-center gap-1 rounded-lg bg-muted p-1"
+		class="relative flex items-center gap-1 rounded-lg bg-muted/50 backdrop-blur-md border border-white/10 dark:border-white/5 p-1"
 		bind:this={containerRef}
 	>
 			<!-- Sliding pill — animated via JS (RAF) to stay smooth even when
@@ -177,12 +177,12 @@ $effect(() => {
 			></div>
 
 			{#each staticTabs as tab, i (tab.href)}
-				<a
-					href={tab.href}
-					bind:this={tabRefs[i]}
-					class="relative z-10 flex items-center gap-1.5 rounded-md px-2 sm:px-3 py-1.5 text-sm font-medium transition-colors no-underline select-none
+			<a
+				href={tab.href}
+				bind:this={tabRefs[i]}
+				class="relative z-10 flex items-center gap-1.5 rounded-md px-2 sm:px-3 py-1.5 text-sm font-medium transition-colors no-underline select-none focus:outline-none
             {isActive(tab.href) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}"
-				>
+			>
 					<tab.icon size={15} strokeWidth={2} />
 					<span
 						class="grid overflow-hidden transition-[grid-template-columns,opacity] duration-300 ease-in-out
