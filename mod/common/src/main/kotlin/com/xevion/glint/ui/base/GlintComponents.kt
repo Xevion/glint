@@ -394,12 +394,13 @@ object GlintComponents {
             card.surface(Surface.flat(0x22FFFFFF)) // Subtle card background
         }
 
-        // Thumbnail placeholder (left)
+        // Thumbnail: first letter of world name, colored by status
         val thumbnail = Containers.verticalFlow(Sizing.fixed(GlintTheme.CARD_THUMBNAIL_SIZE), Sizing.fixed(GlintTheme.CARD_THUMBNAIL_SIZE))
-        thumbnail.surface(Surface.flat(0x44888888)) // Gray placeholder
+        thumbnail.surface(Surface.flat(0x44888888))
         thumbnail.horizontalAlignment(HorizontalAlignment.CENTER)
         thumbnail.verticalAlignment(VerticalAlignment.CENTER)
-        thumbnail.child(Components.label(McComponent.literal("?")).color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component)
+        val letter = name.firstOrNull()?.uppercase() ?: "?"
+        thumbnail.child(Components.label(McComponent.literal(letter)).color(Color.ofRgb(statusColor(status))) as Component)
         card.child(thumbnail as Component)
 
         // Text content (right)

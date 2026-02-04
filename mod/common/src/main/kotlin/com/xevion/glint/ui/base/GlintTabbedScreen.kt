@@ -100,6 +100,16 @@ abstract class GlintTabbedScreen(
         buildDetailPanel(detailPanel)
     }
 
+    protected fun rebuildTabBar() {
+        tabBar.clearChildren()
+        buildTabBar(tabBar)
+    }
+
+    protected fun rebuildStatusBar() {
+        statusBar.clearChildren()
+        buildStatusBar(statusBar)
+    }
+
     /**
      * Handle click on empty space in master panel to deselect.
      * Call this in subclass init after setting up click handler.
