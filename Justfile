@@ -67,10 +67,12 @@ bun *args:
 
 # === Agent ===
 
-# Run agent in development mode (requires backend running)
-# Usage: just dev-agent [--once] [--dev-shader SHADER --dev-scenes SCENES]
+# Run agent in development mode (builds mod, deploys JAR, requires backend running)
+# Usage: just dev-agent [flags] [-- agent-args]
+# Flags: -s(kip-build) -p(latform) -v(erbose)
+# Agent args: --once, --dev-shader SLUG --dev-scenes SCENES
 dev-agent *args:
-    cargo run --manifest-path agent/Cargo.toml -- {{args}}
+    bun scripts/dev-agent.ts {{args}}
 
 # === Mod Development ===
 
