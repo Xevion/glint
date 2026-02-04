@@ -13,7 +13,6 @@ import io.wispforest.owo.ui.core.Insets
 import io.wispforest.owo.ui.core.Sizing
 import io.wispforest.owo.ui.core.Surface
 import io.wispforest.owo.ui.core.VerticalAlignment
-import net.minecraft.client.gui.components.Tooltip
 import net.minecraft.network.chat.CommonComponents
 import net.minecraft.network.chat.Component as McComponent
 
@@ -148,7 +147,7 @@ object GlintComponents {
     ): ButtonComponent {
         val btn = Components.button(McComponent.literal(icon), onClick)
         (btn as Component).sizing(Sizing.fixed(20), Sizing.fixed(20))
-        tooltip?.let { btn.setTooltip(Tooltip.create(it)) }
+        tooltip?.let { (btn as Component).tooltip(it) }
         return btn
     }
 
@@ -163,7 +162,7 @@ object GlintComponents {
     ): ButtonComponent {
         val btn = Components.button(text, onClick)
         (btn as Component).sizing(Sizing.fixed(width), Sizing.fixed(20))
-        tooltip?.let { btn.setTooltip(Tooltip.create(it)) }
+        tooltip?.let { (btn as Component).tooltip(it) }
         return btn
     }
 
@@ -315,4 +314,147 @@ object GlintComponents {
             onToggle()
         }
     }
+
+    // ============================================
+    // Tab Components
+    // ============================================
+
+    /**
+     * Creates a tab button for the tab bar.
+     */
+    fun tabButton(
+        text: McComponent,
+        isActive: Boolean,
+        onClick: () -> Unit,
+    ): FlowLayout {
+        val tab = Containers.horizontalFlow(Sizing.content(), Sizing.fixed(24))
+        tab.padding(Insets.of(GlintTheme.PADDING_SM))
+        tab.verticalAlignment(VerticalAlignment.CENTER)
+        tab.horizontalAlignment(HorizontalAlignment.CENTER)
+        tab.cursorStyle(CursorStyle.HAND)
+
+        val label =
+            Components
+                .label(text)
+                .color(Color.ofRgb(if (isActive) GlintTheme.TEXT_PRIMARY else GlintTheme.TEXT_SECONDARY))
+                .cursorStyle(CursorStyle.HAND)
+        tab.child(label as Component)
+
+        if (isActive) {
+            tab.surface(Surface.flat(GlintTheme.SELECTED_BG))
+        }
+
+        tab.mouseDown().subscribe { _, _, button ->
+            if (button == 0) {
+                onClick()
+                true
+            } else {
+                false
+            }
+        }
+
+        if (!isActive) {
+            tab.mouseEnter().subscribe {
+                tab.surface(Surface.flat(GlintTheme.HIGHLIGHT_BG))
+                true
+            }
+            tab.mouseLeave().subscribe {
+                tab.surface(Surface.BLANK)
+                true
+            }
+        }
+
+        return tab
+    }
+
+    // ============================================
+    // Card Components
+    // ============================================
+
+    /**
+     * Creates a world card for the master grid.
+     * Horizontal layout: thumbnail placeholder left, text right.
+     */
+    fun worldCard(
+        name: String,
+        sceneCount: Int,
+        status: String,
+        isSelected: Boolean,
+        onClick: () -> Unit,
+    ): FlowLayout {
+        val card = Containers.horizontalFlow(Sizing.fill(100), Sizing.fixed(GlintTheme.CARD_HEIGHT))
+        card.padding(GlintTheme.paddingSm())
+        card.gap(GlintTheme.GAP_MD)
+        card.verticalAlignment(VerticalAlignment.CENTER)
+        card.cursorStyle(CursorStyle.HAND)
+
+        if (isSelected) {
+            card.surface(Surface.flat(GlintTheme.SELECTED_BG))
+        } else {
+            card.surface(Surface.flat(0x22FFFFFF)) // Subtle card background
+        }
+
+        // Thumbnail placeholder (left)
+        val thumbnail = Containers.verticalFlow(Sizing.fixed(GlintTheme.CARD_THUMBNAIL_SIZE), Sizing.fixed(GlintTheme.CARD_THUMBNAIL_SIZE))
+        thumbnail.surface(Surface.flat(0x44888888)) // Gray placeholder
+        thumbnail.horizontalAlignment(HorizontalAlignment.CENTER)
+        thumbnail.verticalAlignment(VerticalAlignment.CENTER)
+        thumbnail.child(Components.label(McComponent.literal("?")).color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component)
+        card.child(thumbnail as Component)
+
+        // Text content (right)
+        val textContainer = Containers.verticalFlow(Sizing.expand(), Sizing.content())
+        textContainer.gap(GlintTheme.GAP_SM)
+        textContainer.child(itemLabel(name) as Component)
+        textContainer.child(itemDetail("$sceneCount scenes") as Component)
+        textContainer.child(itemDetail(status, statusColor(status)) as Component)
+        card.child(textContainer as Component)
+
+        // Click handler
+        card.mouseDown().subscribe { _, _, button ->
+            if (button == 0) {
+                onClick()
+                true
+            } else {
+                false
+            }
+        }
+
+        // Hover effect (only if not selected)
+        if (!isSelected) {
+            card.mouseEnter().subscribe {
+                card.surface(Surface.flat(GlintTheme.HIGHLIGHT_BG))
+                true
+            }
+            card.mouseLeave().subscribe {
+                card.surface(Surface.flat(0x22FFFFFF))
+                true
+            }
+        }
+
+        return card
+    }
+
+    /**
+     * Helper to get status color.
+     */
+    private fun statusColor(status: String): Int =
+        when (status) {
+            "synced" -> GlintTheme.TEXT_SUCCESS
+            "local" -> GlintTheme.TEXT_INFO
+            "stale" -> GlintTheme.TEXT_WARNING
+            "remote" -> GlintTheme.TEXT_SECONDARY
+            else -> GlintTheme.TEXT_MUTED
+        }
+
+    /**
+     * Overload for itemDetail with custom color.
+     */
+    fun itemDetail(
+        text: String,
+        color: Int,
+    ): LabelComponent =
+        Components
+            .label(McComponent.literal(text))
+            .color(Color.ofRgb(color))
 }

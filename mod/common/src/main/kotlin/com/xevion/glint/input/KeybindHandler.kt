@@ -3,7 +3,7 @@ package com.xevion.glint.input
 import com.xevion.glint.Glint
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.ui.ApiConfigWizardScreen
-import com.xevion.glint.ui.GlintHubScreen
+import com.xevion.glint.ui.GlintMainScreen
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 
@@ -53,11 +53,11 @@ object KeybindHandler {
 
         if (config.needsValidation()) {
             Glint.LOGGER.info("Opening API configuration (needs validation)")
-            val hub = GlintHubScreen(null)
+            val hub = GlintMainScreen(null)
             mc.setScreen(ApiConfigWizardScreen(hub, showConnectionFirst = true))
         } else {
             Glint.LOGGER.info("Opening Glint Hub")
-            mc.setScreen(GlintHubScreen(null))
+            mc.setScreen(GlintMainScreen(null))
         }
     }
 

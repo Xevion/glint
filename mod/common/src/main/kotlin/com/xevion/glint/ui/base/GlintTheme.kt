@@ -46,6 +46,11 @@ object GlintTheme {
     const val INDENT_LEVEL_2 = 28
     const val INDENT_LEVEL_3 = 48
 
+    // Card dimensions
+    const val CARD_HEIGHT = 60
+    const val CARD_THUMBNAIL_SIZE = 48
+    const val CARD_MIN_WIDTH = 180 // Minimum width for auto-flow calculation
+
     // Sizing helpers
     fun buttonSizing(): Sizing = Sizing.fixed(BUTTON_WIDTH)
 

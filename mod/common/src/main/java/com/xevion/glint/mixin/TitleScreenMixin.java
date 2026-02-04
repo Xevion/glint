@@ -2,7 +2,7 @@ package com.xevion.glint.mixin;
 
 import com.xevion.glint.Glint;
 import com.xevion.glint.session.SessionRegistry;
-import com.xevion.glint.ui.GlintHubScreen;
+import com.xevion.glint.ui.GlintMainScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -47,7 +47,7 @@ public abstract class TitleScreenMixin extends Screen {
         Button glintButton =
                 Button.builder(
                                 Component.literal("Glint"),
-                                button -> mc.setScreen(new GlintHubScreen((Screen) (Object) this)))
+                                button -> mc.setScreen(new GlintMainScreen((Screen) (Object) this)))
                         .bounds(buttonX, buttonY, buttonWidth, buttonHeight)
                         .build();
 

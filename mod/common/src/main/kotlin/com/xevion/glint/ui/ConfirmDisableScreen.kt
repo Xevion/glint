@@ -50,8 +50,8 @@ class ConfirmDisableScreen(
                     }
                     minecraft?.setScreen(parent)
 
-                    // Refresh the parent screen if it's GlintHubScreen
-                    if (parent is GlintHubScreen) {
+                    // Refresh the parent screen if it supports refresh
+                    if (parent is GlintMainScreen) {
                         parent.refreshWorlds()
                     }
                 }
