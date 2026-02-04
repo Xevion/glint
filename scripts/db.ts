@@ -12,7 +12,7 @@ const USER = "glint";
 const PASS = "glint";
 const DB = "glint";
 const PORT = "59490";
-const ENV_FILE = ".env";
+const ENV_FILE = "backend/.env";
 
 const cmd = process.argv[2] || "start";
 
