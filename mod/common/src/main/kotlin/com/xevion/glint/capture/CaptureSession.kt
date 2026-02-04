@@ -478,6 +478,9 @@ class CaptureSession(
     private fun handleFinishing() {
         logger.info("Capture session complete, restoring original state")
 
+        // Release force-loaded chunks
+        ChunkForceLoader.releaseAll()
+
         // Build session data for return
         sessionData = buildSessionData()
 

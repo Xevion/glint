@@ -20,12 +20,20 @@ class StabilizationDetector(
     private var ticksSinceStable: Int = 0
     private var graphUpdateTicks: Int = 0
 
+    // Force loading and section count tracking
+    private var forceLoadingInitiated: Boolean = false
+    private var lastSectionCount: Int = 0
+    private var sectionStableTicks: Int = 0
+
     /**
      * Reset state for a new stabilization cycle.
      */
     fun reset() {
         ticksSinceStable = 0
         graphUpdateTicks = 0
+        forceLoadingInitiated = false
+        lastSectionCount = 0
+        sectionStableTicks = 0
         SodiumIntegration.resetStabilizationState()
     }
 
@@ -75,6 +83,52 @@ class StabilizationDetector(
     }
 
     private fun areChunksLoaded(
+        mc: Minecraft,
+        logInterval: Boolean,
+    ): Boolean {
+        // Initiate force loading once per stabilization cycle (singleplayer only)
+        if (!forceLoadingInitiated && mc.singleplayerServer != null) {
+            ChunkForceLoader.forceLoadRenderDistance()
+            forceLoadingInitiated = true
+        }
+
+        // Use Sodium's section count as ground truth when available
+        val currentSections = SodiumIntegration.getTotalSections()
+        if (currentSections != null) {
+            return areSectionCountStable(currentSections, logInterval)
+        }
+
+        // Fall back to vanilla chunk counting if Sodium unavailable
+        return vanillaChunksLoaded(mc, logInterval)
+    }
+
+    /**
+     * Check if Sodium's section count has stabilized.
+     * Section count is stable when it hasn't changed for SECTION_STABLE_TICKS.
+     */
+    private fun areSectionCountStable(
+        currentSections: Int,
+        logInterval: Boolean,
+    ): Boolean {
+        if (currentSections == lastSectionCount) {
+            sectionStableTicks++
+        } else {
+            sectionStableTicks = 0
+            lastSectionCount = currentSections
+        }
+
+        if (logInterval) {
+            Glint.LOGGER.debug("Stabilize: $currentSections sections loaded (stable for $sectionStableTicks ticks)")
+        }
+
+        // Consider stable when section count hasn't changed for threshold
+        return sectionStableTicks >= SECTION_STABLE_TICKS
+    }
+
+    /**
+     * Vanilla chunk loading check - used when Sodium is not available.
+     */
+    private fun vanillaChunksLoaded(
         mc: Minecraft,
         logInterval: Boolean,
     ): Boolean {
@@ -211,5 +265,6 @@ class StabilizationDetector(
     companion object {
         private const val DEFAULT_SETTLING_TICKS = 10
         private const val LOG_INTERVAL_TICKS = 10
+        private const val SECTION_STABLE_TICKS = 10 // 0.5 seconds at 20 TPS
     }
 }

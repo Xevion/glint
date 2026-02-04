@@ -40,6 +40,7 @@ object SodiumIntegration {
     private var getScheduledJobCountMethod: java.lang.reflect.Method? = null
     private var getBusyThreadCountMethod: java.lang.reflect.Method? = null
     private var getTotalThreadCountMethod: java.lang.reflect.Method? = null
+    private var getTotalSectionsMethod: java.lang.reflect.Method? = null
 
     private var sawRebuildActivity: Boolean = false
 
@@ -97,6 +98,7 @@ object SodiumIntegration {
             getBusyThreadCountMethod = chunkBuilderClass!!.getMethod("getBusyThreadCount")
             getTotalThreadCountMethod = chunkBuilderClass!!.getMethod("getTotalThreadCount")
             isBuildQueueEmptyMethod = chunkBuilderClass!!.getMethod("isBuildQueueEmpty")
+            getTotalSectionsMethod = renderSectionManagerClass!!.getMethod("getTotalSections")
 
             Glint.LOGGER.info("Sodium integration initialized successfully")
             availability = AvailabilityState.AVAILABLE
@@ -249,6 +251,24 @@ object SodiumIntegration {
             return getTotalThreadCountMethod!!.invoke(builder) as Int
         } catch (e: Exception) {
             Glint.LOGGER.debug("Failed to get Sodium total thread count: ${e.message}")
+            return null
+        }
+    }
+
+    /**
+     * Get the total number of render sections from Sodium's RenderSectionManager.
+     * This represents the total sections Sodium is managing for rendering.
+     * Returns null if Sodium is not available or reflection fails.
+     */
+    fun getTotalSections(): Int? {
+        if (!isAvailable()) return null
+
+        try {
+            val renderer = instanceNullableMethod!!.invoke(null) ?: return null
+            val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
+            return getTotalSectionsMethod!!.invoke(sectionManager) as Int
+        } catch (e: Exception) {
+            Glint.LOGGER.debug("Failed to get Sodium section count: ${e.message}")
             return null
         }
     }
