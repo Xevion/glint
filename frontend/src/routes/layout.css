@@ -185,6 +185,32 @@
 	view-transition-name: none !important;
 }
 
+/* Keep sheet overlays above page transition animations.
+ * These elements are portalled to body and only exist when the sheet is open,
+ * so the names are only captured during open-sheet navigations. */
+[data-slot="sheet-overlay"] {
+	view-transition-name: sheet-overlay;
+}
+
+[data-slot="sheet-content"] {
+	view-transition-name: sheet-content;
+}
+
+::view-transition-group(sheet-overlay),
+::view-transition-group(sheet-content) {
+	z-index: 100;
+}
+
+::view-transition-old(sheet-overlay),
+::view-transition-old(sheet-content) {
+	display: none;
+}
+
+::view-transition-new(sheet-overlay),
+::view-transition-new(sheet-content) {
+	animation: none !important;
+}
+
 /* View Transitions — page navigation animations
  * Animations target app-content (not root) so background stays stable.
  * Navbar is excluded from transitions entirely.
