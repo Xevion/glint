@@ -24,7 +24,7 @@ function handleOpenChange(value: boolean) {
 <Sheet.Root {open} onOpenChange={handleOpenChange}>
 	<Sheet.Content
 		side="right"
-		class={width === 'wide' ? 'sm:max-w-lg' : 'sm:max-w-md'}
+		class="w-full sm:w-3/4 {width === 'wide' ? 'sm:max-w-lg' : 'sm:max-w-md'}"
 	>
 		<Sheet.Header>
 			<Sheet.Title>{title}</Sheet.Title>
@@ -33,12 +33,12 @@ function handleOpenChange(value: boolean) {
 			{/if}
 		</Sheet.Header>
 
-		<div class="flex-1 overflow-y-auto py-4">
+		<div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
 			{@render children()}
 		</div>
 
 		{#if footer}
-			<Sheet.Footer>
+			<Sheet.Footer class="px-4 sm:px-6">
 				{@render footer()}
 			</Sheet.Footer>
 		{/if}

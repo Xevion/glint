@@ -1,11 +1,12 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { Button } from '$lib/components/ui/button';
+import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
 import * as Checkbox from '$lib/components/ui/checkbox';
-import { RefreshCw, Trash2, Save, RotateCcw } from '@lucide/svelte';
+import { RefreshCw, Trash2, RotateCcw } from '@lucide/svelte';
 import AdminTable from '$lib/components/admin-table.svelte';
 import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
 import TimeAgo from '$lib/components/time-ago.svelte';
@@ -21,6 +22,7 @@ let refreshing = $state(false);
 let saving = $state(false);
 let error = $state<string | null>(null);
 let showInactive = $state(false);
+let showDisableConfirm = $state(false);
 
 // Edit form state
 let editName = $state('');
@@ -119,9 +121,13 @@ async function handleSave() {
 	saving = false;
 }
 
-async function handleDisable() {
+function handleDisable() {
 	if (!selected) return;
-	if (!confirm(`Disable scene "${selected.name}"? It will be hidden from capture jobs.`)) return;
+	showDisableConfirm = true;
+}
+
+async function confirmDisable() {
+	if (!selected) return;
 
 	const result = await api.admin.disableScene(selected.id);
 	if (result.isOk) {
@@ -295,22 +301,41 @@ onMount(() => {
 	{/if}
 
 	{#snippet footer()}
-		<div class="flex justify-between">
-			{#if selected?.active}
-				<Button variant="destructive" onclick={handleDisable}>
-					<Trash2 class="mr-2 h-4 w-4" />
-					Disable
+		<div class="flex justify-end">
+			<div class="inline-flex">
+				{#if selected?.active}
+					<Button
+						variant="destructive"
+						onclick={handleDisable}
+						class="rounded-r-none border-r-0"
+						size="icon"
+					>
+						<Trash2 class="h-4 w-4" />
+						<span class="sr-only">Disable</span>
+					</Button>
+				{:else}
+					<Button
+						variant="outline"
+						onclick={handleReactivate}
+						class="rounded-r-none border-r-0"
+						size="icon"
+					>
+						<RotateCcw class="h-4 w-4" />
+						<span class="sr-only">Reactivate</span>
+					</Button>
+				{/if}
+				<Button onclick={handleSave} disabled={saving} class="rounded-l-none">
+					{saving ? 'Saving...' : 'Save Changes'}
 				</Button>
-			{:else}
-				<Button variant="outline" onclick={handleReactivate}>
-					<RotateCcw class="mr-2 h-4 w-4" />
-					Reactivate
-				</Button>
-			{/if}
-			<Button onclick={handleSave} disabled={saving}>
-				<Save class="mr-2 h-4 w-4" />
-				{saving ? 'Saving...' : 'Save Changes'}
-			</Button>
+			</div>
 		</div>
 	{/snippet}
 </AdminSlideOver>
+
+<ConfirmDialog
+	bind:open={showDisableConfirm}
+	title="Disable Scene"
+	description={`Disable scene "${selected?.name}"? It will be hidden from capture jobs.`}
+	confirmLabel="Disable"
+	onConfirm={confirmDisable}
+/>

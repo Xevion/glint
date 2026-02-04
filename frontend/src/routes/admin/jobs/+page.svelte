@@ -1,6 +1,7 @@
 <script lang="ts">
 import { onMount, onDestroy } from 'svelte';
 import { Button } from '$lib/components/ui/button';
+import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { RefreshCw, Play, Pause } from '@lucide/svelte';
 import AdminTable from '$lib/components/admin-table.svelte';
 import CreateJobDialog from '$lib/components/create-job-dialog.svelte';
@@ -17,6 +18,8 @@ let autoRefresh = $state(true);
 let refreshInterval: number | undefined;
 let selectedJob = $state<JobWithDetails | null>(null);
 let showJobDetails = $state(false);
+let showDeleteConfirm = $state(false);
+let jobToDelete = $state<JobWithDetails | null>(null);
 
 const columns = [
 	{
@@ -105,13 +108,19 @@ async function handleJobAction(action: string, job: JobWithDetails) {
 			error = result.error.message;
 		}
 	} else if (action === 'delete') {
-		if (!confirm('Delete this job?')) return;
-		const result = await api.admin.deleteJob(job.id);
-		if (result.isOk) {
-			void load();
-		} else {
-			error = result.error.message;
-		}
+		jobToDelete = job;
+		showDeleteConfirm = true;
+	}
+}
+
+async function confirmDelete() {
+	if (!jobToDelete) return;
+	const result = await api.admin.deleteJob(jobToDelete.id);
+	if (result.isOk) {
+		jobToDelete = null;
+		void load();
+	} else {
+		error = result.error.message;
 	}
 }
 
@@ -204,3 +213,11 @@ onDestroy(() => {
 {#if selectedJob}
 	<JobDetailsDialog job={selectedJob} bind:open={showJobDetails} />
 {/if}
+
+<ConfirmDialog
+	bind:open={showDeleteConfirm}
+	title="Delete Job"
+	description="Delete this job?"
+	confirmLabel="Delete"
+	onConfirm={confirmDelete}
+/>

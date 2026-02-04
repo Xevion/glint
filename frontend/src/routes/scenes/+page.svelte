@@ -34,7 +34,7 @@ const hasFilters = $derived(searchQuery !== '');
 	<div in:fly={{ y: 10, duration: 400, delay: 100 }} class="mb-6 space-y-4 rounded-xl bg-card p-4">
 		<div class="flex flex-wrap items-center gap-4">
 			<!-- Search -->
-			<div class="relative min-w-50 flex-1">
+			<div class="relative min-w-0 flex-1 sm:min-w-50">
 				<Search
 					class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
 					strokeWidth={2}

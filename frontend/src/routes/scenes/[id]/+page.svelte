@@ -117,7 +117,7 @@ const timeLabel = $derived(() => {
 
 					<!-- Shader Thumbnails -->
 					{#if capturesByShader().length > 0}
-						<div class="grid grid-cols-4 gap-2">
+						<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
 							{#each capturesByShader() as capture (capture.id)}
 								<button
 									type="button"

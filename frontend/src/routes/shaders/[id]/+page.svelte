@@ -106,7 +106,7 @@ const uniqueSceneCaptures = $derived.by(() => {
 
 				<!-- Scene Thumbnails -->
 				{#if uniqueSceneCaptures.length > 0}
-					<div class="grid grid-cols-4 gap-2">
+					<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
 						{#each uniqueSceneCaptures as capture (capture.id)}
 							<button
 								type="button"

@@ -1,10 +1,11 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { Button } from '$lib/components/ui/button';
+import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
-import { RefreshCw, Trash2, Save } from '@lucide/svelte';
+import { RefreshCw, Trash2 } from '@lucide/svelte';
 import AdminTable from '$lib/components/admin-table.svelte';
 import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
 import TimeAgo from '$lib/components/time-ago.svelte';
@@ -18,6 +19,7 @@ let loading = $state(true);
 let refreshing = $state(false);
 let saving = $state(false);
 let error = $state<string | null>(null);
+let showDeleteConfirm = $state(false);
 
 // Edit form state
 let editName = $state('');
@@ -107,9 +109,13 @@ async function handleSave() {
 	saving = false;
 }
 
-async function handleDelete() {
+function handleDelete() {
 	if (!selected) return;
-	if (!confirm(`Delete shader "${selected.name}"? This cannot be undone.`)) return;
+	showDeleteConfirm = true;
+}
+
+async function confirmDelete() {
+	if (!selected) return;
 
 	const result = await api.admin.deleteShader(selected.id);
 	if (result.isOk) {
@@ -223,15 +229,29 @@ onMount(() => {
 	{/if}
 
 	{#snippet footer()}
-		<div class="flex justify-between">
-			<Button variant="destructive" onclick={handleDelete}>
-				<Trash2 class="mr-2 h-4 w-4" />
-				Delete
-			</Button>
-			<Button onclick={handleSave} disabled={saving}>
-				<Save class="mr-2 h-4 w-4" />
-				{saving ? 'Saving...' : 'Save Changes'}
-			</Button>
+		<div class="flex justify-end">
+			<div class="inline-flex">
+				<Button
+					variant="destructive"
+					onclick={handleDelete}
+					class="rounded-r-none border-r-0"
+					size="icon"
+				>
+					<Trash2 class="h-4 w-4" />
+					<span class="sr-only">Delete</span>
+				</Button>
+				<Button onclick={handleSave} disabled={saving} class="rounded-l-none">
+					{saving ? 'Saving...' : 'Save Changes'}
+				</Button>
+			</div>
 		</div>
 	{/snippet}
 </AdminSlideOver>
+
+<ConfirmDialog
+	bind:open={showDeleteConfirm}
+	title="Delete Shader"
+	description={`Delete shader "${selected?.name}"? This cannot be undone.`}
+	confirmLabel="Delete"
+	onConfirm={confirmDelete}
+/>

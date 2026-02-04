@@ -1,6 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { Button } from '$lib/components/ui/button';
+import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { RefreshCw, Trash2 } from '@lucide/svelte';
 import AdminTable from '$lib/components/admin-table.svelte';
 import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
@@ -14,6 +15,8 @@ let selected = $state<CaptureWithContext | null>(null);
 let loading = $state(true);
 let refreshing = $state(false);
 let error = $state<string | null>(null);
+let showDeleteConfirm = $state(false);
+let captureToDelete = $state<CaptureWithContext | null>(null);
 
 const columns = [
 	{
@@ -78,11 +81,17 @@ async function load() {
 	refreshing = false;
 }
 
-async function handleDelete(capture: CaptureWithContext) {
-	if (!confirm(`Delete capture for ${capture.shader_name}?`)) return;
-	const result = await api.admin.deleteCapture(capture.id);
+function handleDelete(capture: CaptureWithContext) {
+	captureToDelete = capture;
+	showDeleteConfirm = true;
+}
+
+async function confirmDelete() {
+	if (!captureToDelete) return;
+	const result = await api.admin.deleteCapture(captureToDelete.id);
 	if (result.isOk) {
 		selected = null;
+		captureToDelete = null;
 		void load();
 	} else {
 		error = result.error.message;
@@ -190,3 +199,11 @@ onMount(() => {
 		</div>
 	{/snippet}
 </AdminSlideOver>
+
+<ConfirmDialog
+	bind:open={showDeleteConfirm}
+	title="Delete Capture"
+	description={`Delete capture for ${captureToDelete?.shader_name}?`}
+	confirmLabel="Delete"
+	onConfirm={confirmDelete}
+/>

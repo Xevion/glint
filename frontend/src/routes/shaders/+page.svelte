@@ -45,7 +45,7 @@ const hasFilters = $derived(searchQuery !== '');
 			<span class="ml-1 text-lg font-normal text-muted-foreground">({filteredShaders.length})</span>
 		</h1>
 
-		<div class="ml-auto flex items-center gap-3">
+		<div class="flex w-full flex-wrap items-center gap-3 sm:ml-auto sm:w-auto">
 			<!-- Search -->
 			<div class="relative">
 				<Search
@@ -56,7 +56,7 @@ const hasFilters = $derived(searchQuery !== '');
 					type="text"
 					placeholder="Search..."
 					bind:value={searchQuery}
-					class="h-9 w-48 rounded-lg border border-input bg-background/50 backdrop-blur-sm pr-3 pl-9 text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none focus:w-64 transition-all"
+					class="h-9 w-full rounded-lg border border-input bg-background/50 pr-3 pl-9 text-sm backdrop-blur-sm transition-all placeholder:text-muted-foreground focus:w-full focus:outline-none focus:ring-2 focus:ring-ring sm:w-48 sm:focus:w-64"
 				/>
 			</div>
 
@@ -85,7 +85,7 @@ const hasFilters = $derived(searchQuery !== '');
 
 	<!-- Shader Grid -->
 	{#if filteredShaders.length > 0}
-		<div class="grid gap-5" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+		<div class="grid grid-cols-1 gap-5 sm:[grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
 			{#each filteredShaders as shader, i (shader.id)}
 				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>
 					<ShaderCard {shader} />

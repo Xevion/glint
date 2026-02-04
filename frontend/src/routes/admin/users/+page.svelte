@@ -1,6 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { Button } from '$lib/components/ui/button';
+import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
 import { RefreshCw, Trash2 } from '@lucide/svelte';
 import AdminTable from '$lib/components/admin-table.svelte';
@@ -15,6 +16,7 @@ let selected = $state<UserWithSessions | null>(null);
 let loading = $state(true);
 let refreshing = $state(false);
 let error = $state<string | null>(null);
+let showDeleteSessionsConfirm = $state(false);
 
 const ROLES = ['user', 'admin', 'agent'] as const;
 
@@ -101,10 +103,13 @@ async function handleRoleChange(newRole: string) {
 	}
 }
 
-async function handleDeleteSessions() {
+function handleDeleteSessions() {
 	if (!selected) return;
-	if (!confirm(`Delete all sessions for ${selected.discord_username}? They will be logged out.`))
-		return;
+	showDeleteSessionsConfirm = true;
+}
+
+async function confirmDeleteSessions() {
+	if (!selected) return;
 	const result = await api.admin.deleteUserSessions(selected.id);
 	if (result.isOk) {
 		// Reload user to get updated session list
@@ -249,3 +254,11 @@ onMount(() => {
 		</dl>
 	{/if}
 </AdminSlideOver>
+
+<ConfirmDialog
+	bind:open={showDeleteSessionsConfirm}
+	title="Delete Sessions"
+	description={`Delete all sessions for ${selected?.discord_username}? They will be logged out.`}
+	confirmLabel="Delete All"
+	onConfirm={confirmDeleteSessions}
+/>

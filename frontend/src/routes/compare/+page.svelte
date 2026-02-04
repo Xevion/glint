@@ -58,13 +58,13 @@ function setMode(newMode: CompareMode) {
 
 		<!-- Mode selector -->
 		<div in:fly={{ y: 10, duration: 400, delay: 50 }} class="mb-6">
-			<div class="mode-selector">
+			<div class="flex flex-wrap gap-2">
 				{#each modes as { value, label, icon: Icon } (value)}
 					<Button
 						variant={mode === value ? 'default' : 'outline'}
 						size="sm"
 						onclick={() => setMode(value)}
-						class="mode-button"
+						class="min-w-fit flex-1"
 					>
 						<Icon size={16} />
 						{label}
@@ -89,24 +89,36 @@ function setMode(newMode: CompareMode) {
 		</div>
 
 		<!-- Image pickers -->
-		<div in:fly={{ y: 10, duration: 400, delay: 150 }} class="image-pickers">
-			<ImagePicker
-				value={leftImage}
-				images={testImages}
-				onSelect={(url: string) => (leftImage = url)}
-				label="Left Shader"
-			/>
+		<div
+			in:fly={{ y: 10, duration: 400, delay: 150 }}
+			class="flex flex-col items-stretch gap-4 sm:flex-row sm:items-end"
+		>
+			<div class="flex-1">
+				<ImagePicker
+					value={leftImage}
+					images={testImages}
+					onSelect={(url: string) => (leftImage = url)}
+					label="Left Shader"
+				/>
+			</div>
 
-			<Button variant="ghost" size="icon" onclick={swapImages} class="swap-button">
+			<Button
+				variant="ghost"
+				size="icon"
+				onclick={swapImages}
+				class="mb-1 min-h-11 min-w-11 self-center"
+			>
 				<ArrowLeftRight size={20} />
 			</Button>
 
-			<ImagePicker
-				value={rightImage}
-				images={testImages}
-				onSelect={(url: string) => (rightImage = url)}
-				label="Right Shader"
-			/>
+			<div class="flex-1">
+				<ImagePicker
+					value={rightImage}
+					images={testImages}
+					onSelect={(url: string) => (rightImage = url)}
+					label="Right Shader"
+				/>
+			</div>
 		</div>
 
 		<!-- Help text -->
@@ -122,44 +134,4 @@ function setMode(newMode: CompareMode) {
 	</div>
 </div>
 
-<style>
-	.mode-selector {
-		display: flex;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
 
-	:global(.mode-button) {
-		flex: 1;
-		min-width: fit-content;
-	}
-
-	.image-pickers {
-		display: flex;
-		align-items: flex-end;
-		gap: 1rem;
-	}
-
-	.image-pickers > :global(:first-child),
-	.image-pickers > :global(:last-child) {
-		flex: 1;
-	}
-
-	:global(.swap-button) {
-		flex-shrink: 0;
-		margin-bottom: 0.25rem;
-	}
-
-	/* Responsive layout */
-	@media (max-width: 640px) {
-		.image-pickers {
-			flex-direction: column;
-			align-items: stretch;
-		}
-
-		:global(.swap-button) {
-			align-self: center;
-			margin: 0;
-		}
-	}
-</style>
