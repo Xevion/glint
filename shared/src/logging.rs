@@ -3,8 +3,16 @@
 //! Provides a less verbose log format compared to the default:
 //! - Before: `2026-02-04T05:02:06.344416Z  INFO glint_backend: Message`
 //! - After:  `05:02:06.34441  INFO glint_backend: Message`
+//!
+//! ## Verbosity Control
+//!
+//! Priority (highest first):
+//! 1. `RUST_LOG` - Full tracing filter syntax, overrides everything
+//! 2. `-v`/`-vv` flags - Sets app crate level (debug/trace)
+//! 3. `LOG_LEVEL` env - Sets app crate level
+//! 4. Default - `glint_*=info`, dependencies at `warn`
 
-use std::fmt;
+use std::{env, fmt};
 
 use time::{format_description::FormatItem, macros::format_description};
 use tracing::{Event, Level, Subscriber};
@@ -144,4 +152,50 @@ pub fn try_init(default_filter: &str) -> Result<(), Box<dyn std::error::Error + 
         .with_env_filter(filter)
         .event_format(CompactFormatter)
         .try_init()
+}
+
+/// Initialize logging with verbosity level support.
+///
+/// Determines log level from (in priority order):
+/// 1. `RUST_LOG` env - Full tracing filter, overrides everything
+/// 2. `verbose_count` - 1 = debug, 2+ = trace (from `-v`/`-vv` flags)
+/// 3. `LOG_LEVEL` env - Level name (debug, trace, etc.)
+/// 4. Default - info
+///
+/// App crates (`glint_*`) use the determined level; all other crates are set to `warn`.
+pub fn init_with_verbosity(verbose_count: u8) {
+    // RUST_LOG takes absolute precedence
+    if env::var("RUST_LOG").is_ok() {
+        let filter = EnvFilter::from_default_env();
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .event_format(CompactFormatter)
+            .init();
+        return;
+    }
+
+    // Determine app log level: -v flags override LOG_LEVEL env
+    let app_level = if verbose_count >= 2 {
+        "trace"
+    } else if verbose_count == 1 {
+        "debug"
+    } else {
+        env::var("LOG_LEVEL")
+            .ok()
+            .map(|s| s.to_lowercase())
+            .filter(|s| ["trace", "debug", "info", "warn", "error"].contains(&s.as_str()))
+            .unwrap_or_else(|| "info".to_string())
+            .leak()
+    };
+
+    // Build filter: app crates at determined level, deps at warn
+    let filter_str = format!(
+        "warn,glint_backend={app_level},glint_agent={app_level},glint_shared={app_level}"
+    );
+    let filter = EnvFilter::new(filter_str);
+
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .event_format(CompactFormatter)
+        .init();
 }

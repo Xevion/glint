@@ -14,8 +14,8 @@ const CLEANUP_INTERVAL_SECS: u64 = 600;
 /// - Corresponding files from R2/S3 storage
 pub async fn cleanup_expired_uploads(pool: SqlitePool, s3: Option<S3Client>, bucket: String) {
     info!(
-        "Starting upload cleanup service (interval: {}s)",
-        CLEANUP_INTERVAL_SECS
+        interval_secs = CLEANUP_INTERVAL_SECS,
+        "Upload cleanup service started"
     );
 
     let mut ticker = interval(Duration::from_secs(CLEANUP_INTERVAL_SECS));
@@ -26,13 +26,11 @@ pub async fn cleanup_expired_uploads(pool: SqlitePool, s3: Option<S3Client>, buc
         match run_cleanup(&pool, s3.as_ref(), &bucket).await {
             Ok(cleaned) => {
                 if cleaned > 0 {
-                    info!("Cleaned up {} expired pending upload(s)", cleaned);
-                } else {
-                    debug!("No expired uploads to clean up");
+                    debug!(count = cleaned, "Cleaned up expired uploads");
                 }
             }
             Err(e) => {
-                error!("Failed to clean up expired uploads: {}", e);
+                error!(error = %e, "Failed to clean up expired uploads");
             }
         }
     }
@@ -61,6 +59,8 @@ async fn run_cleanup(
 
     let mut cleaned = 0;
 
+    use tracing::trace;
+
     for (upload_id, upload_key) in &expired {
         // Delete from R2/S3 if configured
         if let Some(client) = s3 {
@@ -72,14 +72,11 @@ async fn run_cleanup(
                 .await
             {
                 Ok(_) => {
-                    debug!("Deleted expired upload file: {}", upload_key);
+                    trace!(key = %upload_key, "Deleted expired upload file");
                 }
                 Err(e) => {
                     // Log but continue - file may already be gone
-                    warn!(
-                        "Failed to delete expired upload file {} (may already be deleted): {}",
-                        upload_key, e
-                    );
+                    warn!(key = %upload_key, error = %e, "Failed to delete expired upload file");
                 }
             }
         }
@@ -91,14 +88,11 @@ async fn run_cleanup(
             .await
         {
             Ok(_) => {
-                debug!("Deleted expired pending upload record: {}", upload_id);
+                trace!(upload_id = %upload_id, "Deleted expired pending upload record");
                 cleaned += 1;
             }
             Err(e) => {
-                error!(
-                    "Failed to delete pending upload record {}: {}",
-                    upload_id, e
-                );
+                error!(upload_id = %upload_id, error = %e, "Failed to delete pending upload record");
             }
         }
     }

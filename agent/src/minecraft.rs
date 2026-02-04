@@ -6,7 +6,7 @@ use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Minecraft process handle
 pub struct MinecraftProcess {
@@ -169,10 +169,10 @@ impl MinecraftProcess {
         }
 
         if status.success() {
-            info!("Minecraft exited successfully");
+            debug!("Minecraft exited successfully");
             Ok(MinecraftResult::Success)
         } else if let Some(code) = status.code() {
-            error!(code, "Minecraft exited with error");
+            error!(exit_code = code, "Minecraft exited with error");
             Ok(MinecraftResult::Failed { code })
         } else {
             error!("Minecraft process was killed");
@@ -210,7 +210,7 @@ pub async fn deduplicate_libraries(libraries_dir: &Path) -> Result<()> {
     deduplicate_walk(libraries_dir, &mut removed).await?;
 
     if removed > 0 {
-        info!(removed, "Removed stale library versions");
+        debug!(count = removed, "Removed stale library versions");
     }
 
     Ok(())
@@ -360,7 +360,7 @@ pub async fn write_scene_definitions(
         let json = serde_json::to_string_pretty(&collection)?;
         fs::write(&scene_file, json).await?;
 
-        info!(world_slug = %world.slug, scene_count = world_scenes.len(), "Wrote scene collection");
+        debug!(world_slug = %world.slug, scene_count = world_scenes.len(), "Wrote scene collection");
     }
 
     Ok(())

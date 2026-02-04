@@ -5,6 +5,7 @@ use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
 };
+use tracing::{debug, info, warn};
 
 use glint_backend::{cli, config::Config, db, routes, services, state::AppState};
 
@@ -14,19 +15,19 @@ async fn main() -> anyhow::Result<()> {
     let backend_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     dotenvy::from_path(backend_dir.join(".env")).ok();
 
-    // Initialize tracing with compact formatter
-    glint_shared::logging::init("glint_backend=debug,tower_http=debug");
-
-    // Parse CLI arguments
+    // Parse CLI arguments (before logging init to get verbosity)
     let cli = cli::Cli::parse();
+
+    // Initialize tracing with compact formatter
+    glint_shared::logging::init_with_verbosity(cli.verbose);
 
     // Load configuration
     let config = Config::load()?;
-    tracing::info!("Configuration loaded");
+    debug!("Configuration loaded");
 
     // Initialize database
     let pool = db::init_pool(&config.database_url).await?;
-    tracing::info!("Database initialized");
+    debug!("Database initialized");
 
     // Handle subcommands
     if let Some(command) = cli.command {
@@ -64,14 +65,14 @@ async fn main() -> anyhow::Result<()> {
             .build();
 
         let client = aws_sdk_s3::Client::from_conf(s3_config);
-        tracing::info!(
-            "R2/S3 client initialized (endpoint: {}, bucket: {})",
-            r2_config.endpoint().unwrap_or_default(),
-            r2_config.bucket.as_deref().unwrap_or("glint")
+        debug!(
+            endpoint = %r2_config.endpoint().unwrap_or_default(),
+            bucket = %r2_config.bucket.as_deref().unwrap_or("glint"),
+            "R2 client initialized"
         );
         Some(client)
     } else {
-        tracing::warn!("R2 not configured - upload functionality will be disabled");
+        warn!("R2 not configured, upload functionality disabled");
         None
     };
 
@@ -109,7 +110,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
-    tracing::info!("Starting server on {addr}");
+    info!(addr = %addr, "Server started");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;

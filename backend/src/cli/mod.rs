@@ -8,6 +8,10 @@ use clap::{Parser, Subcommand};
 #[command(about = "Backend API server for shader screenshot catalog")]
 #[command(version)]
 pub struct Cli {
+    /// Increase log verbosity (-v for debug, -vv for trace)
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    pub verbose: u8,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }

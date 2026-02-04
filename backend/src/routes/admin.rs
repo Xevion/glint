@@ -6,7 +6,8 @@ use axum::{
     routing::{delete, get, post, put},
 };
 use chrono::Utc;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -18,7 +19,6 @@ use crate::{
     },
     state::AppState,
 };
-use serde::Serialize;
 
 /// Presigned URL expiry time (5 minutes)
 const PRESIGN_EXPIRY_SECS: u64 = 300;
@@ -136,10 +136,7 @@ async fn create_world_upload(
     State(state): State<AppState>,
     Json(request): Json<CreateWorldUploadRequest>,
 ) -> AppResult<(StatusCode, Json<CreateWorldUploadResponse>)> {
-    tracing::info!(
-        "Starting world upload preparation for slug: {}",
-        request.slug
-    );
+    debug!(slug = %request.slug, "Preparing world upload");
 
     // Validate hash format (must have algorithm prefix)
     if !request.file_hash.starts_with("sha256:") {
@@ -199,7 +196,7 @@ async fn create_world_upload(
         )
         .await
         .map_err(|e| {
-            tracing::error!("Failed to generate presigned URL: {}", e);
+            error!(error = %e, "Failed to generate presigned URL");
             AppError::Internal(anyhow::anyhow!("Failed to generate presigned URL: {}", e))
         })?;
 
@@ -222,11 +219,11 @@ async fn create_world_upload(
     .execute(state.db())
     .await?;
 
-    tracing::info!(
-        "Created pending upload {} for world '{}' (expires: {})",
-        upload_id,
-        request.slug,
-        expires_at
+    debug!(
+        upload_id = %upload_id,
+        slug = %request.slug,
+        expires_at = %expires_at,
+        "Pending upload created"
     );
 
     Ok((
@@ -248,11 +245,7 @@ async fn complete_world_upload(
     Path(slug): Path<String>,
     Json(request): Json<CompleteWorldUploadRequest>,
 ) -> AppResult<(StatusCode, Json<World>)> {
-    tracing::info!(
-        "Completing world upload for slug: {}, upload_id: {}",
-        slug,
-        request.upload_id
-    );
+    debug!(slug = %slug, upload_id = %request.upload_id, "Completing world upload");
 
     // Fetch pending upload record
     let pending =
@@ -305,11 +298,7 @@ async fn complete_world_upload(
     let head = match head_result {
         Ok(h) => h,
         Err(e) => {
-            tracing::warn!(
-                "File not found in R2 for upload {}: {}",
-                request.upload_id,
-                e
-            );
+            warn!(upload_id = %request.upload_id, error = %e, "Upload file not found in R2");
             return Err(AppError::NotFound(
                 "Uploaded file not found in storage. Please retry the upload.".into(),
             ));
@@ -324,11 +313,11 @@ async fn complete_world_upload(
         .unwrap_or(&pending.file_hash);
 
     if stored_hash.as_deref() != Some(expected_hash) {
-        tracing::warn!(
-            "Hash mismatch for upload {}: expected {}, got {:?}",
-            request.upload_id,
-            expected_hash,
-            stored_hash
+        warn!(
+            upload_id = %request.upload_id,
+            expected = %expected_hash,
+            actual = ?stored_hash,
+            "Upload hash mismatch"
         );
         return Err(AppError::BadRequest(
             "File hash mismatch. The uploaded file may be corrupted.".into(),
@@ -348,7 +337,7 @@ async fn complete_world_upload(
         .send()
         .await
         .map_err(|e| {
-            tracing::error!("Failed to copy file to final location: {}", e);
+            error!(error = %e, "Failed to copy upload to final location");
             AppError::Internal(anyhow::anyhow!("Failed to finalize upload: {}", e))
         })?;
 
@@ -361,7 +350,7 @@ async fn complete_world_upload(
         .await
     {
         // Log but don't fail - cleanup will handle it
-        tracing::warn!("Failed to delete temporary upload file: {}", e);
+        warn!(key = %pending.upload_key, error = %e, "Failed to delete temp upload file");
     }
 
     // Generate public URL
@@ -404,7 +393,7 @@ async fn complete_world_upload(
             .send()
             .await
         {
-            tracing::warn!("Failed to clean up conflicting upload file: {}", e);
+            warn!(key = %final_key, error = %e, "Failed to clean up conflicting upload");
         }
 
         // Delete pending record
@@ -432,7 +421,7 @@ async fn complete_world_upload(
         .fetch_one(state.db())
         .await?;
 
-    tracing::info!("World created successfully: {} ({})", world.name, world.id);
+    info!(world_id = %world.id, slug = %world.slug, "World created");
     Ok((StatusCode::CREATED, Json(world)))
 }
 

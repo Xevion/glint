@@ -22,6 +22,10 @@ use tracing::info;
 #[command(name = "glint-agent")]
 #[command(about = "Glint capture agent - runs Minecraft to capture shader screenshots")]
 struct Args {
+    /// Increase log verbosity (-v for debug, -vv for trace)
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    verbose: u8,
+
     /// Backend API URL
     #[arg(long, env = "GLINT_API_URL", default_value = "http://localhost:8080")]
     api_url: String,
@@ -69,10 +73,10 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing with compact formatter
-    glint_shared::logging::init("info");
-
     let args = Args::parse();
+
+    // Initialize tracing with compact formatter
+    glint_shared::logging::init_with_verbosity(args.verbose);
 
     info!(
         agent_id = %args.agent_id,
@@ -118,6 +122,7 @@ mod tests {
     #[test]
     fn test_args_parsing() {
         let args = Args::parse_from(["glint-agent"]);
+        assert_eq!(args.verbose, 0);
         assert_eq!(args.api_url, "http://localhost:8080");
         assert_eq!(args.api_key, "dev-agent-key");
         assert_eq!(args.minecraft_dir, ".minecraft");
@@ -143,5 +148,17 @@ mod tests {
         assert_eq!(args.api_url, "http://example.com");
         assert_eq!(args.api_key, "test-key");
         assert!(args.once);
+    }
+
+    #[test]
+    fn test_verbose_flags() {
+        let args = Args::parse_from(["glint-agent", "-v"]);
+        assert_eq!(args.verbose, 1);
+
+        let args = Args::parse_from(["glint-agent", "-vv"]);
+        assert_eq!(args.verbose, 2);
+
+        let args = Args::parse_from(["glint-agent", "--verbose", "--verbose"]);
+        assert_eq!(args.verbose, 2);
     }
 }

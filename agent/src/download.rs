@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 /// Download manager for worlds and shaders
 pub struct Downloader {
@@ -61,7 +61,7 @@ impl Downloader {
             return Ok(());
         }
 
-        info!(
+        debug!(
             world_slug = %world.slug,
             size_bytes = ?world.size_bytes,
             "Downloading world"
@@ -85,7 +85,7 @@ impl Downloader {
         fs::remove_file(&temp_path).await.ok();
 
         self.world_cache.insert(file_hash.clone());
-        info!(world_slug = %world.slug, "World downloaded and extracted");
+        debug!(world_slug = %world.slug, "World downloaded and extracted");
 
         Ok(())
     }
@@ -130,7 +130,7 @@ impl Downloader {
             }
         }
 
-        info!(shader_slug = %shader.slug, "Downloading shader");
+        debug!(shader_slug = %shader.slug, "Downloading shader");
 
         // Download directly (shaders are single zip files, no extraction needed)
         self.download_file(download_url, &shader_path).await?;
@@ -148,7 +148,7 @@ impl Downloader {
             }
         }
 
-        info!(shader_slug = %shader.slug, "Shader downloaded");
+        debug!(shader_slug = %shader.slug, "Shader downloaded");
         Ok(())
     }
 
@@ -159,7 +159,7 @@ impl Downloader {
             fs::create_dir_all(parent).await?;
         }
 
-        info!(url = %url, "Starting download");
+        debug!(url = %url, "Starting download");
 
         let response = self
             .client
@@ -173,12 +173,8 @@ impl Downloader {
         }
 
         let content_length = response.content_length();
-        if let Some(size) = content_length {
-            info!(size_bytes = size, "Download size");
-        }
-
         let bytes = response.bytes().await.context("Failed to read response")?;
-        info!(bytes_received = bytes.len(), "Download complete");
+        debug!(bytes = bytes.len(), expected = ?content_length, "Download complete");
 
         let mut file = fs::File::create(path).await?;
         file.write_all(&bytes).await?;

@@ -9,11 +9,11 @@ use glint_shared::{CaptureRecord, CompleteJobRequest, JobPayload, OrchestrationM
 use std::path::Path;
 use tokio::fs;
 use tokio::time::interval;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Run the worker loop continuously
 pub async fn run_loop(config: &Config) -> Result<()> {
-    info!("Starting worker loop");
+    debug!("Worker loop started");
 
     loop {
         match run_once(config).await {
@@ -40,7 +40,7 @@ pub async fn run_dev_direct(
 ) -> Result<()> {
     let client = ApiClient::new(&config.api_url, &config.api_key);
 
-    info!("Fetching shader and scene data from backend...");
+    debug!("Fetching shader and scene data from backend");
 
     // Fetch shader version (use latest version for the shader)
     let shader_version = fetch_shader_version(&client, shader_slug).await?;
@@ -73,7 +73,7 @@ pub async fn run_dev_direct(
     // Run the capture (without backend job tracking)
     process_job(config, &client, &job).await?;
 
-    info!("Direct capture complete!");
+    info!("Direct capture complete");
     Ok(())
 }
 
@@ -83,7 +83,7 @@ pub async fn run_once(config: &Config) -> Result<()> {
 
     // Try to claim a job
     let Some(job) = client.claim_job().await? else {
-        info!("No jobs available");
+        debug!("No jobs available");
         return Ok(());
     };
 
@@ -113,7 +113,7 @@ pub async fn run_once(config: &Config) -> Result<()> {
 
 /// Process a single job
 async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> Result<()> {
-    info!("Setting up directories...");
+    debug!("Setting up directories");
     // Ensure directories exist
     fs::create_dir_all(config.saves_dir()).await?;
     fs::create_dir_all(config.shaderpacks_dir()).await?;
@@ -121,23 +121,23 @@ async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> R
     fs::create_dir_all(config.captures_dir()).await?;
 
     // Download resources
-    info!("Downloading resources...");
+    debug!("Downloading resources");
     let mut downloader = Downloader::new();
 
     for world in &job.worlds {
-        info!(world_slug = %world.slug, "Downloading world");
+        debug!(world_slug = %world.slug, "Downloading world");
         downloader
             .download_world(world, &config.saves_dir())
             .await?;
     }
 
-    info!(shader = %job.shader.slug, version = %job.shader.version, "Downloading shader");
+    debug!(shader = %job.shader.slug, version = %job.shader.version, "Downloading shader");
     downloader
         .download_shader(&job.shader, &config.shaderpacks_dir())
         .await?;
 
     // Write scene definitions
-    info!(scene_count = job.scenes.len(), "Writing scene definitions");
+    debug!(scene_count = job.scenes.len(), "Writing scene definitions");
     minecraft::write_scene_definitions(&config.scenes_dir(), &job.scenes, &job.worlds).await?;
 
     // Remove duplicate library versions to prevent classpath conflicts
@@ -162,7 +162,7 @@ async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> R
     });
 
     // Wait for Minecraft to complete
-    info!("Waiting for Minecraft to complete...");
+    debug!("Waiting for Minecraft to complete");
     let result = mc.wait().await?;
 
     // Stop heartbeat
@@ -171,7 +171,7 @@ async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> R
     // Check result
     match result {
         MinecraftResult::Success => {
-            info!("Minecraft completed successfully");
+            debug!("Minecraft completed successfully");
         }
         MinecraftResult::Failed { code } => {
             anyhow::bail!("Minecraft exited with code {}", code);
@@ -182,11 +182,11 @@ async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> R
     }
 
     // Find and parse manifest
-    info!("Looking for capture manifest...");
+    debug!("Looking for capture manifest");
     let manifest = find_and_parse_manifest(&config.captures_dir()).await?;
 
     // Upload screenshots and report completion
-    info!("Uploading screenshots and reporting completion...");
+    debug!("Uploading screenshots");
     upload_and_complete(config, client, job, &manifest).await?;
 
     Ok(())
@@ -223,7 +223,7 @@ async fn find_and_parse_manifest(captures_dir: &Path) -> Result<OrchestrationMan
     let manifest_json = fs::read_to_string(&manifest_path).await?;
     let manifest: OrchestrationManifest = serde_json::from_str(&manifest_json)?;
 
-    info!(
+    debug!(
         session = %session_name,
         total_sessions = manifest.orchestration.total_sessions,
         "Found manifest"
@@ -323,7 +323,7 @@ async fn upload_and_complete(
                             "Failed to upload screenshot"
                         );
                     } else {
-                        info!(file = %screenshot.file, "Uploaded screenshot");
+                        debug!(file = %screenshot.file, "Uploaded screenshot");
                     }
                 } else {
                     warn!(file = %file_path.display(), "Screenshot file not found");
@@ -346,10 +346,7 @@ async fn upload_and_complete(
     }
 
     // Report completion
-    info!(
-        capture_count = captures.len(),
-        "Reporting job completion to backend"
-    );
+    debug!(capture_count = captures.len(), "Reporting job completion");
     client
         .complete_job(
             &job.id,
@@ -364,7 +361,6 @@ async fn upload_and_complete(
         )
         .await?;
 
-    info!("Job processing complete!");
     Ok(())
 }
 

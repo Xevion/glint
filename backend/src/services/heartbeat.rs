@@ -10,8 +10,10 @@ use crate::config::HeartbeatConfig;
 /// Uses adaptive polling: faster when jobs are active, slower when idle.
 pub async fn monitor_heartbeats(pool: SqlitePool, config: HeartbeatConfig) {
     info!(
-        "Starting heartbeat monitor (timeout: {}s, active poll: {}s, idle poll: {}s)",
-        config.timeout_seconds, config.active_poll_seconds, config.idle_poll_seconds
+        timeout_secs = config.timeout_seconds,
+        active_poll_secs = config.active_poll_seconds,
+        idle_poll_secs = config.idle_poll_seconds,
+        "Heartbeat monitor started"
     );
 
     let mut current_interval = Duration::from_secs(config.idle_poll_seconds);
@@ -23,14 +25,14 @@ pub async fn monitor_heartbeats(pool: SqlitePool, config: HeartbeatConfig) {
         match reset_stale_jobs(&pool, config.timeout_seconds).await {
             Ok(reset_count) => {
                 if reset_count > 0 {
-                    warn!("Reset {} stale job(s)", reset_count);
+                    warn!(count = reset_count, "Reset stale jobs");
                 }
 
                 // Check if there are active jobs to determine next interval
                 let has_active_jobs = match check_active_jobs(&pool).await {
                     Ok(active) => active,
                     Err(e) => {
-                        error!("Failed to check for active jobs: {}", e);
+                        error!(error = %e, "Failed to check for active jobs");
                         false
                     }
                 };
@@ -43,15 +45,17 @@ pub async fn monitor_heartbeats(pool: SqlitePool, config: HeartbeatConfig) {
 
                 if new_interval != current_interval {
                     debug!(
-                        "Adjusting heartbeat poll interval: {:?} -> {:?} (active_jobs: {})",
-                        current_interval, new_interval, has_active_jobs
+                        from_secs = current_interval.as_secs(),
+                        to_secs = new_interval.as_secs(),
+                        active_jobs = has_active_jobs,
+                        "Poll interval adjusted"
                     );
                     current_interval = new_interval;
                     ticker = interval(new_interval);
                 }
             }
             Err(e) => {
-                error!("Failed to reset stale jobs: {}", e);
+                error!(error = %e, "Failed to reset stale jobs");
             }
         }
     }
