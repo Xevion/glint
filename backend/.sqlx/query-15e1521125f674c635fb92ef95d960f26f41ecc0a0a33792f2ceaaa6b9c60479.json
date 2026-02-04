@@ -1,0 +1,128 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                j.id, j.shader_version_id, j.scene_ids, j.profiles, j.priority,\n                j.status, j.attempts, j.max_attempts, j.agent_id, j.claimed_at,\n                j.last_heartbeat, j.started_at, j.completed_at, j.error_message,\n                j.created_at,\n                s.name as shader_name,\n                s.slug as shader_slug,\n                sv.version as shader_version,\n                COALESCE(json_array_length(j.scene_ids::json), 0)::int4 as \"scene_count!\"\n            FROM jobs j\n            JOIN shader_versions sv ON sv.id = j.shader_version_id\n            JOIN shaders s ON s.id = sv.shader_id\n            ORDER BY j.created_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "scene_ids",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "profiles",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "priority",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "max_attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "agent_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "claimed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "last_heartbeat",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "shader_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "shader_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "shader_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "scene_count!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "15e1521125f674c635fb92ef95d960f26f41ecc0a0a33792f2ceaaa6b9c60479"
+}

@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                COUNT(*) FILTER (WHERE status = 'pending')::int4 as \"pending!\",\n                COUNT(*) FILTER (WHERE status = 'completed')::int4 as \"completed!\",\n                COUNT(*) FILTER (WHERE status = 'failed')::int4 as \"failed!\",\n                COUNT(*) FILTER (WHERE outdated = TRUE)::int4 as \"outdated!\"\n            FROM captures\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pending!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "completed!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "failed!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "outdated!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "3cd00ed9a71abc3c9c2f910aa26de625624d497d25a8a984c0aefa011cef1aed"
+}

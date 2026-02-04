@@ -3,7 +3,7 @@ use tracing::{debug, instrument};
 
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
-use crate::models::{CreateWorldRequest, World};
+use crate::models::{CreateWorldRequest, UpdateWorldRequest, World};
 
 pub struct WorldRepo;
 
@@ -111,5 +111,26 @@ impl WorldRepo {
             .context(format!("failed to delete world '{}'", id))?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    #[instrument(skip(db, req), level = "debug")]
+    pub async fn update(db: &DbPool, id: &str, req: &UpdateWorldRequest) -> AppResult<World> {
+        sqlx::query!(
+            r#"
+            UPDATE worlds SET
+                name = COALESCE($1, name),
+                description = COALESCE($2, description),
+                updated_at = now()
+            WHERE id = $3
+            "#,
+            req.name,
+            req.description,
+            id
+        )
+        .execute(db)
+        .await
+        .context(format!("failed to update world '{}'", id))?;
+
+        Self::get_by_id(db, id).await
     }
 }

@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                COUNT(*) FILTER (WHERE status = 'pending')::int4 as \"pending!\",\n                COUNT(*) FILTER (WHERE status = 'claimed')::int4 as \"claimed!\",\n                COUNT(*) FILTER (WHERE status = 'running')::int4 as \"running!\",\n                COUNT(*) FILTER (WHERE status = 'completed')::int4 as \"completed!\",\n                COUNT(*) FILTER (WHERE status = 'failed')::int4 as \"failed!\"\n            FROM jobs\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pending!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "claimed!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "running!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "completed!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "failed!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "59356d7b79e6a6b10ef534826a4d6ebf96488b2c0f64635b3144f37f3bc54142"
+}

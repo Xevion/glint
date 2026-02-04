@@ -1,0 +1,140 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                sc.id, sc.name, sc.slug, sc.description, sc.world_id,\n                sc.x, sc.y, sc.z, sc.pitch, sc.yaw,\n                sc.dimension, sc.time_of_day_ticks, sc.weather, sc.weather_intensity,\n                sc.moon_phase, sc.biome, sc.definition_json, sc.active, sc.created_at,\n                w.name as world_name,\n                w.slug as world_slug\n            FROM scenes sc\n            LEFT JOIN worlds w ON sc.world_id = w.id\n            ORDER BY sc.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "world_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "x",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 6,
+        "name": "y",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "z",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 8,
+        "name": "pitch",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 9,
+        "name": "yaw",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 10,
+        "name": "dimension",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "time_of_day_ticks",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "weather",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "weather_intensity",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 14,
+        "name": "moon_phase",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 15,
+        "name": "biome",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "definition_json",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 18,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 19,
+        "name": "world_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "world_slug",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "be6bc4104a52798dfb9b55959994b07e8f70a6bbb62ec8cb90688eb0de8b0344"
+}

@@ -1,351 +1,116 @@
 <script lang="ts">
 import { onMount, onDestroy } from 'svelte';
 import { Button } from '$lib/components/ui/button';
-import { RefreshCw, Play, Pause } from '@lucide/svelte';
+import {
+	RefreshCw,
+	Play,
+	Pause,
+	Sparkles,
+	Globe,
+	Mountain,
+	Camera,
+	Briefcase,
+	Users,
+	ArrowRight
+} from '@lucide/svelte';
 import TimeAgo from '$lib/components/time-ago.svelte';
-import AdminTable from '$lib/components/admin-table.svelte';
-import CreateJobDialog from '$lib/components/create-job-dialog.svelte';
-import JobDetailsDialog from '$lib/components/job-details-dialog.svelte';
-import WorldUploadDialog from '$lib/components/world-upload-dialog.svelte';
 import { api } from '$lib/api';
-import type { Shader, Scene, CaptureWithContext, World } from '$lib/api';
+import type { CaptureWithContext } from '$lib/bindings';
 import type { JobWithDetails } from '$lib/api/endpoints/admin';
-import { escapeHtml, formatBytes } from '$lib/utils/display';
 
-let shaders = $state<Shader[]>([]);
-let scenes = $state<Scene[]>([]);
-let worlds = $state<World[]>([]);
-let captures = $state<CaptureWithContext[]>([]);
-let jobs = $state<JobWithDetails[]>([]);
+// Stats
+let shaderCount = $state(0);
+let worldCount = $state(0);
+let sceneCount = $state(0);
+let captureCount = $state(0);
+let userCount = $state(0);
+let jobCounts = $state({ pending: 0, running: 0, completed: 0, failed: 0 });
+
+// Recent activity
+let recentJobs = $state<JobWithDetails[]>([]);
+let recentCaptures = $state<CaptureWithContext[]>([]);
+
+// Loading state
 let loading = $state(true);
-let errors = $state<Record<string, string>>({});
-let autoRefresh = $state(true);
 let refreshing = $state(false);
-let refreshTimeout: number | undefined;
-let isLoadingData = $state(false);
-let healthStatus = $state<'ok' | 'error' | 'checking'>('checking');
+let autoRefresh = $state(true);
 let lastRefreshed = $state<Date | null>(null);
-let selectedJob = $state<JobWithDetails | null>(null);
-let showJobDetails = $state(false);
+let healthStatus = $state<'ok' | 'error' | 'checking'>('checking');
+let errors = $state<Record<string, string>>({});
 
 let refreshInterval: number | undefined;
 
-// Shader table columns
-const shaderColumns = [
-	{ id: 'name', key: 'name', name: 'Name' },
-	{ id: 'slug', key: 'slug', name: 'Slug' },
-	{
-		id: 'description',
-		key: 'description',
-		name: 'Description',
-		render: (value: string | null) => value ?? 'No description'
-	},
-	{
-		id: 'created_at',
-		key: 'created_at',
-		name: 'Created',
-		component: 'time' as const
-	},
-	{
-		id: 'actions',
-		key: 'slug',
-		name: 'Actions',
-		component: 'link-button' as const,
-		href: (row: Shader) => `/shaders/${row.slug}`
-	}
-];
-
-// Scene table columns
-const sceneColumns = [
-	{ id: 'name', key: 'name', name: 'Name' },
-	{ id: 'slug', key: 'slug', name: 'Slug' },
-	{
-		id: 'description',
-		key: 'description',
-		name: 'Description',
-		render: (value: string | null) => value ?? 'No description'
-	},
-	{
-		id: 'created_at',
-		key: 'created_at',
-		name: 'Created',
-		component: 'time' as const
-	},
-	{
-		id: 'actions',
-		key: 'slug',
-		name: 'Actions',
-		component: 'link-button' as const,
-		href: (row: Scene) => `/scenes/${row.slug}`
-	}
-];
-
-// World table columns
-const worldColumns = [
-	{ id: 'name', key: 'name', name: 'Name' },
-	{ id: 'slug', key: 'slug', name: 'Slug' },
-	{
-		id: 'minecraft_version',
-		key: 'minecraft_version',
-		name: 'MC Version',
-		render: (v: string) =>
-			`<code class="rounded bg-muted px-1.5 py-0.5 text-xs">${escapeHtml(v)}</code>`
-	},
-	{
-		id: 'size',
-		key: 'size_bytes',
-		name: 'Size',
-		render: (bytes: number | null) => (bytes ? formatBytes(bytes) : '-')
-	},
-	{
-		id: 'description',
-		key: 'description',
-		name: 'Description',
-		render: (value: string | null) => value ?? 'No description'
-	},
-	{
-		id: 'created_at',
-		key: 'created_at',
-		name: 'Created',
-		component: 'time' as const
-	}
-];
-
-// Capture table columns
-const captureColumns = [
-	{
-		id: 'preview',
-		key: 'screenshot_url',
-		name: 'Preview',
-		render: (value: string | null, row: CaptureWithContext) => {
-			if (value) {
-				const safeUrl = escapeHtml(value);
-				return `<img src="${safeUrl}" alt="Capture preview" class="h-12 w-20 rounded object-cover" />`;
-			} else if (row.screenshot_path) {
-				return '<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">No URL</div>';
-			}
-			return '<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">N/A</div>';
-		}
-	},
-	{
-		id: 'shader',
-		key: 'shader_name',
-		name: 'Shader',
-		render: (_value: unknown, row: CaptureWithContext) => {
-			const safeName = escapeHtml(row.shader_name);
-			const safeSlug = escapeHtml(row.shader_slug);
-			const safeVersion = escapeHtml(row.shader_version);
-			return `<div><a href="/shaders/${safeSlug}" class="font-medium text-primary hover:underline">${safeName}</a><div class="text-xs text-muted-foreground">${safeVersion}</div></div>`;
-		}
-	},
-	{ id: 'scene_id', key: 'scene_id', name: 'Scene' },
-	{
-		id: 'resolution',
-		key: 'resolution_width',
-		name: 'Resolution',
-		render: (_value: unknown, row: CaptureWithContext) =>
-			row.resolution_width && row.resolution_height
-				? `${row.resolution_width}x${row.resolution_height}`
-				: '-'
-	},
-	{
-		id: 'captured_at',
-		key: 'captured_at',
-		name: 'Captured',
-		component: 'time' as const
-	},
-	{
-		id: 'actions',
-		key: 'id',
-		name: 'Actions',
-		component: 'delete-button' as const
-	}
-];
-
-// Job table columns
-const jobColumns = [
-	{
-		id: 'shader',
-		key: 'shader_name',
-		name: 'Shader',
-		render: (_value: unknown, row: JobWithDetails) => {
-			const safeName = escapeHtml(row.shader_name);
-			const safeSlug = escapeHtml(row.shader_slug);
-			const safeVersion = escapeHtml(row.shader_version);
-			return `<div><a href="/shaders/${safeSlug}" class="font-medium text-primary hover:underline">${safeName}</a><div class="text-xs text-muted-foreground">${safeVersion}</div></div>`;
-		}
-	},
-	{ id: 'scene_count', key: 'scene_count', name: 'Scenes' },
-	{
-		id: 'status',
-		key: 'status',
-		name: 'Status',
-		render: (value: string) => {
-			const colorMap: Record<string, string> = {
-				pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-				claimed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-				running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-				completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-				failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-			};
-			const colorClass =
-				colorMap[value] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
-			return `<span class="rounded px-2 py-1 text-xs font-medium ${colorClass}">${value}</span>`;
-		}
-	},
-	{ id: 'priority', key: 'priority', name: 'Priority' },
-	{
-		id: 'attempts',
-		key: 'attempts',
-		name: 'Attempts',
-		render: (_value: unknown, row: JobWithDetails) => `${row.attempts}/${row.max_attempts}`
-	},
-	{
-		id: 'created_at',
-		key: 'created_at',
-		name: 'Created',
-		component: 'time' as const
-	},
-	{
-		id: 'completed_at',
-		key: 'completed_at',
-		name: 'Completed',
-		component: 'time' as const
-	},
-	{
-		id: 'actions',
-		key: 'id',
-		name: 'Actions',
-		component: 'job-actions' as const,
-		onAction: handleJobAction
-	}
-];
-
-async function handleJobAction(action: string, job: JobWithDetails) {
-	if (action === 'view-details') {
-		selectedJob = job;
-		showJobDetails = true;
-		return;
-	}
-
-	if (action === 'cancel') {
-		const result = await api.admin.cancelJob(job.id);
-		if (result.isOk) {
-			void loadJobs();
-		} else {
-			errors.jobs = result.error.message;
-		}
-	} else if (action === 'retry') {
-		const result = await api.admin.retryJob(job.id);
-		if (result.isOk) {
-			void loadJobs();
-		} else {
-			errors.jobs = result.error.message;
-		}
-	} else if (action === 'release') {
-		const result = await api.admin.releaseJob(job.id);
-		if (result.isOk) {
-			void loadJobs();
-		} else {
-			errors.jobs = result.error.message;
-		}
-	} else if (action === 'delete') {
-		const result = await api.admin.deleteJob(job.id);
-		if (result.isOk) {
-			void loadJobs();
-		} else {
-			errors.jobs = result.error.message;
-		}
-	}
+interface StatCard {
+	label: string;
+	count: number;
+	href: string;
+	icon: typeof Sparkles;
 }
 
-async function loadShaders() {
-	const result = await api.shaders.list();
-	if (result.isOk) {
-		shaders = result.value;
-	} else {
-		errors.shaders = result.error.message;
-	}
-}
-
-async function loadScenes() {
-	const result = await api.scenes.list();
-	if (result.isOk) {
-		scenes = result.value;
-	} else {
-		errors.scenes = result.error.message;
-	}
-}
-
-async function loadWorlds() {
-	const result = await api.worlds.listWorlds();
-	if (result.isOk) {
-		worlds = result.value;
-	} else {
-		errors.worlds = result.error.message;
-	}
-}
-
-async function loadCaptures() {
-	const result = await api.captures.list();
-	if (result.isOk) {
-		captures = result.value;
-	} else {
-		errors.captures = result.error.message;
-	}
-}
-
-async function loadJobs() {
-	const result = await api.admin.listJobs();
-	if (result.isOk) {
-		jobs = result.value;
-	} else {
-		errors.jobs = result.error.message;
-	}
-}
-
-async function loadHealth() {
-	const result = await api.admin.health();
-	if (result.isOk) {
-		healthStatus = 'ok';
-	} else {
-		healthStatus = 'error';
-		errors.health = result.error.message;
-	}
-}
+const statCards = $derived<StatCard[]>([
+	{ label: 'Shaders', count: shaderCount, href: '/admin/shaders', icon: Sparkles },
+	{ label: 'Worlds', count: worldCount, href: '/admin/worlds', icon: Globe },
+	{ label: 'Scenes', count: sceneCount, href: '/admin/scenes', icon: Mountain },
+	{ label: 'Captures', count: captureCount, href: '/admin/captures', icon: Camera },
+	{ label: 'Users', count: userCount, href: '/admin/users', icon: Users }
+]);
 
 async function loadData() {
-	// Prevent overlapping refresh calls
-	if (isLoadingData) return;
-	isLoadingData = true;
-
-	// Clear any pending timeout
-	if (refreshTimeout) {
-		clearTimeout(refreshTimeout);
-		refreshTimeout = undefined;
-	}
-
 	refreshing = true;
 	errors = {};
 
-	try {
+	const [shadersRes, worldsRes, scenesRes, capturesRes, usersRes, jobsRes, healthRes] =
 		await Promise.all([
-			loadShaders(),
-			loadScenes(),
-			loadWorlds(),
-			loadCaptures(),
-			loadJobs(),
-			loadHealth()
+			api.shaders.list(),
+			api.worlds.listWorlds(),
+			api.scenes.list(),
+			api.admin.listCaptures(),
+			api.admin.listUsers(),
+			api.admin.listJobs(),
+			api.admin.health()
 		]);
-		lastRefreshed = new Date();
-	} finally {
-		loading = false;
-		isLoadingData = false;
-		// Keep spinner visible briefly for visual feedback
-		refreshTimeout = window.setTimeout(() => {
-			refreshing = false;
-		}, 500);
+
+	if (shadersRes.isOk) shaderCount = shadersRes.value.length;
+	else errors.shaders = shadersRes.error.message;
+
+	if (worldsRes.isOk) worldCount = worldsRes.value.length;
+	else errors.worlds = worldsRes.error.message;
+
+	if (scenesRes.isOk) sceneCount = scenesRes.value.length;
+	else errors.scenes = scenesRes.error.message;
+
+	if (capturesRes.isOk) {
+		captureCount = capturesRes.value.length;
+		recentCaptures = capturesRes.value.slice(0, 5);
+	} else {
+		errors.captures = capturesRes.error.message;
 	}
+
+	if (usersRes.isOk) userCount = usersRes.value.length;
+	else errors.users = usersRes.error.message;
+
+	if (jobsRes.isOk) {
+		const jobs = jobsRes.value;
+		jobCounts = {
+			pending: jobs.filter((j) => j.status === 'pending').length,
+			running: jobs.filter((j) => j.status === 'running' || j.status === 'claimed').length,
+			completed: jobs.filter((j) => j.status === 'completed').length,
+			failed: jobs.filter((j) => j.status === 'failed').length
+		};
+		recentJobs = jobs.slice(0, 5);
+	} else {
+		errors.jobs = jobsRes.error.message;
+	}
+
+	if (healthRes.isOk) healthStatus = 'ok';
+	else {
+		healthStatus = 'error';
+		errors.health = healthRes.error.message;
+	}
+
+	lastRefreshed = new Date();
+	loading = false;
+	refreshing = false;
 }
 
 function toggleAutoRefresh() {
@@ -353,7 +118,7 @@ function toggleAutoRefresh() {
 	if (autoRefresh) {
 		refreshInterval = window.setInterval(() => {
 			void loadData();
-		}, 5000);
+		}, 10000);
 	} else if (refreshInterval) {
 		clearInterval(refreshInterval);
 		refreshInterval = undefined;
@@ -362,11 +127,10 @@ function toggleAutoRefresh() {
 
 onMount(() => {
 	void loadData();
-	// Start auto-refresh since it's enabled by default
 	if (autoRefresh) {
 		refreshInterval = window.setInterval(() => {
 			void loadData();
-		}, 5000);
+		}, 10000);
 	}
 });
 
@@ -374,16 +138,13 @@ onDestroy(() => {
 	if (refreshInterval) {
 		clearInterval(refreshInterval);
 	}
-	if (refreshTimeout) {
-		clearTimeout(refreshTimeout);
-	}
 });
 </script>
 
-<div class="container mx-auto px-4 py-8">
-	<div class="mb-8 flex items-center justify-between">
+<div class="space-y-6">
+	<header class="flex items-center justify-between">
 		<div class="flex items-center gap-4">
-			<h1 class="text-3xl font-bold">Admin Panel</h1>
+			<h1 class="text-2xl font-semibold">Dashboard</h1>
 			<div
 				class="flex h-3 w-3 items-center justify-center rounded-full"
 				class:bg-green-500={healthStatus === 'ok'}
@@ -402,7 +163,7 @@ onDestroy(() => {
 					{#if refreshing}
 						Refreshing...
 					{:else}
-						Last updated <TimeAgo timestamp={lastRefreshed} />
+						Updated <TimeAgo timestamp={lastRefreshed} />
 					{/if}
 				</div>
 			{/if}
@@ -411,7 +172,7 @@ onDestroy(() => {
 					variant={autoRefresh ? 'default' : 'outline'}
 					size="icon"
 					onclick={toggleAutoRefresh}
-					title={autoRefresh ? 'Disable auto-refresh (5s)' : 'Enable auto-refresh (5s)'}
+					title={autoRefresh ? 'Disable auto-refresh (10s)' : 'Enable auto-refresh (10s)'}
 				>
 					{#if autoRefresh}
 						<Pause class="h-4 w-4" />
@@ -419,113 +180,155 @@ onDestroy(() => {
 						<Play class="h-4 w-4" />
 					{/if}
 				</Button>
-				<Button
-					variant="outline"
-					size="icon"
-					onclick={loadData}
-					disabled={refreshing}
-					title="Refresh data"
-				>
+				<Button variant="outline" size="icon" onclick={loadData} disabled={refreshing}>
 					<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
 				</Button>
 			</div>
 		</div>
-	</div>
+	</header>
 
 	{#if loading}
 		<div class="text-center text-muted-foreground">Loading...</div>
 	{:else}
-		<div class="grid gap-6">
-			<!-- Shaders Section -->
-			<section class="rounded-lg border bg-card p-6">
-				<div class="mb-4 flex items-baseline gap-3">
-					<h2 class="text-2xl font-semibold">Shaders</h2>
-					<span class="text-lg text-muted-foreground">{shaders.length}</span>
-				</div>
-				{#if errors.shaders}
-					<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-						Error: {errors.shaders}
+		<!-- Stats Grid -->
+		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+			{#each statCards as card (card.label)}
+				<a
+					href={card.href}
+					class="rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+				>
+					<div class="flex items-center justify-between">
+						<card.icon class="h-5 w-5 text-muted-foreground" />
+						<span class="text-2xl font-bold">{card.count}</span>
 					</div>
-				{:else}
-					<AdminTable columns={shaderColumns} data={shaders} />
-				{/if}
-			</section>
+					<div class="mt-2 text-sm text-muted-foreground">{card.label}</div>
+				</a>
+			{/each}
+		</div>
 
-			<!-- Scenes Section -->
-			<section class="rounded-lg border bg-card p-6">
-				<div class="mb-4 flex items-baseline gap-3">
-					<h2 class="text-2xl font-semibold">Scenes</h2>
-					<span class="text-lg text-muted-foreground">{scenes.length}</span>
-				</div>
-				{#if errors.scenes}
-					<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-						Error: {errors.scenes}
+		<!-- Jobs Summary -->
+		<div class="rounded-lg border bg-card p-4">
+			<div class="mb-4 flex items-center justify-between">
+				<h2 class="flex items-center gap-2 text-lg font-semibold">
+					<Briefcase class="h-5 w-5" />
+					Jobs
+				</h2>
+				<a href="/admin/jobs" class="flex items-center gap-1 text-sm text-primary hover:underline">
+					View all <ArrowRight class="h-4 w-4" />
+				</a>
+			</div>
+			<div class="grid gap-4 sm:grid-cols-4">
+				<div class="rounded-md bg-yellow-50 p-3 dark:bg-yellow-900/20">
+					<div class="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
+						{jobCounts.pending}
 					</div>
-				{:else}
-					<AdminTable columns={sceneColumns} data={scenes} />
-				{/if}
-			</section>
+					<div class="text-sm text-yellow-600 dark:text-yellow-400">Pending</div>
+				</div>
+				<div class="rounded-md bg-blue-50 p-3 dark:bg-blue-900/20">
+					<div class="text-2xl font-bold text-blue-700 dark:text-blue-300">
+						{jobCounts.running}
+					</div>
+					<div class="text-sm text-blue-600 dark:text-blue-400">Running</div>
+				</div>
+				<div class="rounded-md bg-green-50 p-3 dark:bg-green-900/20">
+					<div class="text-2xl font-bold text-green-700 dark:text-green-300">
+						{jobCounts.completed}
+					</div>
+					<div class="text-sm text-green-600 dark:text-green-400">Completed</div>
+				</div>
+				<div class="rounded-md bg-red-50 p-3 dark:bg-red-900/20">
+					<div class="text-2xl font-bold text-red-700 dark:text-red-300">
+						{jobCounts.failed}
+					</div>
+					<div class="text-sm text-red-600 dark:text-red-400">Failed</div>
+				</div>
+			</div>
+		</div>
 
-			<!-- Worlds Section -->
-			<section class="rounded-lg border bg-card p-6">
+		<!-- Recent Activity Grid -->
+		<div class="grid gap-4 lg:grid-cols-2">
+			<!-- Recent Jobs -->
+			<div class="rounded-lg border bg-card p-4">
 				<div class="mb-4 flex items-center justify-between">
-					<div class="flex items-baseline gap-3">
-						<h2 class="text-2xl font-semibold">Worlds</h2>
-						<span class="text-lg text-muted-foreground">{worlds.length}</span>
-					</div>
-					<WorldUploadDialog onWorldCreated={loadData} />
+					<h2 class="text-lg font-semibold">Recent Jobs</h2>
+					<a
+						href="/admin/jobs"
+						class="flex items-center gap-1 text-sm text-primary hover:underline"
+					>
+						View all <ArrowRight class="h-4 w-4" />
+					</a>
 				</div>
-				{#if errors.worlds}
-					<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-						Error: {errors.worlds}
-					</div>
-				{:else if worlds.length === 0}
-					<p class="text-muted-foreground">No worlds uploaded yet.</p>
+				{#if recentJobs.length === 0}
+					<p class="text-sm text-muted-foreground">No jobs yet</p>
 				{:else}
-					<AdminTable columns={worldColumns} data={worlds} />
-				{/if}
-			</section>
-
-			<!-- Captures Section -->
-			<section class="rounded-lg border bg-card p-6">
-				<div class="mb-4 flex items-baseline gap-3">
-					<h2 class="text-2xl font-semibold">Captures</h2>
-					<span class="text-lg text-muted-foreground">{captures.length}</span>
-				</div>
-				{#if errors.captures}
-					<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-						Error: {errors.captures}
+					<div class="space-y-2">
+						{#each recentJobs as job (job.id)}
+							{@const statusColor =
+								{
+									pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+									claimed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+									running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+									completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+									failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+								}[job.status] ?? 'bg-gray-100 text-gray-800'}
+							<div class="flex items-center justify-between rounded border p-2 text-sm">
+								<div>
+									<div class="font-medium">{job.shader_name}</div>
+									<div class="text-xs text-muted-foreground">
+										{job.scene_count} scenes &middot; {job.shader_version}
+									</div>
+								</div>
+								<span class="rounded px-2 py-0.5 text-xs font-medium {statusColor}">
+									{job.status}
+								</span>
+							</div>
+						{/each}
 					</div>
-				{:else if captures.length === 0}
-					<p class="text-muted-foreground">No captures yet.</p>
-				{:else}
-					<AdminTable columns={captureColumns} data={captures} />
 				{/if}
-			</section>
+			</div>
 
-			<!-- Jobs Section -->
-			<section class="rounded-lg border bg-card p-6">
+			<!-- Recent Captures -->
+			<div class="rounded-lg border bg-card p-4">
 				<div class="mb-4 flex items-center justify-between">
-					<div class="flex items-baseline gap-3">
-						<h2 class="text-2xl font-semibold">Jobs</h2>
-						<span class="text-lg text-muted-foreground">{jobs.length}</span>
-					</div>
-					<CreateJobDialog onJobCreated={loadData} />
+					<h2 class="text-lg font-semibold">Recent Captures</h2>
+					<a
+						href="/admin/captures"
+						class="flex items-center gap-1 text-sm text-primary hover:underline"
+					>
+						View all <ArrowRight class="h-4 w-4" />
+					</a>
 				</div>
-				{#if errors.jobs}
-					<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-						Error: {errors.jobs}
-					</div>
-				{:else if jobs.length === 0}
-					<p class="text-muted-foreground">No jobs in queue.</p>
+				{#if recentCaptures.length === 0}
+					<p class="text-sm text-muted-foreground">No captures yet</p>
 				{:else}
-					<AdminTable columns={jobColumns} data={jobs} />
+					<div class="space-y-2">
+						{#each recentCaptures as capture (capture.id)}
+							<div class="flex items-center gap-3 rounded border p-2 text-sm">
+								{#if capture.screenshot_url}
+									<img
+										src={capture.screenshot_url}
+										alt="Capture"
+										class="h-10 w-16 rounded object-cover"
+									/>
+								{:else}
+									<div class="flex h-10 w-16 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+										N/A
+									</div>
+								{/if}
+								<div class="min-w-0 flex-1">
+									<div class="truncate font-medium">{capture.shader_name}</div>
+									<div class="text-xs text-muted-foreground">
+										{capture.shader_version}
+										{#if capture.profile}
+											&middot; {capture.profile}
+										{/if}
+									</div>
+								</div>
+							</div>
+						{/each}
+					</div>
 				{/if}
-			</section>
+			</div>
 		</div>
 	{/if}
 </div>
-
-{#if selectedJob}
-	<JobDetailsDialog job={selectedJob} bind:open={showJobDetails} />
-{/if}

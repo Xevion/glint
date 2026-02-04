@@ -26,6 +26,9 @@ pub enum AppError {
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
     #[error("Database error")]
     Database(#[source] sqlx::Error),
 
@@ -58,6 +61,7 @@ impl IntoResponse for AppError {
                 msg.clone(),
             ),
             AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg.clone()),
+            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, "FORBIDDEN", msg.clone()),
             AppError::Database(e) => {
                 error!(error = %e, "Database error");
                 (

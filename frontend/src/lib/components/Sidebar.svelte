@@ -11,7 +11,11 @@ import {
 	Cloud,
 	TreePine,
 	LayoutDashboard,
-	Settings
+	Settings,
+	Globe,
+	Camera,
+	Briefcase,
+	Users
 } from '@lucide/svelte';
 
 // Placeholder: would come from auth context
@@ -50,6 +54,12 @@ const sceneFilters = [
 
 const adminItems = [
 	{ href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+	{ href: '/admin/shaders', label: 'Shaders', icon: Sparkles },
+	{ href: '/admin/worlds', label: 'Worlds', icon: Globe },
+	{ href: '/admin/scenes', label: 'Scenes', icon: Mountain },
+	{ href: '/admin/captures', label: 'Captures', icon: Camera },
+	{ href: '/admin/jobs', label: 'Jobs', icon: Briefcase },
+	{ href: '/admin/users', label: 'Users', icon: Users },
 	{ href: '/admin/settings', label: 'Settings', icon: Settings }
 ];
 

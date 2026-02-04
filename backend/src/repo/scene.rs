@@ -3,7 +3,66 @@ use tracing::{debug, instrument};
 
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
-use crate::models::{CreateSceneRequest, Scene, UpdateSceneRequest};
+use chrono::{DateTime, Utc};
+
+use crate::models::{
+    CreateSceneRequest, Scene, SceneWithWorld, UpdateSceneMetadataRequest, UpdateSceneRequest,
+};
+
+/// Helper struct for joined scene/world query
+struct SceneWithWorldRow {
+    id: String,
+    name: String,
+    slug: String,
+    description: Option<String>,
+    world_id: String,
+    x: f64,
+    y: f64,
+    z: f64,
+    pitch: f64,
+    yaw: f64,
+    dimension: String,
+    time_of_day_ticks: i32,
+    weather: String,
+    weather_intensity: f64,
+    moon_phase: Option<i32>,
+    biome: Option<String>,
+    definition_json: Option<String>,
+    active: bool,
+    created_at: DateTime<Utc>,
+    world_name: Option<String>,
+    world_slug: Option<String>,
+}
+
+impl From<SceneWithWorldRow> for SceneWithWorld {
+    fn from(row: SceneWithWorldRow) -> Self {
+        Self {
+            scene: Scene {
+                id: row.id,
+                name: row.name,
+                slug: row.slug,
+                description: row.description,
+                world_id: row.world_id,
+                x: row.x,
+                y: row.y,
+                z: row.z,
+                pitch: row.pitch,
+                yaw: row.yaw,
+                dimension: row.dimension,
+                time_of_day_ticks: row.time_of_day_ticks,
+                weather: row.weather,
+                weather_intensity: row.weather_intensity,
+                moon_phase: row.moon_phase,
+                biome: row.biome,
+                definition_json: row.definition_json,
+                active: row.active,
+                created_at: row.created_at,
+            },
+            world_name: row.world_name,
+            world_slug: row.world_slug,
+        }
+    }
+}
 
 pub struct SceneRepo;
 
@@ -217,6 +276,72 @@ impl SceneRepo {
         .execute(db)
         .await
         .context(format!("failed to reactivate scene '{}'", id))?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// List all scenes (including inactive) for admin dashboard
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_all(db: &DbPool) -> AppResult<Vec<SceneWithWorld>> {
+        let rows = sqlx::query_as!(
+            SceneWithWorldRow,
+            r#"
+            SELECT
+                sc.id, sc.name, sc.slug, sc.description, sc.world_id,
+                sc.x, sc.y, sc.z, sc.pitch, sc.yaw,
+                sc.dimension, sc.time_of_day_ticks, sc.weather, sc.weather_intensity,
+                sc.moon_phase, sc.biome, sc.definition_json, sc.active, sc.created_at,
+                w.name as world_name,
+                w.slug as world_slug
+            FROM scenes sc
+            LEFT JOIN worlds w ON sc.world_id = w.id
+            ORDER BY sc.name
+            "#
+        )
+        .fetch_all(db)
+        .await
+        .context("failed to list all scenes")?;
+
+        let scenes: Vec<SceneWithWorld> = rows.into_iter().map(Into::into).collect();
+        debug!(count = scenes.len(), "Listed all scenes");
+        Ok(scenes)
+    }
+
+    /// Update scene metadata (name/description only)
+    #[instrument(skip(db, req), level = "debug")]
+    pub async fn update_metadata(
+        db: &DbPool,
+        id: &str,
+        req: &UpdateSceneMetadataRequest,
+    ) -> AppResult<Scene> {
+        sqlx::query!(
+            r#"
+            UPDATE scenes SET
+                name = COALESCE($1, name),
+                description = COALESCE($2, description)
+            WHERE id = $3
+            "#,
+            req.name,
+            req.description,
+            id
+        )
+        .execute(db)
+        .await
+        .context(format!("failed to update scene metadata '{}'", id))?;
+
+        Self::get_by_id(db, id).await
+    }
+
+    /// Disable a scene by ID (for admin)
+    #[instrument(skip(db), level = "debug")]
+    pub async fn disable_by_id(db: &DbPool, id: &str) -> AppResult<bool> {
+        let result = sqlx::query!(
+            "UPDATE scenes SET active = FALSE WHERE id = $1 AND active = TRUE",
+            id
+        )
+        .execute(db)
+        .await
+        .context(format!("failed to disable scene '{}'", id))?;
 
         Ok(result.rows_affected() > 0)
     }

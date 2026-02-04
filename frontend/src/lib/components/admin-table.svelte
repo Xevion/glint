@@ -23,9 +23,19 @@ interface Column {
 interface Props {
 	data: T[];
 	columns: Column[];
+	selectedId?: string | null;
+	onRowClick?: (item: T) => void;
+	getRowId?: (item: T) => string;
 }
 
-let { data, columns }: Props = $props();
+let { data, columns, selectedId = null, onRowClick, getRowId }: Props = $props();
+
+function extractRowId(row: T): string {
+	if (getRowId) return getRowId(row);
+	if ('id' in row && typeof row.id === 'string') return row.id;
+	if ('slug' in row && typeof row.slug === 'string') return row.slug;
+	return JSON.stringify(row);
+}
 
 const table = $derived(
 	new DataTable({
@@ -46,8 +56,17 @@ const table = $derived(
 		</Table.Header>
 		<Table.Body>
 			{#if table.rows.length}
-				{#each table.rows as row (row.id ?? row.slug ?? JSON.stringify(row))}
-					<Table.Row>
+				{#each table.rows as row (extractRowId(row))}
+					{@const rowId = extractRowId(row)}
+					<Table.Row
+						class={[
+							onRowClick && 'cursor-pointer hover:bg-muted/50',
+							selectedId === rowId && 'bg-muted'
+						]
+							.filter(Boolean)
+							.join(' ')}
+						onclick={() => onRowClick?.(row)}
+					>
 						{#each table.columns as column (column.id)}
 							<Table.Cell>
 								{@const colDef = columns.find((c) => c.id === column.id)}

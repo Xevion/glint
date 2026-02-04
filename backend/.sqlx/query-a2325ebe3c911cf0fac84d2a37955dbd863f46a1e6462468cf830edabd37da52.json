@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE jobs\n            SET status = 'claimed',\n                agent_id = $1,\n                claimed_at = now(),\n                last_heartbeat = now(),\n                attempts = attempts + 1\n            WHERE id = (\n                SELECT id FROM jobs\n                WHERE status = 'pending'\n                  AND attempts < max_attempts\n                ORDER BY priority DESC, created_at ASC\n                LIMIT 1\n            )\n            RETURNING id, shader_version_id, scene_ids, profiles, priority\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "scene_ids",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "profiles",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "priority",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "a2325ebe3c911cf0fac84d2a37955dbd863f46a1e6462468cf830edabd37da52"
+}

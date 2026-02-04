@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE scenes SET active = FALSE WHERE id = $1 AND active = TRUE",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2aac58e3b5b59c305e686e9b9bc041702693992e830b73cba9fc3914a4200bcb"
+}

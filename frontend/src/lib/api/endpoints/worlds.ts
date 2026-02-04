@@ -37,7 +37,7 @@ export class WorldsEndpoints {
 	 * List all worlds
 	 */
 	async listWorlds(): Promise<Result<World[], ApiError>> {
-		const url = `${this.baseUrl}/api/admin/worlds`;
+		const url = `${this.baseUrl}/api/worlds`;
 
 		try {
 			const response = await fetch(url);
@@ -66,7 +66,7 @@ export class WorldsEndpoints {
 	async createWorldUpload(
 		request: CreateWorldUploadRequest
 	): Promise<Result<CreateWorldUploadResponse, ApiError>> {
-		const url = `${this.baseUrl}/api/admin/worlds`;
+		const url = `${this.baseUrl}/api/worlds`;
 
 		try {
 			const response = await fetch(url, {
@@ -156,7 +156,7 @@ export class WorldsEndpoints {
 		slug: string,
 		request: CompleteWorldUploadRequest
 	): Promise<Result<World, ApiError>> {
-		const url = `${this.baseUrl}/api/admin/worlds/${encodeURIComponent(slug)}/complete`;
+		const url = `${this.baseUrl}/api/worlds/${encodeURIComponent(slug)}/complete`;
 
 		try {
 			const response = await fetch(url, {

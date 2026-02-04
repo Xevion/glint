@@ -5,6 +5,7 @@ use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
 use crate::models::{
     CaptureWithContext, CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderVersion,
+    UpdateShaderRequest,
 };
 
 pub struct ShaderRepo;
@@ -108,6 +109,33 @@ impl ShaderRepo {
             .await
             .context(format!("failed to delete shader '{}'", id))?;
         Ok(result.rows_affected() > 0)
+    }
+
+    #[instrument(skip(db, req), level = "debug")]
+    pub async fn update(db: &DbPool, id: &str, req: &UpdateShaderRequest) -> AppResult<Shader> {
+        sqlx::query!(
+            r#"
+            UPDATE shaders SET
+                name = COALESCE($1, name),
+                description = COALESCE($2, description),
+                modrinth_id = COALESCE($3, modrinth_id),
+                curseforge_id = COALESCE($4, curseforge_id),
+                website_url = COALESCE($5, website_url),
+                updated_at = now()
+            WHERE id = $6
+            "#,
+            req.name,
+            req.description,
+            req.modrinth_id,
+            req.curseforge_id,
+            req.website_url,
+            id
+        )
+        .execute(db)
+        .await
+        .context(format!("failed to update shader '{}'", id))?;
+
+        Self::get_by_id(db, id).await
     }
 
     /// Fetch captures with shader/version context for a given shader

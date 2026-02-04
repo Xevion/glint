@@ -71,6 +71,30 @@ impl FromRequestParts<AppState> for MaybeAuthUser {
     }
 }
 
+/// Admin user extractor - fails if not authenticated or not an admin
+pub struct AdminUser {
+    pub user: User,
+    pub session: Session,
+}
+
+impl FromRequestParts<AppState> for AdminUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let token = extract_token(parts, state).await?;
+        let (user, session) = SessionRepo::validate(state.db(), &token).await?;
+
+        if user.role != "admin" {
+            return Err(AppError::Forbidden("Admin access required".to_string()));
+        }
+
+        Ok(AdminUser { user, session })
+    }
+}
+
 /// Extract session token from Authorization header or cookie
 async fn extract_token(parts: &mut Parts, state: &AppState) -> AppResult<String> {
     // Try Authorization header first: "Bearer <token>"

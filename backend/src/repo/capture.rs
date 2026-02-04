@@ -223,3 +223,79 @@ pub struct CaptureStatusCounts {
     pub failed: i32,
     pub outdated: i32,
 }
+
+impl CaptureRepo {
+    /// List all captures with context (for admin dashboard)
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_all_with_context(db: &DbPool) -> AppResult<Vec<CaptureWithContext>> {
+        let captures = sqlx::query_as!(
+            CaptureWithContext,
+            r#"
+            SELECT
+                c.id,
+                c.scene_id,
+                s.slug as shader_slug,
+                s.name as shader_name,
+                sv.version as shader_version,
+                c.profile,
+                c.screenshot_path,
+                c.screenshot_url,
+                c.captured_at,
+                c.resolution_width,
+                c.resolution_height
+            FROM captures c
+            JOIN shader_versions sv ON c.shader_version_id = sv.id
+            JOIN shaders s ON sv.shader_id = s.id
+            ORDER BY c.created_at DESC
+            "#
+        )
+        .fetch_all(db)
+        .await
+        .context("failed to list all captures with context")?;
+
+        debug!(count = captures.len(), "Listed all captures with context");
+        Ok(captures)
+    }
+
+    /// Get a single capture with context (for admin detail view)
+    #[instrument(skip(db), level = "debug")]
+    pub async fn get_with_context(db: &DbPool, id: &str) -> AppResult<CaptureWithContext> {
+        sqlx::query_as!(
+            CaptureWithContext,
+            r#"
+            SELECT
+                c.id,
+                c.scene_id,
+                s.slug as shader_slug,
+                s.name as shader_name,
+                sv.version as shader_version,
+                c.profile,
+                c.screenshot_path,
+                c.screenshot_url,
+                c.captured_at,
+                c.resolution_width,
+                c.resolution_height
+            FROM captures c
+            JOIN shader_versions sv ON c.shader_version_id = sv.id
+            JOIN shaders s ON sv.shader_id = s.id
+            WHERE c.id = $1
+            "#,
+            id
+        )
+        .fetch_optional(db)
+        .await
+        .context(format!("failed to get capture with context '{}'", id))?
+        .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
+    }
+
+    /// Delete a capture
+    #[instrument(skip(db), level = "debug")]
+    pub async fn delete(db: &DbPool, id: &str) -> AppResult<bool> {
+        let result = sqlx::query!("DELETE FROM captures WHERE id = $1", id)
+            .execute(db)
+            .await
+            .context(format!("failed to delete capture '{}'", id))?;
+
+        Ok(result.rows_affected() > 0)
+    }
+}

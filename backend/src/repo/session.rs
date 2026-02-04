@@ -5,7 +5,7 @@ use tracing::{debug, instrument};
 
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
-use crate::models::{Session, User};
+use crate::models::{Session, SessionInfo, User};
 
 pub const SESSION_DURATION_DAYS: i64 = 7;
 
@@ -154,5 +154,33 @@ impl SessionRepo {
             debug!(user_id, count, "Deleted user sessions");
         }
         Ok(count)
+    }
+
+    /// List sessions for a user (for admin dashboard)
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_for_user(db: &DbPool, user_id: i32) -> AppResult<Vec<SessionInfo>> {
+        let sessions = sqlx::query!(
+            r#"
+            SELECT token, created_at, expires_at
+            FROM sessions
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            "#,
+            user_id
+        )
+        .fetch_all(db)
+        .await
+        .context(format!("failed to list sessions for user '{}'", user_id))?;
+
+        let infos = sessions
+            .into_iter()
+            .map(|row| SessionInfo {
+                token_prefix: row.token.chars().take(8).collect(),
+                created_at: row.created_at,
+                expires_at: row.expires_at,
+            })
+            .collect();
+
+        Ok(infos)
     }
 }

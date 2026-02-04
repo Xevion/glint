@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO pending_uploads (upload_id, slug, name, description, minecraft_version, file_hash, size_bytes, upload_key, expires_at, created_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "73806167037fc8dae4b103a8dd90614be5e5232d2abbebba98151b2c5b7edede"
+}

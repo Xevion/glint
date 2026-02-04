@@ -411,3 +411,58 @@ pub struct CreateJobRequest {
     pub profiles: Option<Vec<String>>,
     pub priority: Option<i32>,
 }
+
+// Admin dashboard request/response types
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateShaderRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub modrinth_id: Option<String>,
+    pub curseforge_id: Option<String>,
+    pub website_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateWorldRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateSceneMetadataRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateUserRoleRequest {
+    pub role: String,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct UserWithSessions {
+    #[serde(flatten)]
+    pub user: User,
+    pub sessions: Vec<SessionInfo>,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct SessionInfo {
+    pub token_prefix: String,
+    #[ts(type = "string")]
+    pub created_at: DateTime<Utc>,
+    #[ts(type = "string")]
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct SceneWithWorld {
+    #[serde(flatten)]
+    pub scene: Scene,
+    pub world_name: Option<String>,
+    pub world_slug: Option<String>,
+}

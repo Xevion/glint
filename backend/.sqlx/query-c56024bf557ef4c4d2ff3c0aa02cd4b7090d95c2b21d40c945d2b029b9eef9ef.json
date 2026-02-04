@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM shader_features WHERE shader_id = $1 AND feature_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c56024bf557ef4c4d2ff3c0aa02cd4b7090d95c2b21d40c945d2b029b9eef9ef"
+}
