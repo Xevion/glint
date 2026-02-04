@@ -171,7 +171,7 @@ class ServerConnectionScreen(
                 } else if (connectionTestResult != null) {
                     guiGraphics.drawCenteredString(
                         font,
-                        "✓ $connectionTestResult",
+                        "OK: $connectionTestResult",
                         centerX,
                         feedbackY,
                         0x00FF00,
@@ -179,7 +179,7 @@ class ServerConnectionScreen(
                 } else if (connectionTestError != null) {
                     guiGraphics.drawCenteredString(
                         font,
-                        "✗ $connectionTestError",
+                        "Error: $connectionTestError",
                         centerX,
                         feedbackY,
                         0xFF0000,
@@ -199,7 +199,7 @@ class ServerConnectionScreen(
                 val error = (validationResult as UrlValidationResult.Invalid).reason
                 guiGraphics.drawCenteredString(
                     font,
-                    "✗ $error",
+                    "Error: $error",
                     centerX,
                     feedbackY,
                     0xFF0000,

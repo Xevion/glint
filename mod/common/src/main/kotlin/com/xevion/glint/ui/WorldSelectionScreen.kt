@@ -149,7 +149,7 @@ class WorldSelectionScreen(
         } else if (loadError != null) {
             guiGraphics.drawCenteredString(
                 font,
-                "❌ $loadError",
+                "Error: $loadError",
                 centerX,
                 height / 2,
                 0xFF0000,
@@ -248,7 +248,7 @@ class WorldSelectionScreen(
                 // Description (MC version + slug) - truncate if needed
                 val description =
                     world.description?.takeIf { it.isNotBlank() }
-                        ?: "MC ${world.minecraftVersion} • ${world.slug}"
+                        ?: "MC ${world.minecraftVersion} - ${world.slug}"
 
                 val descText = truncateText(font, description, maxWidth)
                 guiGraphics.drawString(

@@ -134,7 +134,7 @@ class ApiConfigWizardScreen(
             // Current configuration
             guiGraphics.drawCenteredString(
                 font,
-                "✓ Connected to server",
+                "Connected to server",
                 centerX,
                 startY,
                 0x00FF00,

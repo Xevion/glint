@@ -42,21 +42,21 @@ class GlintHubScreen(
 
         headerRow.addChild(
             Button
-                .builder(Component.literal("🔄 Refresh")) { refreshWorlds() }
+                .builder(Component.literal("Refresh")) { refreshWorlds() }
                 .width(80)
                 .build(),
         )
 
         headerRow.addChild(
             Button
-                .builder(Component.literal("📦 New World")) { /* TODO: Stub for now */ }
+                .builder(Component.literal("New World")) { /* TODO: Stub for now */ }
                 .width(90)
                 .build(),
         )
 
         headerRow.addChild(
             Button
-                .builder(Component.literal("⚙️ Settings")) { openSettings() }
+                .builder(Component.literal("Settings")) { openSettings() }
                 .width(80)
                 .build(),
         )

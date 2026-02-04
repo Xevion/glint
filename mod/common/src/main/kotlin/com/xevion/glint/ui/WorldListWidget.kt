@@ -126,14 +126,14 @@ class WorldListWidget(
     ) : Entry() {
         private val expandButton =
             Button
-                .builder(Component.literal(if (isWorldExpanded(world.id)) "▼" else "▶")) {
+                .builder(Component.literal(if (isWorldExpanded(world.id)) "v" else ">")) {
                     toggleWorldExpanded(world.id)
                 }.width(20)
                 .build()
 
         private val openButton =
             Button
-                .builder(Component.literal("↗️")) {
+                .builder(Component.literal("[+]")) {
                     openWorld(world)
                 }.width(20)
                 .tooltip(Tooltip.create(Component.literal("Open world (download if needed)")))
@@ -141,7 +141,7 @@ class WorldListWidget(
 
         private val settingsButton =
             Button
-                .builder(Component.literal("⚙️")) {
+                .builder(Component.literal("[*]")) {
                     // TODO: World settings
                 }.width(20)
                 .tooltip(Tooltip.create(Component.literal("World settings")))
@@ -228,7 +228,7 @@ class WorldListWidget(
     ) : Entry() {
         private val teleportButton =
             Button
-                .builder(Component.literal("👁️")) {
+                .builder(Component.literal("[o]")) {
                     teleportToScene()
                 }.width(20)
                 .tooltip(Tooltip.create(Component.literal("Teleport to scene (must be in world)")))
@@ -239,15 +239,15 @@ class WorldListWidget(
 
         private val captureButton =
             Button
-                .builder(Component.literal("📸")) {
+                .builder(Component.literal("[C]")) {
                     startCapture()
                 }.width(20)
-                .tooltip(Tooltip.create(Component.literal("Test capture for this scene")))
+                .tooltip(Tooltip.create(Component.literal("Test capture for this scene (must be in world)")))
                 .build()
 
         private val syncButton =
             Button
-                .builder(Component.literal("⬆️")) {
+                .builder(Component.literal("[^]")) {
                     syncScene()
                 }.width(20)
                 .tooltip(Tooltip.create(Component.literal("Sync scene to API")))
@@ -255,7 +255,7 @@ class WorldListWidget(
 
         private val disableButton =
             Button
-                .builder(Component.literal("🗑️")) {
+                .builder(Component.literal("[X]")) {
                     disableScene()
                 }.width(20)
                 .tooltip(Tooltip.create(Component.literal("Disable scene (marks inactive on API)")))

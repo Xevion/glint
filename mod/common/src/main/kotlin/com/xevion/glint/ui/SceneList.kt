@@ -65,7 +65,7 @@ class SceneList(
     ) : Entry() {
         private val expandButton =
             Button
-                .builder(Component.literal(if (screen.isWorldExpanded(fileName)) "▼" else "▶")) {
+                .builder(Component.literal(if (screen.isWorldExpanded(fileName)) "v" else ">")) {
                     screen.toggleWorldExpanded(fileName)
                 }.width(20)
                 .build()
@@ -131,7 +131,7 @@ class SceneList(
         private val expandButton: Button? =
             if (scene.variants.isNotEmpty()) {
                 Button
-                    .builder(Component.literal(if (screen.isSceneExpanded(scene.id)) "▼" else "▶")) {
+                    .builder(Component.literal(if (screen.isSceneExpanded(scene.id)) "v" else ">")) {
                         screen.toggleSceneExpanded(scene.id)
                     }.width(16)
                     .build()
@@ -233,7 +233,7 @@ class SceneList(
             val indent = 40
             val textY = top + 12
 
-            guiGraphics.drawString(minecraft.font, "  ↳ ${variant.name}", left + indent, textY, 0xCCCCCC)
+            guiGraphics.drawString(minecraft.font, "  > ${variant.name}", left + indent, textY, 0xCCCCCC)
 
             teleportButton.setPosition(left + width - 44, top + 8)
             teleportButton.render(guiGraphics, mouseX, mouseY, delta)
