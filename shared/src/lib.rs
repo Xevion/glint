@@ -2,6 +2,8 @@
 //!
 //! These types are used for API request/response serialization.
 
+pub mod logging;
+
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};

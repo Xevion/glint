@@ -17,7 +17,6 @@ mod worker;
 use anyhow::Result;
 use clap::Parser;
 use tracing::info;
-use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
 #[command(name = "glint-agent")]
@@ -70,12 +69,8 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
-        .init();
+    // Initialize tracing with compact formatter
+    glint_shared::logging::init("info");
 
     let args = Args::parse();
 

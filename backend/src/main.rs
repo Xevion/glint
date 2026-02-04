@@ -5,7 +5,6 @@ use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
 };
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use glint_backend::{cli, config::Config, db, routes, services, state::AppState};
 
@@ -15,14 +14,8 @@ async fn main() -> anyhow::Result<()> {
     let backend_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     dotenvy::from_path(backend_dir.join(".env")).ok();
 
-    // Initialize tracing
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "glint_backend=debug,tower_http=debug".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    // Initialize tracing with compact formatter
+    glint_shared::logging::init("glint_backend=debug,tower_http=debug");
 
     // Parse CLI arguments
     let cli = cli::Cli::parse();
