@@ -2,6 +2,7 @@
 //!
 //! These types are used for API request/response serialization.
 
+pub mod cli;
 pub mod logging;
 
 use std::collections::HashMap;

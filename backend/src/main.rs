@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = cli::Cli::parse();
 
     // Initialize tracing with compact formatter
-    glint_shared::logging::init_with_verbosity(cli.verbose);
+    glint_shared::logging::init_with_verbosity(cli.verbose.verbose);
 
     // Load configuration
     let config = Config::load()?;

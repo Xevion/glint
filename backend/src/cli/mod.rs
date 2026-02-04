@@ -1,6 +1,7 @@
 pub mod seed;
 
 use clap::{Parser, Subcommand};
+use glint_shared::cli::VerboseArgs;
 
 /// Glint - Shader preview catalog and comparison tool
 #[derive(Parser, Debug)]
@@ -8,9 +9,8 @@ use clap::{Parser, Subcommand};
 #[command(about = "Backend API server for shader screenshot catalog")]
 #[command(version)]
 pub struct Cli {
-    /// Increase log verbosity (-v for debug, -vv for trace)
-    #[arg(short, long, action = clap::ArgAction::Count)]
-    pub verbose: u8,
+    #[command(flatten)]
+    pub verbose: VerboseArgs,
 
     #[command(subcommand)]
     pub command: Option<Command>,
