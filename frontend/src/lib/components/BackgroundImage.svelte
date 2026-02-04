@@ -37,6 +37,8 @@ let containerHeight = $state(2160);
 let viewportWidth = $state(1920);
 let containerEl: HTMLDivElement | undefined = $state();
 let mounted = $state(false);
+// Track if initial fade-in animation has completed (prevents re-animation on section recreation)
+let initialAnimationDone = $state(false);
 
 // Calculate the displayed height of each wallpaper section based on scale
 const sectionHeight = $derived(() => {
@@ -154,7 +156,12 @@ onMount(() => {
 		}
 	};
 
-	void preloadImages();
+	void preloadImages().then(() => {
+		// Mark initial animation as done after it completes (800ms animation duration)
+		setTimeout(() => {
+			initialAnimationDone = true;
+		}, 800);
+	});
 
 	// Use MutationObserver for height changes only (not width)
 	const observer = new MutationObserver(debouncedHeightUpdate);
@@ -195,6 +202,7 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 			{@const isLast = i === lightIndices.length - 1}
 			<div
 				class="wallpaper-section wallpaper-light"
+				class:animate-in={!initialAnimationDone}
 				style:top="{top}px"
 				style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
 				style:background-image="url({getWallpaperUrl(wallpaperIndex)})"
@@ -215,6 +223,7 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 			{@const isLast = i === darkIndices.length - 1}
 			<div
 				class="wallpaper-section wallpaper-dark"
+				class:animate-in={!initialAnimationDone}
 				style:top="{top}px"
 				style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
 				style:background-image="url({getWallpaperUrl(wallpaperIndex)})"
@@ -255,12 +264,17 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 		background-position: center;
 		background-repeat: no-repeat;
 		z-index: 0;
-		opacity: 0;
-		animation: fade-in 800ms ease-out forwards;
+		opacity: 1;
 		transition:
 			top 300ms ease-out,
 			height 300ms ease-out;
 		will-change: top, height;
+	}
+
+	/* Only animate fade-in on initial mount, not on section recreation */
+	.wallpaper-section.animate-in {
+		opacity: 0;
+		animation: fade-in 800ms ease-out forwards;
 	}
 
 	@keyframes fade-in {
@@ -315,7 +329,6 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 	.background-overlay {
 		position: absolute;
 		inset: 0;
-		top: 4rem; /* Start below header to allow header glass effect */
 		background: var(--background);
 		opacity: var(--overlay-opacity);
 		z-index: 1;
@@ -329,7 +342,6 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 	.noise-layer {
 		position: absolute;
 		inset: 0;
-		top: 4rem; /* Start below header */
 		background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='3' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
 		opacity: 0.18;
 		pointer-events: none;

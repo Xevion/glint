@@ -291,7 +291,7 @@ function getStepDescription(currentStep: Step): string {
 		<Button><Plus class="mr-2 h-4 w-4" />Create World</Button>
 	</Dialog.Trigger>
 
-	<Dialog.Content class="sm:max-w-[500px]">
+	<Dialog.Content class="sm:max-w-125">
 		<Dialog.Header>
 			<Dialog.Title>Create World</Dialog.Title>
 			<Dialog.Description>

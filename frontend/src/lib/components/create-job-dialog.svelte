@@ -159,7 +159,7 @@ let availableVersions = $derived(
 			Create Job
 		</Button>
 	</Dialog.Trigger>
-	<Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
+	<Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-150">
 		<Dialog.Header>
 			<Dialog.Title>Create New Job</Dialog.Title>
 			<Dialog.Description>

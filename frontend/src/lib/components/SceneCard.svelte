@@ -10,6 +10,7 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { comparisonStore } from '$lib/stores/comparison.svelte';
 import { cn } from '$lib/utils';
+import { Sun, Check, ArrowRight } from 'lucide-svelte';
 
 interface Props {
 	scene: Scene;
@@ -115,7 +116,7 @@ function handleCheckboxClick(e: MouseEvent) {
 
 		<!-- Gradient overlay -->
 		<div
-			class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"
+			class="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent"
 		></div>
 
 		<!-- Time badge - top left -->
@@ -123,13 +124,7 @@ function handleCheckboxClick(e: MouseEvent) {
 			<span
 				class="inline-flex items-center gap-1.5 rounded-md bg-blue-500/80 px-2 py-1 text-xs font-medium text-white capitalize shadow-sm backdrop-blur-sm"
 			>
-				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-					/>
-				</svg>
+				<Sun class="h-3 w-3" strokeWidth={2} />
 				{timeOfDay}
 			</span>
 		</div>
@@ -149,15 +144,7 @@ function handleCheckboxClick(e: MouseEvent) {
 			)}
 		>
 			{#if isSelected}
-				<svg
-					class="h-3 w-3 text-primary-foreground"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					stroke-width="3"
-				>
-					<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-				</svg>
+				<Check class="h-3 w-3 text-primary-foreground" strokeWidth={3} />
 			{/if}
 		</button>
 	</div>
@@ -235,13 +222,7 @@ function handleCheckboxClick(e: MouseEvent) {
 				class="inline-flex items-center gap-1 text-xs font-medium text-primary transition-transform group-hover:translate-x-1"
 			>
 				View
-				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
-					/>
-				</svg>
+				<ArrowRight class="h-3 w-3" strokeWidth={2} />
 			</span>
 		</div>
 	</div>

@@ -6,8 +6,10 @@ import { OverlayScrollbars } from 'overlayscrollbars';
 import type { OverlayScrollbars as OverlayScrollbarsInstance } from 'overlayscrollbars';
 import 'overlayscrollbars/overlayscrollbars.css';
 import { themeStore } from '$lib/stores/theme.svelte';
+import { initNavigation } from '$lib/stores/navigation.svelte';
 import BackgroundImage from '$lib/components/BackgroundImage.svelte';
 import Navigation from '$lib/components/Navigation.svelte';
+import Sidebar from '$lib/components/Sidebar.svelte';
 import './layout.css';
 
 interface Props {
@@ -17,6 +19,8 @@ interface Props {
 let { children }: Props = $props();
 
 let osInstance: OverlayScrollbarsInstance | null = null;
+
+initNavigation();
 
 // Update favicon when theme changes (client-side only to avoid hydration mismatch)
 $effect(() => {
@@ -61,10 +65,20 @@ onMount(() => {
 	overlayOpacity={0.7}
 	lightBrightness={1.7}
 >
-	<div class="flex min-h-screen flex-col">
-		<Navigation />
-		<main class="flex-1">
-			{@render children()}
-		</main>
+	<div class="flex min-h-screen flex-col overflow-x-hidden px-3 md:px-5">
+		<div class="w-full max-w-6xl mx-auto flex flex-col flex-1">
+			<!-- Navbar -->
+			<div class="pt-5 pb-5" style="view-transition-name: navbar">
+				<Navigation />
+			</div>
+
+			<!-- Content with contextual sidebar -->
+			<main class="flex-1 flex gap-8 pb-5">
+				<Sidebar />
+				<div class="flex-1 min-w-0" style="view-transition-name: app-content">
+					{@render children()}
+				</div>
+			</main>
+		</div>
 	</div>
 </BackgroundImage>

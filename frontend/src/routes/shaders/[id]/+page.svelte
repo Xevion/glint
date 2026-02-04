@@ -3,6 +3,7 @@ import { fly, fade, scale } from 'svelte/transition';
 import { SvelteMap } from 'svelte/reactivity';
 import { resolve } from '$app/paths';
 import { Button } from '$lib/components/ui/button';
+import { ChevronRight, ImageOff } from 'lucide-svelte';
 import type { CaptureWithContext, ShaderWithCaptures } from '$lib/bindings';
 
 interface Props {
@@ -47,9 +48,7 @@ const capturesByScene = $derived.by(() => {
 				class="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
 			>
 				<a href={resolve('/shaders', {})} class="transition-colors hover:text-foreground">Shaders</a>
-				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-				</svg>
+				<ChevronRight class="h-4 w-4" strokeWidth={2} />
 				<span class="font-medium text-foreground">{shader.name}</span>
 			</nav>
 
@@ -73,7 +72,7 @@ const capturesByScene = $derived.by(() => {
 
 							<!-- Overlay with capture info -->
 							<div
-								class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"
+								class="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent"
 							>
 								<div class="absolute right-0 bottom-0 left-0 p-4">
 									<div class="flex items-end justify-between">
@@ -98,19 +97,7 @@ const capturesByScene = $derived.by(() => {
 						{:else}
 							<div class="flex h-full items-center justify-center text-muted-foreground">
 								<div class="text-center">
-									<svg
-										class="mx-auto mb-4 h-16 w-16"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="1.5"
-											d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-										/>
-									</svg>
+									<ImageOff class="mx-auto mb-4 h-16 w-16" strokeWidth={1.5} />
 									<p class="text-sm">No captures available yet</p>
 								</div>
 							</div>
@@ -239,7 +226,7 @@ const capturesByScene = $derived.by(() => {
 										class="h-full w-full object-cover"
 									/>
 									<div
-										class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+										class="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
 									>
 										<div class="absolute right-0 bottom-0 left-0 p-3">
 											<div class="flex items-center gap-2">
@@ -268,19 +255,7 @@ const capturesByScene = $derived.by(() => {
 					in:fade|local={{ duration: 300, delay: 200 }}
 					class="mb-8 rounded-xl border border-border bg-card p-12 text-center"
 				>
-					<svg
-						class="mx-auto mb-4 h-16 w-16 text-muted-foreground/30"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="1.5"
-							d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-						/>
-					</svg>
+					<ImageOff class="mx-auto mb-4 h-16 w-16 text-muted-foreground/30" strokeWidth={1.5} />
 					<h3 class="mb-2 text-lg font-semibold text-card-foreground">No Captures Yet</h3>
 					<p class="text-sm text-muted-foreground">Captures for this shader are being generated.</p>
 				</div>

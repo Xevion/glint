@@ -1,157 +1,200 @@
 <script lang="ts">
-import { page } from '$app/stores';
-import { resolve } from '$app/paths';
-import { Sun, Moon, Settings } from '@lucide/svelte';
-import { themeStore } from '$lib/stores/theme.svelte';
+import { page } from '$app/state';
+import { navbar } from '$lib/stores/navigation.svelte';
+import { Home, Layers, GitCompare } from 'lucide-svelte';
+import ThemeToggle from './ThemeToggle.svelte';
 
-const navItems = [
-	{ href: '/' as const, label: 'Home' },
-	{ href: '/shaders' as const, label: 'Shaders' },
-	{ href: '/scenes' as const, label: 'Scenes' },
-	{ href: '/compare' as const, label: 'Compare' }
-];
+const staticTabs = [
+	{ href: '/', label: 'Home', icon: Home },
+	{ href: '/shaders', label: 'Shaders', icon: Layers },
+	{ href: '/compare', label: 'Compare', icon: GitCompare }
+] as const;
 
-function isActive(href: string): boolean {
-	if (href === '/') {
-		return $page.url.pathname === '/';
-	}
-	return $page.url.pathname.startsWith(href);
+function isActive(tabHref: string): boolean {
+	if (tabHref === '/') return page.url.pathname === '/';
+	return page.url.pathname.startsWith(tabHref);
 }
+
+/** Label expansion check using a deferred path that updates only after
+ *  view transitions finish, so CSS transitions run on visible DOM. */
+function isLabelExpanded(tabHref: string): boolean {
+	if (tabHref === '/') return navbar.path === '/';
+	return navbar.path.startsWith(tabHref);
+}
+
+// DOM refs
+let tabRefs: HTMLAnchorElement[] = $state([]);
+let containerRef: HTMLDivElement | undefined = $state();
+let pillRef: HTMLDivElement | undefined = $state();
+
+// Pill animation state — driven by JS, not CSS transitions
+let targetLeft = 0;
+let targetWidth = 0;
+let currentLeft = 0;
+let currentWidth = 0;
+let animationId: number | null = null;
+let mounted = $state(false);
+
+const ANIMATION_DURATION = 300;
+const EASING = cubicOut;
+
+function cubicOut(t: number): number {
+	const f = t - 1;
+	return f * f * f + 1;
+}
+
+function activeIndex(): number {
+	return staticTabs.findIndex((tab) => isActive(tab.href));
+}
+
+function measureActiveTab(): { left: number; width: number } | null {
+	const idx = activeIndex();
+	if (idx < 0 || !tabRefs[idx] || !containerRef) return null;
+	const containerRect = containerRef.getBoundingClientRect();
+	const tabRect = tabRefs[idx].getBoundingClientRect();
+	return {
+		left: tabRect.left - containerRect.left,
+		width: tabRect.width
+	};
+}
+
+function applyPill(left: number, width: number) {
+	if (!pillRef) return;
+	pillRef.style.transform = `translateX(${left}px)`;
+	pillRef.style.width = `${width}px`;
+	currentLeft = left;
+	currentWidth = width;
+}
+
+function animatePill(fromLeft: number, fromWidth: number, toLeft: number, toWidth: number) {
+	if (animationId !== null) {
+		cancelAnimationFrame(animationId);
+		animationId = null;
+	}
+
+	const startTime = performance.now();
+
+	function tick(now: number) {
+		const elapsed = now - startTime;
+		const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
+		const eased = EASING(progress);
+
+		const left = fromLeft + (toLeft - fromLeft) * eased;
+		const width = fromWidth + (toWidth - fromWidth) * eased;
+		applyPill(left, width);
+
+		if (progress < 1) {
+			animationId = requestAnimationFrame(tick);
+		} else {
+			animationId = null;
+		}
+	}
+
+	animationId = requestAnimationFrame(tick);
+}
+
+function updateTarget() {
+	const measured = measureActiveTab();
+	if (!measured) return;
+
+	targetLeft = measured.left;
+	targetWidth = measured.width;
+
+	if (!mounted) {
+		// First render — snap immediately, no animation
+		applyPill(targetLeft, targetWidth);
+		mounted = true;
+		return;
+	}
+
+	// Always (re)start animation from current position — handles both fresh
+	// navigations and rapid route changes that interrupt a running animation
+	if (animationId !== null) {
+		cancelAnimationFrame(animationId);
+		animationId = null;
+	}
+	animatePill(currentLeft, currentWidth, targetLeft, targetWidth);
+}
+
+function updateTargetFromResize() {
+	const measured = measureActiveTab();
+	if (!measured) return;
+
+	const newLeft = measured.left;
+	const newWidth = measured.width;
+
+	// If nothing changed, skip
+	if (newLeft === targetLeft && newWidth === targetWidth) return;
+
+	targetLeft = newLeft;
+	targetWidth = newWidth;
+
+	if (animationId !== null) {
+		// Animation in progress — retarget it smoothly by starting a new
+		// animation from the current interpolated position to the new target
+		cancelAnimationFrame(animationId);
+		animationId = null;
+		animatePill(currentLeft, currentWidth, targetLeft, targetWidth);
+	} else {
+		// No animation running — snap (this handles window resize, etc.)
+		applyPill(targetLeft, targetWidth);
+	}
+}
+
+// Start animation when route changes
+$effect(() => {
+	void page.url.pathname;
+
+	requestAnimationFrame(() => {
+		updateTarget();
+	});
+});
+
+// Track the active tab's size during label transitions and window resizes
+$effect(() => {
+	if (!containerRef) return;
+	const observer = new ResizeObserver(() => {
+		updateTargetFromResize();
+	});
+	observer.observe(containerRef);
+	for (const ref of tabRefs) {
+		if (ref) observer.observe(ref);
+	}
+	return () => observer.disconnect();
+});
 </script>
 
-<nav class="nav-header dark:border-b">
-	<div class="container mx-auto flex h-16 items-center px-4">
-		<a href={resolve('/', {})} class="glint-title mr-8 text-xl font-bold">Glint</a>
+<nav class="w-full flex items-center justify-between">
+	<div
+		class="relative flex items-center gap-1 rounded-lg bg-muted p-1"
+		bind:this={containerRef}
+	>
+			<!-- Sliding pill — animated via JS (RAF) to stay smooth even when
+			     heavy page transitions cause CSS transition skipping -->
+			<div
+				class="absolute top-1 bottom-1 left-0 rounded-md bg-background shadow-sm will-change-[transform,width]"
+				bind:this={pillRef}
+			></div>
 
-		<div class="flex flex-1 gap-6">
-			{#each navItems as item (item.href)}
+			{#each staticTabs as tab, i (tab.href)}
 				<a
-					href={resolve(item.href, {})}
-					class="nav-link text-sm font-medium transition-colors"
-					class:active={isActive(item.href)}
+					href={tab.href}
+					bind:this={tabRefs[i]}
+					class="relative z-10 flex items-center gap-1.5 rounded-md px-2 sm:px-3 py-1.5 text-sm font-medium transition-colors no-underline select-none
+            {isActive(tab.href) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}"
 				>
-					{item.label}
+					<tab.icon size={15} strokeWidth={2} />
+					<span
+						class="grid overflow-hidden transition-[grid-template-columns,opacity] duration-300 ease-in-out
+              {isLabelExpanded(tab.href)
+							? 'grid-cols-[1fr] opacity-100'
+							: 'grid-cols-[0fr] opacity-0 sm:grid-cols-[1fr] sm:opacity-100'}"
+					>
+						<span class="overflow-hidden whitespace-nowrap">{tab.label}</span>
+					</span>
 				</a>
 			{/each}
-		</div>
 
-		<div class="flex gap-2">
-			<a
-				href={resolve('/admin', {})}
-				class="nav-icon rounded-md p-2 transition-colors"
-				aria-label="Admin panel"
-			>
-				<Settings class="size-5" />
-			</a>
-			<button
-				onclick={() => {
-					themeStore.toggle();
-				}}
-				class="nav-icon rounded-md p-2 transition-colors"
-				aria-label="Toggle theme"
-			>
-				{#if themeStore.isDark}
-					<Sun class="size-5" />
-				{:else}
-					<Moon class="size-5" />
-				{/if}
-			</button>
-		</div>
+			<ThemeToggle />
 	</div>
 </nav>
-
-<style>
-	:root {
-		--glint-color-1: oklch(0.65 0.25 300);
-		--glint-color-2: oklch(0.75 0.2 320);
-	}
-
-	.glint-title {
-		position: relative;
-		color: var(--foreground);
-		background: linear-gradient(
-			110deg,
-			var(--foreground) 0%,
-			var(--foreground) 92%,
-			var(--glint-color-1) 94%,
-			var(--glint-color-2) 96%,
-			var(--glint-color-1) 98%,
-			var(--foreground) 100%
-		);
-		background-size: 900% 100%;
-		-webkit-background-clip: text;
-		background-clip: text;
-		-webkit-text-fill-color: transparent;
-		animation: glint-sweep 9s linear infinite;
-	}
-
-	@keyframes glint-sweep {
-		0% {
-			background-position: 117% 0;
-		}
-
-		15% {
-			background-position: 90% 0;
-		}
-	}
-
-	.nav-header {
-		background: oklch(1 0 0 / 76%);
-		-webkit-backdrop-filter: blur(12px);
-		backdrop-filter: blur(12px);
-	}
-
-	:global(.dark) .nav-header {
-		background: oklch(0.141 0.005 285.823 / 60%);
-	}
-
-	/* Light mode: dark text with white glow for contrast */
-	.nav-link {
-		color: oklch(0.3 0 0 / 80%);
-		text-shadow:
-			0 0 8px oklch(1 0 0 / 80%),
-			0 0 3px oklch(1 0 0 / 90%);
-	}
-
-	.nav-link:hover {
-		color: oklch(0.15 0 0);
-	}
-
-	.nav-link.active {
-		color: oklch(0.1 0 0);
-	}
-
-	.nav-icon {
-		color: oklch(0.3 0 0);
-		filter: drop-shadow(0 0 3px oklch(1 0 0 / 80%));
-	}
-
-	.nav-icon:hover {
-		color: oklch(0.15 0 0);
-		background: oklch(0 0 0 / 8%);
-	}
-
-	/* Dark mode: light text, no glow needed */
-	:global(.dark) .nav-link {
-		color: oklch(1 0 0 / 60%);
-		text-shadow: none;
-	}
-
-	:global(.dark) .nav-link:hover {
-		color: oklch(1 0 0 / 100%);
-	}
-
-	:global(.dark) .nav-link.active {
-		color: oklch(1 0 0 / 100%);
-	}
-
-	:global(.dark) .nav-icon {
-		color: oklch(1 0 0 / 60%);
-		filter: none;
-	}
-
-	:global(.dark) .nav-icon:hover {
-		color: oklch(1 0 0 / 100%);
-		background: oklch(1 0 0 / 10%);
-	}
-</style>

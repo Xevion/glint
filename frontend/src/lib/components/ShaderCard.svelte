@@ -11,6 +11,7 @@ import { resolve } from '$app/paths';
 import { comparisonStore } from '$lib/stores/comparison.svelte';
 import { cn } from '$lib/utils';
 import BrandIcon from './icons/BrandIcon.svelte';
+import { Check, Layers, ExternalLink } from 'lucide-svelte';
 
 interface Props {
 	shader: Shader;
@@ -94,7 +95,7 @@ function handleCheckboxClick(e: MouseEvent) {
 
 		<!-- Gradient overlay -->
 		<div
-			class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"
+			class="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent"
 		></div>
 
 		<!-- Compare checkbox - top right -->
@@ -112,15 +113,7 @@ function handleCheckboxClick(e: MouseEvent) {
 			)}
 		>
 			{#if isSelected}
-				<svg
-					class="h-3 w-3 text-primary-foreground"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					stroke-width="3"
-				>
-					<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-				</svg>
+				<Check class="h-3 w-3 text-primary-foreground" strokeWidth={3} />
 			{/if}
 		</button>
 	</div>
@@ -192,16 +185,7 @@ function handleCheckboxClick(e: MouseEvent) {
 
 				<!-- MC Version -->
 				<span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-					<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
-						<path
-							d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-							stroke="currentColor"
-							stroke-width="2"
-							fill="none"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						/>
-					</svg>
+					<Layers class="h-3.5 w-3.5" />
 					1.21.4
 				</span>
 			</div>
@@ -245,14 +229,7 @@ function handleCheckboxClick(e: MouseEvent) {
 						class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent"
 						title="Visit website"
 					>
-						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-							/>
-						</svg>
+						<ExternalLink class="h-4 w-4" />
 					</a>
 				{/if}
 			</div>

@@ -1,16 +1,55 @@
 /**
- * Store for managing comparison selection state across shader and scene cards.
- * Tracks which items are selected for comparison and provides reactive state
- * for UI behavior changes (checkbox visibility, click behavior, etc.)
+ * Store for managing shader comparison state.
+ *
+ * Provides two APIs:
+ * 1. New: Typed left/right Shader slots for the compare page
+ * 2. Legacy: Selection-based toggle API for card components (Phase 2 will migrate these)
  */
 
+import type { Shader } from '$lib/bindings';
 import { SvelteSet } from 'svelte/reactivity';
 
 function createComparisonStore() {
+	// New API: typed comparison slots
+	let leftShader = $state<Shader | null>(null);
+	let rightShader = $state<Shader | null>(null);
+
+	// Legacy API: selection sets for card multi-select behavior
 	const selectedShaders = new SvelteSet<string>();
 	const selectedScenes = new SvelteSet<string>();
 
 	return {
+		// === New API (typed slots) ===
+		get left(): Shader | null {
+			return leftShader;
+		},
+		get right(): Shader | null {
+			return rightShader;
+		},
+		get canCompare(): boolean {
+			return leftShader !== null && rightShader !== null;
+		},
+
+		setLeft(shader: Shader | null) {
+			leftShader = shader;
+		},
+
+		setRight(shader: Shader | null) {
+			rightShader = shader;
+		},
+
+		swap() {
+			const temp = leftShader;
+			leftShader = rightShader;
+			rightShader = temp;
+		},
+
+		clear() {
+			leftShader = null;
+			rightShader = null;
+		},
+
+		// === Legacy API (selection sets) - will be removed in Phase 2 ===
 		get selectedShaders() {
 			return selectedShaders;
 		},
@@ -65,6 +104,8 @@ function createComparisonStore() {
 		clearAll() {
 			selectedShaders.clear();
 			selectedScenes.clear();
+			leftShader = null;
+			rightShader = null;
 		}
 	};
 }

@@ -6,8 +6,10 @@ import { sveltePhosphorOptimize } from 'phosphor-svelte/vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit(), sveltePhosphorOptimize(), devtoolsJson()],
-
 	server: {
+		watch: {
+			ignored: ['**/.svelte-kit/generated/**']
+		},
 		proxy: {
 			'/api': { target: 'http://localhost:8080', changeOrigin: true },
 			'/health': { target: 'http://localhost:8080', changeOrigin: true }

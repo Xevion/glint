@@ -178,3 +178,110 @@
 .dark .card-glow:hover {
 	--glow-opacity: 0.15;
 }
+
+/* View Transitions API - Theme Toggle Animation */
+/* Suppress all named view-transition elements during theme transition */
+.theme-transitioning * {
+	view-transition-name: none !important;
+}
+
+/* View Transitions — page navigation animations
+ * Animations target app-content (not root) so background stays stable.
+ * Navbar is excluded from transitions entirely.
+ */
+
+/* Suppress root and navbar animations - only content should animate */
+::view-transition-group(root),
+::view-transition-group(navbar),
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-old(navbar),
+::view-transition-new(navbar) {
+	animation: none !important;
+}
+
+/* Content slide animations */
+@keyframes vt-slide-out-left {
+	from {
+		opacity: 1;
+		transform: translateX(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateX(-40px);
+	}
+}
+
+@keyframes vt-slide-in-right {
+	from {
+		opacity: 0;
+		transform: translateX(40px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes vt-slide-out-right {
+	from {
+		opacity: 1;
+		transform: translateX(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateX(40px);
+	}
+}
+
+@keyframes vt-slide-in-left {
+	from {
+		opacity: 0;
+		transform: translateX(-40px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes vt-crossfade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes vt-crossfade-out {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
+/* Default: crossfade for unknown routes */
+:root:not([data-nav-direction]) ::view-transition-old(app-content) {
+	animation: vt-crossfade-out 400ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+:root:not([data-nav-direction]) ::view-transition-new(app-content) {
+	animation: vt-crossfade-in 400ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Apply slide animations to content based on direction */
+:root[data-nav-direction="left"] ::view-transition-old(app-content) {
+	animation: vt-slide-out-left 400ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+:root[data-nav-direction="left"] ::view-transition-new(app-content) {
+	animation: vt-slide-in-right 400ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+:root[data-nav-direction="right"] ::view-transition-old(app-content) {
+	animation: vt-slide-out-right 400ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+:root[data-nav-direction="right"] ::view-transition-new(app-content) {
+	animation: vt-slide-in-left 400ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}

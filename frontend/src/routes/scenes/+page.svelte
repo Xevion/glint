@@ -2,6 +2,7 @@
 import { fly, fade, scale } from 'svelte/transition';
 import { Button } from '$lib/components/ui/button';
 import SceneCard from '$lib/components/SceneCard.svelte';
+import { Search } from 'lucide-svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -33,20 +34,11 @@ const hasFilters = $derived(searchQuery !== '');
 	<div in:fly={{ y: 10, duration: 400, delay: 100 }} class="mb-6 space-y-4 rounded-xl bg-card p-4">
 		<div class="flex flex-wrap items-center gap-4">
 			<!-- Search -->
-			<div class="relative min-w-[200px] flex-1">
-				<svg
+			<div class="relative min-w-50 flex-1">
+				<Search
 					class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-					/>
-				</svg>
+					strokeWidth={2}
+				/>
 				<input
 					type="text"
 					placeholder="Search scenes..."
@@ -89,19 +81,7 @@ const hasFilters = $derived(searchQuery !== '');
 		</div>
 	{:else}
 		<div class="flex flex-col items-center justify-center py-16 text-center">
-			<svg
-				class="mb-4 h-16 w-16 text-muted-foreground/50"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-				stroke-width="1.5"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-				/>
-			</svg>
+			<Search class="mb-4 h-16 w-16 text-muted-foreground/50" strokeWidth={1.5} />
 			<h3 class="text-lg font-semibold text-muted-foreground">No scenes found</h3>
 			<p class="mt-1 text-sm text-muted-foreground/70">Try adjusting your filters</p>
 		</div>
