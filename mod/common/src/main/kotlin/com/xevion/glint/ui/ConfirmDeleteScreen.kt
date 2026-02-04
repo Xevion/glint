@@ -1,62 +1,36 @@
 package com.xevion.glint.ui
 
-import net.minecraft.client.gui.GuiGraphics
-import net.minecraft.client.gui.components.Button
-import net.minecraft.client.gui.screens.Screen
-import net.minecraft.network.chat.CommonComponents
-import net.minecraft.network.chat.Component
+import com.xevion.glint.ui.base.GlintComponents
+import com.xevion.glint.ui.base.GlintDialogScreen
+import com.xevion.glint.ui.base.GlintTheme
+import io.wispforest.owo.ui.container.FlowLayout
+import io.wispforest.owo.ui.core.Component
+import net.minecraft.network.chat.Component as McComponent
 
 class ConfirmDeleteScreen(
     private val parent: SceneManagerScreen,
     private val worldName: String,
     private val sceneId: String,
     private val sceneName: String,
-) : Screen(Component.literal("Disable Scene?")) {
-    override fun init() {
-        val yPos = height / 2 - 20
+) : GlintDialogScreen(McComponent.literal("Disable Scene?")) {
+    override fun buildDialog(dialog: FlowLayout) {
+        dialog.child(GlintComponents.title(title) as Component)
 
-        addRenderableWidget(
-            Button
-                .builder(Component.literal("Disable Scene")) {
+        dialog.child(
+            GlintComponents.textBlock(
+                McComponent.literal("Are you sure you want to disable '$sceneName'?") to GlintTheme.TEXT_PRIMARY,
+                McComponent.literal("This will remove it locally and mark it inactive on the API.") to GlintTheme.TEXT_MUTED,
+            ) as Component,
+        )
+
+        dialog.child(
+            GlintComponents.buttonRow(
+                GlintComponents.button(McComponent.literal("Disable Scene")) {
                     parent.executeDeleteScene(worldName, sceneId)
                     minecraft?.setScreen(parent)
-                }.bounds(width / 2 - 105, yPos, 100, 20)
-                .build(),
+                },
+                GlintComponents.cancelButton { minecraft?.setScreen(parent) },
+            ) as Component,
         )
-
-        addRenderableWidget(
-            Button
-                .builder(CommonComponents.GUI_CANCEL) {
-                    minecraft?.setScreen(parent)
-                }.bounds(width / 2 + 5, yPos, 100, 20)
-                .build(),
-        )
-    }
-
-    override fun render(
-        guiGraphics: GuiGraphics,
-        mouseX: Int,
-        mouseY: Int,
-        delta: Float,
-    ) {
-        renderBackground(guiGraphics, mouseX, mouseY, delta)
-        guiGraphics.drawCenteredString(font, title, width / 2, height / 2 - 50, 0xFFFFFF)
-
-        guiGraphics.drawCenteredString(
-            font,
-            "Are you sure you want to disable '$sceneName'?",
-            width / 2,
-            height / 2 - 30,
-            0xFFFFFF,
-        )
-        guiGraphics.drawCenteredString(
-            font,
-            "This will remove it locally and mark it inactive on the API.",
-            width / 2,
-            height / 2 - 18,
-            0x888888,
-        )
-
-        super.render(guiGraphics, mouseX, mouseY, delta)
     }
 }

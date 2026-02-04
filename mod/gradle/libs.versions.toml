@@ -17,6 +17,10 @@ sodium = "mc1.21.4-0.6.13-fabric"
 jcpp = "1.4.14"
 glsl-transformer = "2.0.1"
 
+# owo-lib UI framework
+owo-fabric = "0.12.19+1.21.4"
+owo-neoforge = "0.12.19-beta.1+1.21.4"
+
 kotlin = "2.2.21"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.8.0"
@@ -51,6 +55,10 @@ iris = { module = "maven.modrinth:iris", version.ref = "iris" }
 sodium = { module = "maven.modrinth:sodium", version.ref = "sodium" }
 jcpp = { module = "org.anarres:jcpp", version.ref = "jcpp" }
 glsl-transformer = { module = "io.github.douira:glsl-transformer", version.ref = "glsl-transformer" }
+
+# owo-lib UI framework
+owo-fabric = { module = "io.wispforest:owo-lib", version.ref = "owo-fabric" }
+owo-neoforge = { module = "io.wispforest:owo-lib-neoforge", version.ref = "owo-neoforge" }
 
 [plugins]
 architectury = { id = "architectury-plugin", version.ref = "architectury-plugin" }

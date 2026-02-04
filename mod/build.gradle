@@ -31,6 +31,8 @@ allprojects {
         maven { url = 'https://thedarkcolour.github.io/KotlinForForge/' }
         // Iris Shaders - for API access
         maven { url = 'https://api.modrinth.com/maven' }
+        // owo-lib UI framework
+        maven { url = 'https://maven.wispforest.io/releases' }
     }
 
     tasks.withType(JavaCompile).configureEach {

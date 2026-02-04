@@ -3,11 +3,21 @@ package com.xevion.glint.ui
 import com.xevion.glint.Glint
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.DeviceTokenResponse
-import net.minecraft.client.gui.GuiGraphics
-import net.minecraft.client.gui.components.Button
+import com.xevion.glint.ui.base.GlintComponents
+import com.xevion.glint.ui.base.GlintScreen
+import com.xevion.glint.ui.base.GlintTheme
+import io.wispforest.owo.ui.component.ButtonComponent
+import io.wispforest.owo.ui.component.Components
+import io.wispforest.owo.ui.container.Containers
+import io.wispforest.owo.ui.container.FlowLayout
+import io.wispforest.owo.ui.core.Color
+import io.wispforest.owo.ui.core.Component
+import io.wispforest.owo.ui.core.HorizontalAlignment
+import io.wispforest.owo.ui.core.Sizing
+import io.wispforest.owo.ui.core.Surface
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.CommonComponents
-import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.Component as McComponent
 
 /**
  * Entry point for API configuration.
@@ -21,14 +31,26 @@ import net.minecraft.network.chat.Component
 class ApiConfigWizardScreen(
     private val parent: Screen,
     private val showConnectionFirst: Boolean = false,
-) : Screen(Component.literal("API Configuration")) {
+) : GlintScreen(McComponent.literal("API Configuration")) {
     private val config: ApiConfig = ApiConfig.load()
 
     // Store token response from device auth for world selection
     private var pendingToken: DeviceTokenResponse? = null
     private var pendingServerUrl: String? = null
 
+    override fun buildContent(root: FlowLayout) {
+        // This screen immediately forwards to another screen
+        // But we still need to build something for the brief moment it's shown
+        root.child(
+            Components
+                .label(McComponent.literal("Loading..."))
+                .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
+        )
+    }
+
     override fun init() {
+        super.init()
+
         // If no config or forced to show connection first, start wizard flow
         if (showConnectionFirst || !config.validated) {
             showConnectionScreen()
@@ -84,54 +106,84 @@ class ApiConfigWizardScreen(
         minecraft?.setScreen(ConfigEditScreen(parent, config))
     }
 
-    override fun render(
-        guiGraphics: GuiGraphics,
-        mouseX: Int,
-        mouseY: Int,
-        delta: Float,
-    ) {
-        // This screen immediately forwards to another screen, so no rendering needed
-        super.render(guiGraphics, mouseX, mouseY, delta)
-    }
-
     /**
      * Edit screen for already-configured API connection.
      */
     private inner class ConfigEditScreen(
-        private val parent: Screen,
-        private val config: ApiConfig,
-    ) : Screen(Component.literal("API Configuration")) {
-        private lateinit var changeServerButton: Button
-        private lateinit var disableButton: Button
-        private lateinit var doneButton: Button
+        private val parentScreen: Screen,
+        private val apiConfig: ApiConfig,
+    ) : GlintScreen(McComponent.literal("API Configuration")) {
+        private lateinit var changeServerButton: ButtonComponent
+        private lateinit var disableButton: ButtonComponent
+        private lateinit var doneButton: ButtonComponent
 
-        override fun init() {
-            val centerX = width / 2
-            val startY = height / 2 - 40
+        override fun buildContent(root: FlowLayout) {
+            val content = Containers.verticalFlow(Sizing.content(), Sizing.content())
+            content.horizontalAlignment(HorizontalAlignment.CENTER)
+            content.gap(GlintTheme.GAP_MD)
+            content.padding(GlintTheme.paddingLg())
+            content.surface(Surface.DARK_PANEL)
 
-            // Change Server button (starts wizard flow)
-            changeServerButton =
-                Button
-                    .builder(Component.literal("Change Server")) { showConnectionScreen() }
-                    .bounds(centerX - 155, startY + 60, 310, 20)
-                    .build()
-            addRenderableWidget(changeServerButton)
+            // Title
+            content.child(GlintComponents.title(title) as Component)
 
-            // Disable Sync button
-            disableButton =
-                Button
-                    .builder(Component.literal("Disable Sync")) { disableSync() }
-                    .bounds(centerX - 155, startY + 85, 310, 20)
-                    .build()
-            addRenderableWidget(disableButton)
+            // Status
+            content.child(
+                Components
+                    .label(McComponent.literal("Connected to server"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_SUCCESS)) as Component,
+            )
 
-            // Done button
-            doneButton =
-                Button
-                    .builder(CommonComponents.GUI_DONE) { minecraft?.setScreen(parent) }
-                    .bounds(centerX - 75, startY + 120, 150, 20)
-                    .build()
-            addRenderableWidget(doneButton)
+            // Config info
+            val infoSection = Containers.verticalFlow(Sizing.content(), Sizing.content())
+            infoSection.horizontalAlignment(HorizontalAlignment.LEFT)
+            infoSection.gap(GlintTheme.GAP_SM)
+
+            // Server URL
+            infoSection.child(
+                Components
+                    .label(McComponent.literal("Server URL:"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            infoSection.child(
+                Components
+                    .label(McComponent.literal(apiConfig.apiUrl))
+                    .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
+            )
+
+            // World
+            infoSection.child(
+                Components
+                    .label(McComponent.literal("Selected World:"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            val worldDisplay =
+                if (apiConfig.worldName.isNotEmpty()) {
+                    "${apiConfig.worldName} (${apiConfig.worldId.take(8)}...)"
+                } else {
+                    apiConfig.worldId.take(16) + "..."
+                }
+            infoSection.child(
+                Components
+                    .label(McComponent.literal(worldDisplay))
+                    .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
+            )
+
+            content.child(infoSection as Component)
+
+            // Buttons
+            changeServerButton = Components.button(McComponent.literal("Change Server")) { showConnectionScreen() }
+            (changeServerButton as Component).horizontalSizing(Sizing.fixed(310))
+            content.child(changeServerButton as Component)
+
+            disableButton = Components.button(McComponent.literal("Disable Sync")) { disableSync() }
+            (disableButton as Component).horizontalSizing(Sizing.fixed(310))
+            content.child(disableButton as Component)
+
+            doneButton = GlintComponents.wideButton(CommonComponents.GUI_DONE) { minecraft?.setScreen(parentScreen) }
+            content.child(doneButton as Component)
+
+            root.child(content as Component)
         }
 
         private fun disableSync() {
@@ -145,68 +197,8 @@ class ApiConfigWizardScreen(
                 )
             if (ApiConfig.save(disabledConfig)) {
                 Glint.LOGGER.info("API sync disabled")
-                minecraft?.setScreen(parent)
+                minecraft?.setScreen(parentScreen)
             }
-        }
-
-        override fun render(
-            guiGraphics: GuiGraphics,
-            mouseX: Int,
-            mouseY: Int,
-            delta: Float,
-        ) {
-            renderBackground(guiGraphics, mouseX, mouseY, delta)
-            guiGraphics.drawCenteredString(font, title, width / 2, height / 2 - 70, 0xFFFFFF)
-
-            val centerX = width / 2
-            val startY = height / 2 - 40
-
-            // Current configuration
-            guiGraphics.drawCenteredString(
-                font,
-                "Connected to server",
-                centerX,
-                startY,
-                0x00FF00,
-            )
-
-            guiGraphics.drawString(
-                font,
-                "Server URL:",
-                centerX - 150,
-                startY + 20,
-                0xAAAAAA,
-            )
-            guiGraphics.drawString(
-                font,
-                config.apiUrl,
-                centerX - 150,
-                startY + 32,
-                0xFFFFFF,
-            )
-
-            guiGraphics.drawString(
-                font,
-                "Selected World:",
-                centerX - 150,
-                startY + 44,
-                0xAAAAAA,
-            )
-            val worldDisplay =
-                if (config.worldName.isNotEmpty()) {
-                    "${config.worldName} (${config.worldId.take(8)}...)"
-                } else {
-                    config.worldId.take(16) + "..."
-                }
-            guiGraphics.drawString(
-                font,
-                worldDisplay,
-                centerX - 150,
-                startY + 56,
-                0xFFFFFF,
-            )
-
-            super.render(guiGraphics, mouseX, mouseY, delta)
         }
     }
 }

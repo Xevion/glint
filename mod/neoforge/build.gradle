@@ -36,6 +36,11 @@ dependencies {
     include libs.kotlinx.coroutines.core
     include libs.kotlinx.serialization.core
     include libs.kotlinx.serialization.json
+
+    // owo-lib UI framework
+    api libs.owo.neoforge
+    annotationProcessor libs.owo.neoforge
+    include libs.owo.neoforge
 }
 
 processResources {

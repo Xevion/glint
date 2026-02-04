@@ -2,12 +2,23 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.Glint
 import com.xevion.glint.download.DownloadProgress
-import net.minecraft.client.gui.GuiGraphics
-import net.minecraft.client.gui.components.Button
+import com.xevion.glint.ui.base.GlintComponents
+import com.xevion.glint.ui.base.GlintDialogScreen
+import com.xevion.glint.ui.base.GlintTheme
+import io.wispforest.owo.ui.component.BoxComponent
+import io.wispforest.owo.ui.component.Components
+import io.wispforest.owo.ui.component.LabelComponent
+import io.wispforest.owo.ui.container.Containers
+import io.wispforest.owo.ui.container.FlowLayout
+import io.wispforest.owo.ui.core.Color
+import io.wispforest.owo.ui.core.Component
+import io.wispforest.owo.ui.core.HorizontalAlignment
+import io.wispforest.owo.ui.core.Insets
+import io.wispforest.owo.ui.core.Sizing
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.CommonComponents
-import net.minecraft.network.chat.Component
 import java.util.concurrent.CompletableFuture
+import net.minecraft.network.chat.Component as McComponent
 
 /**
  * Dialog showing world download progress.
@@ -16,21 +27,70 @@ class WorldDownloadDialog(
     private val parent: Screen,
     private val worldName: String,
     private val downloadFuture: CompletableFuture<String>,
-) : Screen(Component.literal("Downloading World")) {
+) : GlintDialogScreen(McComponent.literal("Downloading World")) {
     private var currentProgress: DownloadProgress = DownloadProgress.downloading(0, 0)
     private var cancelled = false
 
-    override fun init() {
-        val centerX = width / 2
-        val buttonY = height / 2 + 60
+    private lateinit var statusLabel: LabelComponent
+    private lateinit var progressBar: BoxComponent
+    private lateinit var progressBarBackground: BoxComponent
+    private lateinit var progressText: LabelComponent
+    private lateinit var bytesLabel: LabelComponent
+    private lateinit var progressContainer: FlowLayout
 
-        addRenderableWidget(
-            Button
-                .builder(CommonComponents.GUI_CANCEL) { cancel() }
-                .bounds(centerX - 50, buttonY, 100, 20)
-                .build(),
+    override fun buildDialog(dialog: FlowLayout) {
+        // Title
+        dialog.child(
+            Components
+                .label(McComponent.literal("Downloading: $worldName"))
+                .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
         )
 
+        // Progress container
+        progressContainer = Containers.verticalFlow(Sizing.content(), Sizing.content())
+        progressContainer.horizontalAlignment(HorizontalAlignment.CENTER)
+        progressContainer.gap(GlintTheme.GAP_SM)
+
+        // Progress bar (stacked layers)
+        val barContainer = Containers.stack(Sizing.fixed(200), Sizing.fixed(20))
+
+        progressBarBackground = Components.box(Sizing.fill(100), Sizing.fill(100))
+        progressBarBackground.color(Color.ofRgb(0x333333))
+        progressBarBackground.fill(true)
+
+        progressBar = Components.box(Sizing.fill(0), Sizing.fill(100))
+        progressBar.color(Color.ofRgb(0x00AA00))
+        progressBar.fill(true)
+
+        barContainer.child(progressBarBackground as Component)
+        barContainer.child(progressBar as Component)
+
+        progressContainer.child(barContainer as Component)
+
+        // Progress percentage
+        progressText = Components.label(McComponent.literal("0%"))
+        progressText.color(Color.ofRgb(GlintTheme.TEXT_PRIMARY))
+        progressContainer.child(progressText as Component)
+
+        // Bytes label
+        bytesLabel = Components.label(McComponent.literal("0 MB / 0 MB"))
+        bytesLabel.color(Color.ofRgb(GlintTheme.TEXT_SECONDARY))
+        progressContainer.child(bytesLabel as Component)
+
+        dialog.child(progressContainer as Component)
+
+        // Status label (for extracting/failed states)
+        statusLabel = Components.label(McComponent.literal(""))
+        statusLabel.color(Color.ofRgb(GlintTheme.TEXT_WARNING))
+        statusLabel.margins(Insets.top(GlintTheme.GAP_SM))
+        dialog.child(statusLabel as Component)
+
+        // Cancel button
+        dialog.child(
+            GlintComponents.button(CommonComponents.GUI_CANCEL) { cancel() } as Component,
+        )
+
+        // Start listening for download completion
         downloadFuture
             .thenAccept { worldPath ->
                 minecraft?.execute {
@@ -48,79 +108,34 @@ class WorldDownloadDialog(
             }
     }
 
-    override fun render(
-        guiGraphics: GuiGraphics,
-        mouseX: Int,
-        mouseY: Int,
-        delta: Float,
-    ) {
-        renderBackground(guiGraphics, mouseX, mouseY, delta)
-        super.render(guiGraphics, mouseX, mouseY, delta)
+    override fun tick() {
+        super.tick()
+        updateProgressDisplay()
+    }
 
-        val centerX = width / 2
-        val centerY = height / 2
-
-        guiGraphics.drawCenteredString(
-            font,
-            "Downloading: $worldName",
-            centerX,
-            centerY - 40,
-            0xFFFFFF,
-        )
-
+    private fun updateProgressDisplay() {
         when (currentProgress.state) {
             DownloadProgress.State.DOWNLOADING -> {
                 val progress = currentProgress.percentComplete
-                val barWidth = 200
-                val barHeight = 20
-                val barX = centerX - barWidth / 2
-                val barY = centerY - 10
-
-                guiGraphics.fill(barX, barY, barX + barWidth, barY + barHeight, 0xFF333333.toInt())
-
-                val fillWidth = (barWidth * progress / 100).coerceIn(0, barWidth)
-                guiGraphics.fill(barX, barY, barX + fillWidth, barY + barHeight, 0xFF00AA00.toInt())
-
-                guiGraphics.drawCenteredString(
-                    font,
-                    "$progress%",
-                    centerX,
-                    centerY - 5,
-                    0xFFFFFF,
-                )
+                (progressBar as Component).horizontalSizing(Sizing.fill(progress.coerceIn(0, 100)))
+                progressText.text(McComponent.literal("$progress%"))
 
                 val mbDownloaded = currentProgress.bytesDownloaded / (1024 * 1024)
                 val mbTotal = currentProgress.totalBytes / (1024 * 1024)
-                guiGraphics.drawCenteredString(
-                    font,
-                    "$mbDownloaded MB / $mbTotal MB",
-                    centerX,
-                    centerY + 20,
-                    0xAAAAAA,
-                )
-            }
+                bytesLabel.text(McComponent.literal("$mbDownloaded MB / $mbTotal MB"))
 
+                statusLabel.text(McComponent.literal(""))
+            }
             DownloadProgress.State.EXTRACTING -> {
-                guiGraphics.drawCenteredString(
-                    font,
-                    "Extracting world files...",
-                    centerX,
-                    centerY,
-                    0xFFAA00,
-                )
+                statusLabel.text(McComponent.literal("Extracting world files..."))
+                statusLabel.color(Color.ofRgb(GlintTheme.TEXT_WARNING))
             }
-
             DownloadProgress.State.COMPLETE -> {
+                statusLabel.text(McComponent.literal(""))
             }
-
             DownloadProgress.State.FAILED -> {
-                guiGraphics.drawCenteredString(
-                    font,
-                    "Download failed!",
-                    centerX,
-                    centerY,
-                    0xFF0000,
-                )
+                statusLabel.text(McComponent.literal("Download failed!"))
+                statusLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
             }
         }
     }

@@ -5,78 +5,108 @@ import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.screenshot.Camera
 import com.xevion.glint.screenshot.Position
+import com.xevion.glint.ui.base.GlintComponents
+import com.xevion.glint.ui.base.GlintDialogScreen
+import com.xevion.glint.ui.base.GlintTheme
+import io.wispforest.owo.ui.component.ButtonComponent
+import io.wispforest.owo.ui.component.Components
+import io.wispforest.owo.ui.component.LabelComponent
+import io.wispforest.owo.ui.component.TextBoxComponent
+import io.wispforest.owo.ui.container.Containers
+import io.wispforest.owo.ui.container.FlowLayout
+import io.wispforest.owo.ui.core.Color
+import io.wispforest.owo.ui.core.Component
+import io.wispforest.owo.ui.core.HorizontalAlignment
+import io.wispforest.owo.ui.core.Insets
+import io.wispforest.owo.ui.core.Sizing
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiGraphics
-import net.minecraft.client.gui.components.Button
-import net.minecraft.client.gui.components.EditBox
-import net.minecraft.client.gui.screens.Screen
-import net.minecraft.network.chat.CommonComponents
-import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.Component as McComponent
 
 class SaveSceneDialog(
     private val parent: SceneManagerScreen,
-) : Screen(Component.literal("Save Current Scene")) {
-    private lateinit var sceneIdInput: EditBox
-    private lateinit var sceneNameInput: EditBox
-    private lateinit var saveButton: Button
-    private var errorMessage: String? = null
+) : GlintDialogScreen(McComponent.literal("Save Current Scene")) {
+    private lateinit var sceneIdInput: TextBoxComponent
+    private lateinit var sceneNameInput: TextBoxComponent
+    private lateinit var saveButton: ButtonComponent
+    private lateinit var errorLabel: LabelComponent
 
-    override fun init() {
-        val centerX = width / 2
-        val startY = height / 2 - 60
+    override fun buildDialog(dialog: FlowLayout) {
+        dialog.child(GlintComponents.title(title) as Component)
 
-        sceneIdInput =
-            EditBox(font, centerX - 100, startY, 200, 20, Component.literal("Scene ID"))
-        sceneIdInput.setHint(Component.literal("scene_id (e.g., village_sunset)"))
+        // Scene ID input
+        val idContainer = Containers.verticalFlow(Sizing.content(), Sizing.content())
+        idContainer.horizontalAlignment(HorizontalAlignment.LEFT)
+        idContainer.gap(GlintTheme.GAP_SM)
+        idContainer.child(
+            Components
+                .label(McComponent.literal("Scene ID:"))
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+        )
+        sceneIdInput = Components.textBox(Sizing.fixed(200))
         sceneIdInput.setMaxLength(64)
-        sceneIdInput.setResponder { validateInput() }
-        addRenderableWidget(sceneIdInput)
+        sceneIdInput.setSuggestion("scene_id (e.g., village_sunset)")
+        sceneIdInput.onChanged().subscribe { validateInput() }
+        idContainer.child(sceneIdInput as Component)
+        dialog.child(idContainer as Component)
 
-        sceneNameInput =
-            EditBox(font, centerX - 100, startY + 40, 200, 20, Component.literal("Scene Name"))
-        sceneNameInput.setHint(Component.literal("Display name (optional)"))
+        // Scene Name input
+        val nameContainer = Containers.verticalFlow(Sizing.content(), Sizing.content())
+        nameContainer.horizontalAlignment(HorizontalAlignment.LEFT)
+        nameContainer.gap(GlintTheme.GAP_SM)
+        nameContainer.child(
+            Components
+                .label(McComponent.literal("Scene Name:"))
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+        )
+        sceneNameInput = Components.textBox(Sizing.fixed(200))
         sceneNameInput.setMaxLength(128)
-        addRenderableWidget(sceneNameInput)
+        sceneNameInput.setSuggestion("Display name (optional)")
+        nameContainer.child(sceneNameInput as Component)
+        dialog.child(nameContainer as Component)
 
-        saveButton =
-            Button
-                .builder(Component.literal("Save")) { saveScene() }
-                .bounds(centerX - 105, startY + 80, 100, 20)
-                .build()
+        // Error label
+        errorLabel = Components.label(McComponent.literal(""))
+        errorLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
+        errorLabel.margins(Insets.top(GlintTheme.GAP_SM))
+        dialog.child(errorLabel as Component)
+
+        // Buttons
+        saveButton = GlintComponents.button(McComponent.literal("Save")) { saveScene() }
         saveButton.active = false
-        addRenderableWidget(saveButton)
-
-        addRenderableWidget(
-            Button
-                .builder(CommonComponents.GUI_CANCEL) { minecraft?.setScreen(parent) }
-                .bounds(centerX + 5, startY + 80, 100, 20)
-                .build(),
+        dialog.child(
+            GlintComponents.buttonRow(
+                saveButton,
+                GlintComponents.cancelButton { minecraft?.setScreen(parent) },
+            ) as Component,
         )
 
-        setFocused(sceneIdInput)
+        // Focus the first input
+        val input = sceneIdInput
+        uiAdapter.rootComponent.focusHandler()?.focus(input as Component, null)
     }
 
     private fun validateInput() {
         val id = sceneIdInput.value.trim()
-        errorMessage = null
 
         if (id.isEmpty()) {
+            errorLabel.text(McComponent.literal(""))
             saveButton.active = false
             return
         }
 
         if (!id.matches(Regex("[a-z0-9_]+"))) {
-            errorMessage = "ID must contain only lowercase letters, numbers, and underscores"
+            errorLabel.text(McComponent.literal("ID must contain only lowercase letters, numbers, and underscores"))
             saveButton.active = false
             return
         }
 
         if (SceneManager.sceneIdExists(id)) {
-            errorMessage = "Scene ID '$id' already exists"
+            errorLabel.text(McComponent.literal("Scene ID '$id' already exists"))
             saveButton.active = false
             return
         }
 
+        errorLabel.text(McComponent.literal(""))
         saveButton.active = true
     }
 
@@ -127,28 +157,5 @@ class SaveSceneDialog(
         } else {
             Glint.LOGGER.error("Failed to save scene: $sceneId")
         }
-    }
-
-    override fun render(
-        guiGraphics: GuiGraphics,
-        mouseX: Int,
-        mouseY: Int,
-        delta: Float,
-    ) {
-        renderBackground(guiGraphics, mouseX, mouseY, delta)
-        guiGraphics.drawCenteredString(font, title, width / 2, height / 2 - 90, 0xFFFFFF)
-
-        val centerX = width / 2
-        val startY = height / 2 - 60
-
-        guiGraphics.drawString(font, "Scene ID:", centerX - 100, startY - 12, 0xAAAAAA)
-        guiGraphics.drawString(font, "Scene Name:", centerX - 100, startY + 28, 0xAAAAAA)
-
-        // Draw error message if present
-        errorMessage?.let { error ->
-            guiGraphics.drawCenteredString(font, error, centerX, startY + 105, 0xFF5555)
-        }
-
-        super.render(guiGraphics, mouseX, mouseY, delta)
     }
 }

@@ -23,4 +23,9 @@ dependencies {
 
     // Iris integration - compile-time only, not bundled
     modCompileOnly libs.iris
+
+    // owo-lib UI framework - use Fabric version in common since both platforms share the same API
+    modCompileOnlyApi(libs.owo.fabric) {
+        exclude group: 'net.fabricmc.fabric-api'
+    }
 }

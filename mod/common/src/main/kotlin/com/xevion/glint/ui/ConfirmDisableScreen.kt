@@ -2,11 +2,13 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.Glint
 import com.xevion.glint.scene.SceneManager
-import net.minecraft.client.gui.GuiGraphics
-import net.minecraft.client.gui.components.Button
+import com.xevion.glint.ui.base.GlintComponents
+import com.xevion.glint.ui.base.GlintDialogScreen
+import com.xevion.glint.ui.base.GlintTheme
+import io.wispforest.owo.ui.container.FlowLayout
+import io.wispforest.owo.ui.core.Component
 import net.minecraft.client.gui.screens.Screen
-import net.minecraft.network.chat.CommonComponents
-import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.Component as McComponent
 
 /**
  * Confirmation dialog for disabling a scene.
@@ -17,49 +19,22 @@ class ConfirmDisableScreen(
     private val worldFileName: String,
     private val sceneId: String,
     private val sceneName: String,
-) : Screen(Component.literal("Disable Scene?")) {
-    override fun init() {
-        val centerX = width / 2
-        val buttonY = height / 2 + 40
+) : GlintDialogScreen(McComponent.literal("Disable Scene?")) {
+    override fun buildDialog(dialog: FlowLayout) {
+        dialog.child(GlintComponents.title(title) as Component)
 
-        addRenderableWidget(
-            Button
-                .builder(Component.literal("Disable Scene")) { executeDisable() }
-                .bounds(centerX - 155, buttonY, 150, 20)
-                .build(),
+        dialog.child(
+            GlintComponents.textBlock(
+                McComponent.literal("Are you sure you want to disable '$sceneName'?") to GlintTheme.TEXT_PRIMARY,
+                McComponent.literal("This will remove it locally and mark it inactive on the API.") to GlintTheme.TEXT_MUTED,
+            ) as Component,
         )
 
-        addRenderableWidget(
-            Button
-                .builder(CommonComponents.GUI_CANCEL) { onClose() }
-                .bounds(centerX + 5, buttonY, 150, 20)
-                .build(),
-        )
-    }
-
-    override fun render(
-        guiGraphics: GuiGraphics,
-        mouseX: Int,
-        mouseY: Int,
-        delta: Float,
-    ) {
-        renderBackground(guiGraphics, mouseX, mouseY, delta)
-        super.render(guiGraphics, mouseX, mouseY, delta)
-
-        guiGraphics.drawCenteredString(font, title, width / 2, height / 2 - 20, 0xFFFFFF)
-        guiGraphics.drawCenteredString(
-            font,
-            "Are you sure you want to disable '$sceneName'?",
-            width / 2,
-            height / 2,
-            0xFFFFFF,
-        )
-        guiGraphics.drawCenteredString(
-            font,
-            "This will remove it locally and mark it inactive on the API.",
-            width / 2,
-            height / 2 + 12,
-            0x888888,
+        dialog.child(
+            GlintComponents.buttonRow(
+                GlintComponents.wideButton(McComponent.literal("Disable Scene")) { executeDisable() },
+                GlintComponents.cancelButton { onClose() },
+            ) as Component,
         )
     }
 

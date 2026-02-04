@@ -39,7 +39,7 @@ dependencies {
 
     modCompileOnly libs.iris
     modCompileOnly libs.sodium
-    
+
     // Include Iris + Sodium in dev environment for smoke testing
     modLocalRuntime libs.iris
     modLocalRuntime libs.sodium
@@ -47,6 +47,9 @@ dependencies {
     // Iris transitive dependencies (not resolved from Modrinth JAR)
     modLocalRuntime libs.jcpp
     modLocalRuntime libs.glsl.transformer
+
+    // owo-lib UI framework (users must install separately)
+    modApi libs.owo.fabric
 }
 
 processResources {

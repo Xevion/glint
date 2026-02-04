@@ -5,13 +5,24 @@ import com.xevion.glint.api.ApiError
 import com.xevion.glint.api.DeviceAuthResponse
 import com.xevion.glint.api.DeviceTokenResponse
 import com.xevion.glint.api.GlintApi
+import com.xevion.glint.ui.base.GlintComponents
+import com.xevion.glint.ui.base.GlintScreen
+import com.xevion.glint.ui.base.GlintTheme
+import io.wispforest.owo.ui.component.ButtonComponent
+import io.wispforest.owo.ui.component.Components
+import io.wispforest.owo.ui.component.LabelComponent
+import io.wispforest.owo.ui.container.Containers
+import io.wispforest.owo.ui.container.FlowLayout
+import io.wispforest.owo.ui.core.Color
+import io.wispforest.owo.ui.core.Component
+import io.wispforest.owo.ui.core.HorizontalAlignment
+import io.wispforest.owo.ui.core.Sizing
+import io.wispforest.owo.ui.core.Surface
 import net.minecraft.Util
-import net.minecraft.client.gui.GuiGraphics
-import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.Screen
-import net.minecraft.network.chat.Component
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicBoolean
+import net.minecraft.network.chat.Component as McComponent
 
 /**
  * Screen for OAuth 2.0 Device Authorization flow.
@@ -22,10 +33,13 @@ class DeviceAuthScreen(
     private val serverUrl: String,
     private val onAuthorized: (DeviceTokenResponse) -> Unit,
     private val onBack: () -> Unit,
-) : Screen(Component.literal("Authorize Device")) {
-    private lateinit var copyUrlButton: Button
-    private lateinit var openBrowserButton: Button
-    private lateinit var cancelButton: Button
+) : GlintScreen(McComponent.literal("Authorize Device")) {
+    private lateinit var copyUrlButton: ButtonComponent
+    private lateinit var openBrowserButton: ButtonComponent
+    private lateinit var cancelButton: ButtonComponent
+    private lateinit var contentContainer: FlowLayout
+    private lateinit var statusLabel: LabelComponent
+    private lateinit var instructionsContainer: FlowLayout
 
     private var authResponse: DeviceAuthResponse? = null
     private var isLoading = true
@@ -36,38 +50,92 @@ class DeviceAuthScreen(
     private var startTime: Long = 0L
     private var expiresAtTime: Long = 0L
 
-    override fun init() {
-        val centerX = width / 2
-        val buttonStartY = height / 2 + 40
+    override fun buildContent(root: FlowLayout) {
+        contentContainer = Containers.verticalFlow(Sizing.content(), Sizing.content())
+        contentContainer.horizontalAlignment(HorizontalAlignment.CENTER)
+        contentContainer.gap(GlintTheme.GAP_MD)
+        contentContainer.padding(GlintTheme.paddingLg())
+        contentContainer.surface(Surface.DARK_PANEL)
 
-        // Copy URL button
-        copyUrlButton =
-            Button
-                .builder(Component.literal("Copy URL")) { copyUrl() }
-                .bounds(centerX - 155, buttonStartY, 150, 20)
-                .build()
+        // Title
+        contentContainer.child(GlintComponents.title(title) as Component)
+
+        // Status/instructions area
+        statusLabel = Components.label(McComponent.literal("Starting authorization..."))
+        statusLabel.color(Color.ofRgb(GlintTheme.TEXT_WARNING))
+        statusLabel.horizontalTextAlignment(HorizontalAlignment.CENTER)
+        contentContainer.child(statusLabel as Component)
+
+        // Instructions container (hidden initially)
+        instructionsContainer = Containers.verticalFlow(Sizing.content(), Sizing.content())
+        instructionsContainer.horizontalAlignment(HorizontalAlignment.CENTER)
+        instructionsContainer.gap(GlintTheme.GAP_SM)
+
+        // Button row
+        copyUrlButton = GlintComponents.wideButton(McComponent.literal("Copy URL")) { copyUrl() }
         copyUrlButton.active = false
-        addRenderableWidget(copyUrlButton)
-
-        // Open Browser button
-        openBrowserButton =
-            Button
-                .builder(Component.literal("Open in Browser")) { openBrowser() }
-                .bounds(centerX + 5, buttonStartY, 150, 20)
-                .build()
+        openBrowserButton = GlintComponents.wideButton(McComponent.literal("Open in Browser")) { openBrowser() }
         openBrowserButton.active = false
-        addRenderableWidget(openBrowserButton)
+        contentContainer.child(
+            GlintComponents.buttonRow(copyUrlButton, openBrowserButton) as Component,
+        )
 
         // Cancel button
-        cancelButton =
-            Button
-                .builder(Component.literal("Cancel")) { cancel() }
-                .bounds(centerX - 75, buttonStartY + 30, 150, 20)
-                .build()
-        addRenderableWidget(cancelButton)
+        cancelButton = GlintComponents.wideButton(McComponent.literal("Cancel")) { cancel() }
+        contentContainer.child(cancelButton as Component)
+
+        root.child(contentContainer as Component)
 
         // Start device auth flow
         startDeviceAuth()
+    }
+
+    private fun rebuildInstructions() {
+        instructionsContainer.clearChildren()
+        val response = authResponse ?: return
+
+        instructionsContainer.child(
+            Components
+                .label(McComponent.literal("To connect this Minecraft client to Glint:"))
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+        )
+
+        // Step 1 - URL
+        val step1 = Containers.horizontalFlow(Sizing.content(), Sizing.content())
+        step1.gap(GlintTheme.GAP_SM)
+        step1.child(Components.label(McComponent.literal("1. Open:")).color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component)
+        step1.child(Components.label(McComponent.literal(response.verificationUri)).color(Color.ofRgb(0x55FFFF)) as Component)
+        instructionsContainer.child(step1 as Component)
+
+        // Step 2 - Code
+        val step2 = Containers.horizontalFlow(Sizing.content(), Sizing.content())
+        step2.gap(GlintTheme.GAP_SM)
+        step2.child(Components.label(McComponent.literal("2. Enter code:")).color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component)
+        step2.child(Components.label(McComponent.literal(response.userCode)).color(Color.ofRgb(0x55FF55)) as Component)
+        instructionsContainer.child(step2 as Component)
+
+        // Timer - will be updated in tick
+        instructionsContainer.child(
+            Components
+                .label(McComponent.literal("Waiting for authorization..."))
+                .color(Color.ofRgb(GlintTheme.TEXT_MUTED))
+                .id("timer-label") as Component,
+        )
+    }
+
+    override fun tick() {
+        super.tick()
+
+        // Update timer display if we have an auth response
+        if (authResponse != null && !isLoading && errorMessage == null) {
+            val remainingSeconds = ((expiresAtTime - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+            val minutes = remainingSeconds / 60
+            val seconds = remainingSeconds % 60
+            val timeDisplay = String.format("%d:%02d", minutes, seconds)
+
+            val timerLabel = instructionsContainer.childById(LabelComponent::class.java, "timer-label")
+            timerLabel?.text(McComponent.literal("Waiting for authorization... (expires in $timeDisplay)"))
+        }
     }
 
     private fun startDeviceAuth() {
@@ -87,12 +155,33 @@ class DeviceAuthScreen(
                             expiresAtTime = startTime + (response.expiresIn * 1000)
                             copyUrlButton.active = true
                             openBrowserButton.active = true
+
+                            // Show instructions
+                            rebuildInstructions()
+                            statusLabel.text(McComponent.literal(""))
+
+                            // Insert instructions before buttons by rebuilding content
+                            val children = contentContainer.children().toMutableList()
+                            val buttonIndex =
+                                children.indexOfFirst { child ->
+                                    child === copyUrlButton || (child is FlowLayout && child.children().any { it === copyUrlButton })
+                                }
+                            if (buttonIndex >= 0 && !children.contains(instructionsContainer)) {
+                                children.add(buttonIndex, instructionsContainer as Component)
+                                contentContainer.clearChildren()
+                                children.forEach { contentContainer.child(it) }
+                            } else if (!children.contains(instructionsContainer)) {
+                                contentContainer.child(instructionsContainer as Component)
+                            }
+
                             Glint.LOGGER.info("Device auth started: {}", response.userCode)
 
                             // Start polling
                             startPolling(response)
                         }.onFailure { error ->
                             errorMessage = error.message ?: "Failed to start device authorization"
+                            statusLabel.text(McComponent.literal("Error: $errorMessage"))
+                            statusLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
                             Glint.LOGGER.error("Device auth failed: {}", error.message)
                         }
                 }
@@ -107,7 +196,7 @@ class DeviceAuthScreen(
                 while (isPolling.get()) {
                     try {
                         Thread.sleep(response.interval * 1000)
-                    } catch (e: InterruptedException) {
+                    } catch (_: InterruptedException) {
                         break
                     }
 
@@ -126,31 +215,36 @@ class DeviceAuthScreen(
                                 is ApiError.AuthorizationPending -> {
                                     // Continue polling
                                 }
-
                                 is ApiError.TokenExpired -> {
                                     isPolling.set(false)
                                     minecraft?.execute {
                                         errorMessage = "Authorization code expired. Please try again."
+                                        statusLabel.text(McComponent.literal("Error: $errorMessage"))
+                                        statusLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
                                         authResponse = null
                                         copyUrlButton.active = false
                                         openBrowserButton.active = false
+                                        contentContainer.removeChild(instructionsContainer as Component)
                                     }
                                 }
-
                                 is ApiError.InvalidGrant -> {
                                     isPolling.set(false)
                                     minecraft?.execute {
                                         errorMessage = "Invalid authorization code. Please try again."
+                                        statusLabel.text(McComponent.literal("Error: $errorMessage"))
+                                        statusLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
                                         authResponse = null
                                         copyUrlButton.active = false
                                         openBrowserButton.active = false
+                                        contentContainer.removeChild(instructionsContainer as Component)
                                     }
                                 }
-
                                 else -> {
                                     isPolling.set(false)
                                     minecraft?.execute {
                                         errorMessage = error.message ?: "Authorization failed"
+                                        statusLabel.text(McComponent.literal("Error: $errorMessage"))
+                                        statusLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
                                     }
                                 }
                             }
@@ -181,107 +275,5 @@ class DeviceAuthScreen(
         super.removed()
         isPolling.set(false)
         pollFuture?.cancel(true)
-    }
-
-    override fun render(
-        guiGraphics: GuiGraphics,
-        mouseX: Int,
-        mouseY: Int,
-        delta: Float,
-    ) {
-        renderBackground(guiGraphics, mouseX, mouseY, delta)
-
-        val centerX = width / 2
-        val startY = height / 2 - 80
-
-        // Title
-        guiGraphics.drawCenteredString(font, title, centerX, startY, 0xFFFFFF)
-
-        if (isLoading) {
-            guiGraphics.drawCenteredString(
-                font,
-                Component.literal("Starting authorization..."),
-                centerX,
-                startY + 40,
-                0xFFAA00,
-            )
-        } else if (errorMessage != null) {
-            guiGraphics.drawCenteredString(
-                font,
-                Component.literal("Error: $errorMessage"),
-                centerX,
-                startY + 40,
-                0xFF0000,
-            )
-
-            guiGraphics.drawCenteredString(
-                font,
-                Component.literal("Click Cancel to go back and try again"),
-                centerX,
-                startY + 55,
-                0x888888,
-            )
-        } else if (authResponse != null) {
-            val response = authResponse!!
-
-            // Instructions
-            guiGraphics.drawCenteredString(
-                font,
-                Component.literal("To connect this Minecraft client to Glint:"),
-                centerX,
-                startY + 25,
-                0xAAAAAA,
-            )
-
-            // Step 1
-            guiGraphics.drawString(
-                font,
-                Component.literal("1. Open:"),
-                centerX - 150,
-                startY + 45,
-                0xFFFFFF,
-            )
-            guiGraphics.drawString(
-                font,
-                Component.literal(response.verificationUri),
-                centerX - 110,
-                startY + 45,
-                0x55FFFF,
-            )
-
-            // Step 2 with user code
-            guiGraphics.drawString(
-                font,
-                Component.literal("2. Enter code:"),
-                centerX - 150,
-                startY + 60,
-                0xFFFFFF,
-            )
-
-            // User code (highlighted)
-            guiGraphics.drawString(
-                font,
-                Component.literal(response.userCode),
-                centerX - 70,
-                startY + 60,
-                0x55FF55,
-            )
-
-            // Waiting message with countdown
-            val remainingSeconds = ((expiresAtTime - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
-            val minutes = remainingSeconds / 60
-            val seconds = remainingSeconds % 60
-            val timeDisplay = String.format("%d:%02d", minutes, seconds)
-
-            guiGraphics.drawCenteredString(
-                font,
-                Component.literal("Waiting for authorization... (expires in $timeDisplay)"),
-                centerX,
-                startY + 85,
-                0x888888,
-            )
-        }
-
-        super.render(guiGraphics, mouseX, mouseY, delta)
     }
 }
