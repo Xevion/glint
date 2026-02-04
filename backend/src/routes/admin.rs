@@ -48,7 +48,7 @@ async fn create_shader(
     let result = sqlx::query(
         r#"
         INSERT INTO shaders (id, name, slug, description, modrinth_id, curseforge_id, website_url, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now', 'utc'), datetime('now', 'utc'))
+        VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())
         "#,
     )
     .bind(&id)
@@ -63,7 +63,7 @@ async fn create_shader(
 
     if let Err(sqlx::Error::Database(db_err)) = &result
         && let Some(code) = db_err.code()
-        && code == "2067"
+        && code == "23505"
     {
         return Err(crate::error::AppError::Conflict(format!(
             "Shader with slug '{}' already exists",
@@ -72,7 +72,7 @@ async fn create_shader(
     }
     result?;
 
-    let shader = sqlx::query_as::<_, Shader>("SELECT * FROM shaders WHERE id = ?1")
+    let shader = sqlx::query_as::<_, Shader>("SELECT * FROM shaders WHERE id = $1")
         .bind(&id)
         .fetch_one(state.db())
         .await?;
@@ -87,7 +87,7 @@ async fn create_shader_version(
     Json(request): Json<CreateShaderVersionRequest>,
 ) -> AppResult<(StatusCode, Json<ShaderVersion>)> {
     // Verify shader exists
-    let exists = sqlx::query_scalar::<_, i32>("SELECT 1 FROM shaders WHERE id = ?1")
+    let exists = sqlx::query_scalar::<_, i32>("SELECT 1 FROM shaders WHERE id = $1")
         .bind(&shader_id)
         .fetch_optional(state.db())
         .await?;
@@ -101,7 +101,7 @@ async fn create_shader_version(
     sqlx::query(
         r#"
         INSERT INTO shader_versions (id, shader_id, version, modrinth_version_id, download_url, file_hash, created_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now', 'utc'))
+        VALUES ($1, $2, $3, $4, $5, $6, now())
         "#,
     )
     .bind(&id)
@@ -113,7 +113,7 @@ async fn create_shader_version(
     .execute(state.db())
     .await?;
 
-    let version = sqlx::query_as::<_, ShaderVersion>("SELECT * FROM shader_versions WHERE id = ?1")
+    let version = sqlx::query_as::<_, ShaderVersion>("SELECT * FROM shader_versions WHERE id = $1")
         .bind(&id)
         .fetch_one(state.db())
         .await?;
@@ -156,7 +156,7 @@ async fn create_world_upload(
     }
 
     // Check if world with this slug already exists
-    let exists = sqlx::query_scalar::<_, i32>("SELECT 1 FROM worlds WHERE slug = ?1")
+    let exists = sqlx::query_scalar::<_, i32>("SELECT 1 FROM worlds WHERE slug = $1")
         .bind(&request.slug)
         .fetch_optional(state.db())
         .await?;
@@ -204,7 +204,7 @@ async fn create_world_upload(
     sqlx::query(
         r#"
         INSERT INTO pending_uploads (upload_id, slug, name, description, minecraft_version, file_hash, size_bytes, upload_key, expires_at, created_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now', 'utc'))
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
         "#,
     )
     .bind(&upload_id)
@@ -215,7 +215,7 @@ async fn create_world_upload(
     .bind(&request.file_hash)
     .bind(request.file_size_bytes)
     .bind(&upload_key)
-    .bind(expires_at.format("%Y-%m-%d %H:%M:%S").to_string())
+    .bind(expires_at)
     .execute(state.db())
     .await?;
 
@@ -231,9 +231,7 @@ async fn create_world_upload(
         Json(CreateWorldUploadResponse {
             upload_id,
             presigned_url: presigned.uri().to_string(),
-            expires_at: crate::db::UtcDateTime::from(
-                expires_at.format("%Y-%m-%d %H:%M:%S").to_string(),
-            ),
+            expires_at: crate::db::UtcDateTime::from(expires_at),
         }),
     ))
 }
@@ -249,7 +247,7 @@ async fn complete_world_upload(
 
     // Fetch pending upload record
     let pending =
-        sqlx::query_as::<_, PendingUpload>("SELECT * FROM pending_uploads WHERE upload_id = ?1")
+        sqlx::query_as::<_, PendingUpload>("SELECT * FROM pending_uploads WHERE upload_id = $1")
             .bind(&request.upload_id)
             .fetch_optional(state.db())
             .await?;
@@ -269,7 +267,7 @@ async fn complete_world_upload(
     // Check if expired
     if pending.expires_at.is_before(&Utc::now()) {
         // Clean up expired record
-        sqlx::query("DELETE FROM pending_uploads WHERE upload_id = ?1")
+        sqlx::query("DELETE FROM pending_uploads WHERE upload_id = $1")
             .bind(&request.upload_id)
             .execute(state.db())
             .await?;
@@ -366,7 +364,7 @@ async fn complete_world_upload(
     let result = sqlx::query(
         r#"
         INSERT INTO worlds (id, name, slug, description, minecraft_version, file_url, file_hash, size_bytes, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now', 'utc'), datetime('now', 'utc'))
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())
         "#,
     )
     .bind(&world_id)
@@ -383,7 +381,7 @@ async fn complete_world_upload(
     // Handle conflict (another upload completed first)
     if let Err(sqlx::Error::Database(db_err)) = &result
         && let Some(code) = db_err.code()
-        && code == "2067"
+        && code == "23505"
     {
         // Clean up the file we just copied
         if let Err(e) = s3
@@ -397,7 +395,7 @@ async fn complete_world_upload(
         }
 
         // Delete pending record
-        sqlx::query("DELETE FROM pending_uploads WHERE upload_id = ?1")
+        sqlx::query("DELETE FROM pending_uploads WHERE upload_id = $1")
             .bind(&request.upload_id)
             .execute(state.db())
             .await?;
@@ -410,13 +408,13 @@ async fn complete_world_upload(
     result?;
 
     // Delete pending upload record
-    sqlx::query("DELETE FROM pending_uploads WHERE upload_id = ?1")
+    sqlx::query("DELETE FROM pending_uploads WHERE upload_id = $1")
         .bind(&request.upload_id)
         .execute(state.db())
         .await?;
 
     // Fetch created world
-    let world = sqlx::query_as::<_, World>("SELECT * FROM worlds WHERE id = ?1")
+    let world = sqlx::query_as::<_, World>("SELECT * FROM worlds WHERE id = $1")
         .bind(&world_id)
         .fetch_one(state.db())
         .await?;
@@ -431,7 +429,7 @@ async fn create_scene(
     Json(request): Json<CreateSceneRequest>,
 ) -> AppResult<(StatusCode, Json<Scene>)> {
     // Verify world exists
-    let exists = sqlx::query_scalar::<_, i32>("SELECT 1 FROM worlds WHERE id = ?1")
+    let exists = sqlx::query_scalar::<_, i32>("SELECT 1 FROM worlds WHERE id = $1")
         .bind(&request.world_id)
         .fetch_optional(state.db())
         .await?;
@@ -442,7 +440,7 @@ async fn create_scene(
 
     // Check world-scoped slug uniqueness (only active scenes)
     let slug_exists = sqlx::query_scalar::<_, i32>(
-        "SELECT 1 FROM scenes WHERE world_id = ?1 AND slug = ?2 AND active = 1",
+        "SELECT 1 FROM scenes WHERE world_id = $1 AND slug = $2 AND active = TRUE",
     )
     .bind(&request.world_id)
     .bind(&request.slug)
@@ -465,7 +463,7 @@ async fn create_scene(
             dimension, time_of_day_ticks, weather, weather_intensity, moon_phase, biome,
             active, created_at
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 1, datetime('now', 'utc'))
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, TRUE, now())
         "#,
     )
     .bind(&id)
@@ -486,7 +484,7 @@ async fn create_scene(
     .execute(state.db())
     .await?;
 
-    let scene = sqlx::query_as::<_, Scene>("SELECT * FROM scenes WHERE id = ?1")
+    let scene = sqlx::query_as::<_, Scene>("SELECT * FROM scenes WHERE id = $1")
         .bind(&id)
         .fetch_one(state.db())
         .await?;
@@ -502,7 +500,7 @@ async fn update_scene(
 ) -> AppResult<Json<Scene>> {
     // Find scene (world-scoped, active only)
     let scene = sqlx::query_as::<_, Scene>(
-        "SELECT * FROM scenes WHERE slug = ?1 AND world_id = ?2 AND active = 1",
+        "SELECT * FROM scenes WHERE slug = $1 AND world_id = $2 AND active = TRUE",
     )
     .bind(&slug)
     .bind(&request.world_id)
@@ -510,14 +508,14 @@ async fn update_scene(
     .await?
     .ok_or_else(|| AppError::NotFound(format!("Scene '{}' not found in this world", slug)))?;
 
-    // Update position/camera/environment fields only (preserve name, description, tags)
+    // Update position/camera/environment fields only (preserve name, description)
     sqlx::query(
         r#"
-        UPDATE scenes 
-        SET x = ?1, y = ?2, z = ?3, pitch = ?4, yaw = ?5,
-            dimension = ?6, time_of_day_ticks = ?7, weather = ?8, 
-            weather_intensity = ?9, moon_phase = ?10, biome = ?11
-        WHERE id = ?12
+        UPDATE scenes
+        SET x = $1, y = $2, z = $3, pitch = $4, yaw = $5,
+            dimension = $6, time_of_day_ticks = $7, weather = $8,
+            weather_intensity = $9, moon_phase = $10, biome = $11
+        WHERE id = $12
         "#,
     )
     .bind(request.position.x)
@@ -536,13 +534,13 @@ async fn update_scene(
     .await?;
 
     // Mark captures as outdated
-    sqlx::query("UPDATE captures SET outdated = 1 WHERE scene_id = ?1 AND status = 'completed'")
+    sqlx::query("UPDATE captures SET outdated = TRUE WHERE scene_id = $1 AND status = 'completed'")
         .bind(&scene.id)
         .execute(state.db())
         .await?;
 
     // Fetch updated scene
-    let updated = sqlx::query_as::<_, Scene>("SELECT * FROM scenes WHERE id = ?1")
+    let updated = sqlx::query_as::<_, Scene>("SELECT * FROM scenes WHERE id = $1")
         .bind(&scene.id)
         .fetch_one(state.db())
         .await?;
@@ -557,7 +555,7 @@ async fn disable_scene(
     Query(params): Query<WorldIdParam>,
 ) -> AppResult<StatusCode> {
     let result = sqlx::query(
-        "UPDATE scenes SET active = 0 WHERE slug = ?1 AND world_id = ?2 AND active = 1",
+        "UPDATE scenes SET active = FALSE WHERE slug = $1 AND world_id = $2 AND active = TRUE",
     )
     .bind(&slug)
     .bind(&params.world_id)
@@ -575,7 +573,7 @@ async fn disable_scene(
 async fn list_jobs(State(state): State<AppState>) -> AppResult<Json<Vec<JobWithDetails>>> {
     let jobs = sqlx::query_as::<_, JobWithDetails>(
         r#"
-        SELECT 
+        SELECT
             j.id, j.shader_version_id, j.scene_ids, j.profiles, j.priority,
             j.status, j.attempts, j.max_attempts, j.agent_id, j.claimed_at,
             j.last_heartbeat, j.started_at, j.completed_at, j.error_message,
@@ -583,7 +581,7 @@ async fn list_jobs(State(state): State<AppState>) -> AppResult<Json<Vec<JobWithD
             s.name as shader_name,
             s.slug as shader_slug,
             sv.version as shader_version,
-            COALESCE(json_array_length(j.scene_ids), 0) as scene_count
+            COALESCE(json_array_length(j.scene_ids::json), 0) as scene_count
         FROM jobs j
         JOIN shader_versions sv ON sv.id = j.shader_version_id
         JOIN shaders s ON s.id = sv.shader_id
@@ -602,7 +600,7 @@ async fn create_job(
     Json(request): Json<CreateJobRequest>,
 ) -> AppResult<(StatusCode, Json<Job>)> {
     // Verify shader version exists
-    let exists = sqlx::query_scalar::<_, i32>("SELECT 1 FROM shader_versions WHERE id = ?1")
+    let exists = sqlx::query_scalar::<_, i32>("SELECT 1 FROM shader_versions WHERE id = $1")
         .bind(&request.shader_version_id)
         .fetch_optional(state.db())
         .await?;
@@ -625,7 +623,7 @@ async fn create_job(
     sqlx::query(
         r#"
         INSERT INTO jobs (id, shader_version_id, scene_ids, profiles, priority, status, attempts, max_attempts, created_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, 'pending', 0, 3, datetime('now', 'utc'))
+        VALUES ($1, $2, $3, $4, $5, 'pending', 0, 3, now())
         "#,
     )
     .bind(&id)
@@ -636,7 +634,7 @@ async fn create_job(
     .execute(state.db())
     .await?;
 
-    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = ?1")
+    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = $1")
         .bind(&id)
         .fetch_one(state.db())
         .await?;
@@ -677,7 +675,7 @@ async fn delete_job(
     State(state): State<AppState>,
     Path(job_id): Path<String>,
 ) -> AppResult<StatusCode> {
-    let result = sqlx::query("DELETE FROM jobs WHERE id = ?1")
+    let result = sqlx::query("DELETE FROM jobs WHERE id = $1")
         .bind(&job_id)
         .execute(state.db())
         .await?;
@@ -697,11 +695,11 @@ async fn cancel_job(
     // Only cancel pending or claimed jobs
     let result = sqlx::query(
         r#"
-        UPDATE jobs 
-        SET status = 'failed', 
+        UPDATE jobs
+        SET status = 'failed',
             error_message = 'Cancelled by admin',
-            completed_at = datetime('now', 'utc')
-        WHERE id = ?1 AND status IN ('pending', 'claimed')
+            completed_at = now()
+        WHERE id = $1 AND status IN ('pending', 'claimed')
         "#,
     )
     .bind(&job_id)
@@ -715,7 +713,7 @@ async fn cancel_job(
         ));
     }
 
-    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = ?1")
+    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = $1")
         .bind(&job_id)
         .fetch_one(state.db())
         .await?;
@@ -731,7 +729,7 @@ async fn retry_job(
     // Only retry failed jobs
     let result = sqlx::query(
         r#"
-        UPDATE jobs 
+        UPDATE jobs
         SET status = 'pending',
             attempts = 0,
             error_message = NULL,
@@ -740,7 +738,7 @@ async fn retry_job(
             last_heartbeat = NULL,
             started_at = NULL,
             completed_at = NULL
-        WHERE id = ?1 AND status = 'failed'
+        WHERE id = $1 AND status = 'failed'
         "#,
     )
     .bind(&job_id)
@@ -753,7 +751,7 @@ async fn retry_job(
         ));
     }
 
-    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = ?1")
+    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = $1")
         .bind(&job_id)
         .fetch_one(state.db())
         .await?;
@@ -769,12 +767,12 @@ async fn release_job(
     // Release claimed or running jobs
     let result = sqlx::query(
         r#"
-        UPDATE jobs 
+        UPDATE jobs
         SET status = 'pending',
             agent_id = NULL,
             claimed_at = NULL,
             last_heartbeat = NULL
-        WHERE id = ?1 AND status IN ('claimed', 'running')
+        WHERE id = $1 AND status IN ('claimed', 'running')
         "#,
     )
     .bind(&job_id)
@@ -788,7 +786,7 @@ async fn release_job(
         ));
     }
 
-    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = ?1")
+    let job = sqlx::query_as::<_, Job>("SELECT * FROM jobs WHERE id = $1")
         .bind(&job_id)
         .fetch_one(state.db())
         .await?;

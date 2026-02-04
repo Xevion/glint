@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use tokio::time::interval;
 use tracing::{debug, error, info, warn};
 
@@ -8,7 +8,7 @@ use crate::config::HeartbeatConfig;
 
 /// Background task that monitors job heartbeats and resets stale jobs.
 /// Uses adaptive polling: faster when jobs are active, slower when idle.
-pub async fn monitor_heartbeats(pool: SqlitePool, config: HeartbeatConfig) {
+pub async fn monitor_heartbeats(pool: PgPool, config: HeartbeatConfig) {
     info!(
         timeout_secs = config.timeout_seconds,
         active_poll_secs = config.active_poll_seconds,
@@ -62,13 +62,11 @@ pub async fn monitor_heartbeats(pool: SqlitePool, config: HeartbeatConfig) {
 }
 
 /// Reset jobs that have exceeded the heartbeat timeout
-async fn reset_stale_jobs(pool: &SqlitePool, timeout_seconds: u64) -> anyhow::Result<u64> {
-    let timeout_str = format!("-{} seconds", timeout_seconds);
-
+async fn reset_stale_jobs(pool: &PgPool, timeout_seconds: u64) -> anyhow::Result<u64> {
     let result = sqlx::query(
         r#"
         UPDATE jobs
-        SET status = CASE 
+        SET status = CASE
             WHEN attempts >= max_attempts THEN 'failed'
             ELSE 'pending'
         END,
@@ -80,10 +78,10 @@ async fn reset_stale_jobs(pool: &SqlitePool, timeout_seconds: u64) -> anyhow::Re
         claimed_at = NULL,
         last_heartbeat = NULL
         WHERE status IN ('claimed', 'running')
-          AND last_heartbeat < datetime('now', 'utc', ?)
+          AND last_heartbeat < now() - make_interval(secs => $1)
         "#,
     )
-    .bind(&timeout_str)
+    .bind(timeout_seconds as f64)
     .execute(pool)
     .await?;
 
@@ -91,7 +89,7 @@ async fn reset_stale_jobs(pool: &SqlitePool, timeout_seconds: u64) -> anyhow::Re
 }
 
 /// Check if there are any active (claimed or running) jobs
-async fn check_active_jobs(pool: &SqlitePool) -> anyhow::Result<bool> {
+async fn check_active_jobs(pool: &PgPool) -> anyhow::Result<bool> {
     let result: (i64,) =
         sqlx::query_as("SELECT COUNT(*) FROM jobs WHERE status IN ('claimed', 'running')")
             .fetch_one(pool)

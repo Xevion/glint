@@ -96,6 +96,11 @@ mod *args:
 
 # === Database ===
 
+# Start PostgreSQL in Docker and update .env with connection string
+# Commands: start (default), reset, rm
+db cmd="start":
+    bun scripts/db.ts {{cmd}}
+
 # Reset database (drops and recreates)
 migrate-reset:
     cd backend && cargo sqlx database reset -y

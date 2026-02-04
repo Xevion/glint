@@ -1,7 +1,7 @@
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Seed the database with sample data
-pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
+pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
     println!("Seeding database...");
 
     // Clear existing data (cascades will handle related records)

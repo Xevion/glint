@@ -89,7 +89,6 @@ pub struct Scene {
     pub moon_phase: Option<i32>,
     pub biome: Option<String>,
     pub definition_json: Option<String>,
-    pub tags: Option<String>,
     pub active: bool,
     #[ts(type = "string")]
     pub created_at: UtcDateTime,
@@ -149,6 +148,68 @@ pub struct Job {
 }
 
 // =============================================================================
+// Authentication Types
+// =============================================================================
+
+/// Discord OAuth user
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
+pub struct User {
+    pub id: i32,
+    pub discord_id: String,
+    pub discord_username: String,
+    pub discord_avatar: Option<String>,
+    pub role: String,
+    #[ts(type = "string")]
+    pub created_at: UtcDateTime,
+    #[ts(type = "string")]
+    pub updated_at: UtcDateTime,
+}
+
+/// Database-backed session (with in-memory cache at runtime)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Session {
+    pub token: String,
+    pub user_id: i32,
+    pub expires_at: UtcDateTime,
+    pub created_at: UtcDateTime,
+}
+
+// =============================================================================
+// Categorization & Tagging Types
+// =============================================================================
+
+/// Shader style category (realistic, fantasy, cartoon, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
+pub struct Category {
+    pub id: i32,
+    pub slug: String,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+/// Shader technical feature (volumetric, PBR, ray tracing, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
+pub struct Feature {
+    pub id: i32,
+    pub slug: String,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+/// Scene tag (indoor, sunset, water, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
+pub struct Tag {
+    pub id: i32,
+    pub slug: String,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+// =============================================================================
 // API Response Types
 // =============================================================================
 
@@ -189,14 +250,6 @@ impl Scene {
 
         if let Some(moon_phase) = self.moon_phase {
             json["moonPhase"] = serde_json::Value::Number(moon_phase.into());
-        }
-
-        if let Some(ref tags) = self.tags
-            && let Ok(parsed) = serde_json::from_str::<Vec<String>>(tags)
-        {
-            json["tags"] = serde_json::Value::Array(
-                parsed.into_iter().map(serde_json::Value::String).collect(),
-            );
         }
 
         json.to_string()

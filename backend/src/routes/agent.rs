@@ -33,9 +33,9 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
         r#"
         UPDATE jobs
         SET status = 'claimed',
-            agent_id = ?1,
-            claimed_at = datetime('now', 'utc'),
-            last_heartbeat = datetime('now', 'utc'),
+            agent_id = $1,
+            claimed_at = now(),
+            last_heartbeat = now(),
             attempts = attempts + 1
         WHERE id = (
             SELECT id FROM jobs
@@ -58,12 +58,12 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
     // Fetch shader version with shader info
     let shader_version = sqlx::query_as::<_, ShaderVersionRow>(
         r#"
-        SELECT 
+        SELECT
             sv.id, sv.version, sv.download_url, sv.file_hash,
             s.id as shader_id, s.slug as shader_slug, s.name as shader_name
         FROM shader_versions sv
         JOIN shaders s ON s.id = sv.shader_id
-        WHERE sv.id = ?1
+        WHERE sv.id = $1
         "#,
     )
     .bind(&job.shader_version_id)
@@ -89,17 +89,17 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
     for scene_id in &scene_ids {
         let scene = sqlx::query_as::<_, SceneRow>(
             r#"
-            SELECT 
+            SELECT
                 sc.id, sc.slug, sc.name, sc.definition_json,
                 sc.x, sc.y, sc.z, sc.pitch, sc.yaw,
                 sc.dimension, sc.time_of_day_ticks, sc.weather, sc.weather_intensity,
-                sc.moon_phase, sc.biome, sc.tags,
+                sc.moon_phase, sc.biome,
                 w.id as world_id, w.slug as world_slug, w.name as world_name,
-                w.file_url as world_file_url, w.file_hash as world_file_hash, 
+                w.file_url as world_file_url, w.file_hash as world_file_hash,
                 w.size_bytes as world_size_bytes
             FROM scenes sc
             JOIN worlds w ON w.id = sc.world_id
-            WHERE sc.id = ?1
+            WHERE sc.id = $1
             "#,
         )
         .bind(scene_id)
@@ -180,9 +180,9 @@ async fn heartbeat(
     let result = sqlx::query(
         r#"
         UPDATE jobs
-        SET last_heartbeat = datetime('now', 'utc'),
+        SET last_heartbeat = now(),
             status = CASE WHEN status = 'claimed' THEN 'running' ELSE status END
-        WHERE id = ?1 AND status IN ('claimed', 'running')
+        WHERE id = $1 AND status IN ('claimed', 'running')
         "#,
     )
     .bind(&job_id)
@@ -205,7 +205,7 @@ async fn prepare_upload(
 ) -> AppResult<Json<PrepareUploadResponse>> {
     // Verify job exists and is running
     let job =
-        sqlx::query_scalar::<_, String>("SELECT id FROM jobs WHERE id = ?1 AND status = 'running'")
+        sqlx::query_scalar::<_, String>("SELECT id FROM jobs WHERE id = $1 AND status = 'running'")
             .bind(&job_id)
             .fetch_optional(state.db())
             .await?;
@@ -270,7 +270,7 @@ async fn complete_job(
 ) -> AppResult<StatusCode> {
     // Get the job to find shader_version_id
     let job = sqlx::query_as::<_, JobVersionRow>(
-        "SELECT shader_version_id FROM jobs WHERE id = ?1 AND status = 'running'",
+        "SELECT shader_version_id FROM jobs WHERE id = $1 AND status = 'running'",
     )
     .bind(&job_id)
     .fetch_optional(state.db())
@@ -285,21 +285,22 @@ async fn complete_job(
     // Insert captures
     for capture in &request.captures {
         let capture_id = Uuid::new_v4().to_string();
-        let captured_at_str = capture.captured_at.to_rfc3339();
+        let captured_at = capture.captured_at;
         sqlx::query(
             r#"
             INSERT INTO captures (
                 id, shader_version_id, scene_id, profile, screenshot_path,
-                resolution_width, resolution_height, outdated, status, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 'completed', ?8, ?8)
-            ON CONFLICT (shader_version_id, scene_id, profile) 
-            DO UPDATE SET 
+                resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, 'completed', $8, $8, $8)
+            ON CONFLICT (shader_version_id, scene_id, profile)
+            DO UPDATE SET
                 screenshot_path = excluded.screenshot_path,
                 resolution_width = excluded.resolution_width,
                 resolution_height = excluded.resolution_height,
-                outdated = 0,
+                outdated = FALSE,
                 status = 'completed',
-                updated_at = excluded.updated_at
+                updated_at = excluded.updated_at,
+                captured_at = excluded.captured_at
             "#,
         )
         .bind(&capture_id)
@@ -309,7 +310,7 @@ async fn complete_job(
         .bind(&capture.screenshot_path)
         .bind(capture.resolution_width)
         .bind(capture.resolution_height)
-        .bind(&captured_at_str)
+        .bind(captured_at)
         .execute(state.db())
         .await?;
     }
@@ -317,7 +318,7 @@ async fn complete_job(
     // Update discovered profiles on shader version if provided
     if let Some(profiles) = &request.discovered_profiles {
         let profiles_json = serde_json::to_string(profiles).unwrap_or_else(|_| "[]".to_string());
-        sqlx::query("UPDATE shader_versions SET supported_profiles = ?1 WHERE id = ?2")
+        sqlx::query("UPDATE shader_versions SET supported_profiles = $1 WHERE id = $2")
             .bind(&profiles_json)
             .bind(&job.shader_version_id)
             .execute(state.db())
@@ -328,8 +329,8 @@ async fn complete_job(
     sqlx::query(
         r#"
         UPDATE jobs
-        SET status = 'completed', completed_at = datetime('now', 'utc')
-        WHERE id = ?1
+        SET status = 'completed', completed_at = now()
+        WHERE id = $1
         "#,
     )
     .bind(&job_id)
@@ -349,10 +350,10 @@ async fn fail_job(
     let result = sqlx::query(
         r#"
         UPDATE jobs
-        SET status = 'failed', 
-            error_message = ?1, 
-            completed_at = datetime('now', 'utc')
-        WHERE id = ?2 AND status IN ('claimed', 'running')
+        SET status = 'failed',
+            error_message = $1,
+            completed_at = now()
+        WHERE id = $2 AND status IN ('claimed', 'running')
         "#,
     )
     .bind(&request.error_message)
@@ -413,7 +414,6 @@ struct SceneRow {
     weather_intensity: f64,
     moon_phase: Option<i32>,
     biome: Option<String>,
-    tags: Option<String>,
     world_id: String,
     world_slug: String,
     world_name: String,
@@ -456,13 +456,6 @@ fn build_scene_definition_json(scene: &SceneRow) -> String {
 
     if let Some(moon_phase) = scene.moon_phase {
         json["moonPhase"] = serde_json::Value::Number(moon_phase.into());
-    }
-
-    if let Some(ref tags) = scene.tags
-        && let Ok(parsed) = serde_json::from_str::<Vec<String>>(tags)
-    {
-        json["tags"] =
-            serde_json::Value::Array(parsed.into_iter().map(serde_json::Value::String).collect());
     }
 
     json.to_string()

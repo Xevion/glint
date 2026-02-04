@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use aws_sdk_s3::Client as S3Client;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use tokio::time::interval;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 /// Interval between cleanup runs (10 minutes)
 const CLEANUP_INTERVAL_SECS: u64 = 600;
@@ -12,7 +12,7 @@ const CLEANUP_INTERVAL_SECS: u64 = 600;
 /// Runs every 10 minutes and removes:
 /// - Expired pending_uploads records from the database
 /// - Corresponding files from R2/S3 storage
-pub async fn cleanup_expired_uploads(pool: SqlitePool, s3: Option<S3Client>, bucket: String) {
+pub async fn cleanup_expired_uploads(pool: PgPool, s3: Option<S3Client>, bucket: String) {
     info!(
         interval_secs = CLEANUP_INTERVAL_SECS,
         "Upload cleanup service started"
@@ -37,17 +37,13 @@ pub async fn cleanup_expired_uploads(pool: SqlitePool, s3: Option<S3Client>, buc
 }
 
 /// Run a single cleanup pass
-async fn run_cleanup(
-    pool: &SqlitePool,
-    s3: Option<&S3Client>,
-    bucket: &str,
-) -> anyhow::Result<usize> {
+async fn run_cleanup(pool: &PgPool, s3: Option<&S3Client>, bucket: &str) -> anyhow::Result<usize> {
     // Find all expired pending uploads
     let expired: Vec<(String, String)> = sqlx::query_as(
         r#"
-        SELECT upload_id, upload_key 
-        FROM pending_uploads 
-        WHERE expires_at < datetime('now', 'utc')
+        SELECT upload_id, upload_key
+        FROM pending_uploads
+        WHERE expires_at < now()
         "#,
     )
     .fetch_all(pool)
@@ -58,8 +54,6 @@ async fn run_cleanup(
     }
 
     let mut cleaned = 0;
-
-    use tracing::trace;
 
     for (upload_id, upload_key) in &expired {
         // Delete from R2/S3 if configured
@@ -82,7 +76,7 @@ async fn run_cleanup(
         }
 
         // Delete from database
-        match sqlx::query("DELETE FROM pending_uploads WHERE upload_id = ?1")
+        match sqlx::query("DELETE FROM pending_uploads WHERE upload_id = $1")
             .bind(upload_id)
             .execute(pool)
             .await

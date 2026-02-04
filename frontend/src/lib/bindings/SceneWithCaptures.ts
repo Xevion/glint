@@ -2,4 +2,4 @@
 import type { CaptureWithContext } from "./CaptureWithContext";
 import type { World } from "./World";
 
-export type SceneWithCaptures = { world: World | null, captures: Array<CaptureWithContext>, id: string, name: string, slug: string, description: string | null, world_id: string, x: number, y: number, z: number, pitch: number, yaw: number, dimension: string, time_of_day_ticks: number, weather: string, weather_intensity: number, moon_phase: number | null, biome: string | null, definition_json: string | null, tags: string | null, active: boolean, created_at: string, };
+export type SceneWithCaptures = { world: World | null, captures: Array<CaptureWithContext>, id: string, name: string, slug: string, description: string | null, world_id: string, x: number, y: number, z: number, pitch: number, yaw: number, dimension: string, time_of_day_ticks: number, weather: string, weather_intensity: number, moon_phase: number | null, biome: string | null, definition_json: string | null, active: boolean, created_at: string, };

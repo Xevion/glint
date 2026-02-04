@@ -19,24 +19,6 @@ interface Props {
 
 let { scene, class: className }: Props = $props();
 
-// Parse tags from JSON string (with error handling)
-function parseTags(tagsJson: string | null): string[] {
-	if (!tagsJson) return [];
-	try {
-		const parsed: unknown = JSON.parse(tagsJson);
-		if (!Array.isArray(parsed)) {
-			console.warn('SceneCard: tags is not an array', typeof parsed);
-			return [];
-		}
-		return parsed as string[];
-	} catch (e) {
-		console.warn('SceneCard: failed to parse tags JSON', e);
-		return [];
-	}
-}
-
-const tags = $derived<string[]>(parseTags(scene.tags));
-
 // Determine time of day from ticks (0-24000, where 0=6am, 6000=noon, 18000=midnight)
 function getTimeOfDay(ticks: number): string {
 	const normalizedTicks = ticks % 24000;
@@ -189,26 +171,6 @@ function handleCheckboxClick(e: MouseEvent) {
 			</p>
 		{:else}
 			<p class="flex-1 text-sm text-muted-foreground/50 italic">No description available</p>
-		{/if}
-
-		<!-- Feature Tags -->
-		{#if tags.length > 0}
-			<div class="flex flex-wrap gap-1.5">
-				{#each tags.slice(0, 4) as tag (tag)}
-					<span
-						class="inline-flex items-center rounded-md bg-muted/50 px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/50"
-					>
-						{tag}
-					</span>
-				{/each}
-				{#if tags.length > 4}
-					<span
-						class="inline-flex items-center rounded-md bg-muted/50 px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/50"
-					>
-						+{tags.length - 4} more
-					</span>
-				{/if}
-			</div>
 		{/if}
 
 		<!-- Footer -->

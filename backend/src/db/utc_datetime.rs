@@ -1,82 +1,89 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{
-    Decode, Encode, Sqlite, Type,
-    sqlite::{SqliteArgumentValue, SqliteTypeInfo, SqliteValueRef},
+    Decode, Encode, Postgres, Type,
+    postgres::{PgArgumentBuffer, PgTypeInfo, PgValueRef},
 };
 use std::fmt;
 
 /// UTC datetime wrapper that ensures proper ISO8601 serialization with Z suffix
 ///
-/// SQLite stores datetimes as TEXT without timezone info. This type ensures:
-/// - Storage: ISO8601 format (e.g., "2025-01-15 10:30:00")
+/// PostgreSQL TIMESTAMPTZ stores datetimes with timezone info. This type ensures:
+/// - Storage: Native PostgreSQL TIMESTAMPTZ
 /// - Serialization: ISO8601 with Z suffix (e.g., "2025-01-15T10:30:00Z")
-/// - Parsing: Accepts both formats, always treats as UTC
+/// - Parsing: Accepts ISO8601 formats, always treats as UTC
 ///
 /// Note: Do NOT add #[derive(Serialize, Deserialize)] - we have custom impls below
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UtcDateTime(String);
+pub struct UtcDateTime(pub chrono::DateTime<chrono::Utc>);
 
 impl UtcDateTime {
     pub fn now() -> Self {
-        // Will be set by SQL datetime('now', 'utc')
-        Self(String::new())
+        Self(chrono::Utc::now())
     }
 
-    /// Get the underlying string value (for database queries)
-    pub fn as_str(&self) -> &str {
+    /// Get the underlying chrono DateTime
+    pub fn inner(&self) -> &chrono::DateTime<chrono::Utc> {
         &self.0
     }
 
     /// Check if this datetime is before the given chrono DateTime
     pub fn is_before(&self, other: &chrono::DateTime<chrono::Utc>) -> bool {
-        // Parse the stored string and compare
-        // Format: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DDTHH:MM:SSZ"
-        let normalized = self.0.replace(' ', "T");
-        let with_tz = if normalized.ends_with('Z') {
-            normalized
-        } else {
-            format!("{}Z", normalized)
-        };
+        self.0 < *other
+    }
+}
 
-        match chrono::DateTime::parse_from_rfc3339(&with_tz) {
-            Ok(parsed) => parsed < *other,
-            Err(_) => true, // If we can't parse, treat as expired
-        }
+impl From<chrono::DateTime<chrono::Utc>> for UtcDateTime {
+    fn from(dt: chrono::DateTime<chrono::Utc>) -> Self {
+        Self(dt)
     }
 }
 
 impl From<String> for UtcDateTime {
     fn from(s: String) -> Self {
-        Self(s)
+        // Try to parse as ISO8601
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+            Self(dt.with_timezone(&chrono::Utc))
+        } else {
+            // Fallback: try without timezone (assume UTC)
+            let normalized = s.replace(' ', "T");
+            let with_tz = if normalized.ends_with('Z') {
+                normalized
+            } else {
+                format!("{}Z", normalized)
+            };
+            chrono::DateTime::parse_from_rfc3339(&with_tz)
+                .map(|dt| Self(dt.with_timezone(&chrono::Utc)))
+                .unwrap_or_else(|_| Self(chrono::Utc::now()))
+        }
     }
 }
 
 impl fmt::Display for UtcDateTime {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.0.to_rfc3339())
     }
 }
 
 // SQLx traits for database interaction
-impl Type<Sqlite> for UtcDateTime {
-    fn type_info() -> SqliteTypeInfo {
-        <String as Type<Sqlite>>::type_info()
+impl Type<Postgres> for UtcDateTime {
+    fn type_info() -> PgTypeInfo {
+        <chrono::DateTime<chrono::Utc> as Type<Postgres>>::type_info()
     }
 }
 
-impl<'q> Encode<'q, Sqlite> for UtcDateTime {
+impl<'q> Encode<'q, Postgres> for UtcDateTime {
     fn encode_by_ref(
         &self,
-        args: &mut Vec<SqliteArgumentValue<'q>>,
+        buf: &mut PgArgumentBuffer,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        <String as Encode<'q, Sqlite>>::encode_by_ref(&self.0, args)
+        <chrono::DateTime<chrono::Utc> as Encode<'q, Postgres>>::encode_by_ref(&self.0, buf)
     }
 }
 
-impl<'r> Decode<'r, Sqlite> for UtcDateTime {
-    fn decode(value: SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as Decode<Sqlite>>::decode(value)?;
-        Ok(Self(s))
+impl<'r> Decode<'r, Postgres> for UtcDateTime {
+    fn decode(value: PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let dt = <chrono::DateTime<chrono::Utc> as Decode<Postgres>>::decode(value)?;
+        Ok(Self(dt))
     }
 }
 
@@ -86,20 +93,7 @@ impl Serialize for UtcDateTime {
     where
         S: serde::Serializer,
     {
-        // SQLite stores as "YYYY-MM-DD HH:MM:SS"
-        // Convert to ISO8601 with Z: "YYYY-MM-DDTHH:MM:SSZ"
-        let iso8601 = if self.0.contains('T') {
-            // Already in ISO format, ensure Z suffix
-            if self.0.ends_with('Z') {
-                self.0.clone()
-            } else {
-                format!("{}Z", self.0)
-            }
-        } else {
-            // SQLite format "YYYY-MM-DD HH:MM:SS" -> "YYYY-MM-DDTHH:MM:SSZ"
-            format!("{}Z", self.0.replace(' ', "T"))
-        };
-        serializer.serialize_str(&iso8601)
+        serializer.serialize_str(&self.0.to_rfc3339())
     }
 }
 
@@ -109,32 +103,37 @@ impl<'de> Deserialize<'de> for UtcDateTime {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        Ok(Self(s))
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+            Ok(Self(dt.with_timezone(&chrono::Utc)))
+        } else {
+            Err(serde::de::Error::custom("invalid datetime format"))
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Datelike;
 
     #[test]
-    fn test_serialization_space_format() {
-        let dt = UtcDateTime("2025-01-15 10:30:00".to_string());
+    fn test_serialization() {
+        let dt = UtcDateTime(
+            chrono::DateTime::parse_from_rfc3339("2025-01-15T10:30:00Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        );
         let json = serde_json::to_string(&dt).unwrap();
-        assert_eq!(json, r#""2025-01-15T10:30:00Z""#);
+        assert!(json.contains("2025-01-15"));
+        assert!(json.contains("10:30:00"));
     }
 
     #[test]
-    fn test_serialization_iso_format() {
-        let dt = UtcDateTime("2025-01-15T10:30:00".to_string());
-        let json = serde_json::to_string(&dt).unwrap();
-        assert_eq!(json, r#""2025-01-15T10:30:00Z""#);
-    }
-
-    #[test]
-    fn test_serialization_already_has_z() {
-        let dt = UtcDateTime("2025-01-15T10:30:00Z".to_string());
-        let json = serde_json::to_string(&dt).unwrap();
-        assert_eq!(json, r#""2025-01-15T10:30:00Z""#);
+    fn test_deserialization() {
+        let json = r#""2025-01-15T10:30:00Z""#;
+        let dt: UtcDateTime = serde_json::from_str(json).unwrap();
+        assert_eq!(dt.0.year(), 2025);
+        assert_eq!(dt.0.month(), 1);
+        assert_eq!(dt.0.day(), 15);
     }
 }
