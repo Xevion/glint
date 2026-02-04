@@ -20,10 +20,6 @@ for (const arg of args) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Fix path: format all subsystems, then fall through to verification
-// ---------------------------------------------------------------------------
-
 if (fix) {
   console.log(c("1;36", "→ Fixing..."));
   run(["bun", "run", "--cwd", "frontend", "format"]);
@@ -31,10 +27,6 @@ if (fix) {
   runPiped(["sh", "-c", "cd mod && ./gradlew spotlessApply ktlintFormat --quiet"]);
   console.log(c("1;36", "→ Verifying..."));
 }
-
-// ---------------------------------------------------------------------------
-// Ensure TypeScript bindings are up-to-date before frontend checks
-// ---------------------------------------------------------------------------
 
 {
   const BINDINGS_DIR = "frontend/src/lib/bindings";
@@ -89,10 +81,6 @@ if (fix) {
     process.stdout.write(c("2", "· bindings up-to-date, skipped") + "\n");
   }
 }
-
-// ---------------------------------------------------------------------------
-// Check definitions - 11 checks across 3 subsystems
-// ---------------------------------------------------------------------------
 
 interface Check {
   name: string;
@@ -186,10 +174,6 @@ const checks: Check[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Domain groups: formatter → { peers, format command, sanity rechecks }
-// ---------------------------------------------------------------------------
-
 const domains: Record<
   string,
   {
@@ -264,10 +248,6 @@ const domains: Record<
   },
 };
 
-// ---------------------------------------------------------------------------
-// Phase 1: run all checks in parallel, display in completion order
-// ---------------------------------------------------------------------------
-
 const start = Date.now();
 const remaining = new Set(checks.map((ch) => ch.name));
 
@@ -305,10 +285,6 @@ await raceInOrder(promises, checks, (r) => {
 
 if (interval) clearInterval(interval);
 if (isStderrTTY) process.stderr.write("\r\x1b[K");
-
-// ---------------------------------------------------------------------------
-// Phase 2: auto-fix formatting if it's the only failure in its domain
-// ---------------------------------------------------------------------------
 
 const autoFixedDomains = new Set<string>();
 
@@ -355,10 +331,6 @@ for (const [fmtName, domain] of Object.entries(domains)) {
     process.stdout.write(c("31", `  ✗ ${fmtName} auto-fix failed sanity check`) + "\n");
   }
 }
-
-// ---------------------------------------------------------------------------
-// Final verdict
-// ---------------------------------------------------------------------------
 
 const finalFailed = Object.entries(results).some(
   ([name, r]) => r.exitCode !== 0 && !autoFixedDomains.has(name),

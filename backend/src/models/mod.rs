@@ -147,10 +147,6 @@ pub struct Job {
     pub created_at: UtcDateTime,
 }
 
-// =============================================================================
-// Authentication Types
-// =============================================================================
-
 /// Discord OAuth user
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
@@ -174,10 +170,6 @@ pub struct Session {
     pub expires_at: UtcDateTime,
     pub created_at: UtcDateTime,
 }
-
-// =============================================================================
-// Categorization & Tagging Types
-// =============================================================================
 
 /// Shader style category (realistic, fantasy, cartoon, etc.)
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
@@ -208,10 +200,6 @@ pub struct Tag {
     pub name: String,
     pub description: Option<String>,
 }
-
-// =============================================================================
-// API Response Types
-// =============================================================================
 
 impl Scene {
     /// Builds a definition JSON matching the Minecraft mod's Scene data class format.
@@ -302,9 +290,7 @@ pub struct CaptureWithContext {
 
 // Agent API types are now in the shared crate (glint-shared)
 
-// =============================================================================
-// Admin API Types
-// =============================================================================
+// Admin-only operations: create/update shaders, worlds, scenes, jobs
 
 #[derive(Debug, Deserialize)]
 pub struct CreateShaderRequest {

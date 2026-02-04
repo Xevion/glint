@@ -364,10 +364,6 @@ async fn upload_and_complete(
     Ok(())
 }
 
-// =============================================================================
-// Development mode helpers - fetch data directly from backend API
-// =============================================================================
-
 #[derive(Debug, serde::Deserialize)]
 struct ShaderResponse {
     id: String,
