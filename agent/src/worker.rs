@@ -3,6 +3,7 @@
 use crate::client::ApiClient;
 use crate::config::Config;
 use crate::download::Downloader;
+use crate::fixtures::{self, FixtureProvider};
 use crate::minecraft::{self, MinecraftProcess, MinecraftResult};
 use anyhow::Result;
 use glint_shared::{CaptureRecord, CompleteJobRequest, JobPayload, OrchestrationManifest};
@@ -37,16 +38,24 @@ pub async fn run_dev_direct(
     config: &Config,
     shader_slug: &str,
     scene_slugs: &[String],
+    offline: bool,
 ) -> Result<()> {
-    let client = ApiClient::new(&config.api_url, &config.api_key);
+    let (shader_version, scenes, worlds) = if offline {
+        // Load from local fixtures
+        debug!("Loading shader and scene data from fixtures");
 
-    debug!("Fetching shader and scene data from backend");
+        let agent_dir = std::path::Path::new("agent");
+        let fixtures = FixtureProvider::load(agent_dir)?;
+        fixtures::resolve_from_fixtures(&fixtures, shader_slug, scene_slugs)?
+    } else {
+        // Fetch from backend
+        let client = ApiClient::new(&config.api_url, &config.api_key);
+        debug!("Fetching shader and scene data from backend");
 
-    // Fetch shader version (use latest version for the shader)
-    let shader_version = fetch_shader_version(&client, shader_slug).await?;
-
-    // Fetch scenes by slugs (includes world data)
-    let (scenes, worlds) = fetch_scenes_with_worlds(&client, scene_slugs).await?;
+        let shader_version = fetch_shader_version(&client, shader_slug).await?;
+        let (scenes, worlds) = fetch_scenes_with_worlds(&client, scene_slugs).await?;
+        (shader_version, scenes, worlds)
+    };
 
     if scenes.is_empty() {
         anyhow::bail!("No scenes found for slugs: {:?}", scene_slugs);
@@ -57,6 +66,7 @@ pub async fn run_dev_direct(
         version = %shader_version.version,
         scene_count = scenes.len(),
         world_count = worlds.len(),
+        offline = offline,
         "Starting direct capture"
     );
 
@@ -70,8 +80,13 @@ pub async fn run_dev_direct(
         priority: 0,
     };
 
-    // Run the capture (without backend job tracking)
-    process_job(config, &client, &job).await?;
+    // Run the capture (without backend job tracking in offline mode)
+    if offline {
+        process_job_offline(config, &job).await?;
+    } else {
+        let client = ApiClient::new(&config.api_url, &config.api_key);
+        process_job(config, &client, &job).await?;
+    }
 
     info!("Direct capture complete");
     Ok(())
@@ -188,6 +203,144 @@ async fn process_job(config: &Config, client: &ApiClient, job: &JobPayload) -> R
     // Upload screenshots and report completion
     debug!("Uploading screenshots");
     upload_and_complete(config, client, job, &manifest).await?;
+
+    Ok(())
+}
+
+/// Process a job in offline mode (no backend communication)
+async fn process_job_offline(config: &Config, job: &JobPayload) -> Result<()> {
+    debug!("Setting up directories (offline mode)");
+
+    // Ensure directories exist
+    fs::create_dir_all(config.saves_dir()).await?;
+    fs::create_dir_all(config.shaderpacks_dir()).await?;
+    fs::create_dir_all(config.scenes_dir()).await?;
+    fs::create_dir_all(config.captures_dir()).await?;
+
+    // Load fixtures
+    let agent_dir = std::path::Path::new("agent");
+    let fixtures = FixtureProvider::load(agent_dir)?;
+
+    // Copy resources from fixtures (instead of downloading)
+    for world in &job.worlds {
+        let src = fixtures.world_path(&world.slug);
+        if src.exists() {
+            debug!(world_slug = %world.slug, "Copying world from fixtures");
+            copy_and_extract_zip(&src, &config.saves_dir().join(&world.slug)).await?;
+        } else {
+            anyhow::bail!("World '{}' not found in fixtures: {:?}", world.slug, src);
+        }
+    }
+
+    let shader_src = fixtures.shader_path(&job.shader.slug);
+    if shader_src.exists() {
+        debug!(shader = %job.shader.slug, "Copying shader from fixtures");
+        let shader_dest = config
+            .shaderpacks_dir()
+            .join(shader_src.file_name().unwrap());
+        fs::copy(&shader_src, &shader_dest).await?;
+    } else {
+        anyhow::bail!(
+            "Shader '{}' not found in fixtures: {:?}",
+            job.shader.slug,
+            shader_src
+        );
+    }
+
+    // Write scene definitions
+    debug!(scene_count = job.scenes.len(), "Writing scene definitions");
+    minecraft::write_scene_definitions(&config.scenes_dir(), &job.scenes, &job.worlds).await?;
+
+    // Remove duplicate library versions to prevent classpath conflicts
+    minecraft::deduplicate_libraries(&config.libraries_dir()).await?;
+
+    // Launch Minecraft (no heartbeat in offline mode)
+    let mc = MinecraftProcess::launch(&config.minecraft_dir, &config.java_path).await?;
+
+    // Wait for Minecraft to complete
+    debug!("Waiting for Minecraft to complete");
+    let result = mc.wait().await?;
+
+    // Check result
+    match result {
+        MinecraftResult::Success => {
+            debug!("Minecraft completed successfully");
+        }
+        MinecraftResult::Failed { code } => {
+            anyhow::bail!("Minecraft exited with code {}", code);
+        }
+        MinecraftResult::Crashed { message } => {
+            anyhow::bail!("Minecraft crashed: {}", message);
+        }
+    }
+
+    // Find and parse manifest (print results instead of uploading)
+    debug!("Looking for capture manifest");
+    let manifest = find_and_parse_manifest(&config.captures_dir()).await?;
+
+    // In offline mode, just print the results instead of uploading
+    info!(
+        sessions = manifest.sessions.len(),
+        total_screenshots = manifest.orchestration.total_sessions,
+        "Capture complete (offline mode - no upload)"
+    );
+
+    for session in &manifest.sessions {
+        info!(
+            scene = %session.scene_id,
+            screenshots = session.screenshots.len(),
+            "Session results"
+        );
+        for screenshot in &session.screenshots {
+            let profile = screenshot
+                .shader
+                .as_ref()
+                .and_then(|s| s.profile.clone())
+                .unwrap_or_else(|| "default".to_string());
+            info!(
+                file = %screenshot.file,
+                profile = %profile,
+                resolution = %format!("{}x{}", screenshot.resolution.width, screenshot.resolution.height),
+                "  Screenshot"
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Copy and extract a zip file to a destination directory
+async fn copy_and_extract_zip(src: &std::path::Path, dest: &std::path::Path) -> Result<()> {
+    // Read the zip file
+    let zip_bytes = fs::read(src).await?;
+
+    // Extract using blocking I/O (zip crate doesn't support async)
+    let dest = dest.to_path_buf();
+    tokio::task::spawn_blocking(move || -> Result<()> {
+        let cursor = std::io::Cursor::new(zip_bytes);
+        let mut archive = zip::ZipArchive::new(cursor)?;
+
+        // Create destination if needed
+        std::fs::create_dir_all(&dest)?;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)?;
+            let outpath = dest.join(file.mangled_name());
+
+            if file.name().ends_with('/') {
+                std::fs::create_dir_all(&outpath)?;
+            } else {
+                if let Some(p) = outpath.parent() {
+                    std::fs::create_dir_all(p)?;
+                }
+                let mut outfile = std::fs::File::create(&outpath)?;
+                std::io::copy(&mut file, &mut outfile)?;
+            }
+        }
+
+        Ok(())
+    })
+    .await??;
 
     Ok(())
 }

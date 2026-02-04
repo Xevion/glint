@@ -1,0 +1,83 @@
+{
+  "world": "test-world",
+  "version": "1.0.0",
+  "description": "Test scenes for development and offline testing",
+  "defaultConfig": {
+    "fov": 70,
+    "renderDistance": 12,
+    "simulationDistance": 12
+  },
+  "scenes": [
+    {
+      "id": "sunset",
+      "name": "Sunset Vista",
+      "description": "Golden hour lighting over plains",
+      "dimension": "minecraft:overworld",
+      "position": { "x": 0.5, "y": 100.0, "z": 0.5 },
+      "camera": { "yaw": 45.0, "pitch": -10.0 },
+      "timeOfDay": 12500,
+      "weather": "CLEAR",
+      "weatherIntensity": 0.0,
+      "moonPhase": 0,
+      "biome": "minecraft:plains",
+      "tags": ["lighting", "golden-hour"]
+    },
+    {
+      "id": "cave",
+      "name": "Lush Cave",
+      "description": "Underground lush cave with glow berries",
+      "dimension": "minecraft:overworld",
+      "position": { "x": 50.5, "y": 30.0, "z": 50.5 },
+      "camera": { "yaw": 180.0, "pitch": 0.0 },
+      "timeOfDay": 6000,
+      "weather": "CLEAR",
+      "weatherIntensity": 0.0,
+      "moonPhase": 0,
+      "biome": "minecraft:lush_caves",
+      "tags": ["underground", "glow"]
+    },
+    {
+      "id": "rain",
+      "name": "Rainy Forest",
+      "description": "Dense forest during rainfall",
+      "dimension": "minecraft:overworld",
+      "position": { "x": -100.5, "y": 80.0, "z": 100.5 },
+      "camera": { "yaw": 90.0, "pitch": -5.0 },
+      "timeOfDay": 6000,
+      "weather": "RAIN",
+      "weatherIntensity": 1.0,
+      "moonPhase": 0,
+      "biome": "minecraft:dark_forest",
+      "tags": ["weather", "atmosphere"]
+    },
+    {
+      "id": "night",
+      "name": "Moonlit Night",
+      "description": "Full moon over open terrain",
+      "dimension": "minecraft:overworld",
+      "position": { "x": 200.5, "y": 90.0, "z": -50.5 },
+      "camera": { "yaw": 270.0, "pitch": -15.0 },
+      "timeOfDay": 18000,
+      "weather": "CLEAR",
+      "weatherIntensity": 0.0,
+      "moonPhase": 0,
+      "biome": "minecraft:plains",
+      "tags": ["night", "moon"]
+    },
+    {
+      "id": "nether",
+      "name": "Nether Wastes",
+      "description": "Classic nether terrain with lava",
+      "dimension": "minecraft:the_nether",
+      "position": { "x": 0.5, "y": 80.0, "z": 0.5 },
+      "camera": { "yaw": 0.0, "pitch": 0.0 },
+      "timeOfDay": 6000,
+      "weather": "CLEAR",
+      "weatherIntensity": 0.0,
+      "moonPhase": 0,
+      "biome": "minecraft:nether_wastes",
+      "tags": ["nether", "lava"]
+    }
+  ],
+  "entities": []
+}

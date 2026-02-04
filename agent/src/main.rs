@@ -11,6 +11,7 @@
 mod client;
 mod config;
 mod download;
+mod fixtures;
 mod minecraft;
 mod worker;
 
@@ -69,6 +70,10 @@ struct Args {
     /// Development mode: scene slugs to capture (comma-separated)
     #[arg(long, env = "GLINT_DEV_SCENES")]
     dev_scenes: Option<String>,
+
+    /// Offline mode: use local fixtures instead of backend
+    #[arg(long, env = "GLINT_OFFLINE")]
+    offline: bool,
 }
 
 #[tokio::main]
@@ -105,9 +110,10 @@ async fn main() -> Result<()> {
         info!(
             shader = %shader_slug,
             scenes = ?scene_slugs,
+            offline = args.offline,
             "Running in development mode (bypassing job queue)"
         );
-        worker::run_dev_direct(&config, &shader_slug, &scene_slugs).await
+        worker::run_dev_direct(&config, &shader_slug, &scene_slugs, args.offline).await
     } else if args.once {
         worker::run_once(&config).await
     } else {

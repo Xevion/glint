@@ -22,5 +22,8 @@
 # Rust workspace build output
 /target/
 
+# Agent fixtures (downloaded shaders/worlds)
+/agent/.fixtures/
+
 # Node.js dependencies
 /node_modules/

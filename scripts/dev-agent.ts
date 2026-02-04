@@ -15,6 +15,7 @@
  *   just dev-agent --once             # Build mod, run agent once
  *   just dev-agent -s --once          # Skip build, run once
  *   just dev-agent --dev-shader bsl --dev-scenes sunset,cave
+ *   just dev-agent --offline --dev-shader bsl --dev-scenes sunset
  */
 
 import { existsSync, statSync, readdirSync, copyFileSync, unlinkSync } from "fs";
@@ -31,6 +32,7 @@ const AGENT_MANIFEST = "agent/Cargo.toml";
 let skipBuild = false;
 let platform = "fabric";
 let verbose = false;
+let offline = false;
 const agentArgs: string[] = [];
 
 const argv = process.argv.slice(2);
@@ -48,6 +50,10 @@ while (i < argv.length) {
 		i++;
 	} else if (arg === "-v" || arg === "--verbose") {
 		verbose = true;
+		i++;
+	} else if (arg === "--offline") {
+		offline = true;
+		agentArgs.push("--offline"); // Also pass to agent
 		i++;
 	} else {
 		// Everything else goes to agent (including --)
@@ -149,15 +155,20 @@ function needsRebuild(jarPath: string): boolean {
 async function main(): Promise<void> {
 	console.log(c("1;36", "=== Glint Dev Agent ===\n"));
 
-	// 1. Check backend
-	console.log(c("36", "→ Checking backend..."));
-	const backendOk = await checkBackend();
-	if (!backendOk) {
-		console.error(c("31", "✗ Backend not running at http://localhost:8080"));
-		console.error(c("33", "  Start it with: just dev -b"));
-		process.exit(1);
+	// 1. Check backend (skip in offline mode)
+	if (offline) {
+		console.log(c("33", "→ Offline mode - skipping backend check\n"));
+	} else {
+		console.log(c("36", "→ Checking backend..."));
+		const backendOk = await checkBackend();
+		if (!backendOk) {
+			console.error(c("31", "✗ Backend not running at http://localhost:8080"));
+			console.error(c("33", "  Start it with: just dev -b"));
+			console.error(c("33", "  Or use --offline to run without backend"));
+			process.exit(1);
+		}
+		console.log(c("32", "✓ Backend is running\n"));
 	}
-	console.log(c("32", "✓ Backend is running\n"));
 
 	// 2. Build mod (unless skipped)
 	let jarPath = findModJar();
