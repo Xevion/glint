@@ -34,6 +34,7 @@ let currentLeft = 0;
 let currentWidth = 0;
 let animationId: number | null = null;
 let mounted = $state(false);
+let pillVisible = $state(false);
 
 const ANIMATION_DURATION = 300;
 const EASING = cubicOut;
@@ -43,15 +44,16 @@ function cubicOut(t: number): number {
 	return f * f * f + 1;
 }
 
-function activeIndex(): number {
-	return staticTabs.findIndex((tab) => isActive(tab.href));
+function activeTabRef(): HTMLAnchorElement | undefined {
+	const idx = staticTabs.findIndex((tab) => isActive(tab.href));
+	return idx >= 0 ? tabRefs[idx] : undefined;
 }
 
 function measureActiveTab(): { left: number; width: number } | null {
-	const idx = activeIndex();
-	if (idx < 0 || !tabRefs[idx] || !containerRef) return null;
+	const tab = activeTabRef();
+	if (!tab || !containerRef) return null;
 	const containerRect = containerRef.getBoundingClientRect();
-	const tabRect = tabRefs[idx].getBoundingClientRect();
+	const tabRect = tab.getBoundingClientRect();
 	return {
 		left: tabRect.left - containerRect.left,
 		width: tabRect.width
@@ -93,9 +95,25 @@ function animatePill(fromLeft: number, fromWidth: number, toLeft: number, toWidt
 	animationId = requestAnimationFrame(tick);
 }
 
+function showPill() {
+	if (!pillRef) return;
+	pillVisible = true;
+	pillRef.style.opacity = '1';
+}
+
+function hidePill() {
+	if (!pillRef) return;
+	pillVisible = false;
+	pillRef.style.opacity = '0';
+}
+
 function updateTarget() {
 	const measured = measureActiveTab();
-	if (!measured) return;
+
+	if (!measured) {
+		if (pillVisible) hidePill();
+		return;
+	}
 
 	targetLeft = measured.left;
 	targetWidth = measured.width;
@@ -103,7 +121,15 @@ function updateTarget() {
 	if (!mounted) {
 		// First render — snap immediately, no animation
 		applyPill(targetLeft, targetWidth);
+		showPill();
 		mounted = true;
+		return;
+	}
+
+	if (!pillVisible) {
+		// Returning from a non-navbar route — snap to position, then fade in
+		applyPill(targetLeft, targetWidth);
+		showPill();
 		return;
 	}
 
@@ -172,7 +198,7 @@ $effect(() => {
 			<!-- Sliding pill — animated via JS (RAF) to stay smooth even when
 			     heavy page transitions cause CSS transition skipping -->
 			<div
-				class="absolute top-1 bottom-1 left-0 rounded-md bg-background shadow-sm will-change-[transform,width]"
+				class="absolute top-1 bottom-1 left-0 rounded-md bg-background shadow-sm opacity-0 transition-opacity duration-150 will-change-[transform,width]"
 				bind:this={pillRef}
 			></div>
 
