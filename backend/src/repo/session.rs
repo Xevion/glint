@@ -1,0 +1,158 @@
+use anyhow::Context;
+use chrono::{Duration, Utc};
+use rand::Rng;
+use tracing::{debug, instrument};
+
+use crate::db::DbPool;
+use crate::error::{AppError, AppResult};
+use crate::models::{Session, User};
+
+pub const SESSION_DURATION_DAYS: i64 = 7;
+
+pub struct SessionRepo;
+
+/// Generate a cryptographically secure session token
+pub fn generate_session_token() -> String {
+    let mut bytes = [0u8; 32];
+    rand::rng().fill(&mut bytes);
+    hex::encode(bytes)
+}
+
+/// Helper struct for joined user/session query
+struct UserSessionRow {
+    user_id: i32,
+    discord_id: String,
+    discord_username: String,
+    discord_avatar: Option<String>,
+    role: String,
+    user_created_at: chrono::DateTime<Utc>,
+    user_updated_at: chrono::DateTime<Utc>,
+    token: String,
+    expires_at: chrono::DateTime<Utc>,
+    session_created_at: chrono::DateTime<Utc>,
+}
+
+impl SessionRepo {
+    /// Create a new session for a user
+    #[instrument(skip(db), level = "debug")]
+    pub async fn create(db: &DbPool, user_id: i32) -> AppResult<Session> {
+        let token = generate_session_token();
+        let expires_at = Utc::now() + Duration::days(SESSION_DURATION_DAYS);
+
+        let session = sqlx::query_as!(
+            Session,
+            r#"
+            INSERT INTO sessions (token, user_id, expires_at)
+            VALUES ($1, $2, $3)
+            RETURNING token, user_id, expires_at, created_at
+            "#,
+            token,
+            user_id,
+            expires_at
+        )
+        .fetch_one(db)
+        .await
+        .context(format!("failed to create session for user '{}'", user_id))?;
+
+        debug!(user_id, "Session created");
+        Ok(session)
+    }
+
+    /// Validate a session token and return the associated user and session
+    #[instrument(skip(db, token), level = "debug")]
+    pub async fn validate(db: &DbPool, token: &str) -> AppResult<(User, Session)> {
+        let result = sqlx::query_as!(
+            UserSessionRow,
+            r#"
+            SELECT
+                u.id as user_id,
+                u.discord_id,
+                u.discord_username,
+                u.discord_avatar,
+                u.role,
+                u.created_at as user_created_at,
+                u.updated_at as user_updated_at,
+                s.token,
+                s.expires_at,
+                s.created_at as session_created_at
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token = $1 AND s.expires_at > now()
+            "#,
+            token
+        )
+        .fetch_optional(db)
+        .await
+        .context("failed to validate session")?;
+
+        match result {
+            Some(row) => {
+                let user = User {
+                    id: row.user_id,
+                    discord_id: row.discord_id,
+                    discord_username: row.discord_username,
+                    discord_avatar: row.discord_avatar,
+                    role: row.role,
+                    created_at: row.user_created_at,
+                    updated_at: row.user_updated_at,
+                };
+                let session = Session {
+                    token: row.token,
+                    user_id: row.user_id,
+                    expires_at: row.expires_at,
+                    created_at: row.session_created_at,
+                };
+                debug!(user_id = user.id, "Session validated");
+                Ok((user, session))
+            }
+            None => Err(AppError::Unauthorized(
+                "Invalid or expired session".to_string(),
+            )),
+        }
+    }
+
+    /// Delete a session by token
+    #[instrument(skip(db, token), level = "debug")]
+    pub async fn delete(db: &DbPool, token: &str) -> AppResult<bool> {
+        let result = sqlx::query!("DELETE FROM sessions WHERE token = $1", token)
+            .execute(db)
+            .await
+            .context("failed to delete session")?;
+
+        let deleted = result.rows_affected() > 0;
+        if deleted {
+            debug!("Session deleted");
+        }
+        Ok(deleted)
+    }
+
+    /// Delete all expired sessions (cleanup task)
+    #[instrument(skip(db), level = "debug")]
+    pub async fn delete_expired(db: &DbPool) -> AppResult<u64> {
+        let result = sqlx::query!("DELETE FROM sessions WHERE expires_at < now()")
+            .execute(db)
+            .await
+            .context("failed to delete expired sessions")?;
+
+        let count = result.rows_affected();
+        if count > 0 {
+            debug!(count, "Deleted expired sessions");
+        }
+        Ok(count)
+    }
+
+    /// Delete all sessions for a user (e.g., when changing password or role)
+    #[instrument(skip(db), level = "debug")]
+    pub async fn delete_for_user(db: &DbPool, user_id: i32) -> AppResult<u64> {
+        let result = sqlx::query!("DELETE FROM sessions WHERE user_id = $1", user_id)
+            .execute(db)
+            .await
+            .context(format!("failed to delete sessions for user '{}'", user_id))?;
+
+        let count = result.rows_affected();
+        if count > 0 {
+            debug!(user_id, count, "Deleted user sessions");
+        }
+        Ok(count)
+    }
+}

@@ -1,9 +1,11 @@
+use anyhow::Context;
 use axum::{
     Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{get, post},
 };
+use tracing::warn;
 use uuid::Uuid;
 
 use glint_shared::{
@@ -11,7 +13,10 @@ use glint_shared::{
     SceneInfo, ShaderInfo, WorldInfo,
 };
 
-use crate::{error::AppResult, state::AppState};
+use crate::db::DbPool;
+use crate::error::{AppError, AppResult};
+use crate::repo::{CaptureRepo, JobRepo, ShaderVersionRepo};
+use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -28,56 +33,21 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
     // TODO: Extract agent_id from API key header
     let agent_id = "default-agent";
 
-    // Find and claim the next pending job (highest priority, oldest first)
-    let job = sqlx::query_as!(
-        JobRow,
-        r#"
-        UPDATE jobs
-        SET status = 'claimed',
-            agent_id = $1,
-            claimed_at = now(),
-            last_heartbeat = now(),
-            attempts = attempts + 1
-        WHERE id = (
-            SELECT id FROM jobs
-            WHERE status = 'pending'
-              AND attempts < max_attempts
-            ORDER BY priority DESC, created_at ASC
-            LIMIT 1
-        )
-        RETURNING id, shader_version_id, scene_ids, profiles, priority
-        "#,
-        agent_id
-    )
-    .fetch_optional(state.db())
-    .await?;
+    let job = JobRepo::claim_next(state.db(), agent_id).await?;
 
     let Some(job) = job else {
         return Ok(Json(None));
     };
 
     // Fetch shader version with shader info
-    let shader_version = sqlx::query_as!(
-        ShaderVersionRow,
-        r#"
-        SELECT
-            sv.id, sv.version, sv.download_url, sv.file_hash,
-            s.id as shader_id, s.slug as shader_slug, s.name as shader_name
-        FROM shader_versions sv
-        JOIN shaders s ON s.id = sv.shader_id
-        WHERE sv.id = $1
-        "#,
-        job.shader_version_id
-    )
-    .fetch_one(state.db())
-    .await?;
+    let shader_version = fetch_shader_version_with_info(state.db(), &job.shader_version_id).await?;
 
     // Parse scene IDs from JSON array
     let scene_ids: Vec<String> = match job.scene_ids.as_deref() {
         Some(json_str) => match serde_json::from_str(json_str) {
             Ok(ids) => ids,
             Err(e) => {
-                tracing::warn!(error = %e, json = %json_str, "Failed to parse scene_ids JSON");
+                warn!(error = %e, json = %json_str, "Failed to parse scene_ids JSON");
                 Vec::new()
             }
         },
@@ -89,25 +59,7 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
     let mut worlds_map = std::collections::HashMap::new();
 
     for scene_id in &scene_ids {
-        let scene = sqlx::query_as!(
-            SceneRow,
-            r#"
-            SELECT
-                sc.id, sc.slug, sc.name, sc.definition_json,
-                sc.x, sc.y, sc.z, sc.pitch, sc.yaw,
-                sc.dimension, sc.time_of_day_ticks, sc.weather, sc.weather_intensity,
-                sc.moon_phase, sc.biome,
-                w.id as world_id, w.slug as world_slug, w.name as world_name,
-                w.file_url as world_file_url, w.file_hash as world_file_hash,
-                w.size_bytes as world_size_bytes
-            FROM scenes sc
-            JOIN worlds w ON w.id = sc.world_id
-            WHERE sc.id = $1
-            "#,
-            scene_id
-        )
-        .fetch_optional(state.db())
-        .await?;
+        let scene = fetch_scene_with_world(state.db(), scene_id).await?;
 
         if let Some(scene) = scene {
             let Some(ref world_file_url) = scene.world_file_url else {
@@ -147,7 +99,7 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
         Some(json_str) => match serde_json::from_str(json_str) {
             Ok(profiles) => profiles,
             Err(e) => {
-                tracing::warn!(error = %e, json = %json_str, "Failed to parse profiles JSON");
+                warn!(error = %e, json = %json_str, "Failed to parse profiles JSON");
                 Vec::new()
             }
         },
@@ -180,19 +132,9 @@ async fn heartbeat(
     State(state): State<AppState>,
     Path(job_id): Path<String>,
 ) -> AppResult<StatusCode> {
-    let result = sqlx::query!(
-        r#"
-        UPDATE jobs
-        SET last_heartbeat = now(),
-            status = CASE WHEN status = 'claimed' THEN 'running' ELSE status END
-        WHERE id = $1 AND status IN ('claimed', 'running')
-        "#,
-        job_id
-    )
-    .execute(state.db())
-    .await?;
+    let updated = JobRepo::heartbeat(state.db(), &job_id).await?;
 
-    if result.rows_affected() == 0 {
+    if !updated {
         return Ok(StatusCode::NOT_FOUND);
     }
 
@@ -207,17 +149,8 @@ async fn prepare_upload(
     Json(request): Json<PrepareUploadRequest>,
 ) -> AppResult<Json<PrepareUploadResponse>> {
     // Verify job exists and is running
-    let job = sqlx::query_scalar!(
-        "SELECT id FROM jobs WHERE id = $1 AND status = 'running'",
-        job_id
-    )
-    .fetch_optional(state.db())
-    .await?;
-
-    if job.is_none() {
-        return Err(crate::error::AppError::NotFound(
-            "Job not found or not running".into(),
-        ));
+    if !JobRepo::is_running(state.db(), &job_id).await? {
+        return Err(AppError::NotFound("Job not found or not running".into()));
     }
 
     let mut urls = std::collections::HashMap::new();
@@ -253,10 +186,7 @@ async fn prepare_upload(
             )
             .await
             .map_err(|e| {
-                crate::error::AppError::Internal(anyhow::anyhow!(
-                    "Failed to generate presigned URL: {}",
-                    e
-                ))
+                AppError::Internal(anyhow::anyhow!("Failed to generate presigned URL: {}", e))
             })?;
 
         urls.insert(file, presigned.uri().to_string());
@@ -272,77 +202,41 @@ async fn complete_job(
     Path(job_id): Path<String>,
     Json(request): Json<CompleteJobRequest>,
 ) -> AppResult<StatusCode> {
-    // Get the job to find shader_version_id
-    let job = sqlx::query_as!(
-        JobVersionRow,
-        "SELECT shader_version_id FROM jobs WHERE id = $1 AND status = 'running'",
-        job_id
-    )
-    .fetch_optional(state.db())
-    .await?;
-
-    let Some(job) = job else {
-        return Err(crate::error::AppError::NotFound(
-            "Job not found or not running".into(),
-        ));
-    };
+    // Get shader_version_id for running job
+    let shader_version_id = JobRepo::get_running_shader_version_id(state.db(), &job_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Job not found or not running".into()))?;
 
     // Insert captures
     for capture in &request.captures {
         let capture_id = Uuid::new_v4().to_string();
-        let captured_at = capture.captured_at;
-        sqlx::query!(
-            r#"
-            INSERT INTO captures (
-                id, shader_version_id, scene_id, profile, screenshot_path,
-                resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, 'completed', $8, $8, $8)
-            ON CONFLICT (shader_version_id, scene_id, profile)
-            DO UPDATE SET
-                screenshot_path = excluded.screenshot_path,
-                resolution_width = excluded.resolution_width,
-                resolution_height = excluded.resolution_height,
-                outdated = FALSE,
-                status = 'completed',
-                updated_at = excluded.updated_at,
-                captured_at = excluded.captured_at
-            "#,
-            capture_id,
-            job.shader_version_id,
-            capture.scene_id,
-            capture.profile,
-            capture.screenshot_path,
-            capture.resolution_width,
-            capture.resolution_height,
-            captured_at
+        CaptureRepo::upsert(
+            state.db(),
+            &capture_id,
+            &shader_version_id,
+            &capture.scene_id,
+            capture.profile.as_deref(),
+            Some(&capture.screenshot_path),
+            Some(capture.resolution_width),
+            Some(capture.resolution_height),
+            Some(capture.captured_at),
         )
-        .execute(state.db())
         .await?;
     }
 
     // Update discovered profiles on shader version if provided
     if let Some(profiles) = &request.discovered_profiles {
         let profiles_json = serde_json::to_string(profiles).unwrap_or_else(|_| "[]".to_string());
-        sqlx::query!(
-            "UPDATE shader_versions SET supported_profiles = $1 WHERE id = $2",
-            profiles_json,
-            job.shader_version_id
+        ShaderVersionRepo::update_supported_profiles(
+            state.db(),
+            &shader_version_id,
+            &profiles_json,
         )
-        .execute(state.db())
         .await?;
     }
 
     // Mark job as completed
-    sqlx::query!(
-        r#"
-        UPDATE jobs
-        SET status = 'completed', completed_at = now()
-        WHERE id = $1
-        "#,
-        job_id
-    )
-    .execute(state.db())
-    .await?;
+    JobRepo::complete(state.db(), &job_id).await?;
 
     Ok(StatusCode::OK)
 }
@@ -354,38 +248,16 @@ async fn fail_job(
     Path(job_id): Path<String>,
     Json(request): Json<FailJobRequest>,
 ) -> AppResult<StatusCode> {
-    let result = sqlx::query!(
-        r#"
-        UPDATE jobs
-        SET status = 'failed',
-            error_message = $1,
-            completed_at = now()
-        WHERE id = $2 AND status IN ('claimed', 'running')
-        "#,
-        request.error_message,
-        job_id
-    )
-    .execute(state.db())
-    .await?;
+    let updated = JobRepo::fail(state.db(), &job_id, &request.error_message).await?;
 
-    if result.rows_affected() == 0 {
+    if !updated {
         return Ok(StatusCode::NOT_FOUND);
     }
 
     Ok(StatusCode::OK)
 }
 
-struct JobRow {
-    id: String,
-    shader_version_id: String,
-    scene_ids: Option<String>,
-    profiles: Option<String>,
-    priority: i32,
-}
-
-struct JobVersionRow {
-    shader_version_id: String,
-}
+// Helper structs for complex queries
 
 struct ShaderVersionRow {
     id: String,
@@ -419,6 +291,55 @@ struct SceneRow {
     world_file_url: Option<String>,
     world_file_hash: Option<String>,
     world_size_bytes: Option<i64>,
+}
+
+async fn fetch_shader_version_with_info(
+    db: &DbPool,
+    shader_version_id: &str,
+) -> AppResult<ShaderVersionRow> {
+    sqlx::query_as!(
+        ShaderVersionRow,
+        r#"
+        SELECT
+            sv.id, sv.version, sv.download_url, sv.file_hash,
+            s.id as shader_id, s.slug as shader_slug, s.name as shader_name
+        FROM shader_versions sv
+        JOIN shaders s ON s.id = sv.shader_id
+        WHERE sv.id = $1
+        "#,
+        shader_version_id
+    )
+    .fetch_one(db)
+    .await
+    .context(format!(
+        "failed to fetch shader version '{}'",
+        shader_version_id
+    ))
+    .map_err(Into::into)
+}
+
+async fn fetch_scene_with_world(db: &DbPool, scene_id: &str) -> AppResult<Option<SceneRow>> {
+    sqlx::query_as!(
+        SceneRow,
+        r#"
+        SELECT
+            sc.id, sc.slug, sc.name, sc.definition_json,
+            sc.x, sc.y, sc.z, sc.pitch, sc.yaw,
+            sc.dimension, sc.time_of_day_ticks, sc.weather, sc.weather_intensity,
+            sc.moon_phase, sc.biome,
+            w.id as world_id, w.slug as world_slug, w.name as world_name,
+            w.file_url as world_file_url, w.file_hash as world_file_hash,
+            w.size_bytes as world_size_bytes
+        FROM scenes sc
+        JOIN worlds w ON w.id = sc.world_id
+        WHERE sc.id = $1
+        "#,
+        scene_id
+    )
+    .fetch_optional(db)
+    .await
+    .context(format!("failed to fetch scene with world '{}'", scene_id))
+    .map_err(Into::into)
 }
 
 /// Builds definition JSON from SceneRow columns, matching the mod's Scene data class format.

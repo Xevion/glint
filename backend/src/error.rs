@@ -26,11 +26,23 @@ pub enum AppError {
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 
-    #[error("Database error: {0}")]
-    Database(#[from] sqlx::Error),
+    #[error("Database error")]
+    Database(#[source] sqlx::Error),
 
-    #[error("Internal error: {0}")]
-    Internal(#[from] anyhow::Error),
+    #[error("{0}")]
+    Internal(#[source] anyhow::Error),
+}
+
+impl From<sqlx::Error> for AppError {
+    fn from(e: sqlx::Error) -> Self {
+        AppError::Database(e)
+    }
+}
+
+impl From<anyhow::Error> for AppError {
+    fn from(e: anyhow::Error) -> Self {
+        AppError::Internal(e)
+    }
 }
 
 impl IntoResponse for AppError {
@@ -55,7 +67,8 @@ impl IntoResponse for AppError {
                 )
             }
             AppError::Internal(e) => {
-                error!(error = %e, "Internal error");
+                // Log full error chain for debugging
+                error!(error = ?e, "Internal error: {:#}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "INTERNAL_ERROR",

@@ -138,6 +138,12 @@ impl Config {
         let mut config: Config = Figment::new()
             .merge(Toml::file("config.toml"))
             .merge(Env::prefixed("GLINT_"))
+            // DATABASE_URL is commonly set by tools like docker-compose, so read it directly
+            .merge(
+                Env::raw()
+                    .only(&["DATABASE_URL"])
+                    .map(|_| "database_url".into()),
+            )
             .extract()?;
 
         // Load R2 config from env vars directly (secrets - avoid logging)

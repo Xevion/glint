@@ -4,11 +4,7 @@ use axum::{
     routing::get,
 };
 
-use crate::{
-    error::{AppError, AppResult},
-    models::Capture,
-    state::AppState,
-};
+use crate::{error::AppResult, models::Capture, repo::CaptureRepo, state::AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -17,13 +13,7 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn list_captures(State(state): State<AppState>) -> AppResult<Json<Vec<Capture>>> {
-    let captures = sqlx::query_as!(
-        Capture,
-        "SELECT * FROM captures WHERE status = 'completed' ORDER BY created_at DESC"
-    )
-    .fetch_all(state.db())
-    .await?;
-
+    let captures = CaptureRepo::list_completed(state.db()).await?;
     Ok(Json(captures))
 }
 
@@ -31,10 +21,6 @@ async fn get_capture(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<Capture>> {
-    let capture = sqlx::query_as!(Capture, "SELECT * FROM captures WHERE id = $1", id)
-        .fetch_optional(state.db())
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("Capture '{id}' not found")))?;
-
+    let capture = CaptureRepo::get_by_id(state.db(), &id).await?;
     Ok(Json(capture))
 }

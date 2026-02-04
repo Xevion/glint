@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM shader_versions WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "modrinth_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "download_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "supported_profiles",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "a1c3accc5063dd32f7ac2e250f9bbdf0ec8e6d38c1c9d9473c4a813f1d1d1a24"
+}

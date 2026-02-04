@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE captures SET outdated = TRUE WHERE scene_id = $1 AND status = 'completed'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "11a6619a477a2bc574b216e278dd217b8a8b26437a75bb42c61a038b000cbc21"
+}

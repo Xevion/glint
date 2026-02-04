@@ -5,6 +5,8 @@ use sqlx::PgPool;
 use tokio::time::interval;
 use tracing::{debug, error, info, trace, warn};
 
+use crate::repo::PendingUploadRepo;
+
 /// Interval between cleanup runs (10 minutes)
 const CLEANUP_INTERVAL_SECS: u64 = 600;
 
@@ -39,15 +41,7 @@ pub async fn cleanup_expired_uploads(pool: PgPool, s3: Option<S3Client>, bucket:
 /// Run a single cleanup pass
 async fn run_cleanup(pool: &PgPool, s3: Option<&S3Client>, bucket: &str) -> anyhow::Result<usize> {
     // Find all expired pending uploads
-    let expired = sqlx::query!(
-        r#"
-        SELECT upload_id, upload_key
-        FROM pending_uploads
-        WHERE expires_at < now()
-        "#
-    )
-    .fetch_all(pool)
-    .await?;
+    let expired = PendingUploadRepo::list_expired(pool).await?;
 
     if expired.is_empty() {
         return Ok(0);
@@ -76,16 +70,13 @@ async fn run_cleanup(pool: &PgPool, s3: Option<&S3Client>, bucket: &str) -> anyh
         }
 
         // Delete from database
-        match sqlx::query!(
-            "DELETE FROM pending_uploads WHERE upload_id = $1",
-            record.upload_id
-        )
-        .execute(pool)
-        .await
-        {
-            Ok(_) => {
+        match PendingUploadRepo::delete_expired_by_id(pool, &record.upload_id).await {
+            Ok(true) => {
                 trace!(upload_id = %record.upload_id, "Deleted expired pending upload record");
                 cleaned += 1;
+            }
+            Ok(false) => {
+                trace!(upload_id = %record.upload_id, "Pending upload already deleted");
             }
             Err(e) => {
                 error!(upload_id = %record.upload_id, error = %e, "Failed to delete pending upload record");

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM shader_versions WHERE id != 'vanilla-1.21.4'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "a4e5a5af905e202fb5ecc511f051e92ba513aea92ed01779bdab1b6e4181ca4a"
+}

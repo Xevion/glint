@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM scene_tags WHERE scene_id = $1 AND tag_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b9ab78bee5ec16b72d5ac45bf3fef1abc30eb4c10ccdd6e374ed0c849e2168de"
+}

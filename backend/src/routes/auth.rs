@@ -13,8 +13,9 @@ use serde::Deserialize;
 use tracing::{debug, error, warn};
 
 use crate::{
-    auth::{self, SESSION_COOKIE_NAME, SESSION_DURATION_DAYS},
+    auth::{self, SESSION_COOKIE_NAME},
     error::{AppError, AppResult},
+    repo::{SessionRepo, UserRepo, session::SESSION_DURATION_DAYS},
     state::AppState,
 };
 
@@ -108,7 +109,7 @@ async fn discord_callback(
     );
 
     // Upsert user in database
-    let user = auth::upsert_user(
+    let user = UserRepo::upsert(
         state.db(),
         &discord_user.id,
         &discord_user.username,
@@ -117,7 +118,7 @@ async fn discord_callback(
     .await?;
 
     // Create session
-    let session = auth::create_session(state.db(), user.id).await?;
+    let session = SessionRepo::create(state.db(), user.id).await?;
 
     // Build session cookie
     let cookie = Cookie::build((SESSION_COOKIE_NAME, session.token))

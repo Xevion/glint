@@ -342,6 +342,18 @@ pub struct CompleteWorldUploadRequest {
     pub upload_id: String,
 }
 
+/// Internal request for creating a world record in the database
+#[derive(Debug)]
+pub struct CreateWorldRequest<'a> {
+    pub name: &'a str,
+    pub slug: &'a str,
+    pub description: Option<&'a str>,
+    pub minecraft_version: &'a str,
+    pub file_url: &'a str,
+    pub file_hash: &'a str,
+    pub size_bytes: i64,
+}
+
 /// Helper types for scene position and camera
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Position {

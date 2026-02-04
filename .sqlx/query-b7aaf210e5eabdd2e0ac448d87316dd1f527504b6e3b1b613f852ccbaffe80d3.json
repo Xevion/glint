@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            sv.id, sv.version, sv.download_url, sv.file_hash,\n            s.id as shader_id, s.slug as shader_slug, s.name as shader_name\n        FROM shader_versions sv\n        JOIN shaders s ON s.id = sv.shader_id\n        WHERE sv.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "download_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "shader_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "shader_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "shader_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b7aaf210e5eabdd2e0ac448d87316dd1f527504b6e3b1b613f852ccbaffe80d3"
+}
