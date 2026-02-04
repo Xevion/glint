@@ -127,6 +127,12 @@ const checks: Check[] = [
       "-E", "not test(export_bindings)",
     ],
   },
+  {
+    name: "backend-sqlx",
+    subsystem: "backend",
+    cmd: ["sh", "-c", "cd backend && cargo sqlx prepare --check"],
+    hint: "Run 'cd backend && cargo sqlx prepare' to update query metadata.",
+  },
   // Agent checks (3)
   {
     name: "agent-format",
