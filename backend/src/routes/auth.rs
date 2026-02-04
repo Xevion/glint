@@ -117,8 +117,8 @@ async fn discord_callback(
     )
     .await?;
 
-    // Create session
-    let session = SessionRepo::create(state.db(), user.id).await?;
+    // Create session (web source since this is browser OAuth)
+    let session = SessionRepo::create(state.db(), user.id, "web").await?;
 
     // Build session cookie
     let cookie = Cookie::build((SESSION_COOKIE_NAME, session.token))

@@ -2,6 +2,7 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.Glint
 import com.xevion.glint.api.ApiConfig
+import com.xevion.glint.api.DeviceTokenResponse
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.Screen
@@ -11,12 +12,21 @@ import net.minecraft.network.chat.Component
 /**
  * Entry point for API configuration.
  * Shows edit screen if already configured, or starts wizard flow if not.
+ *
+ * Wizard flow:
+ * 1. ServerConnectionScreen - validate URL
+ * 2. DeviceAuthScreen - authenticate user
+ * 3. WorldSelectionScreen - select world
  */
 class ApiConfigWizardScreen(
     private val parent: Screen,
     private val showConnectionFirst: Boolean = false,
 ) : Screen(Component.literal("API Configuration")) {
     private val config: ApiConfig = ApiConfig.load()
+
+    // Store token response from device auth for world selection
+    private var pendingToken: DeviceTokenResponse? = null
+    private var pendingServerUrl: String? = null
 
     override fun init() {
         // If no config or forced to show connection first, start wizard flow
@@ -33,19 +43,39 @@ class ApiConfigWizardScreen(
             ServerConnectionScreen(
                 parent = parent,
                 onConnectionValidated = { validatedUrl ->
-                    showWorldSelection(validatedUrl)
+                    showDeviceAuth(validatedUrl)
                 },
                 initialUrl = config.apiUrl.ifBlank { "http://localhost:8080" },
             ),
         )
     }
 
-    private fun showWorldSelection(serverUrl: String) {
+    private fun showDeviceAuth(serverUrl: String) {
+        minecraft?.setScreen(
+            DeviceAuthScreen(
+                parent = parent,
+                serverUrl = serverUrl,
+                onAuthorized = { tokenResponse ->
+                    pendingToken = tokenResponse
+                    pendingServerUrl = serverUrl
+                    showWorldSelection(serverUrl, tokenResponse)
+                },
+                onBack = { showConnectionScreen() },
+            ),
+        )
+    }
+
+    private fun showWorldSelection(
+        serverUrl: String,
+        tokenResponse: DeviceTokenResponse,
+    ) {
         minecraft?.setScreen(
             WorldSelectionScreen(
                 parent = parent,
                 serverUrl = serverUrl,
-                onBack = { showConnectionScreen() },
+                accessToken = tokenResponse.accessToken,
+                tokenExpiresIn = tokenResponse.expiresIn,
+                onBack = { showDeviceAuth(serverUrl) },
             ),
         )
     }

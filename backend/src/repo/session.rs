@@ -34,27 +34,29 @@ struct UserSessionRow {
 
 impl SessionRepo {
     /// Create a new session for a user
+    /// `source` indicates how the session was created: "web" (browser) or "device" (mod)
     #[instrument(skip(db), level = "debug")]
-    pub async fn create(db: &DbPool, user_id: i32) -> AppResult<Session> {
+    pub async fn create(db: &DbPool, user_id: i32, source: &str) -> AppResult<Session> {
         let token = generate_session_token();
         let expires_at = Utc::now() + Duration::days(SESSION_DURATION_DAYS);
 
         let session = sqlx::query_as!(
             Session,
             r#"
-            INSERT INTO sessions (token, user_id, expires_at)
-            VALUES ($1, $2, $3)
+            INSERT INTO sessions (token, user_id, expires_at, source)
+            VALUES ($1, $2, $3, $4)
             RETURNING token, user_id, expires_at, created_at
             "#,
             token,
             user_id,
-            expires_at
+            expires_at,
+            source
         )
         .fetch_one(db)
         .await
         .context(format!("failed to create session for user '{}'", user_id))?;
 
-        debug!(user_id, "Session created");
+        debug!(user_id, source, "Session created");
         Ok(session)
     }
 

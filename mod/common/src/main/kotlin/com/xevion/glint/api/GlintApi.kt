@@ -6,13 +6,15 @@ import com.xevion.glint.screenshot.Position
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.charset.StandardCharsets
 
 /**
  * HTTP client for communicating with the Glint backend API.
- * Handles scene CRUD operations and synchronization.
+ * Handles scene CRUD operations, synchronization, and device authentication.
  */
 object GlintApi {
     private val JSON =
@@ -20,6 +22,15 @@ object GlintApi {
             ignoreUnknownKeys = true
             encodeDefaults = true
         }
+
+    /**
+     * Sets the Authorization header on an HTTP connection if a token is provided.
+     */
+    private fun HttpURLConnection.setAuthHeader(token: String?) {
+        if (!token.isNullOrBlank()) {
+            setRequestProperty("Authorization", "Bearer $token")
+        }
+    }
 
     /**
      * Validates URL format for API connection.
@@ -88,7 +99,7 @@ object GlintApi {
     }
 
     /**
-     * Tests connection to the API server by fetching world list.
+     * Tests connection to the API server using the device status endpoint (no auth required).
      * Returns success if server responds with 200, error otherwise.
      */
     fun testConnection(apiUrl: String): Result<String> {
@@ -105,7 +116,7 @@ object GlintApi {
             )
         }
 
-        val url = "${validationResult.normalizedUrl}/api/admin/worlds"
+        val url = "${validationResult.normalizedUrl}/api/device/status"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
@@ -128,15 +139,121 @@ object GlintApi {
         }
     }
 
+    // ============== Device Authorization Flow ==============
+
+    /**
+     * Starts device authorization flow. Returns device_code and user_code for the mod to display.
+     */
+    fun startDeviceAuth(apiUrl: String): Result<DeviceAuthResponse> {
+        val url = "$apiUrl/api/device/authorize"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 10000
+
+            // Empty body for POST
+            connection.outputStream.use { it.write("{}".toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                200 -> {
+                    val responseBody = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    try {
+                        val response = JSON.decodeFromString<DeviceAuthResponse>(responseBody)
+                        Result.success(response)
+                    } catch (e: Exception) {
+                        Result.failure(ApiError.ParseError("Failed to parse device auth response", e))
+                    }
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /**
+     * Polls for device token. Returns the access token if user has authorized,
+     * or specific error types for pending/expired/invalid states.
+     */
+    fun pollDeviceToken(
+        apiUrl: String,
+        deviceCode: String,
+    ): Result<DeviceTokenResponse> {
+        val url = "$apiUrl/api/device/token"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 10000
+
+            val requestBody = """{"device_code":"$deviceCode"}"""
+            connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                200 -> {
+                    val responseBody = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    try {
+                        val response = JSON.decodeFromString<DeviceTokenResponse>(responseBody)
+                        Result.success(response)
+                    } catch (e: Exception) {
+                        Result.failure(ApiError.ParseError("Failed to parse token response", e))
+                    }
+                }
+
+                400 -> {
+                    // Parse error response to determine specific error type
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8) ?: ""
+                    try {
+                        val errorJson = JSON.decodeFromString<JsonObject>(errorBody)
+                        val errorType = errorJson["error"]?.jsonPrimitive?.content
+                        when (errorType) {
+                            "authorization_pending" -> Result.failure(ApiError.AuthorizationPending())
+                            "expired_token" -> Result.failure(ApiError.TokenExpired())
+                            "invalid_grant" -> Result.failure(ApiError.InvalidGrant())
+                            else -> Result.failure(ApiError.HttpError(400, errorBody))
+                        }
+                    } catch (e: Exception) {
+                        Result.failure(ApiError.HttpError(400, errorBody))
+                    }
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    // ============== Authenticated API Endpoints ==============
+
     /**
      * Fetches list of available worlds from the API server.
+     * Requires authentication token.
      */
-    fun listWorlds(apiUrl: String): Result<List<WorldInfo>> {
-        val url = "$apiUrl/api/admin/worlds"
+    fun listWorlds(
+        apiUrl: String,
+        token: String? = null,
+    ): Result<List<WorldInfo>> {
+        val url = "$apiUrl/api/worlds"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
+            connection.setAuthHeader(token)
             connection.connectTimeout = 5000
             connection.readTimeout = 10000
 
@@ -163,13 +280,15 @@ object GlintApi {
 
     /**
      * Creates a new scene on the backend.
+     * Requires authentication token.
      */
     fun createScene(
         apiUrl: String,
         worldId: String,
         scene: Scene,
+        token: String? = null,
     ): Result<ApiScene> {
-        val url = "$apiUrl/api/admin/scenes"
+        val url = "$apiUrl/api/scenes"
         val request =
             CreateSceneRequest(
                 worldId = worldId,
@@ -189,6 +308,7 @@ object GlintApi {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
+            connection.setAuthHeader(token)
             connection.doOutput = true
             connection.connectTimeout = 5000
             connection.readTimeout = 10000
@@ -223,13 +343,15 @@ object GlintApi {
 
     /**
      * Updates an existing scene on the backend.
+     * Requires authentication token.
      */
     fun updateScene(
         apiUrl: String,
         worldId: String,
         scene: Scene,
+        token: String? = null,
     ): Result<ApiScene> {
-        val url = "$apiUrl/api/admin/scenes/${scene.id}"
+        val url = "$apiUrl/api/scenes/by-slug/${scene.id}"
         val request =
             UpdateSceneRequest(
                 worldId = worldId,
@@ -247,6 +369,7 @@ object GlintApi {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "PUT"
             connection.setRequestProperty("Content-Type", "application/json")
+            connection.setAuthHeader(token)
             connection.doOutput = true
             connection.connectTimeout = 5000
             connection.readTimeout = 10000
@@ -281,17 +404,20 @@ object GlintApi {
 
     /**
      * Disables a scene on the backend (soft delete).
+     * Requires authentication token.
      */
     fun disableScene(
         apiUrl: String,
         worldId: String,
         sceneSlug: String,
+        token: String? = null,
     ): Result<Unit> {
-        val url = "$apiUrl/api/admin/scenes/$sceneSlug?world_id=$worldId"
+        val url = "$apiUrl/api/scenes/by-slug/$sceneSlug?world_id=$worldId"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "DELETE"
+            connection.setAuthHeader(token)
             connection.connectTimeout = 5000
             connection.readTimeout = 10000
 
@@ -402,3 +528,26 @@ sealed class UrlValidationResult {
         val reason: String,
     ) : UrlValidationResult()
 }
+
+/**
+ * Response from device authorization request.
+ */
+@Serializable
+data class DeviceAuthResponse(
+    @SerialName("device_code") val deviceCode: String,
+    @SerialName("user_code") val userCode: String,
+    @SerialName("verification_uri") val verificationUri: String,
+    @SerialName("verification_uri_complete") val verificationUriComplete: String,
+    @SerialName("expires_in") val expiresIn: Long,
+    val interval: Long,
+)
+
+/**
+ * Response from device token polling request.
+ */
+@Serializable
+data class DeviceTokenResponse(
+    @SerialName("access_token") val accessToken: String,
+    @SerialName("token_type") val tokenType: String,
+    @SerialName("expires_in") val expiresIn: Long,
+)

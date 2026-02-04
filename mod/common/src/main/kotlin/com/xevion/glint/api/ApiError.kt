@@ -64,6 +64,34 @@ sealed class ApiError : Exception() {
         override val userMessage: String = "Unknown error: ${cause?.message ?: message}"
     }
 
+    /**
+     * Device authorization is still pending (user hasn't confirmed yet).
+     * The mod should continue polling.
+     */
+    data class AuthorizationPending(
+        override val message: String = "Authorization pending",
+    ) : ApiError() {
+        override val userMessage: String = "Waiting for user authorization..."
+    }
+
+    /**
+     * Device code has expired. The mod should request a new code.
+     */
+    data class TokenExpired(
+        override val message: String = "Token expired",
+    ) : ApiError() {
+        override val userMessage: String = "Device code expired. Please try again."
+    }
+
+    /**
+     * Device code is invalid or already used.
+     */
+    data class InvalidGrant(
+        override val message: String = "Invalid grant",
+    ) : ApiError() {
+        override val userMessage: String = "Device code is invalid or already used."
+    }
+
     companion object {
         fun fromException(e: Exception): ApiError =
             when (e) {

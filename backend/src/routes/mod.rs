@@ -1,6 +1,7 @@
 mod agent;
 mod auth;
 mod captures;
+mod device;
 mod jobs;
 mod scenes;
 mod sessions;
@@ -32,6 +33,7 @@ fn api_router() -> Router<AppState> {
         .nest("/users", users::router())
         .nest("/sessions", sessions::router())
         .nest("/agent", agent::router())
+        .nest("/device", device::router())
 }
 
 async fn health() -> &'static str {

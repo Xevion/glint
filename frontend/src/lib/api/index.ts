@@ -3,6 +3,7 @@ import { SceneEndpoints } from './endpoints/scenes';
 import { CaptureEndpoints } from './endpoints/captures';
 import { AdminEndpoints } from './endpoints/admin';
 import { WorldsEndpoints } from './endpoints/worlds';
+import { DeviceEndpoints } from './endpoints/device';
 import { API_BASE_URL } from './config';
 
 /**
@@ -24,7 +25,8 @@ export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
 		scenes: new SceneEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
 		captures: new CaptureEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
 		admin: new AdminEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		worlds: new WorldsEndpoints(baseUrl ?? API_BASE_URL)
+		worlds: new WorldsEndpoints(baseUrl ?? API_BASE_URL),
+		device: new DeviceEndpoints(baseUrl ?? API_BASE_URL, fetchFn)
 	};
 }
 

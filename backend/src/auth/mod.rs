@@ -16,8 +16,9 @@ pub const SESSION_COOKIE_NAME: &str = "glint_session";
 pub const SESSION_DURATION_DAYS: i64 = 7;
 
 /// Create a new session in the database (delegates to SessionRepo)
-pub async fn create_session(db: &DbPool, user_id: i32) -> AppResult<Session> {
-    SessionRepo::create(db, user_id).await
+/// `source` indicates how the session was created: "web" (browser) or "device" (mod)
+pub async fn create_session(db: &DbPool, user_id: i32, source: &str) -> AppResult<Session> {
+    SessionRepo::create(db, user_id, source).await
 }
 
 /// Validate a session token and return the associated user (delegates to SessionRepo)

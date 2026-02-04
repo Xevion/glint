@@ -15,6 +15,8 @@ import java.util.concurrent.CompletableFuture
 class WorldSelectionScreen(
     private val parent: Screen,
     private val serverUrl: String,
+    private val accessToken: String? = null,
+    private val tokenExpiresIn: Long = 0L,
     private val onBack: () -> Unit,
 ) : Screen(Component.literal("Select World")) {
     private var worldList: WorldListWidget? = null
@@ -71,7 +73,7 @@ class WorldSelectionScreen(
 
         CompletableFuture
             .supplyAsync {
-                GlintApi.listWorlds(serverUrl)
+                GlintApi.listWorlds(serverUrl, accessToken)
             }.thenAccept { result ->
                 minecraft?.execute {
                     loadingWorlds = false
@@ -95,6 +97,14 @@ class WorldSelectionScreen(
     private fun saveSelection() {
         val selected = worldList?.selected ?: return
 
+        // Calculate token expiry time (current time + expires_in seconds)
+        val tokenExpiresAt =
+            if (accessToken != null && tokenExpiresIn > 0) {
+                System.currentTimeMillis() + (tokenExpiresIn * 1000)
+            } else {
+                0L
+            }
+
         val config =
             ApiConfig(
                 apiUrl = serverUrl,
@@ -102,6 +112,8 @@ class WorldSelectionScreen(
                 worldName = selected.name,
                 enabled = true,
                 validated = true,
+                accessToken = accessToken ?: "",
+                tokenExpiresAt = tokenExpiresAt,
             )
 
         if (ApiConfig.save(config)) {

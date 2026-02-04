@@ -17,6 +17,8 @@ data class ApiConfig(
     val worldName: String = "",
     val enabled: Boolean = false,
     val validated: Boolean = false,
+    val accessToken: String = "",
+    val tokenExpiresAt: Long = 0L,
 ) {
     companion object {
         private val JSON =
@@ -74,10 +76,20 @@ data class ApiConfig(
     /**
      * Checks if the config is valid for API operations.
      */
-    fun isValid(): Boolean = enabled && apiUrl.isNotBlank() && worldId.isNotBlank() && validated
+    fun isValid(): Boolean = enabled && apiUrl.isNotBlank() && worldId.isNotBlank() && validated && hasValidToken()
 
     /**
      * Checks if the config needs validation (has URL but not validated).
      */
     fun needsValidation(): Boolean = apiUrl.isNotBlank() && !validated
+
+    /**
+     * Checks if the access token is present and not expired.
+     */
+    fun hasValidToken(): Boolean = accessToken.isNotBlank() && tokenExpiresAt > System.currentTimeMillis()
+
+    /**
+     * Checks if the token is close to expiring (within 1 hour).
+     */
+    fun isTokenExpiringSoon(): Boolean = accessToken.isNotBlank() && tokenExpiresAt - System.currentTimeMillis() < 3600_000L
 }
