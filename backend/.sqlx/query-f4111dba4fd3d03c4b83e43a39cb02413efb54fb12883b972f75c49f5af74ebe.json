@@ -1,0 +1,142 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                sc.id, sc.slug, sc.name, sc.definition_json,\n                sc.x, sc.y, sc.z, sc.pitch, sc.yaw,\n                sc.dimension, sc.time_of_day_ticks, sc.weather, sc.weather_intensity,\n                sc.moon_phase, sc.biome,\n                w.id as world_id, w.slug as world_slug, w.name as world_name,\n                w.file_url as world_file_url, w.file_hash as world_file_hash,\n                w.size_bytes as world_size_bytes\n            FROM scenes sc\n            JOIN worlds w ON w.id = sc.world_id\n            WHERE sc.id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "definition_json",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "x",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "y",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 6,
+        "name": "z",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "pitch",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 8,
+        "name": "yaw",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 9,
+        "name": "dimension",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "time_of_day_ticks",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "weather",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "weather_intensity",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 13,
+        "name": "moon_phase",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "biome",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "world_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "world_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "world_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "world_file_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "world_file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "world_size_bytes",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "f4111dba4fd3d03c4b83e43a39cb02413efb54fb12883b972f75c49f5af74ebe"
+}

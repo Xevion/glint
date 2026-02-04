@@ -1,4 +1,4 @@
-use crate::db::UtcDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use ts_rs::TS;
@@ -16,9 +16,9 @@ pub struct World {
     pub file_hash: Option<String>,
     pub size_bytes: Option<i64>,
     #[ts(type = "string")]
-    pub created_at: UtcDateTime,
+    pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
-    pub updated_at: UtcDateTime,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Tracks pending world uploads (presigned URL workflow)
@@ -32,8 +32,8 @@ pub struct PendingUpload {
     pub file_hash: String,
     pub size_bytes: i64,
     pub upload_key: String,
-    pub expires_at: UtcDateTime,
-    pub created_at: UtcDateTime,
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
 }
 
 /// Shader pack identity (not version-specific)
@@ -48,9 +48,9 @@ pub struct Shader {
     pub curseforge_id: Option<String>,
     pub website_url: Option<String>,
     #[ts(type = "string")]
-    pub created_at: UtcDateTime,
+    pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
-    pub updated_at: UtcDateTime,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Specific release of a shader pack
@@ -66,7 +66,7 @@ pub struct ShaderVersion {
     /// JSON array of profile names, discovered after first capture
     pub supported_profiles: Option<String>,
     #[ts(type = "string")]
-    pub created_at: UtcDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
@@ -83,7 +83,7 @@ pub struct Scene {
     pub pitch: f64,
     pub yaw: f64,
     pub dimension: String,
-    pub time_of_day_ticks: i64,
+    pub time_of_day_ticks: i32,
     pub weather: String,
     pub weather_intensity: f64,
     pub moon_phase: Option<i32>,
@@ -91,7 +91,7 @@ pub struct Scene {
     pub definition_json: Option<String>,
     pub active: bool,
     #[ts(type = "string")]
-    pub created_at: UtcDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
@@ -113,13 +113,17 @@ pub struct Capture {
     pub minecraft_version: Option<String>,
     pub iris_version: Option<String>,
     pub gpu_model: Option<String>,
+    pub resolution_width: Option<i32>,
+    pub resolution_height: Option<i32>,
+    #[ts(type = "string | null")]
+    pub captured_at: Option<DateTime<Utc>>,
     pub status: String,
     pub error_message: Option<String>,
     pub outdated: bool,
     #[ts(type = "string")]
-    pub created_at: UtcDateTime,
+    pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
-    pub updated_at: UtcDateTime,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
@@ -135,16 +139,16 @@ pub struct Job {
     pub max_attempts: i32,
     pub agent_id: Option<String>,
     #[ts(type = "string | null")]
-    pub claimed_at: Option<UtcDateTime>,
+    pub claimed_at: Option<DateTime<Utc>>,
     #[ts(type = "string | null")]
-    pub last_heartbeat: Option<UtcDateTime>,
+    pub last_heartbeat: Option<DateTime<Utc>>,
     #[ts(type = "string | null")]
-    pub started_at: Option<UtcDateTime>,
+    pub started_at: Option<DateTime<Utc>>,
     #[ts(type = "string | null")]
-    pub completed_at: Option<UtcDateTime>,
+    pub completed_at: Option<DateTime<Utc>>,
     pub error_message: Option<String>,
     #[ts(type = "string")]
-    pub created_at: UtcDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 /// Discord OAuth user
@@ -157,9 +161,9 @@ pub struct User {
     pub discord_avatar: Option<String>,
     pub role: String,
     #[ts(type = "string")]
-    pub created_at: UtcDateTime,
+    pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
-    pub updated_at: UtcDateTime,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Database-backed session (with in-memory cache at runtime)
@@ -167,8 +171,8 @@ pub struct User {
 pub struct Session {
     pub token: String,
     pub user_id: i32,
-    pub expires_at: UtcDateTime,
-    pub created_at: UtcDateTime,
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
 }
 
 /// Shader style category (realistic, fantasy, cartoon, etc.)
@@ -283,7 +287,7 @@ pub struct CaptureWithContext {
     pub screenshot_path: Option<String>,
     pub screenshot_url: Option<String>,
     #[ts(type = "string | null")]
-    pub captured_at: Option<UtcDateTime>,
+    pub captured_at: Option<DateTime<Utc>>,
     pub resolution_width: Option<i32>,
     pub resolution_height: Option<i32>,
 }
@@ -329,7 +333,7 @@ pub struct CreateWorldUploadResponse {
     pub upload_id: String,
     pub presigned_url: String,
     #[ts(type = "string")]
-    pub expires_at: UtcDateTime,
+    pub expires_at: DateTime<Utc>,
 }
 
 /// Request to complete a world upload
@@ -362,7 +366,7 @@ pub struct CreateSceneRequest {
     pub camera: Camera,
     pub dimension: String,
     #[serde(rename = "timeOfDay")]
-    pub time_of_day: i64,
+    pub time_of_day: i32,
     pub weather: String,
     #[serde(rename = "weatherIntensity", default)]
     pub weather_intensity: f64,
@@ -379,7 +383,7 @@ pub struct UpdateSceneRequest {
     pub camera: Camera,
     pub dimension: String,
     #[serde(rename = "timeOfDay")]
-    pub time_of_day: i64,
+    pub time_of_day: i32,
     pub weather: String,
     #[serde(rename = "weatherIntensity", default)]
     pub weather_intensity: f64,

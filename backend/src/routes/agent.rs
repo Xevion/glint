@@ -29,7 +29,8 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
     let agent_id = "default-agent";
 
     // Find and claim the next pending job (highest priority, oldest first)
-    let job = sqlx::query_as::<_, JobRow>(
+    let job = sqlx::query_as!(
+        JobRow,
         r#"
         UPDATE jobs
         SET status = 'claimed',
@@ -46,8 +47,8 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
         )
         RETURNING id, shader_version_id, scene_ids, profiles, priority
         "#,
+        agent_id
     )
-    .bind(agent_id)
     .fetch_optional(state.db())
     .await?;
 
@@ -56,7 +57,8 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
     };
 
     // Fetch shader version with shader info
-    let shader_version = sqlx::query_as::<_, ShaderVersionRow>(
+    let shader_version = sqlx::query_as!(
+        ShaderVersionRow,
         r#"
         SELECT
             sv.id, sv.version, sv.download_url, sv.file_hash,
@@ -65,8 +67,8 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
         JOIN shaders s ON s.id = sv.shader_id
         WHERE sv.id = $1
         "#,
+        job.shader_version_id
     )
-    .bind(&job.shader_version_id)
     .fetch_one(state.db())
     .await?;
 
@@ -87,7 +89,8 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
     let mut worlds_map = std::collections::HashMap::new();
 
     for scene_id in &scene_ids {
-        let scene = sqlx::query_as::<_, SceneRow>(
+        let scene = sqlx::query_as!(
+            SceneRow,
             r#"
             SELECT
                 sc.id, sc.slug, sc.name, sc.definition_json,
@@ -101,8 +104,8 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
             JOIN worlds w ON w.id = sc.world_id
             WHERE sc.id = $1
             "#,
+            scene_id
         )
-        .bind(scene_id)
         .fetch_optional(state.db())
         .await?;
 
@@ -177,15 +180,15 @@ async fn heartbeat(
     State(state): State<AppState>,
     Path(job_id): Path<String>,
 ) -> AppResult<StatusCode> {
-    let result = sqlx::query(
+    let result = sqlx::query!(
         r#"
         UPDATE jobs
         SET last_heartbeat = now(),
             status = CASE WHEN status = 'claimed' THEN 'running' ELSE status END
         WHERE id = $1 AND status IN ('claimed', 'running')
         "#,
+        job_id
     )
-    .bind(&job_id)
     .execute(state.db())
     .await?;
 
@@ -204,11 +207,12 @@ async fn prepare_upload(
     Json(request): Json<PrepareUploadRequest>,
 ) -> AppResult<Json<PrepareUploadResponse>> {
     // Verify job exists and is running
-    let job =
-        sqlx::query_scalar::<_, String>("SELECT id FROM jobs WHERE id = $1 AND status = 'running'")
-            .bind(&job_id)
-            .fetch_optional(state.db())
-            .await?;
+    let job = sqlx::query_scalar!(
+        "SELECT id FROM jobs WHERE id = $1 AND status = 'running'",
+        job_id
+    )
+    .fetch_optional(state.db())
+    .await?;
 
     if job.is_none() {
         return Err(crate::error::AppError::NotFound(
@@ -269,10 +273,11 @@ async fn complete_job(
     Json(request): Json<CompleteJobRequest>,
 ) -> AppResult<StatusCode> {
     // Get the job to find shader_version_id
-    let job = sqlx::query_as::<_, JobVersionRow>(
+    let job = sqlx::query_as!(
+        JobVersionRow,
         "SELECT shader_version_id FROM jobs WHERE id = $1 AND status = 'running'",
+        job_id
     )
-    .bind(&job_id)
     .fetch_optional(state.db())
     .await?;
 
@@ -286,7 +291,7 @@ async fn complete_job(
     for capture in &request.captures {
         let capture_id = Uuid::new_v4().to_string();
         let captured_at = capture.captured_at;
-        sqlx::query(
+        sqlx::query!(
             r#"
             INSERT INTO captures (
                 id, shader_version_id, scene_id, profile, screenshot_path,
@@ -302,15 +307,15 @@ async fn complete_job(
                 updated_at = excluded.updated_at,
                 captured_at = excluded.captured_at
             "#,
+            capture_id,
+            job.shader_version_id,
+            capture.scene_id,
+            capture.profile,
+            capture.screenshot_path,
+            capture.resolution_width,
+            capture.resolution_height,
+            captured_at
         )
-        .bind(&capture_id)
-        .bind(&job.shader_version_id)
-        .bind(&capture.scene_id)
-        .bind(&capture.profile)
-        .bind(&capture.screenshot_path)
-        .bind(capture.resolution_width)
-        .bind(capture.resolution_height)
-        .bind(captured_at)
         .execute(state.db())
         .await?;
     }
@@ -318,22 +323,24 @@ async fn complete_job(
     // Update discovered profiles on shader version if provided
     if let Some(profiles) = &request.discovered_profiles {
         let profiles_json = serde_json::to_string(profiles).unwrap_or_else(|_| "[]".to_string());
-        sqlx::query("UPDATE shader_versions SET supported_profiles = $1 WHERE id = $2")
-            .bind(&profiles_json)
-            .bind(&job.shader_version_id)
-            .execute(state.db())
-            .await?;
+        sqlx::query!(
+            "UPDATE shader_versions SET supported_profiles = $1 WHERE id = $2",
+            profiles_json,
+            job.shader_version_id
+        )
+        .execute(state.db())
+        .await?;
     }
 
     // Mark job as completed
-    sqlx::query(
+    sqlx::query!(
         r#"
         UPDATE jobs
         SET status = 'completed', completed_at = now()
         WHERE id = $1
         "#,
+        job_id
     )
-    .bind(&job_id)
     .execute(state.db())
     .await?;
 
@@ -347,7 +354,7 @@ async fn fail_job(
     Path(job_id): Path<String>,
     Json(request): Json<FailJobRequest>,
 ) -> AppResult<StatusCode> {
-    let result = sqlx::query(
+    let result = sqlx::query!(
         r#"
         UPDATE jobs
         SET status = 'failed',
@@ -355,9 +362,9 @@ async fn fail_job(
             completed_at = now()
         WHERE id = $2 AND status IN ('claimed', 'running')
         "#,
+        request.error_message,
+        job_id
     )
-    .bind(&request.error_message)
-    .bind(&job_id)
     .execute(state.db())
     .await?;
 
@@ -368,7 +375,6 @@ async fn fail_job(
     Ok(StatusCode::OK)
 }
 
-#[derive(sqlx::FromRow)]
 struct JobRow {
     id: String,
     shader_version_id: String,
@@ -377,12 +383,10 @@ struct JobRow {
     priority: i32,
 }
 
-#[derive(sqlx::FromRow)]
 struct JobVersionRow {
     shader_version_id: String,
 }
 
-#[derive(sqlx::FromRow)]
 struct ShaderVersionRow {
     id: String,
     version: String,
@@ -393,7 +397,6 @@ struct ShaderVersionRow {
     shader_name: String,
 }
 
-#[derive(sqlx::FromRow)]
 struct SceneRow {
     id: String,
     slug: String,

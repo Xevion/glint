@@ -1,0 +1,158 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM captures WHERE status = 'completed' ORDER BY created_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "scene_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "profile",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "screenshot_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "screenshot_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "video_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "thumbnail_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "resolution_width",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "resolution_height",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "captured_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "avg_fps",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 12,
+        "name": "min_fps",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 13,
+        "name": "max_fps",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 14,
+        "name": "frame_time_avg",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 15,
+        "name": "frame_time_p99",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 16,
+        "name": "minecraft_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "iris_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "gpu_model",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "outdated",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 22,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 23,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1a2c065f430f38a67c4e7715d1d44781166fbe16593930168f89c9725bca240a"
+}

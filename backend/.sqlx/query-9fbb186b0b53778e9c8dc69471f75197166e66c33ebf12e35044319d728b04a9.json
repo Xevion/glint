@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE jobs\n        SET status = 'failed',\n            error_message = 'Cancelled by admin',\n            completed_at = now()\n        WHERE id = $1 AND status IN ('pending', 'claimed')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9fbb186b0b53778e9c8dc69471f75197166e66c33ebf12e35044319d728b04a9"
+}

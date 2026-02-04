@@ -63,7 +63,8 @@ pub async fn monitor_heartbeats(pool: PgPool, config: HeartbeatConfig) {
 
 /// Reset jobs that have exceeded the heartbeat timeout
 async fn reset_stale_jobs(pool: &PgPool, timeout_seconds: u64) -> anyhow::Result<u64> {
-    let result = sqlx::query(
+    let timeout_secs = timeout_seconds as f64;
+    let result = sqlx::query!(
         r#"
         UPDATE jobs
         SET status = CASE
@@ -80,8 +81,8 @@ async fn reset_stale_jobs(pool: &PgPool, timeout_seconds: u64) -> anyhow::Result
         WHERE status IN ('claimed', 'running')
           AND last_heartbeat < now() - make_interval(secs => $1)
         "#,
+        timeout_secs
     )
-    .bind(timeout_seconds as f64)
     .execute(pool)
     .await?;
 
@@ -90,10 +91,11 @@ async fn reset_stale_jobs(pool: &PgPool, timeout_seconds: u64) -> anyhow::Result
 
 /// Check if there are any active (claimed or running) jobs
 async fn check_active_jobs(pool: &PgPool) -> anyhow::Result<bool> {
-    let result: (i64,) =
-        sqlx::query_as("SELECT COUNT(*) FROM jobs WHERE status IN ('claimed', 'running')")
-            .fetch_one(pool)
-            .await?;
+    let result = sqlx::query_scalar!(
+        r#"SELECT COUNT(*)::int8 as "count!" FROM jobs WHERE status IN ('claimed', 'running')"#
+    )
+    .fetch_one(pool)
+    .await?;
 
-    Ok(result.0 > 0)
+    Ok(result > 0)
 }

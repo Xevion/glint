@@ -18,10 +18,12 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn list_scenes(State(state): State<AppState>) -> AppResult<Json<Vec<Scene>>> {
-    let scenes =
-        sqlx::query_as::<_, Scene>("SELECT * FROM scenes WHERE active = TRUE ORDER BY name")
-            .fetch_all(state.db())
-            .await?;
+    let scenes = sqlx::query_as!(
+        Scene,
+        "SELECT * FROM scenes WHERE active = TRUE ORDER BY name"
+    )
+    .fetch_all(state.db())
+    .await?;
 
     Ok(Json(scenes))
 }
@@ -37,19 +39,23 @@ async fn get_scene(
     Query(params): Query<SceneQuery>,
 ) -> AppResult<Json<Vec<SceneWithCaptures>>> {
     // Fetch all scenes with this slug (world-scoped), optionally filtered by world_id
-    let scenes = if let Some(world_id) = &params.world_id {
-        sqlx::query_as::<_, Scene>(
+    let scenes = if let Some(ref world_id) = params.world_id {
+        sqlx::query_as!(
+            Scene,
             "SELECT * FROM scenes WHERE slug = $1 AND world_id = $2 AND active = TRUE",
+            slug,
+            world_id
         )
-        .bind(&slug)
-        .bind(world_id)
         .fetch_all(state.db())
         .await?
     } else {
-        sqlx::query_as::<_, Scene>("SELECT * FROM scenes WHERE slug = $1 AND active = TRUE")
-            .bind(&slug)
-            .fetch_all(state.db())
-            .await?
+        sqlx::query_as!(
+            Scene,
+            "SELECT * FROM scenes WHERE slug = $1 AND active = TRUE",
+            slug
+        )
+        .fetch_all(state.db())
+        .await?
     };
 
     // Return 404 only if slug is completely unused (no scenes found at all)
@@ -61,13 +67,13 @@ async fn get_scene(
     let mut results = Vec::new();
     for scene in scenes {
         // Fetch the associated world
-        let world = sqlx::query_as::<_, World>("SELECT * FROM worlds WHERE id = $1")
-            .bind(&scene.world_id)
+        let world = sqlx::query_as!(World, "SELECT * FROM worlds WHERE id = $1", scene.world_id)
             .fetch_optional(state.db())
             .await?;
 
         // Fetch captures with shader/version context via JOIN
-        let captures = sqlx::query_as::<_, CaptureWithContext>(
+        let captures = sqlx::query_as!(
+            CaptureWithContext,
             r#"
             SELECT
                 c.id,
@@ -87,8 +93,8 @@ async fn get_scene(
             WHERE c.scene_id = $1 AND c.status = 'completed'
             ORDER BY s.name, sv.created_at DESC
             "#,
+            scene.id
         )
-        .bind(&scene.id)
         .fetch_all(state.db())
         .await?;
 

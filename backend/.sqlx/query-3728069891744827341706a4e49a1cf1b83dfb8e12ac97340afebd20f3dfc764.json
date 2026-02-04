@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE scenes\n        SET x = $1, y = $2, z = $3, pitch = $4, yaw = $5,\n            dimension = $6, time_of_day_ticks = $7, weather = $8,\n            weather_intensity = $9, moon_phase = $10, biome = $11\n        WHERE id = $12\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Text",
+        "Int4",
+        "Text",
+        "Float8",
+        "Int4",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3728069891744827341706a4e49a1cf1b83dfb8e12ac97340afebd20f3dfc764"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE jobs\n        SET last_heartbeat = now(),\n            status = CASE WHEN status = 'claimed' THEN 'running' ELSE status END\n        WHERE id = $1 AND status IN ('claimed', 'running')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3de67cbcc823264a34afec9ae3fe62d1f4c8dd85cb0f6daa32b8045f580e07ba"
+}

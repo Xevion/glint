@@ -39,12 +39,12 @@ pub async fn cleanup_expired_uploads(pool: PgPool, s3: Option<S3Client>, bucket:
 /// Run a single cleanup pass
 async fn run_cleanup(pool: &PgPool, s3: Option<&S3Client>, bucket: &str) -> anyhow::Result<usize> {
     // Find all expired pending uploads
-    let expired: Vec<(String, String)> = sqlx::query_as(
+    let expired = sqlx::query!(
         r#"
         SELECT upload_id, upload_key
         FROM pending_uploads
         WHERE expires_at < now()
-        "#,
+        "#
     )
     .fetch_all(pool)
     .await?;
@@ -55,38 +55,40 @@ async fn run_cleanup(pool: &PgPool, s3: Option<&S3Client>, bucket: &str) -> anyh
 
     let mut cleaned = 0;
 
-    for (upload_id, upload_key) in &expired {
+    for record in &expired {
         // Delete from R2/S3 if configured
         if let Some(client) = s3 {
             match client
                 .delete_object()
                 .bucket(bucket)
-                .key(upload_key)
+                .key(&record.upload_key)
                 .send()
                 .await
             {
                 Ok(_) => {
-                    trace!(key = %upload_key, "Deleted expired upload file");
+                    trace!(key = %record.upload_key, "Deleted expired upload file");
                 }
                 Err(e) => {
                     // Log but continue - file may already be gone
-                    warn!(key = %upload_key, error = %e, "Failed to delete expired upload file");
+                    warn!(key = %record.upload_key, error = %e, "Failed to delete expired upload file");
                 }
             }
         }
 
         // Delete from database
-        match sqlx::query("DELETE FROM pending_uploads WHERE upload_id = $1")
-            .bind(upload_id)
-            .execute(pool)
-            .await
+        match sqlx::query!(
+            "DELETE FROM pending_uploads WHERE upload_id = $1",
+            record.upload_id
+        )
+        .execute(pool)
+        .await
         {
             Ok(_) => {
-                trace!(upload_id = %upload_id, "Deleted expired pending upload record");
+                trace!(upload_id = %record.upload_id, "Deleted expired pending upload record");
                 cleaned += 1;
             }
             Err(e) => {
-                error!(upload_id = %upload_id, error = %e, "Failed to delete pending upload record");
+                error!(upload_id = %record.upload_id, error = %e, "Failed to delete pending upload record");
             }
         }
     }
