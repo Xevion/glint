@@ -61,7 +61,7 @@ internal object LogConfig {
         return if (existing.name == modId) {
             existing
         } else {
-            val newConfig = LoggerConfig(modId, Level.DEBUG, true)
+            val newConfig = LoggerConfig(modId, Level.DEBUG, false)
             config.addLogger(modId, newConfig)
             newConfig
         }
