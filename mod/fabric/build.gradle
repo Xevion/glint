@@ -43,6 +43,10 @@ dependencies {
     // Include Iris + Sodium in dev environment for smoke testing
     modLocalRuntime libs.iris
     modLocalRuntime libs.sodium
+
+    // Iris transitive dependencies (not resolved from Modrinth JAR)
+    modLocalRuntime libs.jcpp
+    modLocalRuntime libs.glsl.transformer
 }
 
 processResources {

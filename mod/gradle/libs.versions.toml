@@ -14,6 +14,8 @@ mixinextras = "0.4.1"
 # Iris Shaders (Modrinth Maven uses version_number from API)
 iris = "1.8.8+1.21.4-fabric"
 sodium = "mc1.21.4-0.6.13-fabric"
+jcpp = "1.4.14"
+glsl-transformer = "2.0.1"
 
 kotlin = "2.2.21"
 kotlinx-coroutines = "1.10.2"
@@ -47,6 +49,8 @@ slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 
 iris = { module = "maven.modrinth:iris", version.ref = "iris" }
 sodium = { module = "maven.modrinth:sodium", version.ref = "sodium" }
+jcpp = { module = "org.anarres:jcpp", version.ref = "jcpp" }
+glsl-transformer = { module = "io.github.douira:glsl-transformer", version.ref = "glsl-transformer" }
 
 [plugins]
 architectury = { id = "architectury-plugin", version.ref = "architectury-plugin" }
