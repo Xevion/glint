@@ -1,8 +1,10 @@
 mod admin;
 mod agent;
+mod auth;
 mod captures;
 mod scenes;
 mod shaders;
+mod user;
 
 use axum::{Router, routing::get};
 
@@ -17,6 +19,8 @@ pub fn router(state: AppState) -> Router {
 
 fn api_router() -> Router<AppState> {
     Router::new()
+        .nest("/auth", auth::router())
+        .nest("/user", user::router())
         .nest("/shaders", shaders::router())
         .nest("/scenes", scenes::router())
         .nest("/captures", captures::router())

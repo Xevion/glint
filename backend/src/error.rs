@@ -23,6 +23,9 @@ pub enum AppError {
     #[error("Service unavailable: {0}")]
     ServiceUnavailable(String),
 
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
@@ -42,6 +45,7 @@ impl IntoResponse for AppError {
                 "SERVICE_UNAVAILABLE",
                 msg.clone(),
             ),
+            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg.clone()),
             AppError::Database(e) => {
                 error!(error = %e, "Database error");
                 (

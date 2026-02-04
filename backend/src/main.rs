@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 
 use clap::Parser;
+use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -76,8 +77,39 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Initialize OAuth client if configured
+    let oauth_client = if config.discord.is_configured() {
+        let discord = &config.discord;
+        let client =
+            oauth2::basic::BasicClient::new(ClientId::new(discord.client_id.clone().unwrap()))
+                .set_client_secret(ClientSecret::new(discord.client_secret.clone().unwrap()))
+                .set_auth_uri(
+                    AuthUrl::new("https://discord.com/api/oauth2/authorize".to_string())
+                        .expect("Invalid Discord auth URL"),
+                )
+                .set_token_uri(
+                    TokenUrl::new("https://discord.com/api/oauth2/token".to_string())
+                        .expect("Invalid Discord token URL"),
+                )
+                .set_redirect_uri(
+                    RedirectUrl::new(discord.redirect_uri.clone().unwrap())
+                        .expect("Invalid Discord redirect URI"),
+                );
+
+        info!("Discord OAuth configured");
+        Some(client)
+    } else {
+        warn!("Discord OAuth not configured, authentication disabled");
+        None
+    };
+
     // Build application state
-    let state = AppState::new(pool.clone(), config.clone(), s3_client.clone());
+    let state = AppState::new(
+        pool.clone(),
+        config.clone(),
+        s3_client.clone(),
+        oauth_client,
+    );
 
     // Start heartbeat monitoring background task
     tokio::spawn(services::heartbeat::monitor_heartbeats(

@@ -24,6 +24,10 @@ pub struct Config {
     /// Job heartbeat monitoring configuration
     #[serde(default)]
     pub heartbeat: HeartbeatConfig,
+
+    /// Discord OAuth configuration
+    #[serde(default)]
+    pub discord: DiscordConfig,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -98,6 +102,25 @@ fn default_cors_origins() -> Vec<String> {
     vec!["http://localhost:5173".to_string()]
 }
 
+/// Discord OAuth configuration
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct DiscordConfig {
+    /// Discord application client ID
+    pub client_id: Option<String>,
+
+    /// Discord application client secret
+    pub client_secret: Option<String>,
+
+    /// OAuth callback URL (e.g., "http://localhost:8080/api/auth/discord/callback")
+    pub redirect_uri: Option<String>,
+}
+
+impl DiscordConfig {
+    pub fn is_configured(&self) -> bool {
+        self.client_id.is_some() && self.client_secret.is_some() && self.redirect_uri.is_some()
+    }
+}
+
 fn default_heartbeat_timeout() -> u64 {
     300 // 5 minutes
 }
@@ -117,13 +140,20 @@ impl Config {
             .merge(Env::prefixed("GLINT_"))
             .extract()?;
 
-        // Load R2 config from env vars directly
+        // Load R2 config from env vars directly (secrets - avoid logging)
         config.r2 = R2Config {
             account_id: std::env::var("GLINT_R2_ACCOUNT_ID").ok(),
             bucket: std::env::var("GLINT_R2_BUCKET").ok(),
             access_key_id: std::env::var("GLINT_R2_ACCESS_KEY_ID").ok(),
             secret_access_key: std::env::var("GLINT_R2_SECRET_ACCESS_KEY").ok(),
             public_url: std::env::var("GLINT_R2_PUBLIC_URL").ok(),
+        };
+
+        // Load Discord config from env vars directly (secrets - avoid logging)
+        config.discord = DiscordConfig {
+            client_id: std::env::var("GLINT_DISCORD_CLIENT_ID").ok(),
+            client_secret: std::env::var("GLINT_DISCORD_CLIENT_SECRET").ok(),
+            redirect_uri: std::env::var("GLINT_DISCORD_REDIRECT_URI").ok(),
         };
 
         Ok(config)
