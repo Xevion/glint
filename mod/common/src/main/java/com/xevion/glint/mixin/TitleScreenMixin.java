@@ -1,7 +1,7 @@
 package com.xevion.glint.mixin;
 
 import com.xevion.glint.Glint;
-import com.xevion.glint.session.SessionRegistry;
+import com.xevion.glint.orchestration.AutonomousRunner;
 import com.xevion.glint.ui.GlintMainScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
@@ -34,8 +34,20 @@ public abstract class TitleScreenMixin extends Screen {
 
         if (Glint.INSTANCE.isAutonomous() && !glint$autonomousTriggered) {
             glint$autonomousTriggered = true;
-            Glint.INSTANCE.getLOGGER().info("Autonomous mode: auto-starting orchestration");
-            SessionRegistry.INSTANCE.startOrchestration();
+            Glint.INSTANCE.getLOGGER().info("Autonomous mode: starting capture runner");
+
+            String apiUrl = Glint.INSTANCE.getApiUrl();
+            String apiToken = Glint.INSTANCE.getApiToken();
+            if (apiToken.isEmpty()) {
+                Glint.INSTANCE
+                        .getLOGGER()
+                        .error("Cannot start autonomous mode: GLINT_API_TOKEN not set");
+                return;
+            }
+
+            AutonomousRunner runner = new AutonomousRunner(apiUrl, apiToken);
+            Glint.INSTANCE.setAutonomousRunner(runner);
+            runner.start();
             return;
         }
 

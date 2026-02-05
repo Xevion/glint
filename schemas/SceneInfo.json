@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SceneInfo",
+  "description": "Scene information for a job",
+  "type": "object",
+  "properties": {
+    "definition_json": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "string"
+    },
+    "world_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "slug",
+    "name",
+    "world_id",
+    "definition_json"
+  ]
+}

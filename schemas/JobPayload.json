@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JobPayload",
+  "description": "Full job payload returned when claiming a job",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "priority": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SceneInfo"
+      }
+    },
+    "shader": {
+      "$ref": "#/$defs/ShaderInfo"
+    },
+    "worlds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/WorldInfo"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "shader",
+    "scenes",
+    "worlds",
+    "profiles",
+    "priority"
+  ],
+  "$defs": {
+    "SceneInfo": {
+      "description": "Scene information for a job",
+      "type": "object",
+      "properties": {
+        "definition_json": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "world_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "world_id",
+        "definition_json"
+      ]
+    },
+    "ShaderInfo": {
+      "description": "Shader information for a job",
+      "type": "object",
+      "properties": {
+        "download_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "version_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "version_id",
+        "version"
+      ]
+    },
+    "WorldInfo": {
+      "description": "World information for a job",
+      "type": "object",
+      "properties": {
+        "file_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "slug": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name"
+      ]
+    }
+  }
+}

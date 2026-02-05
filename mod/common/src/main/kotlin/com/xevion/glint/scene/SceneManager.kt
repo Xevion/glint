@@ -244,7 +244,7 @@ object SceneManager {
         val collection =
             loadCollection(fileName)?.let {
                 it.copy(scenes = it.scenes + scene)
-            } ?: SceneCollection(world = worldName, scenes = listOf(scene))
+            } ?: SceneCollection(world = worldName, folder = fileName, scenes = listOf(scene))
 
         return saveCollection(fileName, collection)
     }
@@ -267,7 +267,7 @@ object SceneManager {
                 val collection =
                     existingCollection?.let {
                         it.copy(scenes = it.scenes + scene)
-                    } ?: SceneCollection(world = worldName, scenes = listOf(scene))
+                    } ?: SceneCollection(world = worldName, folder = fileName, scenes = listOf(scene))
 
                 saveCollectionAsync(fileName, collection)
             }
@@ -405,10 +405,19 @@ data class ResolvedScene(
     val collectionFileName: String,
 ) {
     /**
-     * The world name from the collection manifest.
+     * Display name for the world (human-readable, from the collection manifest).
      */
-    val worldName: String
+    val worldDisplayName: String
         get() = collection.world
+
+    /**
+     * The world save folder name, used for loading worlds via Minecraft's openWorld().
+     *
+     * Resolved from the explicit `folder` field in the scene collection manifest,
+     * falling back to the collection filename (the established naming convention).
+     */
+    val worldFolderName: String
+        get() = collection.folder ?: collectionFileName
 
     /**
      * Entities applicable to this scene.

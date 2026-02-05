@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FailJobRequest",
+  "description": "Request to fail a job",
+  "type": "object",
+  "properties": {
+    "error_message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "error_message"
+  ]
+}

@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OrchestrationManifest",
+  "description": "The manifest.json output by the Minecraft mod",
+  "type": "object",
+  "properties": {
+    "orchestration": {
+      "$ref": "#/$defs/OrchestrationInfo"
+    },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CaptureSessionData"
+      }
+    }
+  },
+  "required": [
+    "orchestration",
+    "sessions"
+  ],
+  "$defs": {
+    "Camera": {
+      "type": "object",
+      "properties": {
+        "pitch": {
+          "type": "number",
+          "format": "float"
+        },
+        "yaw": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "yaw",
+        "pitch"
+      ]
+    },
+    "CaptureSessionData": {
+      "type": "object",
+      "properties": {
+        "completedAt": {
+          "type": "string"
+        },
+        "minecraft": {
+          "$ref": "#/$defs/MinecraftInfo"
+        },
+        "sceneId": {
+          "type": "string"
+        },
+        "screenshots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ScreenshotEntry"
+          }
+        },
+        "sessionDir": {
+          "type": "string"
+        },
+        "shaderPacks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "totalScreenshots": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "worldName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worldName",
+        "sceneId",
+        "sessionDir",
+        "startedAt",
+        "completedAt",
+        "totalScreenshots",
+        "shaderPacks",
+        "minecraft",
+        "screenshots"
+      ]
+    },
+    "MinecraftInfo": {
+      "type": "object",
+      "properties": {
+        "camera": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Camera"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dimension": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "irisVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Position"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ]
+    },
+    "OrchestrationInfo": {
+      "type": "object",
+      "properties": {
+        "completedAt": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "jobId": {
+          "description": "Job ID from the job definition (None for interactive captures)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/OrchestrationStatus"
+        },
+        "totalSessions": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "id",
+        "startedAt",
+        "completedAt",
+        "totalSessions",
+        "status"
+      ]
+    },
+    "OrchestrationStatus": {
+      "type": "string",
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "FAILED"
+      ]
+    },
+    "Position": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "z": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z"
+      ]
+    },
+    "Resolution": {
+      "type": "object",
+      "properties": {
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "width": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ]
+    },
+    "ScreenshotEntry": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        },
+        "shader": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShaderMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "timestamp",
+        "resolution"
+      ]
+    },
+    "ShaderMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "packFile": {
+          "type": "string"
+        },
+        "profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "packFile",
+        "id",
+        "version"
+      ]
+    }
+  }
+}

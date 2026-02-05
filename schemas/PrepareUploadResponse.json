@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PrepareUploadResponse",
+  "description": "Response with pre-signed upload URLs",
+  "type": "object",
+  "properties": {
+    "urls": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "urls"
+  ]
+}

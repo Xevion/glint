@@ -13,6 +13,7 @@ use crate::{
     error::{AppError, AppResult},
     models::{
         AdoptPreviewAuthor, AdoptPreviewResponse, AdoptShaderRequest, LinkShaderRequest, Shader,
+        ShaderSearchRequest, ShaderSearchResponse, ShaderSearchResult,
     },
     platform::{self, Platform, PlatformError},
     repo::{ShaderAuthorRepo, ShaderRepo},
@@ -23,8 +24,108 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/adopt/preview", post(adopt_preview))
         .route("/adopt", post(adopt))
+        .route("/search", post(search_platforms))
         .route("/{id}/link", post(link_platform))
         .route("/{id}/sync", post(sync_shader))
+}
+
+/// POST /api/shaders/search - Search both platforms for shaders (admin)
+async fn search_platforms(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Json(request): Json<ShaderSearchRequest>,
+) -> AppResult<Json<ShaderSearchResponse>> {
+    let query = request.query.trim();
+    if query.is_empty() {
+        return Err(AppError::BadRequest("Search query cannot be empty".into()));
+    }
+
+    let limit = request.limit.unwrap_or(20).min(100);
+    let offset = request.offset.unwrap_or(0);
+
+    // Search both platforms concurrently
+    let modrinth_fut = state.modrinth().search_shaders(query, offset, limit);
+    let cf_fut = async {
+        if let Some(cf) = state.curseforge() {
+            Some(cf.search_shaders(query, limit, offset).await)
+        } else {
+            None
+        }
+    };
+
+    let (modrinth_result, cf_result) = tokio::join!(modrinth_fut, cf_fut);
+
+    let mut results: Vec<ShaderSearchResult> = Vec::new();
+    let total_modrinth;
+
+    // Process Modrinth results
+    match modrinth_result {
+        Ok(search) => {
+            total_modrinth = search.total_hits;
+            for hit in search.hits {
+                let slug = hit.slug.unwrap_or_default();
+                results.push(ShaderSearchResult {
+                    platform: Platform::Modrinth.to_string(),
+                    platform_id: hit.project_id,
+                    platform_url: format!("https://modrinth.com/shader/{slug}"),
+                    slug,
+                    name: hit.title,
+                    description: hit.description,
+                    icon_url: hit.icon_url,
+                    author: hit.author,
+                    downloads: hit.downloads,
+                    categories: hit.categories,
+                });
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = ?e, "Modrinth search failed");
+            total_modrinth = 0;
+        }
+    }
+
+    // Process CurseForge results
+    let total_curseforge = match cf_result {
+        Some(Ok(search)) => {
+            let total = search.pagination.map(|p| p.total_count);
+            for cf_mod in search.data {
+                results.push(ShaderSearchResult {
+                    platform: Platform::CurseForge.to_string(),
+                    platform_id: cf_mod.id.to_string(),
+                    slug: cf_mod.slug.clone(),
+                    name: cf_mod.name,
+                    description: cf_mod.summary,
+                    icon_url: cf_mod.logo.map(|l| l.url),
+                    author: cf_mod
+                        .authors
+                        .first()
+                        .map(|a| a.name.clone())
+                        .unwrap_or_default(),
+                    downloads: cf_mod.download_count,
+                    categories: cf_mod.categories.into_iter().map(|c| c.name).collect(),
+                    platform_url: format!(
+                        "https://www.curseforge.com/minecraft/shaders/{}",
+                        cf_mod.slug
+                    ),
+                });
+            }
+            total
+        }
+        Some(Err(e)) => {
+            tracing::warn!(error = ?e, "CurseForge search failed");
+            Some(0)
+        }
+        None => None,
+    };
+
+    // Sort by downloads descending
+    results.sort_by(|a, b| b.downloads.cmp(&a.downloads));
+
+    Ok(Json(ShaderSearchResponse {
+        results,
+        total_modrinth,
+        total_curseforge,
+    }))
 }
 
 /// POST /api/shaders/adopt/preview - Preview a shader from a platform URL (admin)

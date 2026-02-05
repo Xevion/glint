@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ShaderInfo",
+  "description": "Shader information for a job",
+  "type": "object",
+  "properties": {
+    "download_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "file_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "version_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "slug",
+    "name",
+    "version_id",
+    "version"
+  ]
+}

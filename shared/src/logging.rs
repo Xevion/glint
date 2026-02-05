@@ -190,7 +190,7 @@ pub fn init_with_verbosity(verbose_count: u8) {
 
     // Build filter: app crates at determined level, deps at warn
     let filter_str = format!(
-        "warn,glint_backend={app_level},glint_agent={app_level},glint_shared={app_level}"
+        "warn,glint_backend={app_level},glint_shared={app_level}"
     );
     let filter = EnvFilter::new(filter_str);
 

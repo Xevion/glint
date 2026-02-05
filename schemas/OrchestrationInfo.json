@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OrchestrationInfo",
+  "type": "object",
+  "properties": {
+    "completedAt": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "jobId": {
+      "description": "Job ID from the job definition (None for interactive captures)",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "startedAt": {
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/OrchestrationStatus"
+    },
+    "totalSessions": {
+      "type": "integer",
+      "format": "int32"
+    }
+  },
+  "required": [
+    "id",
+    "startedAt",
+    "completedAt",
+    "totalSessions",
+    "status"
+  ],
+  "$defs": {
+    "OrchestrationStatus": {
+      "type": "string",
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "FAILED"
+      ]
+    }
+  }
+}

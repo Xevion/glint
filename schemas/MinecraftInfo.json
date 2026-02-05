@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MinecraftInfo",
+  "type": "object",
+  "properties": {
+    "camera": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Camera"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dimension": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "irisVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "position": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Position"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "$defs": {
+    "Camera": {
+      "type": "object",
+      "properties": {
+        "pitch": {
+          "type": "number",
+          "format": "float"
+        },
+        "yaw": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "yaw",
+        "pitch"
+      ]
+    },
+    "Position": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "z": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z"
+      ]
+    }
+  }
+}

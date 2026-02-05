@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SceneCollection(
     val world: String,
+    val folder: String? = null,
     val version: String = "1.21.4",
     val description: String? = null,
     val defaultConfig: SceneConfig? = null,

@@ -6,12 +6,15 @@ import com.xevion.glint.api.GlintApi
 import com.xevion.glint.api.SceneSyncManager
 import com.xevion.glint.api.SyncResult
 import com.xevion.glint.api.WorldInfo
+import com.xevion.glint.orchestration.CaptureSpec
+import com.xevion.glint.orchestration.ShaderSpec
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneCollection
 import com.xevion.glint.scene.SceneConfig
 import com.xevion.glint.scene.SceneManager
+import com.xevion.glint.session.SessionRegistry
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintTabbedScreen
 import com.xevion.glint.ui.base.GlintTheme
@@ -550,14 +553,24 @@ class GlintMainScreen(
             } as Component,
         )
 
-        // Capture button (stub)
+        // Capture button
         buttonRow.child(
             GlintComponents.smallButton(
                 McComponent.literal("Capture"),
                 tooltip = McComponent.literal("Capture screenshot"),
                 width = 55,
             ) {
-                StatusLog.info("Capture not yet wired for single scenes")
+                val spec =
+                    CaptureSpec(
+                        sceneIds = listOf(scene.id),
+                        shaders = listOf(ShaderSpec(filename = null)),
+                    )
+                if (SessionRegistry.startOrchestration(spec)) {
+                    StatusLog.info("Started capture for ${scene.name}")
+                    onClose()
+                } else {
+                    StatusLog.error("Failed to start capture")
+                }
                 rebuildStatusBar()
             } as Component,
         )

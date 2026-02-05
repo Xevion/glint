@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Resolution",
+  "type": "object",
+  "properties": {
+    "height": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "width": {
+      "type": "integer",
+      "format": "int32"
+    }
+  },
+  "required": [
+    "width",
+    "height"
+  ]
+}

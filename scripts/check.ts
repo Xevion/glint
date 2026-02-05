@@ -133,23 +133,6 @@ const checks: Check[] = [
     cmd: ["sh", "-c", "cd backend && cargo sqlx prepare --check"],
     hint: "Run 'cd backend && cargo sqlx prepare' to update query metadata.",
   },
-  // Agent checks (3)
-  {
-    name: "agent-format",
-    subsystem: "backend",
-    cmd: ["cargo", "fmt", "--manifest-path", "agent/Cargo.toml", "--", "--check"],
-    hint: "Run 'cargo fmt --manifest-path agent/Cargo.toml' to fix formatting.",
-  },
-  {
-    name: "agent-lint",
-    subsystem: "backend",
-    cmd: ["cargo", "clippy", "--manifest-path", "agent/Cargo.toml", "--", "--deny", "warnings"],
-  },
-  {
-    name: "agent-test",
-    subsystem: "backend",
-    cmd: ["cargo", "nextest", "run", "--manifest-path", "agent/Cargo.toml"],
-  },
   // Mod checks (4)
   {
     name: "mod-format",
@@ -217,22 +200,6 @@ const domains: Record<
         name: "backend-lint",
         subsystem: "backend",
         cmd: ["cargo", "clippy", "--manifest-path", "backend/Cargo.toml", "--", "--deny", "warnings"],
-      },
-    ],
-  },
-  "agent-format": {
-    peers: ["agent-lint", "agent-test"],
-    format: () => runPiped(["cargo", "fmt", "--manifest-path", "agent/Cargo.toml"]),
-    recheck: [
-      {
-        name: "agent-format",
-        subsystem: "backend",
-        cmd: ["cargo", "fmt", "--manifest-path", "agent/Cargo.toml", "--", "--check"],
-      },
-      {
-        name: "agent-lint",
-        subsystem: "backend",
-        cmd: ["cargo", "clippy", "--manifest-path", "agent/Cargo.toml", "--", "--deny", "warnings"],
       },
     ],
   },

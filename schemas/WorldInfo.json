@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorldInfo",
+  "description": "World information for a job",
+  "type": "object",
+  "properties": {
+    "file_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "file_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "size_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int64"
+    },
+    "slug": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "slug",
+    "name"
+  ]
+}

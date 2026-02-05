@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScreenshotEntry",
+  "type": "object",
+  "properties": {
+    "file": {
+      "type": "string"
+    },
+    "resolution": {
+      "$ref": "#/$defs/Resolution"
+    },
+    "shader": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ShaderMetadata"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "timestamp": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "file",
+    "timestamp",
+    "resolution"
+  ],
+  "$defs": {
+    "Resolution": {
+      "type": "object",
+      "properties": {
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "width": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ]
+    },
+    "ShaderMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "packFile": {
+          "type": "string"
+        },
+        "profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "packFile",
+        "id",
+        "version"
+      ]
+    }
+  }
+}

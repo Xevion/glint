@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Position",
+  "type": "object",
+  "properties": {
+    "x": {
+      "type": "number",
+      "format": "double"
+    },
+    "y": {
+      "type": "number",
+      "format": "double"
+    },
+    "z": {
+      "type": "number",
+      "format": "double"
+    }
+  },
+  "required": [
+    "x",
+    "y",
+    "z"
+  ]
+}

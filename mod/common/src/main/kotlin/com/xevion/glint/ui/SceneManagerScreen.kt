@@ -4,6 +4,8 @@ import com.xevion.glint.Glint
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.SceneSyncManager
 import com.xevion.glint.api.SyncResult
+import com.xevion.glint.orchestration.CaptureSpec
+import com.xevion.glint.orchestration.ShaderSpec
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneApplicator
@@ -291,7 +293,12 @@ class SceneManagerScreen(
     }
 
     fun startCaptureScene(sceneId: String) {
-        if (SessionRegistry.startCaptureSession(sceneId = sceneId)) {
+        val spec =
+            CaptureSpec(
+                sceneIds = listOf(sceneId),
+                shaders = listOf(ShaderSpec(filename = null)),
+            )
+        if (SessionRegistry.startOrchestration(spec)) {
             Glint.LOGGER.info("Starting capture for scene: $sceneId")
             onClose()
         } else {
@@ -304,7 +311,25 @@ class SceneManagerScreen(
     }
 
     private fun startOrchestration() {
-        if (SessionRegistry.startOrchestration()) {
+        val allSceneIds =
+            collections.flatMap { (_, collection) ->
+                collection.scenes.flatMap { scene ->
+                    listOf(scene.id) + scene.variants.map { it.id }
+                }
+            }
+
+        if (allSceneIds.isEmpty()) {
+            Glint.LOGGER.warn("No scenes to capture")
+            return
+        }
+
+        val spec =
+            CaptureSpec(
+                sceneIds = allSceneIds,
+                shaders = listOf(ShaderSpec(filename = null)),
+            )
+
+        if (SessionRegistry.startOrchestration(spec)) {
             Glint.LOGGER.info("Starting orchestration from menu")
             onClose()
         } else {

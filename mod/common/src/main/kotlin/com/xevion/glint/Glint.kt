@@ -3,6 +3,7 @@ package com.xevion.glint
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.GlintApi
 import com.xevion.glint.input.KeybindHandler
+import com.xevion.glint.orchestration.AutonomousRunner
 import com.xevion.glint.session.SessionRegistry
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
@@ -18,6 +19,13 @@ object Glint {
     var isAutonomous: Boolean = false
         private set
 
+    var apiUrl: String = ""
+        private set
+    var apiToken: String = ""
+        private set
+
+    var autonomousRunner: AutonomousRunner? = null
+
     fun init() {
         LOGGER.info("Initializing Glint mod")
         LogConfig.setupDebugLogging(MOD_ID)
@@ -25,6 +33,11 @@ object Glint {
         isAutonomous = System.getenv("GLINT_AUTONOMOUS")?.equals("true", ignoreCase = true) == true
         if (isAutonomous) {
             LOGGER.info("Autonomous mode enabled - will auto-start orchestration on title screen")
+            apiUrl = System.getenv("GLINT_API_URL") ?: "http://localhost:8080"
+            apiToken = System.getenv("GLINT_API_TOKEN") ?: ""
+            if (apiToken.isBlank()) {
+                LOGGER.error("GLINT_API_TOKEN is required in autonomous mode")
+            }
         }
 
         validateApiConfig()
@@ -33,6 +46,12 @@ object Glint {
 
     fun onClientTick() {
         SessionRegistry.tick()
+        autonomousRunner?.let { runner ->
+            runner.tick()
+            if (!runner.isRunning) {
+                autonomousRunner = null
+            }
+        }
         KeybindHandler.onTick()
     }
 

@@ -30,7 +30,7 @@ check *flags:
 dev *flags:
     bun scripts/dev.ts {{flags}}
 
-# Run all unit tests (parallel). Usage: just test [web|web-e2e|rust|mod|agent|<nextest filter>]
+# Run all unit tests (parallel). Usage: just test [web|web-e2e|rust|mod|<nextest filter>]
 test *args:
     bun scripts/test.ts {{args}}
 
@@ -42,7 +42,6 @@ test-e2e:
 format:
     bun run --cwd frontend format
     cargo fmt --manifest-path backend/Cargo.toml
-    cargo fmt --manifest-path agent/Cargo.toml
     cd mod && ./gradlew spotlessApply ktlintFormat --quiet
 
 # Lint all code
@@ -64,15 +63,6 @@ bun *args:
 
 # === Backend ===
 # (Use `just dev -b` for backend dev server)
-
-# === Agent ===
-
-# Run agent in development mode (builds mod, deploys JAR, requires backend running)
-# Usage: just dev-agent [flags] [-- agent-args]
-# Flags: -s(kip-build) -p(latform) -v(erbose)
-# Agent args: --once, --dev-shader SLUG --dev-scenes SCENES
-dev-agent *args:
-    bun scripts/dev-agent.ts {{args}}
 
 # === Mod Development ===
 

@@ -528,3 +528,35 @@ pub struct SceneWithWorld {
     pub world_name: Option<String>,
     pub world_slug: Option<String>,
 }
+
+// Platform search types
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct ShaderSearchResult {
+    pub platform: String,
+    pub platform_id: String,
+    pub slug: String,
+    pub name: String,
+    pub description: String,
+    pub icon_url: Option<String>,
+    pub author: String,
+    pub downloads: u64,
+    pub categories: Vec<String>,
+    pub platform_url: String,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct ShaderSearchResponse {
+    pub results: Vec<ShaderSearchResult>,
+    pub total_modrinth: u32,
+    pub total_curseforge: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ShaderSearchRequest {
+    pub query: String,
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+}

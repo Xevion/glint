@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ShaderMetadata",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "packFile": {
+      "type": "string"
+    },
+    "profile": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "packFile",
+    "id",
+    "version"
+  ]
+}

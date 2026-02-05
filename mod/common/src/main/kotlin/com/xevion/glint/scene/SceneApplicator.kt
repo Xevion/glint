@@ -28,8 +28,8 @@ object SceneApplicator {
         Glint.LOGGER.info("Applying scene: ${scene.name} (${scene.id})")
 
         // 1. Validate world is loaded
-        if (!validateWorld(resolvedScene.worldName)) {
-            Glint.LOGGER.error("World not loaded or doesn't match: ${resolvedScene.worldName}")
+        if (!validateWorld(resolvedScene.worldFolderName)) {
+            Glint.LOGGER.error("World not loaded or doesn't match: ${resolvedScene.worldFolderName}")
             return false
         }
 

@@ -15,7 +15,7 @@ import java.time.Instant
 /**
  * Orchestrates multi-world, multi-scene capture sessions.
  *
- * Discovers all scenes across all worlds, loads each world sequentially,
+ * Resolves scene IDs from a [CaptureSpec], loads each world sequentially,
  * captures all scenes in that world, then moves to the next world.
  * Generates a master manifest on completion.
  */
@@ -26,6 +26,7 @@ class Orchestrator {
     private var state: State = State.Idle
     private var ticksInState: Int = 0
 
+    private var spec: CaptureSpec? = null
     private var worldScenePairs: List<WorldScenePair> = emptyList()
     private var currentPairIndex: Int = 0
 
@@ -36,18 +37,19 @@ class Orchestrator {
     private val sessionDataList = mutableListOf<CaptureSessionData>()
 
     private data class WorldScenePair(
-        val worldName: String,
+        val worldFolder: String,
         val scene: ResolvedScene,
         val sceneId: String,
     )
 
-    fun start(): Boolean {
+    fun start(spec: CaptureSpec): Boolean {
         if (state != State.Idle) {
             logger.warn("Orchestrator already running")
             return false
         }
 
-        logger.info("Starting orchestration")
+        logger.info("Starting orchestration with ${spec.sceneIds.size} scenes, ${spec.shaders.size} shaders")
+        this.spec = spec
 
         if (!createSessionDirectory()) {
             return false
@@ -107,7 +109,7 @@ class Orchestrator {
     }
 
     private fun handleDiscoveringScenes() {
-        val pairs = discoverWorldScenePairs()
+        val pairs = buildWorldScenePairs()
         if (pairs.isEmpty()) {
             finishWithError("No valid scenes found")
             return
@@ -126,19 +128,21 @@ class Orchestrator {
                 return
             }
 
-        when (val result = worldLoader.loadWorld(pair.worldName, ticksInState)) {
+        when (val result = worldLoader.loadWorld(pair.worldFolder, ticksInState)) {
             is WorldLoader.LoadResult.Complete -> {
-                logger.info("[${currentPairIndex + 1}/${worldScenePairs.size}] World ready: ${pair.worldName}")
+                logger.info("[${currentPairIndex + 1}/${worldScenePairs.size}] World ready: ${pair.worldFolder}")
                 transitionTo(State.RunningScene)
             }
 
             is WorldLoader.LoadResult.LoadingWorld,
             is WorldLoader.LoadResult.UnloadingWorld,
-            -> {
-                // Continue waiting
-            }
+            -> {}
 
             is WorldLoader.LoadResult.Timeout -> {
+                finishWithError(result.reason)
+            }
+
+            is WorldLoader.LoadResult.Failed -> {
                 finishWithError(result.reason)
             }
         }
@@ -147,11 +151,12 @@ class Orchestrator {
     private fun handleRunningScene() {
         val pair = getCurrentPair()!!
         val currentSessionDir = sessionDir!!
+        val currentSpec = spec!!
 
         if (captureSession == null) {
             logger.info("[${currentPairIndex + 1}/${worldScenePairs.size}] Running scene: ${pair.sceneId}")
 
-            val worldDir = File(currentSessionDir, pair.worldName)
+            val worldDir = File(currentSessionDir, pair.worldFolder)
             if (!worldDir.exists() && !worldDir.mkdirs()) {
                 logger.error("Failed to create world directory: ${worldDir.absolutePath}")
                 finishWithError("Failed to create world directory")
@@ -161,9 +166,9 @@ class Orchestrator {
             captureSession =
                 CaptureSession(
                     sceneId = pair.sceneId,
+                    shaders = currentSpec.shaders,
                     outputDir = worldDir,
-                    worldName = pair.worldName,
-                    orchestrated = true,
+                    worldName = pair.worldFolder,
                 )
 
             if (!captureSession!!.start()) {
@@ -207,7 +212,7 @@ class Orchestrator {
         pair: WorldScenePair,
         currentSessionDir: File,
     ) {
-        val worldDir = File(currentSessionDir, pair.worldName)
+        val worldDir = File(currentSessionDir, pair.worldFolder)
         val screenshotsDir = File(worldDir, "screenshots")
         val sceneDir = File(worldDir, pair.sceneId)
 
@@ -232,8 +237,8 @@ class Orchestrator {
         if (currentPairIndex >= worldScenePairs.size) {
             transitionTo(State.GeneratingManifest)
         } else {
-            val currentWorld = worldScenePairs[currentPairIndex - 1].worldName
-            val nextWorld = worldScenePairs[currentPairIndex].worldName
+            val currentWorld = worldScenePairs[currentPairIndex - 1].worldFolder
+            val nextWorld = worldScenePairs[currentPairIndex].worldFolder
 
             if (currentWorld != nextWorld) {
                 transitionTo(State.LoadingWorld)
@@ -260,8 +265,8 @@ class Orchestrator {
         logger.info("Orchestration finished")
         cleanup()
 
-        if (Glint.isAutonomous) {
-            logger.info("Autonomous mode: capture complete, shutting down Minecraft")
+        if (spec?.shutdownOnComplete == true) {
+            logger.info("Shutting down Minecraft (shutdownOnComplete)")
             Minecraft.getInstance().stop()
         }
     }
@@ -275,8 +280,8 @@ class Orchestrator {
 
         cleanup()
 
-        if (Glint.isAutonomous) {
-            logger.info("Autonomous mode: orchestration failed, shutting down Minecraft")
+        if (spec?.shutdownOnComplete == true) {
+            logger.info("Shutting down Minecraft after failure (shutdownOnComplete)")
             Minecraft.getInstance().stop()
         }
     }
@@ -294,79 +299,66 @@ class Orchestrator {
         startedAt = null
         sessionDataList.clear()
         worldLoader.reset()
+        spec = null
     }
 
-    private fun discoverWorldScenePairs(): List<WorldScenePair> {
-        val mc = Minecraft.getInstance()
-        val savesDir = File(mc.gameDirectory, "saves")
-
-        if (!savesDir.exists() || !savesDir.isDirectory) {
-            logger.error("Saves directory not found: ${savesDir.absolutePath}")
-            return emptyList()
-        }
-
-        val collections = SceneManager.discoverAllCollections()
-        if (collections.isEmpty()) {
-            logger.error("No scene collections found in glint/scenes/")
-            return emptyList()
-        }
-
-        logger.info("Found ${collections.size} scene collections")
+    /**
+     * Resolves scene IDs from the spec into (world, scene) pairs, grouped by world
+     * and preserving scene order.
+     */
+    private fun buildWorldScenePairs(): List<WorldScenePair> {
+        val currentSpec = spec ?: return emptyList()
 
         val pairs = mutableListOf<WorldScenePair>()
-        for ((_, collection) in collections) {
-            for (scene in collection.scenes) {
-                addScenePair(scene.id, collection.world, savesDir, pairs)
-                for (variant in scene.variants) {
-                    addScenePair(variant.id, collection.world, savesDir, pairs)
-                }
+        for (sceneId in currentSpec.sceneIds) {
+            val resolvedScene = SceneManager.loadScene(sceneId)
+            if (resolvedScene == null) {
+                logger.warn("Failed to load scene: $sceneId, skipping")
+                continue
             }
+
+            if (!worldLoader.worldExists(resolvedScene.worldFolderName)) {
+                logger.warn("World directory not found for scene: $sceneId (world: ${resolvedScene.worldFolderName}), skipping")
+                continue
+            }
+
+            pairs.add(WorldScenePair(resolvedScene.worldFolderName, resolvedScene, sceneId))
         }
 
-        if (pairs.isNotEmpty()) {
-            val uniqueWorlds = pairs.map { it.worldName }.distinct().size
-            logger.info("Discovered ${pairs.size} scenes across $uniqueWorlds worlds")
+        // Group by world to minimize world loads, preserving first-seen order
+        val worldOrder = pairs.map { it.worldFolder }.distinct()
+        val grouped = pairs.groupBy { it.worldFolder }
+        val sorted = worldOrder.flatMap { world -> grouped[world] ?: emptyList() }
+
+        if (sorted.isNotEmpty()) {
+            val uniqueWorlds = sorted.map { it.worldFolder }.distinct().size
+            logger.info("Resolved ${sorted.size} scenes across $uniqueWorlds worlds")
         }
 
-        return pairs
-    }
-
-    private fun addScenePair(
-        sceneId: String,
-        expectedWorld: String,
-        savesDir: File,
-        pairs: MutableList<WorldScenePair>,
-    ) {
-        val resolvedScene = SceneManager.loadScene(sceneId)
-        if (resolvedScene == null) {
-            logger.warn("Failed to load scene: $sceneId")
-            return
-        }
-
-        if (resolvedScene.worldName != expectedWorld) {
-            logger.warn("Scene world mismatch: expected $expectedWorld, got ${resolvedScene.worldName} for scene $sceneId")
-            return
-        }
-
-        if (!worldLoader.worldExists(resolvedScene.worldName)) {
-            logger.warn("World directory not found for scene: $sceneId (world: ${resolvedScene.worldName})")
-            return
-        }
-
-        pairs.add(WorldScenePair(resolvedScene.worldName, resolvedScene, sceneId))
-        logger.debug("Added scene: $sceneId (world: ${resolvedScene.worldName})")
+        return sorted
     }
 
     private fun createSessionDirectory(): Boolean {
         val mc = Minecraft.getInstance()
+        val currentSpec = spec ?: return false
         startedAt = Instant.now()
 
         return try {
-            val capturesDir = File(mc.gameDirectory, "glint/captures")
-            val (dir, id) = SessionDirectoryManager.createSessionDirectory(capturesDir, startedAt!!)
-            sessionId = id
-            sessionDir = dir
-            logger.info("Session directory: ${dir.absolutePath}")
+            if (currentSpec.outputDir != null) {
+                val dir = File(mc.gameDirectory, currentSpec.outputDir)
+                if (!dir.exists() && !dir.mkdirs()) {
+                    logger.error("Failed to create output directory: ${dir.absolutePath}")
+                    return false
+                }
+                sessionId = currentSpec.jobId?.let { "job_$it" } ?: dir.name
+                sessionDir = dir
+            } else {
+                val capturesDir = File(mc.gameDirectory, "glint/captures")
+                val (dir, id) = SessionDirectoryManager.createSessionDirectory(capturesDir, startedAt!!)
+                sessionId = id
+                sessionDir = dir
+            }
+            logger.info("Session directory: ${sessionDir!!.absolutePath}")
             true
         } catch (e: Exception) {
             logger.error("Failed to create session directory", e)
@@ -384,6 +376,7 @@ class Orchestrator {
                 sessionDataList,
                 sessionId,
                 startedAt ?: Instant.now(),
+                jobId = spec?.jobId,
             )
 
         try {

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Camera",
+  "type": "object",
+  "properties": {
+    "pitch": {
+      "type": "number",
+      "format": "float"
+    },
+    "yaw": {
+      "type": "number",
+      "format": "float"
+    }
+  },
+  "required": [
+    "yaw",
+    "pitch"
+  ]
+}

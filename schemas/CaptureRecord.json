@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CaptureRecord",
+  "description": "A single capture result",
+  "type": "object",
+  "properties": {
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "profile": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "resolution_height": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "resolution_width": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "scene_id": {
+      "type": "string"
+    },
+    "screenshot_path": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "scene_id",
+    "screenshot_path",
+    "resolution_width",
+    "resolution_height",
+    "captured_at"
+  ]
+}

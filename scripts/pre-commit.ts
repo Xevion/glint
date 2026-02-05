@@ -24,7 +24,6 @@ async function main() {
   // Categorize staged files by subsystem
   const frontendFiles = Array.from(stagedFiles).filter((f) => f.startsWith("frontend/"));
   const backendFiles = Array.from(stagedFiles).filter((f) => f.startsWith("backend/"));
-  const agentFiles = Array.from(stagedFiles).filter((f) => f.startsWith("agent/"));
   const modFiles = Array.from(stagedFiles).filter((f) => f.startsWith("mod/"));
 
   // Track which subsystems need formatting
@@ -38,18 +37,11 @@ async function main() {
     }
   }
 
-  if (backendFiles.length > 0 || agentFiles.length > 0) {
+  if (backendFiles.length > 0) {
     const backendCheckResult =
-      backendFiles.length > 0
-        ? await $`cargo fmt --manifest-path backend/Cargo.toml -- --check`.nothrow().quiet()
-        : { exitCode: 0 };
+      await $`cargo fmt --manifest-path backend/Cargo.toml -- --check`.nothrow().quiet();
 
-    const agentCheckResult =
-      agentFiles.length > 0
-        ? await $`cargo fmt --manifest-path agent/Cargo.toml -- --check`.nothrow().quiet()
-        : { exitCode: 0 };
-
-    if (backendCheckResult.exitCode !== 0 || agentCheckResult.exitCode !== 0) {
+    if (backendCheckResult.exitCode !== 0) {
       needsFormatting = true;
     }
   }
@@ -76,10 +68,6 @@ async function main() {
 
   if (backendFiles.length > 0) {
     await $`cargo fmt --manifest-path backend/Cargo.toml`.quiet();
-  }
-
-  if (agentFiles.length > 0) {
-    await $`cargo fmt --manifest-path agent/Cargo.toml`.quiet();
   }
 
   if (modFiles.length > 0) {

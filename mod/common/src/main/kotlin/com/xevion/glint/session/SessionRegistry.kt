@@ -1,39 +1,24 @@
 package com.xevion.glint.session
 
 import com.xevion.glint.Glint
-import com.xevion.glint.capture.CaptureSession
+import com.xevion.glint.orchestration.CaptureSpec
 import com.xevion.glint.orchestration.Orchestrator
 
 /**
- * Manages lifecycle of tickable sessions globally.
- * Provides centralized access to active capture sessions and orchestrators.
+ * Manages lifecycle of the orchestrator session globally.
  */
 object SessionRegistry {
-    private val captureSessionManager = SessionManager<CaptureSession>()
     private val orchestratorManager = SessionManager<Orchestrator>()
 
     /**
-     * Starts a capture session for a specific scene (or all scenes if null).
-     * @param sceneId The scene to capture, or null to capture all scenes
-     * @return true if session started successfully, false if already running
-     */
-    fun startCaptureSession(sceneId: String? = null): Boolean =
-        captureSessionManager.start(
-            name = "Capture session",
-            factory = { CaptureSession(sceneId = sceneId) },
-            starter = { it.start() },
-            isRunning = { it.isRunning },
-        )
-
-    /**
-     * Starts orchestration of all scenes across all worlds.
+     * Starts orchestration with the given capture spec.
      * @return true if orchestration started successfully, false if already running
      */
-    fun startOrchestration(): Boolean =
+    fun startOrchestration(spec: CaptureSpec): Boolean =
         orchestratorManager.start(
             name = "Orchestration",
             factory = { Orchestrator() },
-            starter = { it.start() },
+            starter = { it.start(spec) },
             isRunning = { it.isRunning },
         )
 
@@ -41,14 +26,8 @@ object SessionRegistry {
      * Ticks active sessions. Must be called every client tick.
      */
     fun tick() {
-        captureSessionManager.tick({ it.tick() }, { it.isRunning })
         orchestratorManager.tick({ it.tick() }, { it.isRunning })
     }
-
-    /**
-     * Checks if a capture session is currently active.
-     */
-    fun isCaptureSessionActive(): Boolean = captureSessionManager.isActive { it.isRunning }
 
     /**
      * Checks if orchestration is currently active.
