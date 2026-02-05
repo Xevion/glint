@@ -1,84 +1,104 @@
 # Code Style Guide
 
+Style guides for each subsystem: [Rust (backend)](RUST.md) | [Kotlin (mod)](KOTLIN.md) | [Svelte (frontend)](SVELTE.md)
+
+## Formatting
+
+Automated. Rust uses `rustfmt`, Kotlin uses Spotless + KtLint, frontend uses Biome. Don't think about it — `just format` handles everything.
+
+## Naming & Domain Vocabulary
+
+Use language-idiomatic casing (snake_case in Rust, camelCase in Kotlin/TypeScript). Use consistent domain terms across all stacks:
+
+| Concept | Name | Notes |
+|---------|------|-------|
+| A shader pack | `Shader` | Not "pack", "shaderpack", or "mod" |
+| A screenshot configuration | `Scene` | A specific location + time + weather + settings |
+| A screenshot result | `Capture` | Not "screenshot" or "image" |
+| A capture batch task | `Job` | Backend-assigned unit of work for the mod |
+| A Minecraft world save | `World` | The world a scene exists in |
+| A shader version | `ShaderVersion` | Specific release of a shader |
+
+These names are used in types, API endpoints, database tables, and UI copy. When in doubt, check the Rust backend models — they're the source of truth.
+
+## Comments
+
+Explain **why**, not **what**. Code should be self-documenting through clear names and small functions. Comments exist for:
+
+- Non-obvious decisions or trade-offs
+- Workarounds with context on what they're working around
+- Domain knowledge that isn't obvious from the code
+
+Never reference old implementations, migrations, or refactoring history in comments. Never add banner comments (`===`, `---`).
+
 ## Logging
 
-### Message Format
+### Principles
 
-Use static messages with structured fields. All dynamic content goes in fields, not interpolated into the message string.
-
-```rust
-// Correct
-info!(endpoint = %addr, bucket = %bucket, "R2 client initialized");
-warn!(job_id = %id, error = %e, "Job failed, will retry");
-
-// Wrong - dynamic content in message
-info!("R2 client initialized (endpoint: {}, bucket: {})", addr, bucket);
-```
-
-Exception: Simple values may appear in the message for critical startup info (e.g., `"Listening on {addr}"`).
+Static messages, structured fields. All dynamic content goes in fields, never interpolated into the message string. This makes logs greppable and machine-parseable.
 
 ### Log Levels
 
 | Level | Use for | Examples |
 |-------|---------|----------|
 | ERROR | Failures requiring attention | Database connection lost, job failed permanently |
-| WARN  | Recoverable issues | Retry succeeded, fallback used, deprecated usage |
+| WARN  | Recoverable issues | Retry succeeded, fallback used |
 | INFO  | Significant lifecycle events | Service started, job completed, config loaded |
 | DEBUG | Routine operations | Cache hit, file written, polling tick |
 | TRACE | Verbose internals | Request/response bodies, full state dumps |
 
-Default to quiet. If an operation happens regularly without issue, it belongs at DEBUG or TRACE.
+Default to quiet. If an operation happens regularly without issue, it's DEBUG or TRACE.
 
-### Verbosity Control
+### Standard Field Names
 
-- **Default**: `glint_*=info`, all dependencies at `warn`
-- **`-v` flag**: Sets app crates to `debug`
-- **`-vv` flag**: Sets app crates to `trace`
-- **`LOG_LEVEL` env**: Overrides default app level (`LOG_LEVEL=debug`)
-- **`RUST_LOG` env**: Full tracing filter syntax, overrides everything
-
-### Imports
-
-Import macros at module top. Do not use qualified `tracing::info!()` calls.
-
-```rust
-use tracing::{debug, error, info, instrument, trace, warn};
-```
-
-### Request Tracing with Spans
-
-Use `#[instrument]` on handlers and significant functions. Skip large or sensitive arguments.
-
-```rust
-#[instrument(skip(db, body), fields(user_id = %user_id))]
-async fn create_resource(db: &Pool, user_id: Uuid, body: CreateRequest) -> Result<Resource> {
-    // ...
-}
-```
-
-Spans propagate context automatically—child logs inherit parent span fields.
-
-### Error Logging
-
-Always log the error with `error = %e` to capture the full chain. Include relevant context fields.
-
-```rust
-// Correct - error in field, context included
-error!(job_id = %id, error = %e, "Failed to process job");
-
-// Wrong - error only in message, loses chain
-error!("Failed to process job: {}", e);
-```
-
-### Metric-Friendly Fields
-
-Use consistent field names for values that may be aggregated or queried:
+Use consistent field names across all stacks for values that may be aggregated or queried:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `duration_ms` | u64 | Operation timing |
-| `count` | usize | Item counts |
-| `bytes` | u64 | Data sizes |
-| `job_id` | Uuid | Job identifier |
-| `shader_id` / `scene_id` | i32 | Entity IDs |
-| `error` | Display | Error with chain |
+| `duration_ms` | number | Operation timing |
+| `count` | number | Item counts |
+| `bytes` | number | Data sizes |
+| `job_id` | string | Job identifier |
+| `shader_id` / `scene_id` | number | Entity IDs |
+| `error` | string | Error with chain |
+
+## Error Handling
+
+### Philosophy
+
+Errors are values, not exceptions. Each stack uses its own idiomatic pattern, but the principles are shared:
+
+- **Expected failures** (not found, validation, conflict) are handled explicitly with typed errors
+- **Unexpected failures** (I/O, serialization, OOM) are wrapped and propagated
+- **Never swallow errors silently** — log or propagate, never `catch {}` empty
+- **User-facing error messages** are separate from internal error details
+
+### API Error Responses
+
+All API errors return a consistent JSON shape:
+
+```json
+{
+  "error": "Human-readable message",
+  "code": "SCREAMING_SNAKE_ERROR_CODE"
+}
+```
+
+HTTP status codes map to error categories: 400 (validation), 404 (not found), 409 (conflict), 500 (internal).
+
+## API Design
+
+- **Casing**: All JSON fields use `camelCase`
+- **List responses**: Wrapped with `{ items: [...], total: N }` for pagination support
+- **Single responses**: Return the object directly (no wrapper)
+- **IDs in URLs**: Use the resource's primary identifier: `/api/shaders/{id}`
+- **Verbs via HTTP methods**: GET (read), POST (create), PUT (full update), PATCH (partial update), DELETE (remove)
+
+## Testing
+
+### Principles
+
+- Test behavior, not implementation. Tests should survive refactors.
+- Prefer integration tests that exercise real code paths over unit tests with heavy mocking.
+- Name tests descriptively: `test_creating_shader_with_duplicate_slug_returns_conflict`.
+- Each stack has its own test runner and conventions — see the language-specific guides.
