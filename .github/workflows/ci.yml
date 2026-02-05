@@ -193,7 +193,8 @@ jobs:
         uses: taiki-e/install-action@cargo-audit
 
       - name: Rust security audit
-        run: cargo audit -f backend/Cargo.lock
+        working-directory: backend
+        run: cargo audit
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
