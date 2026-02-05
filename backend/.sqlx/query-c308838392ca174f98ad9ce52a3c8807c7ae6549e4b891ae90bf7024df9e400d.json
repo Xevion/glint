@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                            INSERT INTO shader_versions (\n                                id, shader_id, version, modrinth_version_id, download_url,\n                                file_hash, file_size, game_versions, release_channel,\n                                upstream_published_at, created_at\n                            )\n                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())\n                            ON CONFLICT (shader_id, version) DO UPDATE SET\n                                modrinth_version_id = EXCLUDED.modrinth_version_id,\n                                download_url = COALESCE(EXCLUDED.download_url, shader_versions.download_url),\n                                file_hash = COALESCE(EXCLUDED.file_hash, shader_versions.file_hash),\n                                file_size = COALESCE(EXCLUDED.file_size, shader_versions.file_size),\n                                game_versions = COALESCE(EXCLUDED.game_versions, shader_versions.game_versions),\n                                release_channel = COALESCE(EXCLUDED.release_channel, shader_versions.release_channel),\n                                upstream_published_at = COALESCE(EXCLUDED.upstream_published_at, shader_versions.upstream_published_at)\n                            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c308838392ca174f98ad9ce52a3c8807c7ae6549e4b891ae90bf7024df9e400d"
+}

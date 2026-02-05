@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE shaders SET modrinth_id = $1, updated_at = now() WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fe5f802252975bd5ab5d4326c67999e22e333b10ac83a9d6203b8fe15351ca70"
+}

@@ -1,5 +1,7 @@
 // Auto-generated barrel file — do not edit manually.
 // Regenerate with: cargo test --manifest-path backend/Cargo.toml export_bindings
+export type { AdoptPreviewAuthor } from "./AdoptPreviewAuthor";
+export type { AdoptPreviewResponse } from "./AdoptPreviewResponse";
 export type { Capture } from "./Capture";
 export type { CaptureWithContext } from "./CaptureWithContext";
 export type { Category } from "./Category";
@@ -16,6 +18,7 @@ export type { SceneWithCaptures } from "./SceneWithCaptures";
 export type { SceneWithWorld } from "./SceneWithWorld";
 export type { SessionInfo } from "./SessionInfo";
 export type { Shader } from "./Shader";
+export type { ShaderAuthor } from "./ShaderAuthor";
 export type { ShaderVersion } from "./ShaderVersion";
 export type { ShaderWithCaptures } from "./ShaderWithCaptures";
 export type { ShaderWithVersions } from "./ShaderWithVersions";

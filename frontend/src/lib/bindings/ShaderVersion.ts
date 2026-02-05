@@ -3,8 +3,8 @@
 /**
  * Specific release of a shader pack
  */
-export type ShaderVersion = { id: string, shader_id: string, version: string, modrinth_version_id: string | null, download_url: string | null, file_hash: string | null, 
+export type ShaderVersion = { id: string, shader_id: string, version: string, modrinth_version_id: string | null, curseforge_file_id: number | null, download_url: string | null, file_hash: string | null, file_size: number | null, game_versions: string | null, release_channel: string | null, 
 /**
  * JSON array of profile names, discovered after first capture
  */
-supported_profiles: string | null, created_at: string, };
+supported_profiles: string | null, upstream_published_at: string | null, created_at: string, };

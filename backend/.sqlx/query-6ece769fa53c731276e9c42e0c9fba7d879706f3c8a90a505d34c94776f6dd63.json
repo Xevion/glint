@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM shader_authors WHERE shader_id = $1 ORDER BY name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "platform",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "6ece769fa53c731276e9c42e0c9fba7d879706f3c8a90a505d34c94776f6dd63"
+}

@@ -8,7 +8,7 @@ use tower_http::{
 };
 use tracing::{debug, info, warn};
 
-use glint_backend::{cli, config::Config, db, routes, services, state::AppState};
+use glint_backend::{cli, config::Config, db, platform, routes, services, state::AppState};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -103,12 +103,31 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Initialize platform clients
+    let modrinth_client =
+        platform::modrinth::ModrinthClient::new(&config.platform.modrinth_user_agent);
+    info!(
+        user_agent = %config.platform.modrinth_user_agent,
+        "Modrinth client initialized"
+    );
+
+    let curseforge_client = if let Some(ref api_key) = config.platform.curseforge_api_key {
+        let client = platform::curseforge::CurseForgeClient::new(api_key);
+        info!("CurseForge client initialized");
+        Some(client)
+    } else {
+        warn!("CurseForge API key not configured, CurseForge integration disabled");
+        None
+    };
+
     // Build application state
     let state = AppState::new(
         pool.clone(),
         config.clone(),
         s3_client.clone(),
         oauth_client,
+        modrinth_client,
+        curseforge_client,
     );
 
     // Start heartbeat monitoring background task

@@ -42,6 +42,31 @@
         "ordinal": 7,
         "name": "created_at",
         "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "curseforge_file_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "file_size",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "game_versions",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "release_channel",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "upstream_published_at",
+        "type_info": "Timestamptz"
       }
     ],
     "parameters": {
@@ -57,7 +82,12 @@
       true,
       true,
       true,
-      false
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
     ]
   },
   "hash": "68c70ae85d8f3d22b9de0c536a988329ba5e543d7948a5cf824ae25887a8f5bf"

@@ -47,6 +47,36 @@
         "ordinal": 8,
         "name": "updated_at",
         "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "icon_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "source_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "license_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "upstream_downloads",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 13,
+        "name": "upstream_updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "last_synced_at",
+        "type_info": "Timestamptz"
       }
     ],
     "parameters": {
@@ -63,7 +93,13 @@
       true,
       true,
       false,
-      false
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
     ]
   },
   "hash": "bea06d8573e30b25c719efcfce3c598114f29b36ea1770bebb355bac81eb3327"

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE shaders SET curseforge_id = $1, updated_at = now() WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bd70b9b39bfd8a83edf34f4f267e3837989387036e0b380b74347d9f8ab54297"
+}

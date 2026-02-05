@@ -28,6 +28,10 @@ pub struct Config {
     /// Discord OAuth configuration
     #[serde(default)]
     pub discord: DiscordConfig,
+
+    /// Platform integration configuration (Modrinth, CurseForge)
+    #[serde(default)]
+    pub platform: PlatformConfig,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -133,6 +137,27 @@ fn default_idle_poll_interval() -> u64 {
     60 // 1 minute when no jobs are active
 }
 
+/// Platform API configuration for Modrinth and CurseForge
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct PlatformConfig {
+    /// CurseForge API key (obtain from https://console.curseforge.com/)
+    pub curseforge_api_key: Option<String>,
+
+    /// User-Agent for Modrinth API requests
+    #[serde(default = "default_modrinth_user_agent")]
+    pub modrinth_user_agent: String,
+}
+
+impl PlatformConfig {
+    pub fn curseforge_configured(&self) -> bool {
+        self.curseforge_api_key.is_some()
+    }
+}
+
+fn default_modrinth_user_agent() -> String {
+    "glint/0.1.0 (https://github.com/Xevion/glint)".to_string()
+}
+
 impl Config {
     pub fn load() -> anyhow::Result<Self> {
         let mut config: Config = Figment::new()
@@ -161,6 +186,14 @@ impl Config {
             client_secret: std::env::var("GLINT_DISCORD_CLIENT_SECRET").ok(),
             redirect_uri: std::env::var("GLINT_DISCORD_REDIRECT_URI").ok(),
         };
+
+        // Load platform config from env vars directly (secrets - avoid logging)
+        if let Ok(key) = std::env::var("GLINT_CURSEFORGE_API_KEY") {
+            config.platform.curseforge_api_key = Some(key);
+        }
+        if let Ok(ua) = std::env::var("GLINT_MODRINTH_USER_AGENT") {
+            config.platform.modrinth_user_agent = ua;
+        }
 
         Ok(config)
     }

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM shader_authors WHERE shader_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "068b487cfe794fd27ba25d1f102b74a15fc784c1e3e27c245364910f346a75b7"
+}

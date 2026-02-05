@@ -4,7 +4,11 @@ use std::sync::Arc;
 use aws_sdk_s3::Client as S3Client;
 use oauth2::{EndpointNotSet, EndpointSet};
 
-use crate::{config::Config, db::DbPool};
+use crate::{
+    config::Config,
+    db::DbPool,
+    platform::{curseforge::CurseForgeClient, modrinth::ModrinthClient},
+};
 
 /// OAuth2 client with auth and token endpoints set (required for authorization code flow)
 pub type OAuthClient = oauth2::basic::BasicClient<
@@ -25,6 +29,8 @@ pub struct AppStateInner {
     pub config: Config,
     pub s3: Option<S3Client>,
     pub oauth: Option<OAuthClient>,
+    pub modrinth: ModrinthClient,
+    pub curseforge: Option<CurseForgeClient>,
 }
 
 impl AppState {
@@ -33,6 +39,8 @@ impl AppState {
         config: Config,
         s3: Option<S3Client>,
         oauth: Option<OAuthClient>,
+        modrinth: ModrinthClient,
+        curseforge: Option<CurseForgeClient>,
     ) -> Self {
         Self {
             inner: Arc::new(AppStateInner {
@@ -40,6 +48,8 @@ impl AppState {
                 config,
                 s3,
                 oauth,
+                modrinth,
+                curseforge,
             }),
         }
     }
@@ -58,6 +68,14 @@ impl AppState {
 
     pub fn oauth(&self) -> Option<&OAuthClient> {
         self.inner.oauth.as_ref()
+    }
+
+    pub fn modrinth(&self) -> &ModrinthClient {
+        &self.inner.modrinth
+    }
+
+    pub fn curseforge(&self) -> Option<&CurseForgeClient> {
+        self.inner.curseforge.as_ref()
     }
 }
 

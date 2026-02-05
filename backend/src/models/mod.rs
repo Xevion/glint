@@ -49,6 +49,14 @@ pub struct Shader {
     pub modrinth_id: Option<String>,
     pub curseforge_id: Option<String>,
     pub website_url: Option<String>,
+    pub icon_url: Option<String>,
+    pub source_url: Option<String>,
+    pub license_id: Option<String>,
+    pub upstream_downloads: Option<i64>,
+    #[ts(type = "string | null")]
+    pub upstream_updated_at: Option<DateTime<Utc>>,
+    #[ts(type = "string | null")]
+    pub last_synced_at: Option<DateTime<Utc>>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
@@ -63,10 +71,16 @@ pub struct ShaderVersion {
     pub shader_id: String,
     pub version: String,
     pub modrinth_version_id: Option<String>,
+    pub curseforge_file_id: Option<i32>,
     pub download_url: Option<String>,
     pub file_hash: Option<String>,
+    pub file_size: Option<i64>,
+    pub game_versions: Option<String>,
+    pub release_channel: Option<String>,
     /// JSON array of profile names, discovered after first capture
     pub supported_profiles: Option<String>,
+    #[ts(type = "string | null")]
+    pub upstream_published_at: Option<DateTime<Utc>>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
 }
@@ -294,7 +308,53 @@ pub struct CaptureWithContext {
     pub resolution_height: Option<i32>,
 }
 
+/// Shader author from upstream platform
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
+pub struct ShaderAuthor {
+    pub id: String,
+    pub shader_id: String,
+    pub name: String,
+    pub url: Option<String>,
+    pub platform: String,
+}
+
 // Agent API types are now in the shared crate (glint-shared)
+
+// Platform adoption types
+
+/// Request to preview or adopt a shader from a platform URL
+#[derive(Debug, Deserialize)]
+pub struct AdoptShaderRequest {
+    pub url: String,
+}
+
+/// Request to link an additional platform to an existing shader
+#[derive(Debug, Deserialize)]
+pub struct LinkShaderRequest {
+    pub url: String,
+}
+
+/// Preview response before confirming adoption
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct AdoptPreviewResponse {
+    pub platform: String,
+    pub name: String,
+    pub slug: String,
+    pub description: String,
+    pub icon_url: Option<String>,
+    pub downloads: u64,
+    pub version_count: usize,
+    pub authors: Vec<AdoptPreviewAuthor>,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct AdoptPreviewAuthor {
+    pub name: String,
+    pub url: Option<String>,
+}
 
 // Admin-only operations: create/update shaders, worlds, scenes, jobs
 

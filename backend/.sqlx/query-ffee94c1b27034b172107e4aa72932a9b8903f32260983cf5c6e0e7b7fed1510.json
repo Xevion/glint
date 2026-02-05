@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO shader_versions (\n                        id, shader_id, version, curseforge_file_id, download_url,\n                        file_hash, file_size, game_versions, release_channel, created_at\n                    )\n                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())\n                    ON CONFLICT (shader_id, version) DO UPDATE SET\n                        curseforge_file_id = EXCLUDED.curseforge_file_id,\n                        download_url = COALESCE(EXCLUDED.download_url, shader_versions.download_url),\n                        file_hash = COALESCE(EXCLUDED.file_hash, shader_versions.file_hash)\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Int4",
+        "Text",
+        "Text",
+        "Int8",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ffee94c1b27034b172107e4aa72932a9b8903f32260983cf5c6e0e7b7fed1510"
+}

@@ -1,3 +1,4 @@
+mod adopt;
 mod agent;
 mod auth;
 mod captures;
@@ -25,7 +26,7 @@ fn api_router() -> Router<AppState> {
     Router::new()
         .nest("/auth", auth::router())
         .nest("/user", user::router())
-        .nest("/shaders", shaders::router())
+        .nest("/shaders", shaders::router().merge(adopt::router()))
         .nest("/scenes", scenes::router())
         .nest("/captures", captures::router())
         .nest("/worlds", worlds::router())

@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO shader_authors (id, shader_id, name, url, platform)\n            VALUES ($1, $2, $3, $4, $5)\n            ON CONFLICT (shader_id, name, platform) DO UPDATE SET\n                url = COALESCE(EXCLUDED.url, shader_authors.url)\n            RETURNING *\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "platform",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "1dabe0f7165f7beee04003aa0b5065d613409892b25d380d0cda2ff521bbfdab"
+}
