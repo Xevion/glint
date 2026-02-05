@@ -1,6 +1,7 @@
 package com.xevion.glint.io
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.error
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -12,6 +13,8 @@ import java.util.concurrent.Executors
  * All operations return CompletableFuture for async/await patterns.
  */
 object AsyncFileIO {
+    private val log = Loggers.Io.get()
+
     private val executor =
         Executors.newFixedThreadPool(2) { r ->
             Thread(r, "Glint-FileIO").apply {
@@ -37,7 +40,7 @@ object AsyncFileIO {
             try {
                 json.decodeFromString(serializer, file.readText())
             } catch (e: Exception) {
-                Glint.LOGGER.error("Failed to read JSON file: ${file.absolutePath}", e)
+                log.error(e, "Failed to read JSON file") { "path" to file.absolutePath }
                 throw e
             }
         }, executor)
@@ -56,7 +59,7 @@ object AsyncFileIO {
                     try {
                         file.writeText(json.encodeToString(serializer, data))
                     } catch (e: Exception) {
-                        Glint.LOGGER.error("Failed to write JSON file: ${file.absolutePath}", e)
+                        log.error(e, "Failed to write JSON file") { "path" to file.absolutePath }
                         throw e
                     }
                 },

@@ -1,10 +1,14 @@
 package com.xevion.glint.capture
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.orchestration.ShaderSpec
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.screenshot.*
+import com.xevion.glint.warn
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.time.Instant
@@ -27,7 +31,7 @@ class CaptureSession(
     private val outputDir: File,
     private val worldName: String,
 ) {
-    private val logger = Glint.LOGGER
+    private val log = Loggers.Capture.get()
     private var state: State = State.Idle
     private var ticksInState: Int = 0
 
@@ -66,20 +70,22 @@ class CaptureSession(
      */
     fun start(): Boolean {
         if (state != State.Idle) {
-            logger.warn("Capture session already in progress")
+            log.warn("Capture session already in progress")
             return false
         }
 
         val mc = Minecraft.getInstance()
 
         if (mc.singleplayerServer == null) {
-            logger.error("Capture system is not available in multiplayer")
+            log.error("Capture system is not available in multiplayer")
             return false
         }
 
         resolvedScene = SceneManager.loadScene(sceneId)
         if (resolvedScene == null) {
-            logger.error("Failed to load scene: $sceneId")
+            log.error("Failed to load scene") {
+                "scene_id" to sceneId
+            }
             return false
         }
 
@@ -87,7 +93,7 @@ class CaptureSession(
         screenshotEntries.clear()
 
         if (!IrisIntegration.isAvailable) {
-            logger.warn("Iris is not available, capturing vanilla only")
+            log.warn("Iris is not available, capturing vanilla only")
             shadersToCapture = listOf(ShaderConfig(packName = null))
             originalShaderPack = null
         } else {
@@ -103,16 +109,15 @@ class CaptureSession(
                     ShaderConfig(packName = spec.filename, profile = spec.profile)
                 }
 
-            logger.info(
-                "Starting capture session with ${shadersToCapture.size} configurations: " +
-                    shadersToCapture.joinToString(", ") { it.displayName },
-            )
+            log.info("Starting capture session") {
+                "config_count" to shadersToCapture.size
+            }
         }
 
         currentIndex = 0
 
         originalState = CaptureStateSnapshot.capture()
-        logger.info("Original client state saved")
+        log.debug("Original client state saved")
 
         transitionTo(State.ApplyingScene)
         return true
@@ -125,7 +130,7 @@ class CaptureSession(
         if (state == State.Idle) return
 
         if (CaptureStateManager.consumeCancelRequest()) {
-            logger.info("Capture session cancelled by user")
+            log.info("Capture session cancelled by user")
             transitionTo(State.Finishing)
             return
         }
@@ -149,7 +154,10 @@ class CaptureSession(
     fun getSessionData(): CaptureSessionData? = sessionData
 
     private fun transitionTo(newState: State) {
-        logger.info("Capture session state: $state -> $newState")
+        log.debug("Capture session state transition") {
+            "from" to state
+            "to" to newState
+        }
         state = newState
         ticksInState = 0
 
@@ -165,20 +173,22 @@ class CaptureSession(
     private fun handleApplyingScene() {
         val scene = resolvedScene
         if (scene == null) {
-            logger.error("Scene not loaded")
+            log.error("Scene not loaded")
             transitionTo(State.Finishing)
             return
         }
 
         if (!sceneApplied) {
-            logger.info("Applying scene: ${scene.scene.id}")
+            log.debug("Applying scene") {
+                "scene_id" to scene.scene.id
+            }
             if (!SceneApplicator.apply(scene)) {
-                logger.error("Failed to apply scene")
+                log.error("Failed to apply scene")
                 transitionTo(State.Finishing)
                 return
             }
             sceneApplied = true
-            logger.debug("Scene applied successfully")
+            log.debug("Scene applied successfully")
         }
 
         if (ticksInState >= SCENE_APPLICATION_WAIT_TICKS) {
@@ -189,27 +199,35 @@ class CaptureSession(
     private fun handleLoadingShader() {
         val config = shadersToCapture.getOrNull(currentIndex)
         if (config == null) {
-            logger.error("Invalid shader config at index $currentIndex")
+            log.error("Invalid shader config") {
+                "index" to currentIndex
+            }
             advanceToNextShader()
             return
         }
 
         if (IrisIntegration.isAvailable) {
-            logger.info("Loading shader configuration: ${config.displayName}")
+            log.info("Loading shader configuration") {
+                "shader" to config.displayName
+            }
 
             val result =
                 if (config.packName == null) {
                     IrisIntegration.disableShaders()
                 } else {
                     IrisIntegration.enableShaders(config.packName).onFailure {
-                        logger.error("Failed to load shader pack: ${config.packName}")
+                        log.error("Failed to load shader pack") {
+                            "pack" to config.packName
+                        }
                         advanceToNextShader()
                         return
                     }
 
                     if (config.profile != null) {
                         IrisIntegration.applyShaderProfile(config.profile).onFailure {
-                            logger.error("Failed to apply profile: ${config.profile}, skipping")
+                            log.error("Failed to apply profile, skipping") {
+                                "profile" to config.profile
+                            }
                             advanceToNextShader()
                             return
                         }
@@ -221,7 +239,9 @@ class CaptureSession(
                 }
 
             if (result.isFailure) {
-                logger.error("Failed to load shader configuration: ${config.displayName}, skipping")
+                log.error("Failed to load shader configuration, skipping") {
+                    "shader" to config.displayName
+                }
                 advanceToNextShader()
                 return
             }
@@ -229,9 +249,13 @@ class CaptureSession(
 
         val scene = resolvedScene
         if (scene != null) {
-            logger.debug("Reapplying scene for shader: ${config.displayName}")
+            log.debug("Reapplying scene for shader") {
+                "shader" to config.displayName
+            }
             if (!SceneApplicator.apply(scene)) {
-                logger.warn("Failed to reapply scene for shader: ${config.displayName}")
+                log.warn("Failed to reapply scene for shader") {
+                    "shader" to config.displayName
+                }
             }
         }
 
@@ -252,13 +276,18 @@ class CaptureSession(
 
         val config = shadersToCapture.getOrNull(currentIndex)
         if (config == null) {
-            logger.error("Invalid shader config at index $currentIndex")
+            log.error("Invalid shader config") {
+                "index" to currentIndex
+            }
             advanceToNextShader()
             return
         }
 
         val screenshotName = buildScreenshotFilename(config)
-        logger.info("Capturing screenshot for: ${config.displayName} -> $screenshotName")
+        log.info("Capturing screenshot") {
+            "shader" to config.displayName
+            "file" to screenshotName
+        }
 
         val timestamp = Instant.now().toString()
         val shaderInfo = config.packName?.let { parseShaderPackName(it) }
@@ -292,7 +321,9 @@ class CaptureSession(
             screenshotName,
             renderTarget,
         ) { message ->
-            logger.info("Screenshot saved: ${message.string}")
+            log.debug("Screenshot saved") {
+                "message" to message.string
+            }
         }
 
         transitionTo(State.PostCaptureCooldown)
@@ -362,7 +393,7 @@ class CaptureSession(
     }
 
     private fun handleFinishing() {
-        logger.info("Capture session complete, restoring original state")
+        log.info("Capture session complete, restoring original state")
 
         ChunkForceLoader.releaseAll()
 
@@ -376,7 +407,7 @@ class CaptureSession(
 
         originalState?.let {
             it.restore()
-            logger.info("Original client state restored")
+            log.debug("Original client state restored")
         }
 
         state = State.Idle
@@ -388,7 +419,7 @@ class CaptureSession(
         startedAt = null
         originalState = null
 
-        logger.info("Capture session finished")
+        log.info("Capture session finished")
     }
 
     private fun buildSessionData(): CaptureSessionData {

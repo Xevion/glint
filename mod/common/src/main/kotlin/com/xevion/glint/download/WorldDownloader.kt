@@ -1,6 +1,9 @@
 package com.xevion.glint.download
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
+import com.xevion.glint.error
+import com.xevion.glint.info
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.io.FileOutputStream
@@ -17,6 +20,7 @@ import javax.net.ssl.SSLException
  * Downloads to .minecraft/glint/worlds/{slug}_{random}/
  */
 object WorldDownloader {
+    private val log = Loggers.Download.get()
     private val downloadedWorlds = mutableSetOf<String>()
 
     /**
@@ -46,7 +50,10 @@ object WorldDownloader {
 
                 worldDir.mkdirs()
 
-                Glint.LOGGER.info("Downloading world {} to {}", worldSlug, worldDir.absolutePath)
+                log.info("Downloading world") {
+                    "slug" to worldSlug
+                    "path" to worldDir.absolutePath
+                }
 
                 val zipFile = File(worldDir, "world.zip")
 
@@ -67,16 +74,16 @@ object WorldDownloader {
 
                 "glint/worlds/$folderName"
             } catch (e: WorldDownloadException) {
-                Glint.LOGGER.error("World download failed", e)
+                log.error(e, "World download failed")
                 progressCallback(DownloadProgress.failed(e.message ?: "Unknown error"))
                 worldDir?.deleteRecursively()
                 throw e
             } catch (e: Exception) {
-                val message = "Unexpected error downloading world: ${e.message}"
-                Glint.LOGGER.error(message, e)
-                progressCallback(DownloadProgress.failed(message))
+                log.error(e, "Unexpected error downloading world")
+                val userMessage = "Unexpected error downloading world: ${e.message}"
+                progressCallback(DownloadProgress.failed(userMessage))
                 worldDir?.deleteRecursively()
-                throw WorldDownloadException.DownloadInterrupted(message, e)
+                throw WorldDownloadException.DownloadInterrupted(userMessage, e)
             }
         }
 
@@ -96,7 +103,7 @@ object WorldDownloader {
             val deleted = worldDir.deleteRecursively()
             if (deleted) {
                 downloadedWorlds.remove(folderName)
-                Glint.LOGGER.info("Cleaned up world: {}", folderName)
+                log.info("Cleaned up world") { "folder" to folderName }
             }
             deleted
         } else {
@@ -112,7 +119,7 @@ object WorldDownloader {
         worldsToCleanup.forEach { folderName ->
             cleanupWorld(folderName)
         }
-        Glint.LOGGER.info("Cleaned up {} downloaded worlds", worldsToCleanup.size)
+        log.info("Cleaned up downloaded worlds") { "count" to worldsToCleanup.size }
     }
 
     private fun getWorldsDirectory(): File {
@@ -208,7 +215,7 @@ object WorldDownloader {
             throw WorldDownloadException.HashMismatch(expected, hash)
         }
 
-        Glint.LOGGER.debug("Hash verification passed for {}", file.name)
+        log.debug("Hash verification passed") { "file" to file.name }
     }
 
     private fun computeSha256(file: File): String {
@@ -249,7 +256,7 @@ object WorldDownloader {
                 }
             }
 
-            Glint.LOGGER.info("Extracted world to {}", targetDir.absolutePath)
+            log.info("Extracted world") { "path" to targetDir.absolutePath }
         } catch (e: Exception) {
             throw WorldDownloadException.ExtractionFailed(e)
         }

@@ -1,12 +1,16 @@
 package com.xevion.glint.orchestration
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.api.AgentApi
 import com.xevion.glint.api.CaptureRecord
 import com.xevion.glint.api.CompleteJobRequest
 import com.xevion.glint.api.JobPayload
+import com.xevion.glint.debug
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.session.SessionRegistry
+import com.xevion.glint.warn
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -26,7 +30,7 @@ class AutonomousRunner(
     private val apiUrl: String,
     private val apiToken: String,
 ) {
-    private val logger = Glint.LOGGER
+    private val log = Loggers.Orchestration.get()
     private val json = Json { ignoreUnknownKeys = true }
 
     private var state: State = State.ClaimingJob
@@ -44,7 +48,7 @@ class AutonomousRunner(
 
     /** Call once to kick off the first job claim. */
     fun start() {
-        logger.info("Autonomous runner started")
+        log.info("Autonomous runner started")
         claimNextJob()
     }
 
@@ -83,16 +87,19 @@ class AutonomousRunner(
         result
             .onSuccess { payload ->
                 if (payload == null) {
-                    logger.info("No jobs available, shutting down")
+                    log.info("No jobs available, shutting down")
                     shutdown()
                     return
                 }
-                logger.info("Claimed job: ${payload.id} (shader: ${payload.shader.name})")
+                log.info("Claimed job") {
+                    "job_id" to payload.id
+                    "shader" to payload.shader.name
+                }
                 currentJob = payload
                 lastHeartbeat = System.currentTimeMillis()
                 state = State.PreparingCapture
             }.onFailure { error ->
-                logger.error("Failed to claim job: ${error.message}")
+                log.error("Failed to claim job") { "error" to error.message }
                 shutdown()
             }
     }
@@ -127,20 +134,23 @@ class AutonomousRunner(
             val spec = buildCaptureSpec(job, shaderFilename)
 
             if (spec == null) {
-                logger.error("Failed to build capture spec for job ${job.id}")
+                log.error("Failed to build capture spec") { "job_id" to job.id }
                 failJobAsync(job.id, "No valid scenes found for job")
                 return
             }
 
-            logger.info("Starting capture: ${spec.sceneIds.size} scenes, ${spec.shaders.size} shaders")
+            log.info("Starting capture") {
+                "scene_count" to spec.sceneIds.size
+                "shader_count" to spec.shaders.size
+            }
             if (SessionRegistry.startOrchestration(spec)) {
                 state = State.Capturing
             } else {
-                logger.error("Failed to start orchestration")
+                log.error("Failed to start orchestration")
                 failJobAsync(job.id, "Orchestrator failed to start")
             }
         } catch (e: Exception) {
-            logger.error("Error preparing capture", e)
+            log.error(e, "Error preparing capture")
             failJobAsync(job.id, "Preparation failed: ${e.message}")
         }
     }
@@ -154,14 +164,14 @@ class AutonomousRunner(
             lastHeartbeat = now
             CompletableFuture.runAsync {
                 AgentApi.heartbeat(apiUrl, apiToken, currentJob!!.id).onFailure { error ->
-                    logger.warn("Heartbeat failed: ${error.message}")
+                    log.warn("Heartbeat failed") { "error" to error.message }
                 }
             }
         }
 
         // Check if orchestration is complete
         if (!SessionRegistry.isOrchestrationActive()) {
-            logger.info("Orchestration complete for job ${currentJob!!.id}")
+            log.info("Orchestration complete") { "job_id" to currentJob!!.id }
             startUpload()
         }
     }
@@ -189,9 +199,9 @@ class AutonomousRunner(
 
         result
             .onSuccess {
-                logger.info("Job ${currentJob!!.id} completed successfully")
+                log.info("Job completed") { "job_id" to currentJob!!.id }
             }.onFailure { error ->
-                logger.error("Upload/completion failed: ${error.message}")
+                log.error("Upload/completion failed") { "error" to error.message }
             }
 
         currentJob = null
@@ -207,7 +217,7 @@ class AutonomousRunner(
             // Try partial manifest
             val partialFile = File(outputDir, "manifest_partial.json")
             if (partialFile.exists()) {
-                logger.warn("Only partial manifest found for job ${job.id}")
+                log.warn("Only partial manifest found") { "job_id" to job.id }
                 return AgentApi.failJob(apiUrl, apiToken, job.id, "Capture only partially completed")
             }
             return AgentApi.failJob(apiUrl, apiToken, job.id, "No manifest produced")
@@ -242,7 +252,7 @@ class AutonomousRunner(
                         ),
                     )
                 } else {
-                    logger.warn("Screenshot file not found: ${file.absolutePath}")
+                    log.warn("Screenshot file not found") { "path" to file.absolutePath }
                 }
             }
         }
@@ -260,7 +270,10 @@ class AutonomousRunner(
             val url = urls[key] ?: continue
             val uploadResult = AgentApi.uploadFile(url, file.readBytes())
             uploadResult.onFailure { error ->
-                logger.error("Failed to upload $key: ${error.message}")
+                log.error("Failed to upload file") {
+                    "key" to key
+                    "error" to error.message
+                }
             }
         }
 
@@ -292,7 +305,10 @@ class AutonomousRunner(
                     try {
                         json.parseToJsonElement(scene.definitionJson)
                     } catch (e: Exception) {
-                        logger.warn("Failed to parse scene definition for ${scene.id}: ${e.message}")
+                        log.warn("Failed to parse scene definition") {
+                            "scene_id" to scene.id
+                            "error" to e.message
+                        }
                         null
                     }
                 }
@@ -311,7 +327,10 @@ class AutonomousRunner(
                     collection,
                 ),
             )
-            logger.info("Wrote scene collection: ${collectionFile.name} (${scenes.size} scenes)")
+            log.info("Wrote scene collection") {
+                "file" to collectionFile.name
+                "scene_count" to scenes.size
+            }
         }
 
         SceneManager.clearCache()
@@ -369,18 +388,21 @@ class AutonomousRunner(
         for (world in job.worlds) {
             val existingDir = File(savesDir, world.slug)
             if (existingDir.exists() && existingDir.isDirectory) {
-                logger.info("World already present: ${world.slug}")
+                log.debug("World already present") { "slug" to world.slug }
                 worldFolders[world.id] = world.slug
                 continue
             }
 
             val fileUrl = world.fileUrl
             if (fileUrl == null) {
-                logger.error("No download URL for world: ${world.name}")
+                log.error("No download URL for world") { "name" to world.name }
                 continue
             }
 
-            logger.info("Downloading world: ${world.name} (${world.slug})")
+            log.info("Downloading world") {
+                "name" to world.name
+                "slug" to world.slug
+            }
             try {
                 val folderPath =
                     com.xevion.glint.download.WorldDownloader
@@ -390,7 +412,10 @@ class AutonomousRunner(
                             fileUrl = fileUrl,
                             expectedHash = world.fileHash,
                             progressCallback = { progress ->
-                                logger.debug("World download progress: ${world.slug} - $progress")
+                                log.debug("World download progress") {
+                                    "slug" to world.slug
+                                    "progress" to progress
+                                }
                             },
                         ).join()
 
@@ -401,7 +426,7 @@ class AutonomousRunner(
                     val targetDir = File(savesDir, world.slug)
                     downloadedDir.copyRecursively(targetDir, overwrite = true)
                     worldFolders[world.id] = world.slug
-                    logger.info("World installed to saves/${world.slug}")
+                    log.info("World installed") { "slug" to world.slug }
                 } else {
                     val subfolders = downloadedDir.listFiles()?.filter { it.isDirectory } ?: emptyList()
                     val worldSubfolder = subfolders.find { File(it, "level.dat").exists() }
@@ -409,13 +434,16 @@ class AutonomousRunner(
                         val targetDir = File(savesDir, world.slug)
                         worldSubfolder.copyRecursively(targetDir, overwrite = true)
                         worldFolders[world.id] = world.slug
-                        logger.info("World installed to saves/${world.slug} (from subfolder ${worldSubfolder.name})")
+                        log.info("World installed") {
+                            "slug" to world.slug
+                            "subfolder" to worldSubfolder.name
+                        }
                     } else {
-                        logger.error("Downloaded world has no level.dat: ${downloadedDir.absolutePath}")
+                        log.error("Downloaded world has no level.dat") { "path" to downloadedDir.absolutePath }
                     }
                 }
             } catch (e: Exception) {
-                logger.error("Failed to download world ${world.slug}: ${e.message}", e)
+                log.error(e, "Failed to download world") { "slug" to world.slug }
             }
         }
 
@@ -434,20 +462,23 @@ class AutonomousRunner(
                 ?: files.firstOrNull { it.nameWithoutExtension.contains(shader.name, ignoreCase = true) }
 
         if (existingFile != null) {
-            logger.info("Shader already present: ${existingFile.name}")
+            log.debug("Shader already present") { "file" to existingFile.name }
             return existingFile.name
         }
 
         val downloadUrl = shader.downloadUrl
         if (downloadUrl == null) {
-            logger.error("No download URL for shader: ${shader.name}")
+            log.error("No download URL for shader") { "name" to shader.name }
             return null
         }
 
         val filename = "${shader.slug}-${shader.version}.zip"
         val targetFile = File(shaderpacksDir, filename)
 
-        logger.info("Downloading shader: ${shader.name} -> $filename")
+        log.info("Downloading shader") {
+            "name" to shader.name
+            "file" to filename
+        }
         try {
             val connection =
                 java.net
@@ -459,7 +490,7 @@ class AutonomousRunner(
             connection.readTimeout = 120000
 
             if (connection.responseCode !in 200..299) {
-                logger.error("Shader download failed: HTTP ${connection.responseCode}")
+                log.error("Shader download failed") { "status" to connection.responseCode }
                 return null
             }
 
@@ -469,10 +500,13 @@ class AutonomousRunner(
                 }
             }
 
-            logger.info("Shader downloaded: $filename (${targetFile.length()} bytes)")
+            log.info("Shader downloaded") {
+                "file" to filename
+                "bytes" to targetFile.length()
+            }
             return filename
         } catch (e: Exception) {
-            logger.error("Failed to download shader: ${e.message}", e)
+            log.error(e, "Failed to download shader")
             targetFile.delete()
             return null
         }
@@ -484,7 +518,7 @@ class AutonomousRunner(
     ) {
         CompletableFuture.runAsync {
             AgentApi.failJob(apiUrl, apiToken, jobId, message).onFailure { error ->
-                logger.error("Failed to report job failure: ${error.message}")
+                log.error("Failed to report job failure") { "error" to error.message }
             }
         }
         currentJob = null
@@ -493,7 +527,7 @@ class AutonomousRunner(
 
     private fun shutdown() {
         state = State.Done
-        logger.info("Autonomous runner shutting down")
+        log.info("Autonomous runner shutting down")
         Minecraft.getInstance().stop()
     }
 }

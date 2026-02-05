@@ -1,9 +1,12 @@
 package com.xevion.glint.scene
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
+import com.xevion.glint.error
 import com.xevion.glint.io.AsyncFileIO
 import com.xevion.glint.screenshot.Camera
 import com.xevion.glint.screenshot.Position
+import com.xevion.glint.warn
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import java.io.File
@@ -14,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap
  * Manages loading and applying scene configurations.
  */
 object SceneManager {
+    private val log = Loggers.Scene.get()
+
     private val JSON =
         Json {
             prettyPrint = true
@@ -43,16 +48,24 @@ object SceneManager {
      * - "nether_fortress" - base scene ID
      */
     fun loadScene(sceneId: String): ResolvedScene? {
-        Glint.LOGGER.info("Loading scene: $sceneId")
+        log.debug("Loading scene") {
+            "scene_id" to sceneId
+        }
 
         val collections = discoverCollections()
-        Glint.LOGGER.debug("Searching ${collections.size} collections for scene ID: $sceneId")
+        log.debug("Searching collections") {
+            "count" to collections.size
+            "scene_id" to sceneId
+        }
 
         for ((fileName, collection) in collections) {
             // Search base scenes
             val baseScene = collection.scenes.find { it.id == sceneId }
             if (baseScene != null) {
-                Glint.LOGGER.debug("Found base scene '$sceneId' in '${collection.world}'")
+                log.debug("Found base scene") {
+                    "scene_id" to sceneId
+                    "world" to collection.world
+                }
                 return resolveScene(baseScene, collection, fileName)
             }
 
@@ -60,14 +73,20 @@ object SceneManager {
             for (scene in collection.scenes) {
                 val variant = scene.variants.find { it.id == sceneId }
                 if (variant != null) {
-                    Glint.LOGGER.debug("Found variant '$sceneId' of scene '${scene.id}' in '${collection.world}'")
+                    log.debug("Found variant") {
+                        "variant_id" to sceneId
+                        "base_scene_id" to scene.id
+                        "world" to collection.world
+                    }
                     val expandedScene = variant.applyTo(scene)
                     return resolveScene(expandedScene, collection, fileName)
                 }
             }
         }
 
-        Glint.LOGGER.error("Scene not found: $sceneId")
+        log.warn("Scene not found") {
+            "scene_id" to sceneId
+        }
         return null
     }
 
@@ -82,17 +101,24 @@ object SceneManager {
         val sceneFile = File(mc.gameDirectory, "glint/scenes/$worldName.json")
 
         if (!sceneFile.exists()) {
-            Glint.LOGGER.error("Scene collection not found: ${sceneFile.absolutePath}")
+            log.warn("Scene collection not found") {
+                "path" to sceneFile.absolutePath
+            }
             return null
         }
 
         return try {
             val collection = JSON.decodeFromString(SceneCollection.serializer(), sceneFile.readText())
             loadedCollections[worldName] = collection
-            Glint.LOGGER.info("Loaded scene collection: $worldName (${collection.scenes.size} scenes)")
+            log.debug("Loaded scene collection") {
+                "world" to worldName
+                "scene_count" to collection.scenes.size
+            }
             collection
         } catch (e: Exception) {
-            Glint.LOGGER.error("Failed to parse scene collection: ${sceneFile.absolutePath}", e)
+            log.error(e, "Failed to parse scene collection") {
+                "path" to sceneFile.absolutePath
+            }
             null
         }
     }
@@ -107,7 +133,9 @@ object SceneManager {
         val sceneFile = File(mc.gameDirectory, "glint/scenes/$worldName.json")
 
         if (!sceneFile.exists()) {
-            Glint.LOGGER.error("Scene collection not found: ${sceneFile.absolutePath}")
+            log.warn("Scene collection not found") {
+                "path" to sceneFile.absolutePath
+            }
             return CompletableFuture.completedFuture(null)
         }
 
@@ -115,10 +143,15 @@ object SceneManager {
             .readJson(sceneFile, SceneCollection.serializer())
             .thenApply { collection ->
                 loadedCollections[worldName] = collection
-                Glint.LOGGER.info("Loaded scene collection: $worldName (${collection.scenes.size} scenes)")
+                log.debug("Loaded scene collection") {
+                    "world" to worldName
+                    "scene_count" to collection.scenes.size
+                }
                 collection
             }.exceptionally { e ->
-                Glint.LOGGER.error("Failed to parse scene collection: ${sceneFile.absolutePath}", e)
+                log.error(e, "Failed to parse scene collection") {
+                    "path" to sceneFile.absolutePath
+                }
                 null
             }
     }
@@ -178,19 +211,19 @@ object SceneManager {
 
         // Scene system only works in single-player
         if (mc.singleplayerServer == null) {
-            Glint.LOGGER.error("Scene capture is not available in multiplayer")
+            log.error("Scene capture is not available in multiplayer")
             return null
         }
 
         val player = mc.player
         if (player == null) {
-            Glint.LOGGER.error("Cannot save scene - player is null")
+            log.error("Cannot save scene - player is null")
             return null
         }
 
         val level = mc.level
         if (level == null) {
-            Glint.LOGGER.error("Cannot save scene - level is null")
+            log.error("Cannot save scene - level is null")
             return null
         }
 
@@ -285,7 +318,9 @@ object SceneManager {
         val updatedScenes = collection.scenes.filter { it.id != sceneId }
 
         if (updatedScenes.size == collection.scenes.size) {
-            Glint.LOGGER.warn("Scene not found for deletion: $sceneId")
+            log.warn("Scene not found for deletion") {
+                "scene_id" to sceneId
+            }
             return false
         }
 
@@ -311,7 +346,7 @@ object SceneManager {
             com.xevion.glint.api.ApiConfig
                 .load()
         if (!config.isValid()) {
-            Glint.LOGGER.debug("API not configured, scene disabled locally only")
+            log.debug("API not configured, scene disabled locally only")
             return CompletableFuture.completedFuture(true)
         }
 
@@ -368,10 +403,14 @@ object SceneManager {
         return try {
             sceneFile.writeText(JSON.encodeToString(SceneCollection.serializer(), collection))
             loadedCollections[worldName] = collection
-            Glint.LOGGER.info("Saved scene collection: $worldName")
+            log.debug("Saved scene collection") {
+                "world" to worldName
+            }
             true
         } catch (e: Exception) {
-            Glint.LOGGER.error("Failed to save scene collection: $worldName", e)
+            log.error(e, "Failed to save scene collection") {
+                "world" to worldName
+            }
             false
         }
     }
@@ -390,10 +429,14 @@ object SceneManager {
             .writeJson(sceneFile, collection, SceneCollection.serializer())
             .thenApply {
                 loadedCollections[worldName] = collection
-                Glint.LOGGER.info("Saved scene collection: $worldName")
+                log.debug("Saved scene collection") {
+                    "world" to worldName
+                }
                 true
             }.exceptionally { e ->
-                Glint.LOGGER.error("Failed to save scene collection: $worldName", e)
+                log.error(e, "Failed to save scene collection") {
+                    "world" to worldName
+                }
                 false
             }
     }
@@ -403,7 +446,7 @@ object SceneManager {
      */
     fun clearCache() {
         loadedCollections.clear()
-        Glint.LOGGER.info("Scene cache cleared")
+        log.debug("Scene cache cleared")
     }
 
     /**

@@ -1,10 +1,12 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiError
 import com.xevion.glint.api.DeviceAuthResponse
 import com.xevion.glint.api.DeviceTokenResponse
 import com.xevion.glint.api.GlintApi
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintScreen
 import com.xevion.glint.ui.base.GlintTheme
@@ -174,7 +176,7 @@ class DeviceAuthScreen(
                                 contentContainer.child(instructionsContainer as Component)
                             }
 
-                            Glint.LOGGER.info("Device auth started: {}", response.userCode)
+                            Loggers.Ui.get().info("Device auth started: {}", response.userCode)
 
                             // Start polling
                             startPolling(response)
@@ -182,7 +184,7 @@ class DeviceAuthScreen(
                             errorMessage = error.message ?: "Failed to start device authorization"
                             statusLabel.text(McComponent.literal("Error: $errorMessage"))
                             statusLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
-                            Glint.LOGGER.error("Device auth failed: {}", error.message)
+                            Loggers.Ui.get().error("Device auth failed: {}", error.message)
                         }
                 }
             }
@@ -207,7 +209,7 @@ class DeviceAuthScreen(
                         .onSuccess { tokenResponse ->
                             isPolling.set(false)
                             minecraft?.execute {
-                                Glint.LOGGER.info("Device authorized successfully")
+                                Loggers.Ui.get().info("Device authorized successfully")
                                 onAuthorized(tokenResponse)
                             }
                         }.onFailure { error ->
@@ -256,13 +258,13 @@ class DeviceAuthScreen(
     private fun copyUrl() {
         val response = authResponse ?: return
         minecraft?.keyboardHandler?.clipboard = response.verificationUriComplete
-        Glint.LOGGER.info("Copied verification URL to clipboard")
+        Loggers.Ui.get().info("Copied verification URL to clipboard")
     }
 
     private fun openBrowser() {
         val response = authResponse ?: return
         Util.getPlatform().openUri(response.verificationUriComplete)
-        Glint.LOGGER.info("Opened verification URL in browser")
+        Loggers.Ui.get().info("Opened verification URL in browser")
     }
 
     private fun cancel() {

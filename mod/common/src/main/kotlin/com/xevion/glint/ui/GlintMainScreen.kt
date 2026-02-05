@@ -1,6 +1,6 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.GlintApi
 import com.xevion.glint.api.SceneSyncManager
@@ -19,6 +19,7 @@ import com.xevion.glint.session.SessionRegistry
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintTabbedScreen
 import com.xevion.glint.ui.base.GlintTheme
+import com.xevion.glint.warn
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
@@ -1167,7 +1168,7 @@ class GlintMainScreen(
                             refreshMasterContent()
                             rebuildStatusBar()
                         }.onFailure { error ->
-                            Glint.LOGGER.warn("Failed to load from API, falling back to local: {}", error.message)
+                            Loggers.Ui.get().warn("Failed to load from API, falling back to local: {}", error.message)
                             StatusLog.warn("API unavailable, using local files")
                             worldData =
                                 localCollections.map { (fileName, collection) ->

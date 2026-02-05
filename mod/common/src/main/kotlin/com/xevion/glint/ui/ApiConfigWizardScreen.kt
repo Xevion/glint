@@ -1,8 +1,9 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.DeviceTokenResponse
+import com.xevion.glint.info
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintScreen
 import com.xevion.glint.ui.base.GlintTheme
@@ -196,7 +197,7 @@ class ApiConfigWizardScreen(
                     validated = false,
                 )
             if (ApiConfig.save(disabledConfig)) {
-                Glint.LOGGER.info("API sync disabled")
+                Loggers.Ui.get().info("API sync disabled")
                 minecraft?.setScreen(parentScreen)
             }
         }

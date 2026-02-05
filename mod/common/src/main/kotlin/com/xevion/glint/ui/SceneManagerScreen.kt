@@ -1,9 +1,11 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.SceneSyncManager
 import com.xevion.glint.api.SyncResult
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.orchestration.CaptureSpec
 import com.xevion.glint.orchestration.ShaderSpec
 import com.xevion.glint.scene.ResolvedScene
@@ -17,6 +19,7 @@ import com.xevion.glint.session.SessionRegistry
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintListScreen
 import com.xevion.glint.ui.base.GlintTheme
+import com.xevion.glint.warn
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
@@ -38,6 +41,10 @@ class SceneManagerScreen(
     private var collections: List<Pair<String, SceneCollection>> = emptyList()
     private val expandedWorlds = mutableSetOf<String>()
     private val expandedScenes = mutableSetOf<String>()
+
+    companion object {
+        private val log = Loggers.Ui.get()
+    }
 
     override fun buildHeader(header: FlowLayout) {
         header.child(
@@ -261,7 +268,9 @@ class SceneManagerScreen(
     fun isSceneExpanded(sceneId: String): Boolean = expandedScenes.contains(sceneId)
 
     fun teleportToScene(resolvedScene: ResolvedScene) {
-        Glint.LOGGER.info("Teleporting to scene: ${resolvedScene.scene.id}")
+        log.info("Teleporting to scene") {
+            "scene_id" to resolvedScene.scene.id
+        }
         SceneApplicator.apply(resolvedScene)
         onClose()
     }
@@ -283,10 +292,15 @@ class SceneManagerScreen(
             .thenAccept { success ->
                 minecraft?.execute {
                     if (success) {
-                        Glint.LOGGER.info("Disabled scene: $sceneId from world: $worldName")
+                        log.info("Disabled scene") {
+                            "scene_id" to sceneId
+                            "world" to worldName
+                        }
                         refreshContent()
                     } else {
-                        Glint.LOGGER.error("Failed to disable scene: $sceneId")
+                        log.error("Failed to disable scene") {
+                            "scene_id" to sceneId
+                        }
                     }
                 }
             }
@@ -299,10 +313,14 @@ class SceneManagerScreen(
                 shaders = listOf(ShaderSpec(filename = null)),
             )
         if (SessionRegistry.startOrchestration(spec)) {
-            Glint.LOGGER.info("Starting capture for scene: $sceneId")
+            log.info("Starting capture for scene") {
+                "scene_id" to sceneId
+            }
             onClose()
         } else {
-            Glint.LOGGER.error("Failed to start capture for scene: $sceneId")
+            log.error("Failed to start capture for scene") {
+                "scene_id" to sceneId
+            }
         }
     }
 
@@ -319,7 +337,7 @@ class SceneManagerScreen(
             }
 
         if (allSceneIds.isEmpty()) {
-            Glint.LOGGER.warn("No scenes to capture")
+            log.warn("No scenes to capture")
             return
         }
 
@@ -330,10 +348,10 @@ class SceneManagerScreen(
             )
 
         if (SessionRegistry.startOrchestration(spec)) {
-            Glint.LOGGER.info("Starting orchestration from menu")
+            log.info("Starting orchestration from menu")
             onClose()
         } else {
-            Glint.LOGGER.error("Failed to start orchestration")
+            log.error("Failed to start orchestration")
         }
     }
 
@@ -347,7 +365,7 @@ class SceneManagerScreen(
         val config = ApiConfig.load()
 
         if (!config.isValid()) {
-            Glint.LOGGER.warn("API config not valid - open API Config to set it up")
+            log.warn("API config not valid - open API Config to set it up")
             SystemToast.add(
                 minecraft!!.toastManager,
                 SystemToast.SystemToastId.WORLD_ACCESS_FAILURE,
@@ -387,7 +405,9 @@ class SceneManagerScreen(
                         )
                     }
                 }.exceptionally { e ->
-                    Glint.LOGGER.error("Failed to sync scenes for ${collection.world}", e)
+                    log.error(e, "Failed to sync scenes") {
+                        "world" to collection.world
+                    }
                     SystemToast.add(
                         minecraft!!.toastManager,
                         SystemToast.SystemToastId.WORLD_ACCESS_FAILURE,
@@ -398,7 +418,10 @@ class SceneManagerScreen(
                 }
         }
 
-        Glint.LOGGER.info("Started sync for $totalScenes scenes across ${allCollections.size} worlds")
+        log.info("Started sync") {
+            "scene_count" to totalScenes
+            "world_count" to allCollections.size
+        }
         SystemToast.add(
             minecraft!!.toastManager,
             SystemToast.SystemToastId.PERIODIC_NOTIFICATION,

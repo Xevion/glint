@@ -1,8 +1,9 @@
 package com.xevion.glint.session
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.orchestration.CaptureSpec
 import com.xevion.glint.orchestration.Orchestrator
+import com.xevion.glint.warn
 
 /**
  * Manages lifecycle of the orchestrator session globally.
@@ -47,7 +48,7 @@ object SessionRegistry {
             isRunning: (T) -> Boolean,
         ): Boolean {
             if (activeSession?.let { isRunning(it) } == true) {
-                Glint.LOGGER.warn("$name already in progress")
+                Loggers.Session.get().warn("Session already in progress") { "name" to name }
                 return false
             }
 

@@ -1,5 +1,6 @@
 package com.xevion.glint.capture
 
+import com.xevion.glint.Loggers
 import net.minecraft.client.CameraType
 import net.minecraft.client.CloudStatus
 import net.minecraft.client.GraphicsStatus
@@ -14,17 +15,20 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Uses atomic operations to ensure safe access from both game thread and mixin injection points.
  */
 object CaptureStateManager {
+    private val log = Loggers.Capture.get()
     private val isCapturing = AtomicBoolean(false)
     private val cancelRequested = AtomicBoolean(false)
 
     fun startCapture() {
         isCapturing.set(true)
         cancelRequested.set(false)
+        log.info("Capture started")
     }
 
     fun endCapture() {
         isCapturing.set(false)
         cancelRequested.set(false)
+        log.info("Capture ended")
     }
 
     fun isActive(): Boolean = isCapturing.get()
@@ -36,6 +40,7 @@ object CaptureStateManager {
     fun requestCancel() {
         if (isCapturing.get()) {
             cancelRequested.set(true)
+            log.info("Capture cancellation requested")
         }
     }
 

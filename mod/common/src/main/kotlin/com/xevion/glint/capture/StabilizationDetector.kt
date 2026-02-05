@@ -1,6 +1,9 @@
 package com.xevion.glint.capture
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
+import com.xevion.glint.info
+import com.xevion.glint.warn
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.chunk.EmptyLevelChunk
 import net.minecraft.world.level.chunk.status.ChunkStatus
@@ -17,6 +20,8 @@ import net.minecraft.world.level.chunk.status.ChunkStatus
 class StabilizationDetector(
     private val settlingTicks: Int = DEFAULT_SETTLING_TICKS,
 ) {
+    private val log = Loggers.Capture.get()
+
     private var ticksSinceStable: Int = 0
     private var graphUpdateTicks: Int = 0
 
@@ -49,7 +54,7 @@ class StabilizationDetector(
         val player = mc.player
 
         if (level == null || player == null) {
-            Glint.LOGGER.warn("Level or player not available during stabilization")
+            log.warn("Level or player not available during stabilization")
             return false
         }
 
@@ -73,9 +78,11 @@ class StabilizationDetector(
         ticksSinceStable++
         if (ticksSinceStable >= settlingTicks) {
             val loadedChunks = countLoadedChunks(mc)
-            Glint.LOGGER.info(
-                "Stabilization complete after $ticksInState ticks total ($ticksSinceStable ticks stable, $loadedChunks chunks loaded)",
-            )
+            log.info("Stabilization complete") {
+                "total_ticks" to ticksInState
+                "stable_ticks" to ticksSinceStable
+                "chunks_loaded" to loadedChunks
+            }
             return true
         }
 
@@ -118,7 +125,10 @@ class StabilizationDetector(
         }
 
         if (logInterval) {
-            Glint.LOGGER.debug("Stabilize: $currentSections sections loaded (stable for $sectionStableTicks ticks)")
+            log.debug("Stabilize: sections loaded") {
+                "sections" to currentSections
+                "stable_ticks" to sectionStableTicks
+            }
         }
 
         // Consider stable when section count hasn't changed for threshold
@@ -162,7 +172,11 @@ class StabilizationDetector(
 
         if (loadedChunks < totalChunks) {
             if (logInterval) {
-                Glint.LOGGER.debug("Stabilize: chunks loaded $loadedChunks/$totalChunks (rd=$renderDistance)")
+                log.debug("Stabilize: chunks loaded") {
+                    "loaded" to loadedChunks
+                    "total" to totalChunks
+                    "render_distance" to renderDistance
+                }
             }
             return false
         }
@@ -208,7 +222,7 @@ class StabilizationDetector(
 
         if (hasLightWork) {
             if (logInterval) {
-                Glint.LOGGER.debug("Stabilize: lighting still running")
+                log.debug("Stabilize: lighting still running")
             }
             return false
         }
@@ -239,17 +253,24 @@ class StabilizationDetector(
                 if (logInterval) {
                     when {
                         scheduledJobs > 0 -> {
-                            Glint.LOGGER.debug(
-                                "Stabilize: Building chunks ($scheduledJobs queued, $busyThreads/$totalThreads threads active)",
-                            )
+                            log.debug("Stabilize: building chunks") {
+                                "queued" to scheduledJobs
+                                "busy_threads" to busyThreads
+                                "total_threads" to totalThreads
+                            }
                         }
 
                         needsUpdate -> {
-                            Glint.LOGGER.debug("Stabilize: Graph update in progress (tick $graphUpdateTicks)")
+                            log.debug("Stabilize: graph update in progress") {
+                                "tick" to graphUpdateTicks
+                            }
                         }
 
                         busyThreads > 0 -> {
-                            Glint.LOGGER.debug("Stabilize: Finishing builds ($busyThreads/$totalThreads threads active)")
+                            log.debug("Stabilize: finishing builds") {
+                                "busy_threads" to busyThreads
+                                "total_threads" to totalThreads
+                            }
                         }
                     }
                 }

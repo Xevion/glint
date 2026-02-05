@@ -1,7 +1,11 @@
 package com.xevion.glint.capture
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.mixin.ShaderPackAccessor
+import com.xevion.glint.warn
 import net.irisshaders.iris.Iris
 import java.nio.file.Path
 
@@ -10,15 +14,16 @@ import java.nio.file.Path
  * Uses compile-time Iris API with runtime availability checks for type-safe integration.
  */
 object IrisIntegration {
+    private val log = Loggers.Capture.get()
     private val available: Boolean =
         runCatching {
             Class.forName("net.irisshaders.iris.Iris")
-            Glint.LOGGER.info("Iris integration enabled")
+            log.info("Iris integration enabled")
             true
         }.getOrElse { e ->
             when (e) {
-                is ClassNotFoundException -> Glint.LOGGER.debug("Iris not detected, shader features disabled")
-                is NoClassDefFoundError -> Glint.LOGGER.warn("Iris detected but failed to load", e)
+                is ClassNotFoundException -> log.debug("Iris not detected, shader features disabled")
+                is NoClassDefFoundError -> log.warn(e, "Iris detected but failed to load")
             }
             false
         }
@@ -30,7 +35,7 @@ object IrisIntegration {
         return runCatching {
             Iris.getCurrentPack().isPresent
         }.onFailure { e ->
-            Glint.LOGGER.error("Error checking shader pack status", e)
+            log.error(e, "Error checking shader pack status")
         }
     }
 
@@ -39,7 +44,7 @@ object IrisIntegration {
         return runCatching {
             Iris.getCurrentPackName()
         }.onFailure { e ->
-            Glint.LOGGER.error("Error getting shader pack name", e)
+            log.error(e, "Error getting shader pack name")
         }
     }
 
@@ -48,7 +53,7 @@ object IrisIntegration {
         return runCatching {
             Iris.getShaderpacksDirectory()
         }.onFailure { e ->
-            Glint.LOGGER.error("Error getting shaderpacks directory", e)
+            log.error(e, "Error getting shaderpacks directory")
         }
     }
 
@@ -68,7 +73,7 @@ object IrisIntegration {
                 }?.sorted()
                 ?: emptyList()
         }.onFailure { e ->
-            Glint.LOGGER.warn("Failed to list shader packs", e)
+            log.warn(e, "Failed to list shader packs")
         }
     }
 
@@ -81,9 +86,9 @@ object IrisIntegration {
             config.setShadersEnabled(packName != null)
             config.save()
             Iris.reload()
-            Glint.LOGGER.info("Shader pack set to: ${packName ?: "(disabled)"}")
+            log.info("Shader pack changed") { "pack" to (packName ?: "(disabled)") }
         }.onFailure { e ->
-            Glint.LOGGER.error("Failed to set shader pack: $packName", e)
+            log.error(e, "Failed to set shader pack") { "pack" to packName }
         }
     }
 
@@ -105,7 +110,7 @@ object IrisIntegration {
             profileSet.forEach { name, _ -> profileNames.add(name) }
             profileNames.toList()
         }.onFailure { e ->
-            Glint.LOGGER.error("Error getting shader profiles", e)
+            log.error(e, "Error getting shader profiles")
         }
     }
 
@@ -131,7 +136,7 @@ object IrisIntegration {
 
             val profile =
                 foundProfile ?: run {
-                    Glint.LOGGER.warn("Profile not found: $profileName")
+                    log.warn("Profile not found") { "profile" to profileName }
                     throw IllegalArgumentException("Profile not found: $profileName")
                 }
 
@@ -139,13 +144,13 @@ object IrisIntegration {
 
             val queue = Iris.getShaderPackOptionQueue()
             if (queue.isEmpty()) {
-                Glint.LOGGER.warn("Profile queued but option queue is empty: $profileName")
+                log.warn("Profile queued but option queue is empty") { "profile" to profileName }
             }
 
             Iris.reload()
-            Glint.LOGGER.info("Applied shader profile: $profileName")
+            log.info("Applied shader profile") { "profile" to profileName }
         }.onFailure { e ->
-            Glint.LOGGER.error("Failed to apply shader profile: $profileName", e)
+            log.error(e, "Failed to apply shader profile") { "profile" to profileName }
         }
     }
 
@@ -157,9 +162,9 @@ object IrisIntegration {
         return runCatching {
             Iris.getShaderPackOptionQueue().clear()
             Iris.reload()
-            Glint.LOGGER.info("Reset shader options to defaults")
+            log.info("Reset shader options to defaults")
         }.onFailure { e ->
-            Glint.LOGGER.error("Failed to reset shader options", e)
+            log.error(e, "Failed to reset shader options")
         }
     }
 }

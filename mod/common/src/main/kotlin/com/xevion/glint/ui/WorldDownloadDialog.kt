@@ -1,7 +1,9 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.download.DownloadProgress
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintDialogScreen
 import com.xevion.glint.ui.base.GlintTheme
@@ -153,12 +155,12 @@ class WorldDownloadDialog(
     }
 
     private fun onDownloadComplete(worldPath: String) {
-        Glint.LOGGER.info("World download complete: {}", worldPath)
+        Loggers.Ui.get().info("World download complete: {}", worldPath)
         minecraft?.setScreen(parent)
     }
 
     private fun onDownloadFailed(error: Throwable) {
-        Glint.LOGGER.error("World download failed", error)
+        Loggers.Ui.get().error(error, "World download failed")
         currentProgress = DownloadProgress.failed()
     }
 }

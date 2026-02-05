@@ -1,6 +1,8 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.scene.Weather
@@ -344,12 +346,12 @@ class SaveSceneDialog(
         val level = mc.level
 
         if (player == null || level == null) {
-            Glint.LOGGER.error("Cannot save scene - player or level is null")
+            Loggers.Ui.get().error("Cannot save scene - player or level is null")
             return
         }
 
         if (mc.singleplayerServer == null) {
-            Glint.LOGGER.error("Cannot save scene - not in singleplayer")
+            Loggers.Ui.get().error("Cannot save scene - not in singleplayer")
             return
         }
 
@@ -389,11 +391,16 @@ class SaveSceneDialog(
         }
 
         if (SceneManager.addScene(worldName, scene)) {
-            Glint.LOGGER.info("Saved scene: $sceneId to world: $worldName")
+            Loggers.Ui.get().info("Saved scene") {
+                "scene_id" to sceneId
+                "world" to worldName
+            }
             onSave()
             minecraft?.setScreen(parentScreen)
         } else {
-            Glint.LOGGER.error("Failed to save scene: $sceneId")
+            Loggers.Ui.get().error("Failed to save scene") {
+                "scene_id" to sceneId
+            }
         }
     }
 }

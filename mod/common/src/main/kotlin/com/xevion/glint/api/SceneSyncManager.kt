@@ -1,8 +1,12 @@
 package com.xevion.glint.api
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneCollection
+import com.xevion.glint.warn
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 
@@ -10,6 +14,7 @@ import java.util.concurrent.Executors
  * Manages synchronization of scenes between local files and the Glint backend.
  */
 object SceneSyncManager {
+    private val log = Loggers.Api.get()
     private val executor = Executors.newSingleThreadExecutor()
 
     /**
@@ -30,14 +35,14 @@ object SceneSyncManager {
 
         return CompletableFuture.supplyAsync(
             {
-                Glint.LOGGER.info("Syncing scene: ${scene.id}")
+                log.info("Syncing scene") { "scene_id" to scene.id }
 
                 // Try to create first - backend will return 409 if exists
                 val createResult = GlintApi.createScene(config.apiUrl, config.worldId, scene, config.accessToken)
 
                 createResult.fold(
                     onSuccess = {
-                        Glint.LOGGER.info("Created scene '${scene.id}' on backend")
+                        log.info("Created scene on backend") { "scene_id" to scene.id }
                         SyncResult.Success(scene.id, created = true)
                     },
                     onFailure = { throwable ->
@@ -45,19 +50,22 @@ object SceneSyncManager {
 
                         if (error is ApiError.HttpError && error.statusCode == 409) {
                             // Scene exists, try updating
-                            Glint.LOGGER.debug("Scene '${scene.id}' exists, updating instead")
+                            log.debug("Scene exists, updating instead") { "scene_id" to scene.id }
                             val updateResult = GlintApi.updateScene(config.apiUrl, config.worldId, scene, config.accessToken)
 
                             updateResult.fold(
                                 onSuccess = {
-                                    Glint.LOGGER.info("Updated scene '${scene.id}' on backend")
+                                    log.info("Updated scene on backend") { "scene_id" to scene.id }
                                     SyncResult.Success(scene.id, created = false)
                                 },
                                 onFailure = { updateThrowable ->
                                     val updateError =
                                         updateThrowable as? ApiError
                                             ?: ApiError.UnknownError(updateThrowable.message ?: "Unknown", updateThrowable)
-                                    Glint.LOGGER.error("Failed to update scene '${scene.id}': ${updateError.message}")
+                                    log.error("Failed to update scene") {
+                                        "scene_id" to scene.id
+                                        "error" to updateError.message
+                                    }
                                     SyncResult.Failure(scene.id, updateError)
                                 },
                             )
@@ -71,9 +79,15 @@ object SceneSyncManager {
                                 }
 
                             if (logLevel == "warn") {
-                                Glint.LOGGER.warn("Failed to create scene '${scene.id}': ${error.userMessage}")
+                                log.warn("Failed to create scene") {
+                                    "scene_id" to scene.id
+                                    "error" to error.userMessage
+                                }
                             } else {
-                                Glint.LOGGER.error("Failed to create scene '${scene.id}': ${error.message}")
+                                log.error("Failed to create scene") {
+                                    "scene_id" to scene.id
+                                    "error" to error.message
+                                }
                             }
 
                             SyncResult.Failure(scene.id, error)
@@ -111,9 +125,15 @@ object SceneSyncManager {
             val failureCount = results.count { it is SyncResult.Failure }
 
             if (failureCount > 0) {
-                Glint.LOGGER.warn("Synced $successCount/${collection.scenes.size} scenes ($failureCount failed)")
+                log.warn("Sync completed with failures") {
+                    "success_count" to successCount
+                    "total" to collection.scenes.size
+                    "failure_count" to failureCount
+                }
             } else {
-                Glint.LOGGER.info("Successfully synced all ${collection.scenes.size} scenes")
+                log.info("Successfully synced all scenes") {
+                    "count" to collection.scenes.size
+                }
             }
 
             results
@@ -128,18 +148,18 @@ object SceneSyncManager {
         config: ApiConfig,
     ): CompletableFuture<Boolean> {
         if (!config.isValid()) {
-            Glint.LOGGER.debug("Cannot disable scene '$sceneSlug': API config not valid")
+            log.debug("Cannot disable scene: API config not valid") { "scene_slug" to sceneSlug }
             return CompletableFuture.completedFuture(false)
         }
 
         return CompletableFuture.supplyAsync(
             {
-                Glint.LOGGER.info("Disabling scene on backend: $sceneSlug")
+                log.info("Disabling scene on backend") { "scene_slug" to sceneSlug }
                 val result = GlintApi.disableScene(config.apiUrl, config.worldId, sceneSlug, config.accessToken)
 
                 result.fold(
                     onSuccess = {
-                        Glint.LOGGER.info("Successfully disabled scene '$sceneSlug' on backend")
+                        log.info("Successfully disabled scene on backend") { "scene_slug" to sceneSlug }
                         true
                     },
                     onFailure = { throwable ->
@@ -147,19 +167,28 @@ object SceneSyncManager {
 
                         when (error) {
                             is ApiError.NetworkError -> {
-                                Glint.LOGGER.warn("Cannot disable scene '$sceneSlug': ${error.userMessage}")
+                                log.warn("Cannot disable scene") {
+                                    "scene_slug" to sceneSlug
+                                    "error" to error.userMessage
+                                }
                             }
 
                             is ApiError.HttpError -> {
                                 if (error.statusCode == 404) {
-                                    Glint.LOGGER.debug("Scene '$sceneSlug' not found on backend (already deleted?)")
+                                    log.debug("Scene not found on backend (already deleted?)") { "scene_slug" to sceneSlug }
                                 } else {
-                                    Glint.LOGGER.error("Failed to disable scene '$sceneSlug': ${error.message}")
+                                    log.error("Failed to disable scene") {
+                                        "scene_slug" to sceneSlug
+                                        "error" to error.message
+                                    }
                                 }
                             }
 
                             else -> {
-                                Glint.LOGGER.error("Failed to disable scene '$sceneSlug': ${error.message}")
+                                log.error("Failed to disable scene") {
+                                    "scene_slug" to sceneSlug
+                                    "error" to error.message
+                                }
                             }
                         }
                         false

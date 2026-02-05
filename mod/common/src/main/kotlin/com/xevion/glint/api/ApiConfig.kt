@@ -1,6 +1,8 @@
 package com.xevion.glint.api
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
+import com.xevion.glint.error
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
@@ -21,6 +23,8 @@ data class ApiConfig(
     val tokenExpiresAt: Long = 0L,
 ) {
     companion object {
+        private val log = Loggers.Api.get()
+
         private val JSON =
             Json {
                 prettyPrint = true
@@ -42,7 +46,7 @@ data class ApiConfig(
             val configFile = getConfigFile()
 
             if (!configFile.exists()) {
-                Glint.LOGGER.info("API config not found, using defaults")
+                log.debug("API config not found, using defaults")
                 return ApiConfig()
             }
 
@@ -50,7 +54,7 @@ data class ApiConfig(
                 val content = configFile.readText()
                 JSON.decodeFromString(serializer(), content)
             } catch (e: Exception) {
-                Glint.LOGGER.error("Failed to load API config, using defaults", e)
+                log.error(e, "Failed to load API config, using defaults")
                 ApiConfig()
             }
         }
@@ -64,10 +68,10 @@ data class ApiConfig(
             return try {
                 val content = JSON.encodeToString(serializer(), config)
                 configFile.writeText(content)
-                Glint.LOGGER.info("Saved API config")
+                log.debug("Saved API config")
                 true
             } catch (e: Exception) {
-                Glint.LOGGER.error("Failed to save API config", e)
+                log.error(e, "Failed to save API config")
                 false
             }
         }

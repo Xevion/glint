@@ -27,8 +27,9 @@ object Glint {
     var autonomousRunner: AutonomousRunner? = null
 
     fun init() {
+        // Trigger Loggers companion init — configures all category loggers + "glint" via LogConfig
+        Loggers.getAllCategories()
         LOGGER.info("Initializing Glint mod")
-        LogConfig.setupDebugLogging(MOD_ID)
 
         isAutonomous = System.getenv("GLINT_AUTONOMOUS")?.equals("true", ignoreCase = true) == true
         if (isAutonomous) {

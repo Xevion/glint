@@ -1,6 +1,10 @@
 package com.xevion.glint.scene
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
+import com.xevion.glint.error
+import com.xevion.glint.info
+import com.xevion.glint.warn
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.GameRules
 import net.minecraft.client.CameraType as MinecraftCameraType
@@ -10,6 +14,8 @@ import net.minecraft.client.CameraType as MinecraftCameraType
  * Handles world state, player positioning, camera, and render settings.
  */
 object SceneApplicator {
+    private val log = Loggers.Scene.get()
+
     /**
      * Applies a resolved scene to the game.
      * Returns true if successful, false if failed.
@@ -21,15 +27,18 @@ object SceneApplicator {
 
         // Scene system only works in single-player
         if (mc.singleplayerServer == null) {
-            Glint.LOGGER.error("Scene system is not available in multiplayer")
+            log.error("Scene system is not available in multiplayer")
             return false
         }
 
-        Glint.LOGGER.info("Applying scene: ${scene.name} (${scene.id})")
+        log.info("Applying scene") {
+            "scene_id" to scene.id
+            "name" to scene.name
+        }
 
         // 1. Validate world is loaded
         if (!validateWorld(resolvedScene.worldFolderName)) {
-            Glint.LOGGER.error("World not loaded or doesn't match: ${resolvedScene.worldFolderName}")
+            log.error("World not loaded") { "world" to resolvedScene.worldFolderName }
             return false
         }
 
@@ -48,7 +57,7 @@ object SceneApplicator {
         // 6. Force chunk reload
         mc.levelRenderer.allChanged()
 
-        Glint.LOGGER.info("Scene applied successfully")
+        log.debug("Scene applied successfully")
         return true
     }
 
@@ -70,7 +79,7 @@ object SceneApplicator {
         val mc = Minecraft.getInstance()
         val player = mc.player
         if (player == null) {
-            Glint.LOGGER.warn("Cannot apply position and camera - player is null")
+            log.warn("Cannot apply position and camera - player is null")
             return
         }
 
@@ -93,10 +102,13 @@ object SceneApplicator {
             },
         )
 
-        Glint.LOGGER.debug(
-            "Teleported to (${scene.position.x}, ${scene.position.y}, ${scene.position.z}), " +
-                "camera (${scene.camera.yaw}, ${scene.camera.pitch})",
-        )
+        log.debug("Teleported") {
+            "x" to scene.position.x
+            "y" to scene.position.y
+            "z" to scene.position.z
+            "yaw" to scene.camera.yaw
+            "pitch" to scene.camera.pitch
+        }
     }
 
     private fun applyTimeAndWeather(scene: Scene) {
@@ -104,43 +116,43 @@ object SceneApplicator {
         val server = mc.singleplayerServer
 
         if (server == null) {
-            Glint.LOGGER.warn("Cannot apply time and weather - not in single-player")
+            log.warn("Cannot apply time and weather - not in single-player")
             return
         }
 
         // Set time of day on server
         val overworld = server.overworld()
         overworld.dayTime = scene.timeOfDay.toLong()
-        Glint.LOGGER.debug("Set server time to: ${scene.timeOfDay}")
+        log.debug("Set server time") { "time" to scene.timeOfDay }
 
         // Set weather on server using the public API
         when (scene.weather) {
             Weather.CLEAR -> {
                 // setWeatherParameters(clearWeatherTime, rainTime, isRaining, isThundering)
                 overworld.setWeatherParameters(6000, 0, false, false)
-                Glint.LOGGER.debug("Set weather to: CLEAR")
+                log.debug("Set weather") { "weather" to "CLEAR" }
             }
 
             Weather.RAIN -> {
                 // setWeatherParameters(clearWeatherTime, rainTime, isRaining, isThundering)
                 overworld.setWeatherParameters(0, 6000, true, false)
-                Glint.LOGGER.debug("Set weather to: RAIN")
+                log.debug("Set weather") { "weather" to "RAIN" }
 
                 // Note: Weather intensity (rainLevel/thunderLevel) is protected in Level class
                 // It's automatically calculated by the game based on isRaining/isThundering state
                 // Manual intensity control would require mixins or reflection
                 if (scene.weatherIntensity != null) {
-                    Glint.LOGGER.warn("Weather intensity setting not supported (requires protected field access)")
+                    log.warn("Weather intensity setting not supported (requires protected field access)")
                 }
             }
 
             Weather.THUNDER -> {
                 // setWeatherParameters(clearWeatherTime, rainTime, isRaining, isThundering)
                 overworld.setWeatherParameters(0, 6000, true, true)
-                Glint.LOGGER.debug("Set weather to: THUNDER")
+                log.debug("Set weather") { "weather" to "THUNDER" }
 
                 if (scene.weatherIntensity != null) {
-                    Glint.LOGGER.warn("Weather intensity setting not supported (requires protected field access)")
+                    log.warn("Weather intensity setting not supported (requires protected field access)")
                 }
             }
         }
@@ -200,7 +212,7 @@ object SceneApplicator {
         config.fovEffects?.let { options.fovEffectScale().set(it) }
         config.mipmapLevels?.let { options.mipmapLevels().set(it) }
 
-        Glint.LOGGER.debug("Render settings applied")
+        log.debug("Render settings applied")
     }
 
     private fun freezeWorldState(config: SceneConfig) {
@@ -221,9 +233,9 @@ object SceneApplicator {
                 .gameRules
                 .getRule(GameRules.RULE_WEATHER_CYCLE)
                 .set(false, server)
-            Glint.LOGGER.debug("World state frozen (single-player)")
+            log.debug("World state frozen (single-player)")
         } ?: run {
-            Glint.LOGGER.warn("Cannot freeze world state on multiplayer client")
+            log.warn("Cannot freeze world state on multiplayer client")
         }
 
         // TODO: Entity freezing
@@ -234,7 +246,7 @@ object SceneApplicator {
         // - Disable AI ticking
         val entityAiFrozen = config.entityAiFrozen ?: true
         if (entityAiFrozen) {
-            Glint.LOGGER.debug("Entity AI freezing not yet implemented")
+            log.debug("Entity AI freezing not yet implemented")
         }
     }
 }

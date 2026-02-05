@@ -1,9 +1,11 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.GlintApi
 import com.xevion.glint.api.WorldInfo
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintScreen
 import com.xevion.glint.ui.base.GlintTheme
@@ -119,12 +121,12 @@ class WorldSelectionScreen(
                                 statusLabel.color(Color.ofRgb(GlintTheme.TEXT_SECONDARY))
                                 rebuildWorldList()
                             }
-                            Glint.LOGGER.info("Loaded {} worlds from server", worlds.size)
+                            Loggers.Ui.get().info("Loaded {} worlds from server", worlds.size)
                         }.onFailure { error ->
                             loadError = error.message ?: "Failed to load worlds"
                             statusLabel.text(McComponent.literal("Error: $loadError"))
                             statusLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
-                            Glint.LOGGER.error("Failed to load worlds: {}", error.message)
+                            Loggers.Ui.get().error("Failed to load worlds: {}", error.message)
                         }
                 }
             }
@@ -189,10 +191,10 @@ class WorldSelectionScreen(
             )
 
         if (ApiConfig.save(config)) {
-            Glint.LOGGER.info("API config saved: connected to {} with world '{}'", serverUrl, selected.name)
+            Loggers.Ui.get().info("API config saved: connected to {} with world '{}'", serverUrl, selected.name)
             minecraft?.setScreen(parent)
         } else {
-            Glint.LOGGER.error("Failed to save API config")
+            Loggers.Ui.get().error("Failed to save API config")
         }
     }
 }

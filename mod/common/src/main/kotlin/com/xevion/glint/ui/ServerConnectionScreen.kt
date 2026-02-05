@@ -1,12 +1,14 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.GlintApi
 import com.xevion.glint.api.UrlValidationResult
+import com.xevion.glint.info
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintScreen
 import com.xevion.glint.ui.base.GlintTheme
+import com.xevion.glint.warn
 import io.wispforest.owo.ui.component.ButtonComponent
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.component.LabelComponent
@@ -29,6 +31,10 @@ class ServerConnectionScreen(
     private val onConnectionValidated: (String) -> Unit,
     private val initialUrl: String = "http://localhost:8080",
 ) : GlintScreen(McComponent.literal("Connect to Glint Server")) {
+    companion object {
+        private val log = Loggers.Ui.get()
+    }
+
     private lateinit var urlInput: TextBoxComponent
     private lateinit var testButton: ButtonComponent
     private lateinit var skipButton: ButtonComponent
@@ -172,7 +178,7 @@ class ServerConnectionScreen(
                         .onSuccess { message ->
                             connectionTestResult = message
                             connectionTestError = null
-                            Glint.LOGGER.info("Connection test successful: {}", normalizedUrl)
+                            log.info("Connection test successful") { "url" to normalizedUrl }
                             updateFeedback()
 
                             // Automatically proceed to world selection after 1 second
@@ -185,7 +191,7 @@ class ServerConnectionScreen(
                         }.onFailure { error ->
                             connectionTestResult = null
                             connectionTestError = error.message ?: "Connection failed"
-                            Glint.LOGGER.warn("Connection test failed: {}", error.message)
+                            log.warn("Connection test failed") { "error" to error.message }
                             updateFeedback()
                         }
                     updateButtonStates()
@@ -203,7 +209,7 @@ class ServerConnectionScreen(
                 validated = false,
             )
         ApiConfig.save(config)
-        Glint.LOGGER.info("API sync disabled by user")
+        log.info("API sync disabled by user")
         minecraft?.setScreen(parent)
     }
 }

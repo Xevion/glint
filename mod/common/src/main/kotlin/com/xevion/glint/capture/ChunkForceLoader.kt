@@ -1,6 +1,7 @@
 package com.xevion.glint.capture
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.ChunkPos
 
@@ -17,6 +18,7 @@ import net.minecraft.world.level.ChunkPos
  * 2. Chunks have proper neighbors for Sodium's rendering requirements
  */
 object ChunkForceLoader {
+    private val log = Loggers.Capture.get()
     private val forcedChunks = mutableSetOf<Long>()
     private var forcedDimension: net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>? = null
 
@@ -58,7 +60,10 @@ object ChunkForceLoader {
                     }
                 }
             }
-            Glint.LOGGER.debug("Force loaded $count chunks in render distance $renderDistance")
+            log.debug("Force loaded chunks") {
+                "count" to count
+                "render_distance" to renderDistance
+            }
         }
         return true
     }
@@ -83,7 +88,9 @@ object ChunkForceLoader {
             for (chunkPos in chunksToRelease) {
                 serverLevel.setChunkForced(ChunkPos.getX(chunkPos), ChunkPos.getZ(chunkPos), false)
             }
-            Glint.LOGGER.debug("Released $count force-loaded chunks")
+            log.debug("Released force-loaded chunks") {
+                "count" to count
+            }
         }
 
         forcedChunks.clear()

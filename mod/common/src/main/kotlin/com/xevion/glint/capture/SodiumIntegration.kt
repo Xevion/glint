@@ -1,6 +1,8 @@
 package com.xevion.glint.capture
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
+import com.xevion.glint.info
 
 /**
  * Integration with Sodium's chunk rendering system.
@@ -21,6 +23,8 @@ import com.xevion.glint.Glint
  * rendering complete on the same tick that allChanged() was called.
  */
 object SodiumIntegration {
+    private val log = Loggers.Capture.get()
+
     private enum class AvailabilityState {
         UNKNOWN,
         AVAILABLE,
@@ -58,12 +62,12 @@ object SodiumIntegration {
     private fun initializeSodium() {
         try {
             sodiumWorldRendererClass = Class.forName("net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer")
-            Glint.LOGGER.info("Sodium detected, initializing integration")
+            log.info("Sodium detected, initializing integration")
 
             // Sodium is present, now try to set up reflection
             initReflection()
         } catch (e: ClassNotFoundException) {
-            Glint.LOGGER.debug("Sodium not detected, using vanilla chunk rendering detection")
+            log.debug("Sodium not detected, using vanilla chunk rendering detection")
             availability = AvailabilityState.UNAVAILABLE
         }
     }
@@ -100,7 +104,7 @@ object SodiumIntegration {
             isBuildQueueEmptyMethod = chunkBuilderClass!!.getMethod("isBuildQueueEmpty")
             getTotalSectionsMethod = renderSectionManagerClass!!.getMethod("getTotalSections")
 
-            Glint.LOGGER.info("Sodium integration initialized successfully")
+            log.info("Sodium integration initialized successfully")
             availability = AvailabilityState.AVAILABLE
         } catch (e: NoSuchMethodException) {
             availability = AvailabilityState.UNAVAILABLE
@@ -179,7 +183,7 @@ object SodiumIntegration {
 
             return queueEmpty
         } catch (e: Exception) {
-            Glint.LOGGER.debug("Sodium rendering check failed: ${e.message}")
+            log.debug("Sodium rendering check failed") { "error" to e.message }
             return null
         }
     }
@@ -197,7 +201,7 @@ object SodiumIntegration {
             val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
             return getScheduledJobCountMethod!!.invoke(builder) as Int
         } catch (e: Exception) {
-            Glint.LOGGER.debug("Failed to get Sodium scheduled job count: ${e.message}")
+            log.debug("Failed to get Sodium scheduled job count") { "error" to e.message }
             return null
         }
     }
@@ -214,7 +218,7 @@ object SodiumIntegration {
             val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
             return needsUpdateMethod!!.invoke(sectionManager) as Boolean
         } catch (e: Exception) {
-            Glint.LOGGER.debug("Failed to check Sodium graph update state: ${e.message}")
+            log.debug("Failed to check Sodium graph update state") { "error" to e.message }
             return null
         }
     }
@@ -232,7 +236,7 @@ object SodiumIntegration {
             val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
             return getBusyThreadCountMethod!!.invoke(builder) as Int
         } catch (e: Exception) {
-            Glint.LOGGER.debug("Failed to get Sodium busy thread count: ${e.message}")
+            log.debug("Failed to get Sodium busy thread count") { "error" to e.message }
             return null
         }
     }
@@ -250,7 +254,7 @@ object SodiumIntegration {
             val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
             return getTotalThreadCountMethod!!.invoke(builder) as Int
         } catch (e: Exception) {
-            Glint.LOGGER.debug("Failed to get Sodium total thread count: ${e.message}")
+            log.debug("Failed to get Sodium total thread count") { "error" to e.message }
             return null
         }
     }
@@ -268,7 +272,7 @@ object SodiumIntegration {
             val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
             return getTotalSectionsMethod!!.invoke(sectionManager) as Int
         } catch (e: Exception) {
-            Glint.LOGGER.debug("Failed to get Sodium section count: ${e.message}")
+            log.debug("Failed to get Sodium section count") { "error" to e.message }
             return null
         }
     }

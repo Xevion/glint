@@ -8,42 +8,80 @@ import org.apache.logging.log4j.core.config.LoggerConfig
 import org.apache.logging.log4j.core.layout.PatternLayout
 
 /**
- * Configures debug-level logging for Glint mod.
- * Isolated from main mod initialization to reduce complexity.
+ * Programmatic Log4j2 configuration for all Glint logging categories.
+ *
+ * Called automatically from [Loggers] companion `init` block on first access.
+ * Creates a dedicated console appender and attaches it to every category logger
+ * so structured output (including key-value pairs from the SLF4J fluent API)
+ * is visible during development.
  */
 internal object LogConfig {
-    fun setupDebugLogging(modId: String) {
+    private var configured = false
+    private var globalLevel = Level.DEBUG
+
+    private const val APPENDER_NAME = "GlintConsole"
+    private const val PATTERN = "[%d{HH:mm:ss.SSS}] [%-5level] [%logger{1}] %msg%n"
+
+    @Synchronized
+    fun configure() {
+        if (configured) return
+        configured = true
+
+        runCatching {
+            val ctx = LogManager.getContext(false) as LoggerContext
+            val config = ctx.configuration
+            val appender = getOrCreateAppender(config)
+
+            // Configure each category logger + the mod-level "glint" logger
+            val allLoggers = Loggers.getAllCategories() + Glint.MOD_ID
+            for (name in allLoggers) {
+                val loggerConfig = getOrCreateLoggerConfig(config, name)
+                loggerConfig.level = globalLevel
+                loggerConfig.addAppender(appender, Level.ALL, null)
+            }
+
+            ctx.updateLoggers()
+        }.onFailure { e ->
+            System.err.println("Failed to configure Glint loggers: ${e.message}")
+        }
+    }
+
+    @Synchronized
+    fun getGlobalLevel(): Level = globalLevel
+
+    @Synchronized
+    fun setGlobalLevel(level: Level) {
+        globalLevel = level
+
         runCatching {
             val ctx = LogManager.getContext(false) as LoggerContext
             val config = ctx.configuration
 
-            val appenderName = "GlintDebugConsole"
-            val appender = config.getAppender(appenderName) ?: createAppender(appenderName, config)
-
-            val loggerConfig = getOrCreateLoggerConfig(config, modId)
-            loggerConfig.level = Level.DEBUG
-            loggerConfig.addAppender(appender, Level.DEBUG, null)
+            val allLoggers = Loggers.getAllCategories() + Glint.MOD_ID
+            for (name in allLoggers) {
+                config.getLoggerConfig(name).takeIf { it.name == name }?.level = level
+            }
 
             ctx.updateLoggers()
         }.onFailure { e ->
-            System.err.println("Failed to configure Glint debug logger: ${e.message}")
+            System.err.println("Failed to set Glint log level: ${e.message}")
         }
     }
 
-    private fun createAppender(
-        name: String,
-        config: org.apache.logging.log4j.core.config.Configuration,
-    ): ConsoleAppender {
+    private fun getOrCreateAppender(config: org.apache.logging.log4j.core.config.Configuration): ConsoleAppender {
+        val existing = config.appenders[APPENDER_NAME]
+        if (existing is ConsoleAppender) return existing
+
         val appender =
             ConsoleAppender
                 .newBuilder()
-                .setName(name)
+                .setName(APPENDER_NAME)
                 .setTarget(ConsoleAppender.Target.SYSTEM_OUT)
                 .setFollow(true)
                 .setLayout(
                     PatternLayout
                         .newBuilder()
-                        .withPattern("[%d{HH:mm:ss}] [%t/%level] (%logger{1}) %msg%n")
+                        .withPattern(PATTERN)
                         .withConfiguration(config)
                         .build(),
                 ).build()
@@ -55,15 +93,15 @@ internal object LogConfig {
 
     private fun getOrCreateLoggerConfig(
         config: org.apache.logging.log4j.core.config.Configuration,
-        modId: String,
+        name: String,
     ): LoggerConfig {
-        val existing = config.getLoggerConfig(modId)
-        return if (existing.name == modId) {
+        val existing = config.getLoggerConfig(name)
+        return if (existing.name == name) {
             existing
         } else {
-            val newConfig = LoggerConfig(modId, Level.DEBUG, false)
-            config.addLogger(modId, newConfig)
-            newConfig
+            LoggerConfig(name, globalLevel, false).also {
+                config.addLogger(name, it)
+            }
         }
     }
 }

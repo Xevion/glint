@@ -111,22 +111,79 @@ Dedicated thread pools for I/O remain acceptable when coroutine integration isn'
 
 ## Logging
 
-Category-based structured logging via the `Loggers` enum:
+Category-based structured logging via the `Loggers` enum and `StructuredLog` DSL.
+
+### Setup
 
 ```kotlin
 private val log = Loggers.Capture.get()
+```
 
+Each domain area uses its dedicated logger category from the `Loggers` enum.
+
+### Structured Fields
+
+Use the DSL block to attach key-value context. Fields are rendered as `key=value` pairs after the message on the console, and also attached to the SLF4J `LoggingEventBuilder` via `addKeyValue()` for structured consumers (JSON appenders, log aggregators).
+
+```kotlin
 log.info("Capture complete") {
     "shader_id" to shaderId
     "duration_ms" to elapsed
-    "scene_id" to sceneId
 }
+// Console: [01:47:49.328] [INFO ] [capture] Capture complete shader_id=iris duration_ms=42
 ```
 
-- Each domain area uses its dedicated logger category
-- Structured fields via the `StructuredLog` DSL (key-value pairs)
-- Lazy evaluation for expensive messages: `log.debug { "State: ${expensiveDump()}" }`
-- Log exceptions with cause parameter: `log.error(cause, "Operation failed") { "context" to value }`
+Values containing spaces, `=`, or `"` are automatically quoted:
+
+```kotlin
+log.error("Failed to set shader pack") { "pack" to "Complementary Reimagined" }
+// Console: [01:47:49.329] [ERROR] [capture] Failed to set shader pack pack="Complementary Reimagined"
+```
+
+### When to Use Structured Fields vs Plain Messages
+
+- **Structured fields** — variable data that you'd want to filter/search on: IDs, paths, counts, durations
+- **Plain messages** — static lifecycle events with no variable context: `"Capture started"`, `"Shutdown complete"`
+
+### Lazy Messages
+
+For expensive message construction, use a lambda. The lambda is only invoked if the level is enabled:
+
+```kotlin
+log.debug { "State: ${expensiveDump()}" }
+```
+
+### Exceptions
+
+Pass the cause as the first parameter:
+
+```kotlin
+log.error(cause, "Operation failed") { "context" to value }
+log.warn(cause, "Retrying") { "attempt" to n }
+```
+
+### Never Use SLF4J Parameterized Style
+
+```kotlin
+// WRONG — bypasses the DSL, renders as raw {} on some backends
+log.info("Downloaded {} files", count)
+
+// RIGHT — structured and always renders correctly
+log.info("Downloaded files") { "count" to count }
+```
+
+### Available Overloads
+
+Every level (TRACE through ERROR) has a symmetrical set of 7 extension overloads:
+- `log.info { "lazy" }` — lazy message
+- `log.info("static") { "k" to v }` — static message + structured fields
+- `log.info({ "lazy" }) { "k" to v }` — lazy message + structured fields
+- `log.info(cause, "static")` — exception + static message
+- `log.info(cause) { "lazy" }` — exception + lazy message
+- `log.info(cause, "static") { "k" to v }` — exception + static message + structured fields
+- `log.info(cause, { "lazy" }) { "k" to v }` — exception + lazy message + structured fields
+
+Plus SLF4J's own `log.info("static")` for plain static messages.
 
 ## Mixin Development
 

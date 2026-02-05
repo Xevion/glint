@@ -1,12 +1,16 @@
 package com.xevion.glint.orchestration
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.capture.CaptureSession
 import com.xevion.glint.capture.CaptureStateManager
+import com.xevion.glint.debug
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.io.SessionDirectoryManager
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.screenshot.CaptureSessionData
+import com.xevion.glint.warn
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import java.io.File
@@ -20,7 +24,7 @@ import java.time.Instant
  * Generates a master manifest on completion.
  */
 class Orchestrator {
-    private val logger = Glint.LOGGER
+    private val log = Loggers.Orchestration.get()
     private val worldLoader = WorldLoader()
 
     private var state: State = State.Idle
@@ -44,11 +48,14 @@ class Orchestrator {
 
     fun start(spec: CaptureSpec): Boolean {
         if (state != State.Idle) {
-            logger.warn("Orchestrator already running")
+            log.warn("Orchestrator already running")
             return false
         }
 
-        logger.info("Starting orchestration with ${spec.sceneIds.size} scenes, ${spec.shaders.size} shaders")
+        log.info("Starting orchestration") {
+            "scene_count" to spec.sceneIds.size
+            "shader_count" to spec.shaders.size
+        }
         this.spec = spec
 
         if (!createSessionDirectory()) {
@@ -64,7 +71,7 @@ class Orchestrator {
         if (state == State.Idle) return
 
         if (!CaptureStateManager.isActive()) {
-            logger.info("Orchestration cancelled by user")
+            log.info("Orchestration cancelled by user")
             finishWithError("User cancelled")
             return
         }
@@ -99,7 +106,10 @@ class Orchestrator {
     val isRunning: Boolean get() = state != State.Idle
 
     private fun transitionTo(newState: State) {
-        logger.info("Orchestrator: $state -> $newState")
+        log.debug("Orchestrator state transition") {
+            "from" to state
+            "to" to newState
+        }
         state = newState
         ticksInState = 0
 
@@ -123,14 +133,17 @@ class Orchestrator {
     private fun handleLoadingWorld() {
         val pair =
             getCurrentPair() ?: run {
-                logger.error("No current world-scene pair")
+                log.error("No current world-scene pair")
                 transitionTo(State.GeneratingManifest)
                 return
             }
 
         when (val result = worldLoader.loadWorld(pair.worldFolder, ticksInState)) {
             is WorldLoader.LoadResult.Complete -> {
-                logger.info("[${currentPairIndex + 1}/${worldScenePairs.size}] World ready: ${pair.worldFolder}")
+                log.info("World ready") {
+                    "progress" to "${currentPairIndex + 1}/${worldScenePairs.size}"
+                    "world" to pair.worldFolder
+                }
                 transitionTo(State.RunningScene)
             }
 
@@ -154,11 +167,14 @@ class Orchestrator {
         val currentSpec = spec!!
 
         if (captureSession == null) {
-            logger.info("[${currentPairIndex + 1}/${worldScenePairs.size}] Running scene: ${pair.sceneId}")
+            log.info("Running scene") {
+                "progress" to "${currentPairIndex + 1}/${worldScenePairs.size}"
+                "scene_id" to pair.sceneId
+            }
 
             val worldDir = File(currentSessionDir, pair.worldFolder)
             if (!worldDir.exists() && !worldDir.mkdirs()) {
-                logger.error("Failed to create world directory: ${worldDir.absolutePath}")
+                log.error("Failed to create world directory") { "path" to worldDir.absolutePath }
                 finishWithError("Failed to create world directory")
                 return
             }
@@ -172,7 +188,7 @@ class Orchestrator {
                 )
 
             if (!captureSession!!.start()) {
-                logger.error("Failed to start capture session for scene: ${pair.sceneId}")
+                log.error("Failed to start capture session") { "scene_id" to pair.sceneId }
                 captureSession = null
                 finishWithError("Failed to start capture session")
                 return
@@ -191,17 +207,17 @@ class Orchestrator {
         pair: WorldScenePair,
         currentSessionDir: File,
     ) {
-        logger.info("Scene capture complete: ${pair.sceneId}")
+        log.info("Scene capture complete") { "scene_id" to pair.sceneId }
 
         val sessionData = captureSession!!.getSessionData()
         if (sessionData != null) {
             if (sessionData.screenshots.isNotEmpty()) {
                 sessionDataList.add(sessionData)
             } else {
-                logger.warn("Session produced no screenshots: ${pair.sceneId}")
+                log.warn("Session produced no screenshots") { "scene_id" to pair.sceneId }
             }
         } else {
-            logger.warn("No session data returned: ${pair.sceneId}")
+            log.warn("No session data returned") { "scene_id" to pair.sceneId }
         }
 
         renameScreenshotsDirectory(pair, currentSessionDir)
@@ -217,17 +233,20 @@ class Orchestrator {
         val sceneDir = File(worldDir, pair.sceneId)
 
         if (!screenshotsDir.exists()) {
-            logger.warn("Screenshots directory not found: ${screenshotsDir.absolutePath}")
+            log.warn("Screenshots directory not found") { "path" to screenshotsDir.absolutePath }
             return
         }
 
         if (sceneDir.exists()) {
-            logger.warn("Scene directory already exists, deleting: ${sceneDir.absolutePath}")
+            log.warn("Scene directory already exists, deleting") { "path" to sceneDir.absolutePath }
             sceneDir.deleteRecursively()
         }
 
         if (!screenshotsDir.renameTo(sceneDir)) {
-            logger.error("Failed to rename screenshots folder: ${screenshotsDir.absolutePath} -> ${sceneDir.absolutePath}")
+            log.error("Failed to rename screenshots folder") {
+                "from" to screenshotsDir.absolutePath
+                "to" to sceneDir.absolutePath
+            }
         }
     }
 
@@ -249,30 +268,31 @@ class Orchestrator {
     }
 
     private fun handleGeneratingManifest() {
-        logger.info("Generating master manifest")
+        log.info("Generating master manifest")
         writeManifest(partial = false)
 
         sessionDir?.let { dir ->
-            logger.info("Orchestration complete!")
-            logger.info("Results: ${dir.absolutePath}")
-            logger.info("Total scenes captured: ${sessionDataList.size}")
+            log.info("Orchestration complete") {
+                "results_dir" to dir.absolutePath
+                "scenes_captured" to sessionDataList.size
+            }
         }
 
         transitionTo(State.Finishing)
     }
 
     private fun handleFinishing() {
-        logger.info("Orchestration finished")
+        log.info("Orchestration finished")
         cleanup()
 
         if (spec?.shutdownOnComplete == true) {
-            logger.info("Shutting down Minecraft (shutdownOnComplete)")
+            log.info("Shutting down Minecraft (shutdownOnComplete)")
             Minecraft.getInstance().stop()
         }
     }
 
     private fun finishWithError(reason: String) {
-        logger.error("Orchestration failed: $reason")
+        log.error("Orchestration failed") { "reason" to reason }
 
         if (sessionDataList.isNotEmpty()) {
             writeManifest(partial = true)
@@ -281,7 +301,7 @@ class Orchestrator {
         cleanup()
 
         if (spec?.shutdownOnComplete == true) {
-            logger.info("Shutting down Minecraft after failure (shutdownOnComplete)")
+            log.info("Shutting down Minecraft after failure (shutdownOnComplete)")
             Minecraft.getInstance().stop()
         }
     }
@@ -313,12 +333,15 @@ class Orchestrator {
         for (sceneId in currentSpec.sceneIds) {
             val resolvedScene = SceneManager.loadScene(sceneId)
             if (resolvedScene == null) {
-                logger.warn("Failed to load scene: $sceneId, skipping")
+                log.warn("Failed to load scene, skipping") { "scene_id" to sceneId }
                 continue
             }
 
             if (!worldLoader.worldExists(resolvedScene.worldFolderName)) {
-                logger.warn("World directory not found for scene: $sceneId (world: ${resolvedScene.worldFolderName}), skipping")
+                log.warn("World directory not found, skipping scene") {
+                    "scene_id" to sceneId
+                    "world" to resolvedScene.worldFolderName
+                }
                 continue
             }
 
@@ -332,7 +355,10 @@ class Orchestrator {
 
         if (sorted.isNotEmpty()) {
             val uniqueWorlds = sorted.map { it.worldFolder }.distinct().size
-            logger.info("Resolved ${sorted.size} scenes across $uniqueWorlds worlds")
+            log.info("Resolved scenes") {
+                "scene_count" to sorted.size
+                "world_count" to uniqueWorlds
+            }
         }
 
         return sorted
@@ -347,7 +373,7 @@ class Orchestrator {
             if (currentSpec.outputDir != null) {
                 val dir = File(mc.gameDirectory, currentSpec.outputDir)
                 if (!dir.exists() && !dir.mkdirs()) {
-                    logger.error("Failed to create output directory: ${dir.absolutePath}")
+                    log.error("Failed to create output directory") { "path" to dir.absolutePath }
                     return false
                 }
                 sessionId = currentSpec.jobId?.let { "job_$it" } ?: dir.name
@@ -358,10 +384,10 @@ class Orchestrator {
                 sessionId = id
                 sessionDir = dir
             }
-            logger.info("Session directory: ${sessionDir!!.absolutePath}")
+            log.info("Session directory created") { "path" to sessionDir!!.absolutePath }
             true
         } catch (e: Exception) {
-            logger.error("Failed to create session directory", e)
+            log.error(e, "Failed to create session directory")
             false
         }
     }
@@ -382,9 +408,12 @@ class Orchestrator {
         try {
             val json = Json { prettyPrint = true }
             manifestFile.writeText(json.encodeToString(OrchestrationManifest.serializer(), manifest))
-            logger.info("${if (partial) "Partial " else ""}Manifest written: ${manifestFile.absolutePath}")
+            log.info("Manifest written") {
+                "partial" to partial
+                "path" to manifestFile.absolutePath
+            }
         } catch (e: Exception) {
-            logger.error("Failed to write manifest", e)
+            log.error(e, "Failed to write manifest")
         }
     }
 

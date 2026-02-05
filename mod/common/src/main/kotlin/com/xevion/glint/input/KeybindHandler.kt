@@ -1,6 +1,6 @@
 package com.xevion.glint.input
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.ui.ApiConfigWizardScreen
 import com.xevion.glint.ui.GlintMainScreen
@@ -16,6 +16,7 @@ import org.lwjgl.glfw.GLFW
  * All other actions are accessible via the Glint menu (J key).
  */
 object KeybindHandler {
+    private val log = Loggers.Input.get()
     private val inputTracker = InputStateTracker()
 
     private val keybinds =
@@ -52,11 +53,11 @@ object KeybindHandler {
         val config = ApiConfig.load()
 
         if (config.needsValidation()) {
-            Glint.LOGGER.info("Opening API configuration (needs validation)")
+            log.debug("Opening API configuration (needs validation)")
             val hub = GlintMainScreen(null)
             mc.setScreen(ApiConfigWizardScreen(hub, showConnectionFirst = true))
         } else {
-            Glint.LOGGER.info("Opening Glint Hub")
+            log.debug("Opening Glint Hub")
             mc.setScreen(GlintMainScreen(null))
         }
     }

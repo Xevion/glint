@@ -1,6 +1,8 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.error
+import com.xevion.glint.info
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintDialogScreen
@@ -44,9 +46,13 @@ class ConfirmDisableScreen(
             .thenAccept { success ->
                 minecraft?.execute {
                     if (success) {
-                        Glint.LOGGER.info("Disabled scene: $sceneId")
+                        Loggers.Ui.get().info("Disabled scene") {
+                            "scene_id" to sceneId
+                        }
                     } else {
-                        Glint.LOGGER.error("Failed to disable scene: $sceneId")
+                        Loggers.Ui.get().error("Failed to disable scene") {
+                            "scene_id" to sceneId
+                        }
                     }
                     minecraft?.setScreen(parent)
 

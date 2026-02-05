@@ -1,6 +1,9 @@
 package com.xevion.glint.orchestration
 
-import com.xevion.glint.Glint
+import com.xevion.glint.Loggers
+import com.xevion.glint.debug
+import com.xevion.glint.error
+import com.xevion.glint.info
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.AlertScreen
 import java.io.File
@@ -15,7 +18,7 @@ import java.io.File
  * display names or level names.
  */
 class WorldLoader {
-    private val logger = Glint.LOGGER
+    private val log = Loggers.Orchestration.get()
     private var loadRequested = false
     private var unloadRequested = false
     private var waitStartTick = 0
@@ -39,14 +42,18 @@ class WorldLoader {
 
         // Detect error screen from a previous load attempt that failed
         if (loadRequested && mc.screen is AlertScreen) {
-            logger.error("World load failed (Minecraft showed error screen): $worldFolder")
+            log.error("World load failed (Minecraft showed error screen)") {
+                "world" to worldFolder
+            }
             reset()
             return LoadResult.Failed("World load failed for: $worldFolder (check saves folder)")
         }
 
         if (!isAtTitleScreen()) {
             if (!unloadRequested) {
-                logger.info("Unloading current world to load: $worldFolder")
+                log.info("Unloading current world") {
+                    "target" to worldFolder
+                }
                 mc.level?.disconnect()
                 unloadRequested = true
                 waitStartTick = ticksWaiting
@@ -60,7 +67,7 @@ class WorldLoader {
                 return LoadResult.UnloadingWorld
             }
 
-            logger.info("World unloaded")
+            log.info("World unloaded")
             unloadRequested = false
         }
 
@@ -72,13 +79,19 @@ class WorldLoader {
                 )
             }
 
-            logger.info("Loading world: $worldFolder")
+            log.info("Loading world") {
+                "world" to worldFolder
+            }
             try {
                 mc.createWorldOpenFlows().openWorld(worldFolder) {
-                    logger.debug("World load cancelled for: $worldFolder")
+                    log.debug("World load cancelled") {
+                        "world" to worldFolder
+                    }
                 }
             } catch (e: Exception) {
-                logger.error("Exception initiating world load: $worldFolder", e)
+                log.error(e, "Exception initiating world load") {
+                    "world" to worldFolder
+                }
                 return LoadResult.Failed("Exception loading world: ${e.message}")
             }
             loadRequested = true
@@ -87,7 +100,9 @@ class WorldLoader {
         }
 
         if (isWorldLoaded() && isInWorld(worldFolder)) {
-            logger.info("World loaded: $worldFolder")
+            log.info("World loaded") {
+                "world" to worldFolder
+            }
             reset()
             return LoadResult.Complete
         }
