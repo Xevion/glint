@@ -29,7 +29,7 @@ import net.minecraft.network.chat.Component as McComponent
 class WorldSelectionScreen(
     private val parent: Screen,
     private val serverUrl: String,
-    private val accessToken: String? = null,
+    private val accessToken: String,
     private val tokenExpiresIn: Long = 0L,
     private val onBack: () -> Unit,
 ) : GlintScreen(McComponent.literal("Select World")) {
@@ -171,7 +171,7 @@ class WorldSelectionScreen(
 
         // Calculate token expiry time (current time + expires_in seconds)
         val tokenExpiresAt =
-            if (accessToken != null && tokenExpiresIn > 0) {
+            if (accessToken.isNotBlank() && tokenExpiresIn > 0) {
                 System.currentTimeMillis() + (tokenExpiresIn * 1000)
             } else {
                 0L
@@ -184,7 +184,7 @@ class WorldSelectionScreen(
                 worldName = selected.name,
                 enabled = true,
                 validated = true,
-                accessToken = accessToken ?: "",
+                accessToken = accessToken,
                 tokenExpiresAt = tokenExpiresAt,
             )
 

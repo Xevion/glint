@@ -246,7 +246,7 @@ object GlintApi {
      */
     fun listWorlds(
         apiUrl: String,
-        token: String? = null,
+        token: String,
     ): Result<List<WorldInfo>> {
         val url = "$apiUrl/api/worlds"
 
@@ -286,7 +286,7 @@ object GlintApi {
         apiUrl: String,
         worldId: String,
         scene: Scene,
-        token: String? = null,
+        token: String,
     ): Result<ApiScene> {
         val url = "$apiUrl/api/scenes"
         val request =
@@ -349,7 +349,7 @@ object GlintApi {
         apiUrl: String,
         worldId: String,
         scene: Scene,
-        token: String? = null,
+        token: String,
     ): Result<ApiScene> {
         val url = "$apiUrl/api/scenes/by-slug/${scene.id}"
         val request =
@@ -410,7 +410,7 @@ object GlintApi {
         apiUrl: String,
         worldId: String,
         sceneSlug: String,
-        token: String? = null,
+        token: String,
     ): Result<Unit> {
         val url = "$apiUrl/api/scenes/by-slug/$sceneSlug?world_id=$worldId"
 

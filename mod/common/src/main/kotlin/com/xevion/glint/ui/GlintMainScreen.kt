@@ -6,6 +6,7 @@ import com.xevion.glint.api.GlintApi
 import com.xevion.glint.api.SceneSyncManager
 import com.xevion.glint.api.SyncResult
 import com.xevion.glint.api.WorldInfo
+import com.xevion.glint.download.WorldDownloader
 import com.xevion.glint.orchestration.CaptureSpec
 import com.xevion.glint.orchestration.ShaderSpec
 import com.xevion.glint.scene.ResolvedScene
@@ -368,14 +369,25 @@ class GlintMainScreen(
 
         when (world.status) {
             "remote" -> {
-                val btn =
-                    GlintComponents.smallButton(
-                        McComponent.literal("Download"),
-                        width = 65,
-                        tooltip = McComponent.literal("Not yet implemented"),
-                    ) { }
-                btn.active = false
-                buttonRow.child(btn as Component)
+                val apiWorld = world.apiWorld
+                if (apiWorld?.fileUrl != null) {
+                    buttonRow.child(
+                        GlintComponents.smallButton(
+                            McComponent.literal("Download"),
+                            width = 65,
+                            tooltip = McComponent.literal("Download world from API"),
+                        ) { downloadWorld(world) } as Component,
+                    )
+                } else {
+                    val btn =
+                        GlintComponents.smallButton(
+                            McComponent.literal("Download"),
+                            width = 65,
+                            tooltip = McComponent.literal("No download available"),
+                        ) { }
+                    btn.active = false
+                    buttonRow.child(btn as Component)
+                }
             }
 
             "local" -> {
@@ -383,7 +395,7 @@ class GlintMainScreen(
                     GlintComponents.smallButton(
                         McComponent.literal("Upload"),
                         width = 55,
-                        tooltip = McComponent.literal("Not yet implemented"),
+                        tooltip = McComponent.literal("World upload not yet available"),
                     ) { }
                 uploadBtn.active = false
                 buttonRow.child(uploadBtn as Component)
@@ -473,31 +485,315 @@ class GlintMainScreen(
     }
 
     // ============================================
-    // Config Tab (Stub)
+    // Config Tab
     // ============================================
 
+    private var connectionTestResult: String? = null
+    private var connectionTesting = false
+
     private fun buildConfigMaster(master: FlowLayout) {
-        master.horizontalAlignment(HorizontalAlignment.CENTER)
-        master.verticalAlignment(VerticalAlignment.CENTER)
+        val config = ApiConfig.load()
+
         master.child(
-            Components
-                .label(McComponent.literal("Configuration coming soon"))
-                .maxWidth(masterTextWidth)
-                .horizontalTextAlignment(HorizontalAlignment.CENTER)
-                .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
+            GlintComponents.title(McComponent.literal("API Connection")) as Component,
         )
+
+        if (!config.enabled || config.apiUrl.isBlank()) {
+            // Not configured state
+            master.child(
+                Components
+                    .label(McComponent.literal("No API connection configured."))
+                    .maxWidth(masterTextWidth)
+                    .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
+            )
+            master.child(
+                Components
+                    .label(McComponent.literal("Set up a connection to sync scenes and download worlds."))
+                    .maxWidth(masterTextWidth)
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+
+            val buttonRow = Containers.horizontalFlow(Sizing.content(), Sizing.content())
+            buttonRow.gap(GlintTheme.GAP_SM)
+            buttonRow.padding(Insets.vertical(GlintTheme.GAP_MD))
+            buttonRow.child(
+                GlintComponents.smallButton(
+                    McComponent.literal("Set Up Connection"),
+                    width = 110,
+                ) {
+                    minecraft?.setScreen(ApiConfigWizardScreen(this, showConnectionFirst = true))
+                } as Component,
+            )
+            master.child(buttonRow as Component)
+            return
+        }
+
+        // Configured state - show connection info
+        val infoContainer = Containers.verticalFlow(Sizing.fill(100), Sizing.content())
+        infoContainer.gap(GlintTheme.GAP_SM)
+        infoContainer.padding(Insets.vertical(GlintTheme.GAP_SM))
+
+        // Server URL
+        infoContainer.child(
+            Components
+                .label(McComponent.literal("Server"))
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+        )
+        infoContainer.child(
+            Components
+                .label(McComponent.literal(config.apiUrl))
+                .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
+        )
+
+        // Status
+        infoContainer.child(
+            Components
+                .label(McComponent.literal("Status"))
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+        )
+
+        val statusColor: Int
+        val statusText: String
+        when {
+            !config.validated -> {
+                statusColor = GlintTheme.TEXT_WARNING
+                statusText = "Not validated"
+            }
+            !config.hasValidToken() -> {
+                statusColor = GlintTheme.TEXT_ERROR
+                statusText = "Token expired"
+            }
+            config.isTokenExpiringSoon() -> {
+                statusColor = GlintTheme.TEXT_WARNING
+                val minutesLeft = ((config.tokenExpiresAt - System.currentTimeMillis()) / 60_000).toInt()
+                statusText = "Connected (token expires in ${minutesLeft}m)"
+            }
+            else -> {
+                statusColor = GlintTheme.TEXT_SUCCESS
+                val hoursLeft = ((config.tokenExpiresAt - System.currentTimeMillis()) / 3_600_000).toInt()
+                statusText = "Connected (token expires in ${hoursLeft}h)"
+            }
+        }
+        infoContainer.child(
+            Components
+                .label(McComponent.literal(statusText))
+                .color(Color.ofRgb(statusColor)) as Component,
+        )
+
+        // World
+        if (config.worldName.isNotBlank()) {
+            infoContainer.child(
+                Components
+                    .label(McComponent.literal("World"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            infoContainer.child(
+                Components
+                    .label(McComponent.literal(config.worldName))
+                    .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
+            )
+        }
+
+        master.child(infoContainer as Component)
+
+        // Action buttons
+        val row1 = Containers.horizontalFlow(Sizing.content(), Sizing.content())
+        row1.gap(GlintTheme.GAP_SM)
+        row1.padding(Insets.vertical(GlintTheme.GAP_SM))
+
+        val testBtn =
+            GlintComponents.smallButton(
+                McComponent.literal(if (connectionTesting) "Testing..." else "Test Connection"),
+                width = 100,
+                tooltip = McComponent.literal("Test connection to API server"),
+            ) {
+                if (!connectionTesting) testConnection(config)
+            }
+        if (connectionTesting) testBtn.active = false
+        row1.child(testBtn as Component)
+
+        if (!config.hasValidToken()) {
+            row1.child(
+                GlintComponents.smallButton(
+                    McComponent.literal("Re-authenticate"),
+                    width = 100,
+                ) {
+                    minecraft?.setScreen(ApiConfigWizardScreen(this))
+                } as Component,
+            )
+        }
+
+        master.child(row1 as Component)
+
+        val row2 = Containers.horizontalFlow(Sizing.content(), Sizing.content())
+        row2.gap(GlintTheme.GAP_SM)
+
+        row2.child(
+            GlintComponents.smallButton(
+                McComponent.literal("Change Server"),
+                width = 90,
+            ) {
+                minecraft?.setScreen(ApiConfigWizardScreen(this, showConnectionFirst = true))
+            } as Component,
+        )
+        row2.child(
+            GlintComponents.smallButton(
+                McComponent.literal("Change World"),
+                width = 90,
+            ) {
+                minecraft?.setScreen(ApiConfigWizardScreen(this))
+            } as Component,
+        )
+
+        master.child(row2 as Component)
+
+        // Disconnect button
+        val row3 = Containers.horizontalFlow(Sizing.content(), Sizing.content())
+        row3.padding(Insets.top(GlintTheme.GAP_MD))
+        row3.child(
+            GlintComponents.smallButton(
+                McComponent.literal("Disconnect"),
+                width = 75,
+                tooltip = McComponent.literal("Remove API connection"),
+            ) {
+                disconnectApi()
+            } as Component,
+        )
+        master.child(row3 as Component)
     }
 
     private fun buildConfigDetail(detail: FlowLayout) {
-        detail.horizontalAlignment(HorizontalAlignment.CENTER)
-        detail.verticalAlignment(VerticalAlignment.CENTER)
+        detail.horizontalAlignment(HorizontalAlignment.LEFT)
+        detail.verticalAlignment(VerticalAlignment.TOP)
+
+        detail.child(
+            GlintComponents.title(McComponent.literal("Diagnostics")) as Component,
+        )
+
+        val config = ApiConfig.load()
+
+        if (!config.enabled || config.apiUrl.isBlank()) {
+            detail.child(
+                Components
+                    .label(McComponent.literal("Use 'Set Up Connection' to configure the API."))
+                    .maxWidth(detailTextWidth)
+                    .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
+            )
+            detail.child(
+                Components
+                    .label(
+                        McComponent.literal(
+                            "The wizard will guide you through server URL validation, authentication, and world selection.",
+                        ),
+                    ).maxWidth(detailTextWidth)
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            return
+        }
+
+        // Show test result if available
+        if (connectionTestResult != null) {
+            detail.child(
+                Components
+                    .label(McComponent.literal("Connection Test"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            val isSuccess = connectionTestResult!!.startsWith("Success")
+            detail.child(
+                Components
+                    .label(McComponent.literal(connectionTestResult!!))
+                    .maxWidth(detailTextWidth)
+                    .color(Color.ofRgb(if (isSuccess) GlintTheme.TEXT_SUCCESS else GlintTheme.TEXT_ERROR)) as Component,
+            )
+        }
+
+        // Token info
+        if (config.hasValidToken()) {
+            val expiresIn = config.tokenExpiresAt - System.currentTimeMillis()
+            val hours = (expiresIn / 3_600_000).toInt()
+            val minutes = ((expiresIn % 3_600_000) / 60_000).toInt()
+
+            detail.child(
+                Components
+                    .label(McComponent.literal("Token Expiry"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            detail.child(
+                Components
+                    .label(McComponent.literal("${hours}h ${minutes}m remaining"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
+            )
+        }
+
+        // API endpoint
         detail.child(
             Components
-                .label(McComponent.literal("Settings will appear here."))
+                .label(McComponent.literal("Endpoint"))
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+        )
+        detail.child(
+            Components
+                .label(McComponent.literal("${config.apiUrl}/api"))
                 .maxWidth(detailTextWidth)
-                .horizontalTextAlignment(HorizontalAlignment.CENTER)
                 .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
         )
+
+        // World ID
+        if (config.worldId.isNotBlank()) {
+            detail.child(
+                Components
+                    .label(McComponent.literal("World ID"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            detail.child(
+                Components
+                    .label(McComponent.literal(config.worldId))
+                    .maxWidth(detailTextWidth)
+                    .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
+            )
+        }
+    }
+
+    private fun testConnection(config: ApiConfig) {
+        connectionTesting = true
+        connectionTestResult = null
+        refreshMasterContent()
+        refreshDetailPanel()
+
+        CompletableFuture
+            .supplyAsync {
+                val start = System.currentTimeMillis()
+                val result = GlintApi.testConnection(config.apiUrl)
+                val latency = System.currentTimeMillis() - start
+                Pair(result, latency)
+            }.thenAccept { (result, latency) ->
+                minecraft?.execute {
+                    connectionTesting = false
+                    result
+                        .onSuccess {
+                            connectionTestResult = "Success (${latency}ms)"
+                            StatusLog.info("Connection test passed (${latency}ms)")
+                        }.onFailure { error ->
+                            connectionTestResult = "Failed: ${error.message}"
+                            StatusLog.error("Connection test failed: ${error.message}")
+                        }
+                    refreshMasterContent()
+                    refreshDetailPanel()
+                    rebuildStatusBar()
+                }
+            }
+    }
+
+    private fun disconnectApi() {
+        val disabledConfig = ApiConfig()
+        if (ApiConfig.save(disabledConfig)) {
+            StatusLog.info("API connection removed")
+            connectionTestResult = null
+            refreshMasterContent()
+            refreshDetailPanel()
+            rebuildStatusBar()
+            refreshWorlds()
+        }
     }
 
     // ============================================
@@ -716,6 +1012,11 @@ class GlintMainScreen(
                     val successes = results.count { it is SyncResult.Success }
                     val failures = results.count { it is SyncResult.Failure }
 
+                    // Link local collection to API world after successful sync
+                    if (successes > 0 && world.collectionFileName != null) {
+                        SceneManager.setApiWorldId(world.collectionFileName, config.worldId)
+                    }
+
                     if (failures > 0) {
                         StatusLog.warn("${world.name}: $successes/${results.size} synced ($failures failed)")
                     } else {
@@ -730,6 +1031,47 @@ class GlintMainScreen(
                 }
                 null
             }
+    }
+
+    private fun downloadWorld(world: WorldEntry) {
+        val apiWorld = world.apiWorld ?: return
+        val fileUrl = apiWorld.fileUrl ?: return
+
+        StatusLog.info("Starting download: ${world.name}...")
+        rebuildStatusBar()
+
+        val future =
+            WorldDownloader.downloadWorld(
+                worldSlug = apiWorld.slug,
+                worldId = apiWorld.id,
+                fileUrl = fileUrl,
+                expectedHash = null,
+                progressCallback = { },
+            )
+
+        future
+            .thenAccept { worldPath ->
+                minecraft?.execute {
+                    val folderName = worldPath.substringAfterLast("/")
+                    SceneManager.addCollectionForApiWorld(
+                        worldName = apiWorld.name,
+                        folder = folderName,
+                        apiWorldId = apiWorld.id,
+                    )
+                    StatusLog.info("Downloaded: ${world.name}")
+                    SceneManager.clearCache()
+                    refreshWorlds()
+                    rebuildStatusBar()
+                }
+            }.exceptionally { e ->
+                minecraft?.execute {
+                    StatusLog.error("Download failed: ${e.message}")
+                    rebuildStatusBar()
+                }
+                null
+            }
+
+        minecraft?.setScreen(WorldDownloadDialog(this, world.name, future))
     }
 
     private fun confirmDeleteWorld(world: WorldEntry) {
@@ -801,36 +1143,44 @@ class GlintMainScreen(
 
         val config = ApiConfig.load()
         if (config.isValid()) {
-            loadWorldsFromApi(config)
+            loadMergedWorlds(config)
         } else {
-            loadWorldsFromLocalFiles()
+            loadLocalOnlyWorlds()
         }
     }
 
-    private fun loadWorldsFromApi(config: ApiConfig) {
+    private fun loadMergedWorlds(config: ApiConfig) {
         CompletableFuture
             .supplyAsync {
-                GlintApi.listWorlds(config.apiUrl)
-            }.thenAccept { result ->
+                val localCollections = SceneManager.discoverAllCollections()
+                val apiResult = GlintApi.listWorlds(config.apiUrl, config.accessToken)
+                Pair(localCollections, apiResult)
+            }.thenAccept { (localCollections, apiResult) ->
                 minecraft?.execute {
                     loading = false
-                    result
+                    apiResult
                         .onSuccess { apiWorlds ->
-                            Glint.LOGGER.info("Loaded {} worlds from API", apiWorlds.size)
-                            StatusLog.info("Loaded ${apiWorlds.size} worlds from API")
-                            worldData = apiWorlds.map { WorldEntry.fromApi(it) }
+                            worldData = mergeWorldSources(apiWorlds, localCollections)
+                            val apiCount = worldData.count { it.apiWorld != null }
+                            val localCount = worldData.count { it.collection != null }
+                            StatusLog.info("Loaded $apiCount API + $localCount local worlds")
                             refreshMasterContent()
                             rebuildStatusBar()
                         }.onFailure { error ->
                             Glint.LOGGER.warn("Failed to load from API, falling back to local: {}", error.message)
                             StatusLog.warn("API unavailable, using local files")
-                            loadWorldsFromLocalFiles()
+                            worldData =
+                                localCollections.map { (fileName, collection) ->
+                                    WorldEntry.fromLocal(fileName, collection)
+                                }
+                            refreshMasterContent()
+                            rebuildStatusBar()
                         }
                 }
             }
     }
 
-    private fun loadWorldsFromLocalFiles() {
+    private fun loadLocalOnlyWorlds() {
         CompletableFuture
             .supplyAsync {
                 SceneManager.discoverAllCollections().map { (fileName, collection) ->
@@ -840,12 +1190,51 @@ class GlintMainScreen(
                 minecraft?.execute {
                     loading = false
                     worldData = localWorlds
-                    Glint.LOGGER.info("Loaded {} worlds from local files", localWorlds.size)
                     StatusLog.info("Loaded ${localWorlds.size} worlds from local files")
                     refreshMasterContent()
                     rebuildStatusBar()
                 }
             }
+    }
+
+    private fun mergeWorldSources(
+        apiWorlds: List<WorldInfo>,
+        localCollections: List<Pair<String, SceneCollection>>,
+    ): List<WorldEntry> {
+        val result = mutableListOf<WorldEntry>()
+        val matchedLocalFiles = mutableSetOf<String>()
+
+        for (apiWorld in apiWorlds) {
+            val match =
+                localCollections.find { (fileName, collection) ->
+                    collection.apiWorldId == apiWorld.id || fileName == apiWorld.slug
+                }
+
+            if (match != null) {
+                matchedLocalFiles.add(match.first)
+                result.add(
+                    WorldEntry(
+                        id = apiWorld.id,
+                        name = apiWorld.name,
+                        description = apiWorld.description,
+                        scenes = match.second.scenes,
+                        collection = match.second,
+                        collectionFileName = match.first,
+                        apiWorld = apiWorld,
+                    ),
+                )
+            } else {
+                result.add(WorldEntry.fromApi(apiWorld))
+            }
+        }
+
+        for ((fileName, collection) in localCollections) {
+            if (fileName !in matchedLocalFiles) {
+                result.add(WorldEntry.fromLocal(fileName, collection))
+            }
+        }
+
+        return result
     }
 
     override fun onClose() {

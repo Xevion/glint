@@ -33,7 +33,7 @@ object SceneSyncManager {
                 Glint.LOGGER.info("Syncing scene: ${scene.id}")
 
                 // Try to create first - backend will return 409 if exists
-                val createResult = GlintApi.createScene(config.apiUrl, config.worldId, scene)
+                val createResult = GlintApi.createScene(config.apiUrl, config.worldId, scene, config.accessToken)
 
                 createResult.fold(
                     onSuccess = {
@@ -46,7 +46,7 @@ object SceneSyncManager {
                         if (error is ApiError.HttpError && error.statusCode == 409) {
                             // Scene exists, try updating
                             Glint.LOGGER.debug("Scene '${scene.id}' exists, updating instead")
-                            val updateResult = GlintApi.updateScene(config.apiUrl, config.worldId, scene)
+                            val updateResult = GlintApi.updateScene(config.apiUrl, config.worldId, scene, config.accessToken)
 
                             updateResult.fold(
                                 onSuccess = {
@@ -135,7 +135,7 @@ object SceneSyncManager {
         return CompletableFuture.supplyAsync(
             {
                 Glint.LOGGER.info("Disabling scene on backend: $sceneSlug")
-                val result = GlintApi.disableScene(config.apiUrl, config.worldId, sceneSlug)
+                val result = GlintApi.disableScene(config.apiUrl, config.worldId, sceneSlug, config.accessToken)
 
                 result.fold(
                     onSuccess = {
