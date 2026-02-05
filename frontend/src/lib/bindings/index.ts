@@ -1,5 +1,5 @@
 // Auto-generated barrel file — do not edit manually.
-// Regenerate with: cargo test --manifest-path backend/Cargo.toml export_bindings
+// Regenerate with: cd backend && cargo test export_bindings
 export type { AdoptPreviewAuthor } from "./AdoptPreviewAuthor";
 export type { AdoptPreviewResponse } from "./AdoptPreviewResponse";
 export type { Capture } from "./Capture";

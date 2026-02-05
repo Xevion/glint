@@ -64,13 +64,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          workspaces: backend
 
       - name: Check formatting
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            cargo fmt --all -- --check
+            cargo fmt --manifest-path backend/Cargo.toml -- --check
           else
-            cargo fmt --all -- --check || echo "::warning::Rust formatting issues found (not failing on push)"
+            cargo fmt --manifest-path backend/Cargo.toml -- --check || echo "::warning::Rust formatting issues found (not failing on push)"
           fi
 
       - name: Clippy (backend)
@@ -143,6 +144,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          workspaces: backend
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@cargo-nextest
@@ -191,7 +193,7 @@ jobs:
         uses: taiki-e/install-action@cargo-audit
 
       - name: Rust security audit
-        run: cargo audit --file audit.toml
+        run: cargo audit -f backend/Cargo.lock
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2

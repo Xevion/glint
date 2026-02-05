@@ -1,9 +1,6 @@
-//! Shared types between glint-backend and the Minecraft mod
+//! Agent API types shared between glint-backend and the Minecraft mod.
 //!
 //! These types are used for API request/response serialization.
-
-pub mod cli;
-pub mod logging;
 
 use std::collections::HashMap;
 

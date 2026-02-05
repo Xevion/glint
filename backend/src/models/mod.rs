@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod device;
 
 use chrono::{DateTime, Utc};
@@ -318,8 +319,6 @@ pub struct ShaderAuthor {
     pub url: Option<String>,
     pub platform: String,
 }
-
-// Agent API types are now in the shared crate (glint-shared)
 
 // Platform adoption types
 

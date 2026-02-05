@@ -1,4 +1,4 @@
-# Rust build output (handled by workspace at root)
+# Rust build output
 /target/
 
 # Database files

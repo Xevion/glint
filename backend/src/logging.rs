@@ -17,9 +17,9 @@ use std::{env, fmt};
 use time::{format_description::FormatItem, macros::format_description};
 use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::{
-    fmt::{format, FmtContext, FormatEvent, FormatFields, FormattedFields},
-    registry::LookupSpan,
     EnvFilter,
+    fmt::{FmtContext, FormatEvent, FormatFields, FormattedFields, format},
+    registry::LookupSpan,
 };
 
 /// Timestamp format: `HH:MM:SS.sssss` (5 decimal places for subseconds)
@@ -189,9 +189,7 @@ pub fn init_with_verbosity(verbose_count: u8) {
     };
 
     // Build filter: app crates at determined level, deps at warn
-    let filter_str = format!(
-        "warn,glint_backend={app_level},glint_shared={app_level}"
-    );
+    let filter_str = format!("warn,glint_backend={app_level}");
     let filter = EnvFilter::new(filter_str);
 
     tracing_subscriber::fmt()

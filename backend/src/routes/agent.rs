@@ -8,7 +8,7 @@ use axum::{
 use tracing::warn;
 use uuid::Uuid;
 
-use glint_shared::{
+use crate::models::agent::{
     CompleteJobRequest, FailJobRequest, JobPayload, PrepareUploadRequest, PrepareUploadResponse,
     SceneInfo, ShaderInfo, WorldInfo,
 };

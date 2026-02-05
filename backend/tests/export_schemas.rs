@@ -1,4 +1,4 @@
-use glint_shared::*;
+use glint_backend::models::agent::*;
 use schemars::schema_for;
 use std::fs;
 use std::path::PathBuf;

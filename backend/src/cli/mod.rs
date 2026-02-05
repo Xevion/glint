@@ -1,7 +1,16 @@
 pub mod seed;
 
-use clap::{Parser, Subcommand};
-use glint_shared::cli::VerboseArgs;
+use clap::{Args, Parser, Subcommand};
+
+/// Verbose logging arguments that can be flattened into any CLI parser.
+///
+/// Use `-v` for debug logging, `-vv` for trace logging.
+#[derive(Args, Debug, Clone, Default)]
+pub struct VerboseArgs {
+    /// Increase log verbosity (-v for debug, -vv for trace)
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    pub verbose: u8,
+}
 
 /// Glint - Shader preview catalog and comparison tool
 #[derive(Parser, Debug)]

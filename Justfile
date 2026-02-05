@@ -113,7 +113,8 @@ db-seed:
 
 # Regenerate TypeScript bindings from Rust types
 bindings:
-    cargo test --manifest-path backend/Cargo.toml export_bindings --quiet
+    cd backend && cargo test export_bindings --quiet
+    bun scripts/bindings-barrel.ts
 
 # Query Minecraft source JAR
 # Usage:

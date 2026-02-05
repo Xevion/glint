@@ -42,10 +42,11 @@ export interface CollectResult {
  * run(["cargo", "build", "--release"]);
  * run(["bun", "run", "test"]);
  */
-export function run(cmd: string[]): void {
+export function run(cmd: string[], options?: { cwd?: string }): void {
 	const proc = Bun.spawnSync(cmd, {
 		stdio: ["ignore", "inherit", "inherit"],
 		env: baseEnv,
+		cwd: options?.cwd,
 	});
 	if (proc.exitCode !== 0) process.exit(proc.exitCode);
 }
@@ -66,7 +67,7 @@ export function run(cmd: string[]): void {
  *   const modified = stdout.split("\n").filter(l => l.startsWith(" M"));
  * }
  */
-export function runPiped(cmd: string[]): {
+export function runPiped(cmd: string[], options?: { cwd?: string }): {
 	exitCode: number;
 	stdout: string;
 	stderr: string;
@@ -75,6 +76,7 @@ export function runPiped(cmd: string[]): {
 		stdout: "pipe",
 		stderr: "pipe",
 		env: baseEnv,
+		cwd: options?.cwd,
 	});
 	return {
 		exitCode: proc.exitCode,
@@ -105,12 +107,14 @@ export function runPiped(cmd: string[]): {
 export async function spawnCollect(
 	cmd: string[],
 	startTime: number,
+	options?: { cwd?: string },
 ): Promise<CollectResult> {
 	try {
 		const proc = Bun.spawn(cmd, {
 			env: { ...baseEnv, FORCE_COLOR: "1" },
 			stdout: "pipe",
 			stderr: "pipe",
+			cwd: options?.cwd,
 		});
 		const [stdout, stderr] = await Promise.all([
 			new Response(proc.stdout).text(),

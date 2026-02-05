@@ -6,7 +6,7 @@
 
 import { c, elapsed, isStderrTTY } from "./lib/fmt";
 import { run, runPiped, spawnCollect, raceInOrder, type CollectResult } from "./lib/proc";
-import { existsSync, statSync, readdirSync, writeFileSync, rmSync } from "fs";
+import { existsSync, statSync, readdirSync, rmSync } from "fs";
 
 const args = process.argv.slice(2);
 let fix = false;
@@ -24,7 +24,7 @@ if (fix) {
   console.log(c("1;36", "→ Fixing..."));
   run(["bun", "run", "--cwd", "frontend", "format"]);
   run(["cargo", "fmt", "--manifest-path", "backend/Cargo.toml"]);
-  runPiped(["sh", "-c", "cd mod && ./gradlew spotlessApply ktlintFormat --quiet"]);
+  runPiped(["./gradlew", "spotlessApply", "ktlintFormat", "--quiet"], { cwd: "mod" });
   console.log(c("1;36", "→ Verifying..."));
 }
 
@@ -36,7 +36,7 @@ if (fix) {
     const mt = statSync(`backend/src/${file}`).mtimeMs;
     if (mt > newestSrcMtime) newestSrcMtime = mt;
   }
-  for (const f of ["backend/Cargo.toml", "Cargo.lock"]) {
+  for (const f of ["backend/Cargo.toml", "backend/Cargo.lock"]) {
     if (existsSync(f)) {
       const mt = statSync(f).mtimeMs;
       if (mt > newestSrcMtime) newestSrcMtime = mt;
@@ -57,26 +57,14 @@ if (fix) {
     process.stdout.write(
       c("1;36", "→ Regenerating TypeScript bindings (Rust sources changed)...") + "\n",
     );
-    run(["cargo", "test", "--manifest-path", "backend/Cargo.toml", "--no-run", "--quiet"]);
+    run(["cargo", "test", "--no-run", "--quiet"], { cwd: "backend" });
     rmSync(BINDINGS_DIR, { recursive: true, force: true });
-    run(["cargo", "test", "--manifest-path", "backend/Cargo.toml", "export_bindings", "--quiet"]);
+    run(["cargo", "test", "export_bindings", "--quiet"], { cwd: "backend" });
 
-    const types = readdirSync(BINDINGS_DIR)
-      .filter((f) => f.endsWith(".ts") && f !== "index.ts")
-      .map((f) => f.replace(/\.ts$/, ""))
-      .sort();
-    writeFileSync(
-      `${BINDINGS_DIR}/index.ts`,
-      "// Auto-generated barrel file — do not edit manually.\n" +
-        "// Regenerate with: cargo test --manifest-path backend/Cargo.toml export_bindings\n" +
-        types.map((t) => `export type { ${t} } from "./${t}";`).join("\n") +
-        "\n",
-    );
+    run(["bun", "scripts/bindings-barrel.ts"]);
 
-    // Format generated files so they pass biome checks
-    runPiped(["bun", "run", "--cwd", "frontend", "format", "src/lib/bindings/"]);
-
-    process.stdout.write(c("32", "✓ bindings") + ` (${elapsed(t)}s, ${types.length} types)\n`);
+    const count = readdirSync(BINDINGS_DIR).filter((f) => f.endsWith(".ts") && f !== "index.ts").length;
+    process.stdout.write(c("32", "✓ bindings") + ` (${elapsed(t)}s, ${count} types)\n`);
   } else {
     process.stdout.write(c("2", "· bindings up-to-date, skipped") + "\n");
   }
@@ -85,6 +73,7 @@ if (fix) {
 interface Check {
   name: string;
   cmd: string[];
+  cwd?: string;
   hint?: string;
   subsystem: "frontend" | "backend" | "mod";
 }
@@ -130,30 +119,35 @@ const checks: Check[] = [
   {
     name: "backend-sqlx",
     subsystem: "backend",
-    cmd: ["sh", "-c", "cd backend && cargo sqlx prepare --check"],
+    cmd: ["cargo", "sqlx", "prepare", "--check"],
+    cwd: "backend",
     hint: "Run 'cd backend && cargo sqlx prepare' to update query metadata.",
   },
   // Mod checks (4)
   {
     name: "mod-format",
     subsystem: "mod",
-    cmd: ["sh", "-c", "cd mod && ./gradlew spotlessCheck ktlintCheck --quiet"],
+    cmd: ["./gradlew", "spotlessCheck", "ktlintCheck", "--quiet"],
+    cwd: "mod",
     hint: "Run 'cd mod && ./gradlew spotlessApply ktlintFormat --quiet' to fix formatting.",
   },
   {
     name: "mod-lint",
     subsystem: "mod",
-    cmd: ["sh", "-c", "cd mod && ./gradlew spotlessCheck ktlintCheck --quiet"],
+    cmd: ["./gradlew", "spotlessCheck", "ktlintCheck", "--quiet"],
+    cwd: "mod",
   },
   {
     name: "mod-check",
     subsystem: "mod",
-    cmd: ["sh", "-c", "cd mod && ./gradlew :common:compileKotlin :common:compileJava --quiet"],
+    cmd: ["./gradlew", ":common:compileKotlin", ":common:compileJava", "--quiet"],
+    cwd: "mod",
   },
   {
     name: "mod-test",
     subsystem: "mod",
-    cmd: ["sh", "-c", "cd mod && ./gradlew test --quiet"],
+    cmd: ["./gradlew", "test", "--quiet"],
+    cwd: "mod",
   },
   // Frontend unit tests
   {
@@ -205,17 +199,19 @@ const domains: Record<
   },
   "mod-format": {
     peers: ["mod-lint", "mod-check", "mod-test"],
-    format: () => runPiped(["sh", "-c", "cd mod && ./gradlew spotlessApply ktlintFormat --quiet"]),
+    format: () => runPiped(["./gradlew", "spotlessApply", "ktlintFormat", "--quiet"], { cwd: "mod" }),
     recheck: [
       {
         name: "mod-format",
         subsystem: "mod",
-        cmd: ["sh", "-c", "cd mod && ./gradlew spotlessCheck ktlintCheck --quiet"],
+        cmd: ["./gradlew", "spotlessCheck", "ktlintCheck", "--quiet"],
+        cwd: "mod",
       },
       {
         name: "mod-check",
         subsystem: "mod",
-        cmd: ["sh", "-c", "cd mod && ./gradlew :common:compileKotlin :common:compileJava --quiet"],
+        cmd: ["./gradlew", ":common:compileKotlin", ":common:compileJava", "--quiet"],
+        cwd: "mod",
       },
     ],
   },
@@ -226,7 +222,7 @@ const remaining = new Set(checks.map((ch) => ch.name));
 
 const promises = checks.map(async (check) => ({
   ...check,
-  ...(await spawnCollect(check.cmd, start)),
+  ...(await spawnCollect(check.cmd, start, { cwd: check.cwd })),
 }));
 
 const interval = isStderrTTY
@@ -282,7 +278,7 @@ for (const [fmtName, domain] of Object.entries(domains)) {
   const recheckStart = Date.now();
   const recheckPromises = domain.recheck.map(async (ch) => ({
     ...ch,
-    ...(await spawnCollect(ch.cmd, recheckStart)),
+    ...(await spawnCollect(ch.cmd, recheckStart, { cwd: ch.cwd })),
   }));
 
   let recheckFailed = false;

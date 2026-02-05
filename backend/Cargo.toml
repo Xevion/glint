@@ -11,7 +11,7 @@ chrono = { version = "0.4.42", features = ["serde"] }
 clap = { version = "4.5.56", features = ["derive"] }
 dotenvy = "0.15.7"
 figment = { version = "0.10.19", features = ["toml", "env"] }
-glint-shared = { version = "0.1.0", path = "../shared" }
+schemars = { version = "1", features = ["chrono04"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "postgres", "migrate", "chrono", "macros"] }
@@ -29,6 +29,6 @@ oauth2 = "5"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 rand = "0.9"
 hex = "0.4"
-time = "0.3"
+time = { version = "0.3", features = ["formatting", "macros"] }
 serde_repr = "0.1.20"
 url = "2.5.8"
