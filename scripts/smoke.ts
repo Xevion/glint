@@ -42,13 +42,14 @@ const BUILD_ERROR_PATTERNS = [
 ];
 
 // Early crash patterns - process will likely die immediately after these
+// NOTE: ClassNotFoundException/NoClassDefFoundError require "Caused by:" context
+// because the mixin system logs benign warnings when probing optional classes:
+//   [WARN] (FabricLoader/Mixin) Error loading class: ... (java.lang.ClassNotFoundException: ...)
 const EARLY_CRASH_PATTERNS = [
-	/ClassNotFoundException/,
-	/NoClassDefFoundError/,
+	/Caused by:.*ClassNotFoundException/,
+	/Caused by:.*NoClassDefFoundError/,
 	/Exception in thread "main"/,
 	/Error: Could not find or load main class/,
-	/BootstrapLauncher/,
-	/KnotClient/
 ];
 
 const SUCCESS_MARKERS = [
