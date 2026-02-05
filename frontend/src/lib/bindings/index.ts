@@ -19,6 +19,8 @@ export type { SceneWithWorld } from "./SceneWithWorld";
 export type { SessionInfo } from "./SessionInfo";
 export type { Shader } from "./Shader";
 export type { ShaderAuthor } from "./ShaderAuthor";
+export type { ShaderSearchResponse } from "./ShaderSearchResponse";
+export type { ShaderSearchResult } from "./ShaderSearchResult";
 export type { ShaderVersion } from "./ShaderVersion";
 export type { ShaderWithCaptures } from "./ShaderWithCaptures";
 export type { ShaderWithVersions } from "./ShaderWithVersions";

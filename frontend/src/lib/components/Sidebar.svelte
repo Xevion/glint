@@ -16,7 +16,8 @@ import {
 	Camera,
 	Briefcase,
 	Users,
-	Menu
+	Menu,
+	Download
 } from '@lucide/svelte';
 import * as Sheet from '$lib/components/ui/sheet';
 import { Button } from '$lib/components/ui/button';
@@ -67,6 +68,7 @@ const sceneFilters = [
 const adminItems = [
 	{ href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
 	{ href: '/admin/shaders', label: 'Shaders', icon: Sparkles },
+	{ href: '/admin/adopt', label: 'Adopt', icon: Download },
 	{ href: '/admin/worlds', label: 'Worlds', icon: Globe },
 	{ href: '/admin/scenes', label: 'Scenes', icon: Mountain },
 	{ href: '/admin/captures', label: 'Captures', icon: Camera },

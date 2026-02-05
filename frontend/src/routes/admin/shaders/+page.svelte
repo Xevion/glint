@@ -8,6 +8,7 @@ import { Textarea } from '$lib/components/ui/textarea';
 import { RefreshCw, Trash2 } from '@lucide/svelte';
 import AdminTable from '$lib/components/admin-table.svelte';
 import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
+import AdoptShaderDialog from '$lib/components/adopt-shader-dialog.svelte';
 import TimeAgo from '$lib/components/time-ago.svelte';
 import { api } from '$lib/api';
 import type { Shader } from '$lib/bindings';
@@ -139,9 +140,12 @@ onMount(() => {
 				<span class="text-lg text-muted-foreground">{shaders.length}</span>
 			{/if}
 		</div>
-		<Button variant="outline" size="icon" onclick={load} disabled={refreshing}>
-			<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-		</Button>
+		<div class="flex items-center gap-2">
+			<AdoptShaderDialog onShaderAdopted={load} />
+			<Button variant="outline" size="icon" onclick={load} disabled={refreshing}>
+				<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+			</Button>
+		</div>
 	</header>
 
 	{#if loading}

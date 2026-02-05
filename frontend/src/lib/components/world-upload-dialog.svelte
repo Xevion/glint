@@ -48,8 +48,8 @@ let description = $state('');
 let minecraftVersion = $state('1.21.4');
 let slugManuallyEdited = $state(false);
 
-// Capabilities detection
-const supportsFileSystemAccess = 'showDirectoryPicker' in window;
+// Capabilities detection (guarded for SSR)
+const supportsFileSystemAccess = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 
 // Computed weighted progress for upload phase
 // Hashing: 10%, Preparing: 5%, Upload: 80%, Finalizing: 5%
