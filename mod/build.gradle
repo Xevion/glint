@@ -33,6 +33,8 @@ allprojects {
         maven { url = 'https://api.modrinth.com/maven' }
         // owo-lib UI framework
         maven { url = 'https://maven.wispforest.io/releases' }
+        // Sinytra Forgified Fabric API (transitive dep of owo-lib-neoforge)
+        maven { url = 'https://maven.su5ed.dev/releases' }
     }
 
     tasks.withType(JavaCompile).configureEach {
