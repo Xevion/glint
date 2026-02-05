@@ -47,8 +47,29 @@ export const load: PageLoad = async ({ fetch }) => {
 
 - **API layer**: `true-myth` Result pattern with `.match({ Ok, Err })` for exhaustive handling
 - **Components**: `<svelte:boundary onerror={handler}>` for render-time errors
-- **Load functions**: Catch errors and return fallback data rather than throwing
+- **Load functions**: Two patterns depending on page type (see below)
 - Never let API errors bubble unhandled — always match or catch
+
+### Load Function Error Patterns
+
+**List pages** — return fallback data + optional error message:
+```typescript
+return result.match({
+    Ok: (items) => ({ items }),
+    Err: (error) => ({ items: [], error: error.message }),
+});
+```
+
+**Detail pages** — throw SvelteKit `error()` for the error page:
+```typescript
+return result.match({
+    Ok: (item) => ({ item }),
+    Err: (err) => {
+        if (err.type === ApiErrorType.NotFound) error(404, { message: 'Not found' });
+        error(500, { message: 'Failed to load data' });
+    },
+});
+```
 
 ```svelte
 <svelte:boundary onerror={(e) => console.error(e)}>

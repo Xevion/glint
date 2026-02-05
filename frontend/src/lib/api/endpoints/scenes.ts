@@ -15,6 +15,7 @@ export class SceneEndpoints extends ApiClient {
 	 * Get scenes by slug with world and captures (returns array for multi-world support)
 	 */
 	getBySlug(slug: string, worldId?: string): Promise<Result<SceneWithCaptures[], ApiError>> {
+		// TODO: backend uses snake_case query params (world_id) — migrate to camelCase (worldId)
 		const url = worldId
 			? `/api/scenes/${encodeURIComponent(slug)}?world_id=${encodeURIComponent(worldId)}`
 			: `/api/scenes/${encodeURIComponent(slug)}`;

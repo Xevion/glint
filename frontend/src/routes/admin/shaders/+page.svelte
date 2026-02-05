@@ -1,22 +1,23 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { invalidateAll } from '$app/navigation';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
 import { RefreshCw, Trash2 } from '@lucide/svelte';
-import AdminTable from '$lib/components/admin-table.svelte';
+import AdminTable from '$lib/components/AdminTable.svelte';
 import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
-import AdoptShaderDialog from '$lib/components/adopt-shader-dialog.svelte';
-import TimeAgo from '$lib/components/time-ago.svelte';
+import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { api } from '$lib/api';
 import type { Shader } from '$lib/bindings';
 import type { UpdateShaderRequest } from '$lib/api/endpoints/admin';
+import type { PageData } from './$types';
 
-let shaders = $state<Shader[]>([]);
+let { data } = $props<{ data: PageData }>();
+let shaders = $derived(data.shaders);
 let selected = $state<Shader | null>(null);
-let loading = $state(true);
 let refreshing = $state(false);
 let saving = $state(false);
 let error = $state<string | null>(null);
@@ -30,40 +31,16 @@ let editCurseforgeId = $state('');
 let editWebsiteUrl = $state('');
 
 const columns = [
-	{
-		id: 'name',
-		key: 'name',
-		name: 'Name',
-		render: (value: string) => `<span class="font-medium">${value}</span>`
-	},
+	{ id: 'name', key: 'name', name: 'Name' },
 	{ id: 'slug', key: 'slug', name: 'Slug' },
-	{
-		id: 'description',
-		key: 'description',
-		name: 'Description',
-		render: (value: string | null) =>
-			value
-				? `<span class="line-clamp-1">${value}</span>`
-				: '<span class="text-muted-foreground">-</span>'
-	},
-	{
-		id: 'created_at',
-		key: 'created_at',
-		name: 'Created',
-		component: 'time' as const
-	}
+	{ id: 'description', key: 'description', name: 'Description' },
+	{ id: 'created_at', key: 'created_at', name: 'Created', component: 'time' as const }
 ];
 
-async function load() {
+async function refresh() {
 	refreshing = true;
 	error = null;
-	const result = await api.admin.listShaders();
-	if (result.isOk) {
-		shaders = result.value;
-	} else {
-		error = result.error.message;
-	}
-	loading = false;
+	await invalidateAll();
 	refreshing = false;
 }
 
@@ -101,12 +78,15 @@ async function handleSave() {
 	}
 
 	const result = await api.admin.updateShader(selected.id, request);
-	if (result.isOk) {
-		selected = result.value;
-		shaders = shaders.map((s) => (s.id === selected!.id ? result.value : s));
-	} else {
-		error = result.error.message;
-	}
+	result.match({
+		Ok: (value) => {
+			selected = value;
+			void refresh();
+		},
+		Err: (err) => {
+			error = err.message;
+		}
+	});
 	saving = false;
 }
 
@@ -119,38 +99,33 @@ async function confirmDelete() {
 	if (!selected) return;
 
 	const result = await api.admin.deleteShader(selected.id);
-	if (result.isOk) {
-		selected = null;
-		void load();
-	} else {
-		error = result.error.message;
-	}
+	result.match({
+		Ok: () => {
+			selected = null;
+			void refresh();
+		},
+		Err: (err) => {
+			error = err.message;
+		}
+	});
 }
-
-onMount(() => {
-	void load();
-});
 </script>
 
 <div class="space-y-4">
 	<header class="flex items-center justify-between">
 		<div class="flex items-baseline gap-3">
 			<h1 class="text-2xl font-semibold">Shaders</h1>
-			{#if !loading}
-				<span class="text-lg text-muted-foreground">{shaders.length}</span>
-			{/if}
+			<span class="text-lg text-muted-foreground">{shaders.length}</span>
 		</div>
 		<div class="flex items-center gap-2">
-			<AdoptShaderDialog onShaderAdopted={load} />
-			<Button variant="outline" size="icon" onclick={load} disabled={refreshing}>
+			<AdoptShaderDialog onShaderAdopted={refresh} />
+			<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
 				<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
 			</Button>
 		</div>
 	</header>
 
-	{#if loading}
-		<div class="text-center text-muted-foreground">Loading...</div>
-	{:else if error && !selected}
+	{#if error && !selected}
 		<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
 			Error: {error}
 		</div>
@@ -163,7 +138,21 @@ onMount(() => {
 			selectedId={selected?.id}
 			onRowClick={openShader}
 			getRowId={(s: Shader) => s.id}
-		/>
+		>
+			{#snippet cell({ columnId, value })}
+				{#if columnId === 'name'}
+					<span class="font-medium">{value}</span>
+				{:else if columnId === 'description'}
+					{#if value}
+						<span class="line-clamp-1">{value}</span>
+					{:else}
+						<span class="text-muted-foreground">-</span>
+					{/if}
+				{:else}
+					{value ?? '-'}
+				{/if}
+			{/snippet}
+		</AdminTable>
 	{/if}
 </div>
 

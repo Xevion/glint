@@ -10,14 +10,27 @@ export const load: PageLoad = async ({ fetch }) => {
 		api.shaders.list()
 	]);
 
+	const errors: string[] = [];
+
+	const captures = capturesResult.match({
+		Ok: (captures): CaptureWithContext[] => captures,
+		Err: (err) => {
+			errors.push(err.message);
+			return [] as CaptureWithContext[];
+		}
+	});
+
+	const shaders = shadersResult.match({
+		Ok: (shaders): Shader[] => shaders,
+		Err: (err) => {
+			errors.push(err.message);
+			return [] as Shader[];
+		}
+	});
+
 	return {
-		captures: capturesResult.match({
-			Ok: (captures): CaptureWithContext[] => captures,
-			Err: (): CaptureWithContext[] => []
-		}),
-		shaders: shadersResult.match({
-			Ok: (shaders): Shader[] => shaders,
-			Err: (): Shader[] => []
-		})
+		captures,
+		shaders,
+		error: errors.length > 0 ? errors.join('; ') : undefined
 	};
 };

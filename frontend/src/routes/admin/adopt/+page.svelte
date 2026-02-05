@@ -4,7 +4,7 @@ import { Input } from '$lib/components/ui/input';
 import { Search, LoaderCircle, Download, CircleAlert } from '@lucide/svelte';
 import { api } from '$lib/api';
 import type { ShaderSearchResult } from '$lib/bindings';
-import AdoptShaderDialog from '$lib/components/adopt-shader-dialog.svelte';
+import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
 
 let query = $state('');
 let results = $state<ShaderSearchResult[]>([]);

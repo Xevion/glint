@@ -13,7 +13,6 @@ export const load: PageLoad = async ({ params, fetch }) => {
 			if (err.type === ApiErrorType.NotFound) {
 				error(404, { message: `Shader "${params.id}" not found` });
 			}
-			console.error('Failed to load shader:', err);
 			error(500, { message: 'Failed to load shader data' });
 		}
 	});

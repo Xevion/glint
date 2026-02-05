@@ -8,9 +8,8 @@ import {
 } from '$lib/utils/display';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import { comparisonStore } from '$lib/stores/comparison.svelte';
 import { cn } from '$lib/utils';
-import { Sun, Check, ArrowRight } from 'lucide-svelte';
+import { Sun, ArrowRight } from '@lucide/svelte';
 
 interface Props {
 	scene: Scene;
@@ -32,40 +31,15 @@ const timeOfDay = $derived(getTimeOfDay(scene.time_of_day_ticks));
 
 const wallpaperIndex = $derived(hashStringToNumber(scene.id) % 50);
 
-let isHovered = $state(false);
-const isSelected = $derived(comparisonStore.isSceneSelected(scene.id));
-const hasAnySelection = $derived(comparisonStore.hasSceneSelection);
-
-function handleCardClick(e: MouseEvent) {
-	const target = e.target as HTMLElement;
-
-	if (target.closest('[data-checkbox]') || target.closest('[data-clickable]')) {
-		return;
-	}
-
-	if (hasAnySelection) {
-		e.preventDefault();
-		comparisonStore.toggleScene(scene.id);
-		return;
-	}
-
+function handleCardClick() {
 	void goto(resolve('/scenes/[id]', { id: scene.slug }), { invalidateAll: true });
 }
 
 function handleKeyDown(e: KeyboardEvent) {
 	if (e.key === 'Enter' || e.key === ' ') {
 		e.preventDefault();
-		if (hasAnySelection) {
-			comparisonStore.toggleScene(scene.id);
-		} else {
-			void goto(resolve('/scenes/[id]', { id: scene.slug }), { invalidateAll: true });
-		}
+		void goto(resolve('/scenes/[id]', { id: scene.slug }), { invalidateAll: true });
 	}
-}
-
-function handleCheckboxClick(e: MouseEvent) {
-	e.stopPropagation();
-	comparisonStore.toggleScene(scene.id);
 }
 </script>
 
@@ -74,15 +48,11 @@ function handleCheckboxClick(e: MouseEvent) {
 	tabindex="0"
 	onclick={handleCardClick}
 	onkeydown={handleKeyDown}
-	onmouseenter={() => (isHovered = true)}
-	onmouseleave={() => (isHovered = false)}
 	class={cn(
 		'group relative flex flex-col overflow-hidden rounded-xl bg-card transition-all duration-300',
 		'border border-border shadow-sm',
 		'focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
-		hasAnySelection
-			? 'cursor-default'
-			: 'cursor-pointer hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg',
+		'cursor-pointer hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg',
 		className
 	)}
 >
@@ -110,25 +80,6 @@ function handleCheckboxClick(e: MouseEvent) {
 				{timeOfDay}
 			</span>
 		</div>
-
-		<!-- Compare checkbox - top right -->
-		<button
-			type="button"
-			data-checkbox
-			onclick={handleCheckboxClick}
-			class={cn(
-				'absolute top-3 right-3 flex h-5 w-5 cursor-pointer items-center justify-center rounded border-2 transition-all duration-200',
-				isSelected
-					? 'border-primary bg-primary'
-					: 'border-gray-400 bg-gray-900/70 backdrop-blur-sm hover:border-gray-300',
-				isSelected || isHovered || hasAnySelection ? 'opacity-100' : 'opacity-0',
-				!isSelected && hasAnySelection && !isHovered && 'opacity-60'
-			)}
-		>
-			{#if isSelected}
-				<Check class="h-3 w-3 text-primary-foreground" strokeWidth={3} />
-			{/if}
-		</button>
 	</div>
 
 	<!-- Card Body -->
@@ -141,10 +92,7 @@ function handleCheckboxClick(e: MouseEvent) {
 				onclick={(e) => {
 					e.stopPropagation();
 				}}
-				class={cn(
-					'line-clamp-1 block text-lg font-semibold text-card-foreground transition-colors hover:text-primary',
-					hasAnySelection ? 'cursor-pointer' : ''
-				)}
+				class="line-clamp-1 block text-lg font-semibold text-card-foreground transition-colors hover:text-primary"
 			>
 				{scene.name}
 			</a>

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { Popover } from 'bits-ui';
-import { ChevronDown } from 'lucide-svelte';
+import { ChevronDown } from '@lucide/svelte';
 import type { ImageOption } from './types';
 
 interface Props {

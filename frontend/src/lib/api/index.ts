@@ -27,7 +27,7 @@ export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
 		captures: new CaptureEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
 		admin: new AdminEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
 		adopt: new AdoptEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		worlds: new WorldsEndpoints(baseUrl ?? API_BASE_URL),
+		worlds: new WorldsEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
 		device: new DeviceEndpoints(baseUrl ?? API_BASE_URL, fetchFn)
 	};
 }

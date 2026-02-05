@@ -1,5 +1,5 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { invalidateAll } from '$app/navigation';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
@@ -7,17 +7,17 @@ import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
 import * as Checkbox from '$lib/components/ui/checkbox';
 import { RefreshCw, Trash2, RotateCcw } from '@lucide/svelte';
-import AdminTable from '$lib/components/admin-table.svelte';
+import AdminTable from '$lib/components/AdminTable.svelte';
 import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
-import TimeAgo from '$lib/components/time-ago.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { api } from '$lib/api';
 import type { SceneWithWorld } from '$lib/bindings';
 import type { UpdateSceneMetadataRequest } from '$lib/api/endpoints/admin';
-import { escapeHtml } from '$lib/utils/display';
+import type { PageData } from './$types';
 
-let scenes = $state<SceneWithWorld[]>([]);
+let { data } = $props<{ data: PageData }>();
+let scenes: SceneWithWorld[] = $derived(data.scenes);
 let selected = $state<SceneWithWorld | null>(null);
-let loading = $state(true);
 let refreshing = $state(false);
 let saving = $state(false);
 let error = $state<string | null>(null);
@@ -32,59 +32,18 @@ let editDescription = $state('');
 const filteredScenes = $derived(showInactive ? scenes : scenes.filter((s) => s.active));
 
 const columns = [
-	{
-		id: 'name',
-		key: 'name',
-		name: 'Name',
-		render: (value: string, row: SceneWithWorld) => {
-			const safeName = escapeHtml(value);
-			const inactive = !row.active
-				? '<span class="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">Inactive</span>'
-				: '';
-			return `<span class="font-medium">${safeName}</span>${inactive}`;
-		}
-	},
+	{ id: 'name', key: 'name', name: 'Name' },
 	{ id: 'slug', key: 'slug', name: 'Slug' },
-	{
-		id: 'world',
-		key: 'world_name',
-		name: 'World',
-		render: (value: string | null) =>
-			value ? `<span>${escapeHtml(value)}</span>` : '<span class="text-muted-foreground">-</span>'
-	},
-	{
-		id: 'dimension',
-		key: 'dimension',
-		name: 'Dimension',
-		render: (value: string) => {
-			const short = value.split(':').pop() ?? value;
-			return `<span class="text-xs">${escapeHtml(short)}</span>`;
-		}
-	},
-	{
-		id: 'weather',
-		key: 'weather',
-		name: 'Weather',
-		render: (value: string) => `<span class="text-xs capitalize">${escapeHtml(value)}</span>`
-	},
-	{
-		id: 'created_at',
-		key: 'created_at',
-		name: 'Created',
-		component: 'time' as const
-	}
+	{ id: 'world', key: 'world_name', name: 'World' },
+	{ id: 'dimension', key: 'dimension', name: 'Dimension' },
+	{ id: 'weather', key: 'weather', name: 'Weather' },
+	{ id: 'created_at', key: 'created_at', name: 'Created', component: 'time' as const }
 ];
 
-async function load() {
+async function refresh() {
 	refreshing = true;
 	error = null;
-	const result = await api.admin.listScenes();
-	if (result.isOk) {
-		scenes = result.value;
-	} else {
-		error = result.error.message;
-	}
-	loading = false;
+	await invalidateAll();
 	refreshing = false;
 }
 
@@ -111,13 +70,15 @@ async function handleSave() {
 	}
 
 	const result = await api.admin.updateScene(selected.id, request);
-	if (result.isOk) {
-		// Merge result into selected (keeps world_name, world_slug)
-		selected = { ...selected, ...result.value };
-		scenes = scenes.map((s) => (s.id === selected!.id ? { ...s, ...result.value } : s));
-	} else {
-		error = result.error.message;
-	}
+	result.match({
+		Ok: (value) => {
+			selected = { ...selected!, ...value };
+			void refresh();
+		},
+		Err: (err) => {
+			error = err.message;
+		}
+	});
 	saving = false;
 }
 
@@ -130,43 +91,42 @@ async function confirmDisable() {
 	if (!selected) return;
 
 	const result = await api.admin.disableScene(selected.id);
-	if (result.isOk) {
-		selected = null;
-		void load();
-	} else {
-		error = result.error.message;
-	}
+	result.match({
+		Ok: () => {
+			selected = null;
+			void refresh();
+		},
+		Err: (err) => {
+			error = err.message;
+		}
+	});
 }
 
 async function handleReactivate() {
 	if (!selected) return;
 
 	const result = await api.admin.reactivateScene(selected.id);
-	if (result.isOk) {
-		// Update the scene in the list
-		selected = { ...selected, active: true };
-		scenes = scenes.map((s) => (s.id === selected!.id ? { ...s, active: true } : s));
-	} else {
-		error = result.error.message;
-	}
+	result.match({
+		Ok: () => {
+			selected = { ...selected!, active: true };
+			void refresh();
+		},
+		Err: (err) => {
+			error = err.message;
+		}
+	});
 }
-
-onMount(() => {
-	void load();
-});
 </script>
 
 <div class="space-y-4">
 	<header class="flex items-center justify-between">
 		<div class="flex items-baseline gap-3">
 			<h1 class="text-2xl font-semibold">Scenes</h1>
-			{#if !loading}
-				<span class="text-lg text-muted-foreground">{filteredScenes.length}</span>
-				{#if showInactive && scenes.some((s) => !s.active)}
-					<span class="text-sm text-muted-foreground">
-						({scenes.filter((s) => !s.active).length} inactive)
-					</span>
-				{/if}
+			<span class="text-lg text-muted-foreground">{filteredScenes.length}</span>
+			{#if showInactive && scenes.some((s) => !s.active)}
+				<span class="text-sm text-muted-foreground">
+					({scenes.filter((s) => !s.active).length} inactive)
+				</span>
 			{/if}
 		</div>
 		<div class="flex items-center gap-4">
@@ -177,15 +137,13 @@ onMount(() => {
 				/>
 				<span>Show inactive</span>
 			</label>
-			<Button variant="outline" size="icon" onclick={load} disabled={refreshing}>
+			<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
 				<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
 			</Button>
 		</div>
 	</header>
 
-	{#if loading}
-		<div class="text-center text-muted-foreground">Loading...</div>
-	{:else if error && !selected}
+	{#if error && !selected}
 		<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
 			Error: {error}
 		</div>
@@ -200,7 +158,28 @@ onMount(() => {
 			selectedId={selected?.id}
 			onRowClick={openScene}
 			getRowId={(s: SceneWithWorld) => s.id}
-		/>
+		>
+			{#snippet cell({ columnId, value, row }: { columnId: string; value: unknown; row: SceneWithWorld })}
+				{#if columnId === 'name'}
+					<span class="font-medium">{value}</span>
+					{#if !row.active}
+						<span class="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">Inactive</span>
+					{/if}
+				{:else if columnId === 'world'}
+					{#if value}
+						<span>{value}</span>
+					{:else}
+						<span class="text-muted-foreground">-</span>
+					{/if}
+				{:else if columnId === 'dimension'}
+					<span class="text-xs">{typeof value === 'string' ? value.split(':').pop() : value}</span>
+				{:else if columnId === 'weather'}
+					<span class="text-xs capitalize">{value}</span>
+				{:else}
+					{value ?? '-'}
+				{/if}
+			{/snippet}
+		</AdminTable>
 	{/if}
 </div>
 

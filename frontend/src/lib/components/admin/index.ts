@@ -1,2 +1,2 @@
-export { default as AdminSlideOver } from './admin-slide-over.svelte';
-export { default as AdminDetailField } from './admin-detail-field.svelte';
+export { default as AdminSlideOver } from './AdminSlideOver.svelte';
+export { default as AdminDetailField } from './AdminDetailField.svelte';

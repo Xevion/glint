@@ -1,6 +1,6 @@
 <script lang="ts">
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
-import TimeAgo from '$lib/components/time-ago.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import type { JobWithDetails } from '$lib/api/endpoints/admin';
 
 interface Props {

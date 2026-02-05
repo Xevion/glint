@@ -11,7 +11,7 @@ import { resolve } from '$app/paths';
 import { comparisonStore } from '$lib/stores/comparison.svelte';
 import { cn } from '$lib/utils';
 import BrandIcon from './icons/BrandIcon.svelte';
-import { Check, Layers, ExternalLink } from 'lucide-svelte';
+import { Check, Layers, ExternalLink } from '@lucide/svelte';
 
 interface Props {
 	shader: Shader;
@@ -23,8 +23,8 @@ let { shader, class: className }: Props = $props();
 const wallpaperIndex = $derived(hashStringToNumber(shader.id) % 50);
 
 let isHovered = $state(false);
-const isSelected = $derived(comparisonStore.isShaderSelected(shader.id));
-const hasAnySelection = $derived(comparisonStore.hasShaderSelection);
+const isSelected = $derived(comparisonStore.isSelected(shader.id));
+const hasAnySelection = $derived(comparisonStore.hasSelection());
 
 const modrinthUrl = $derived(getModrinthUrl(shader.modrinth_id));
 const curseforgeUrl = $derived(getCurseforgeUrl(shader.curseforge_id));
@@ -42,7 +42,7 @@ function handleCardClick(e: MouseEvent) {
 
 	if (hasAnySelection) {
 		e.preventDefault();
-		comparisonStore.toggleShader(shader.id);
+		comparisonStore.select(shader);
 		return;
 	}
 
@@ -53,7 +53,7 @@ function handleKeyDown(e: KeyboardEvent) {
 	if (e.key === 'Enter' || e.key === ' ') {
 		e.preventDefault();
 		if (hasAnySelection) {
-			comparisonStore.toggleShader(shader.id);
+			comparisonStore.select(shader);
 		} else {
 			void goto(resolve('/shaders/[id]', { id: shader.slug }), { invalidateAll: true });
 		}
@@ -62,7 +62,7 @@ function handleKeyDown(e: KeyboardEvent) {
 
 function handleCheckboxClick(e: MouseEvent) {
 	e.stopPropagation();
-	comparisonStore.toggleShader(shader.id);
+	comparisonStore.select(shader);
 }
 </script>
 

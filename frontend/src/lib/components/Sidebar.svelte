@@ -1,5 +1,5 @@
 <script lang="ts">
-import { page } from '$app/stores';
+import { page } from '$app/state';
 import {
 	Sparkles,
 	Mountain,
@@ -30,7 +30,7 @@ let mobileSheetOpen = $state(false);
 type SidebarContext = 'home' | 'shaders' | 'scenes' | 'admin' | null;
 
 const context: SidebarContext = $derived.by(() => {
-	const path = $page.url.pathname;
+	const path = page.url.pathname;
 	if (path.startsWith('/admin')) return 'admin';
 	if (path.startsWith('/compare')) return null;
 	if (path.startsWith('/shaders')) return 'shaders';
@@ -78,10 +78,10 @@ const adminItems = [
 ];
 
 function isActive(href: string): boolean {
-	if (href === '/') return $page.url.pathname === '/';
-	if (href === '/admin') return $page.url.pathname === '/admin';
+	if (href === '/') return page.url.pathname === '/';
+	if (href === '/admin') return page.url.pathname === '/admin';
 	if (href.includes('?')) return false;
-	return $page.url.pathname.startsWith(href);
+	return page.url.pathname.startsWith(href);
 }
 
 function getContextItems(ctx: SidebarContext) {

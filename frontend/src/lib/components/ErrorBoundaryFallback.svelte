@@ -1,6 +1,5 @@
 <script lang="ts">
-import CircleAlert from 'lucide-svelte/icons/circle-alert';
-import ChevronDown from 'lucide-svelte/icons/chevron-down';
+import { CircleAlert, ChevronDown } from '@lucide/svelte';
 import { Button } from '$lib/components/ui/button';
 import * as Collapsible from '$lib/components/ui/collapsible';
 

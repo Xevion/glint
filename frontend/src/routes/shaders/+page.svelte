@@ -2,7 +2,7 @@
 import { fly, scale } from 'svelte/transition';
 import { Button } from '$lib/components/ui/button';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
-import { Search } from 'lucide-svelte';
+import { Search } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

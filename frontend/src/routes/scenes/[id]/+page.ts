@@ -21,7 +21,6 @@ export const load: PageLoad = async ({ params, fetch, url }) => {
 			if (err.type === ApiErrorType.NotFound) {
 				error(404, { message: `Scene "${params.id}" not found` });
 			}
-			console.error('Failed to load scene:', err);
 			error(500, { message: 'Failed to load scene data' });
 		}
 	});

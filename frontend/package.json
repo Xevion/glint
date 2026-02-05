@@ -70,7 +70,6 @@
 		"class-variance-authority": "^0.7.1",
 		"fflate": "^0.8.2",
 		"img-comparison-slider": "^8.0.7",
-		"lucide-svelte": "^0.562.0",
 		"overlayscrollbars": "^2.14.0",
 		"overlayscrollbars-svelte": "^0.5.5",
 		"svelte-relative-time": "^0.0.6",

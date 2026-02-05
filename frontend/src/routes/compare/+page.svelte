@@ -10,7 +10,7 @@ import {
 	type CompareMode
 } from '$lib/components/compare';
 import ErrorBoundaryFallback from '$lib/components/ErrorBoundaryFallback.svelte';
-import { Columns3, SplitSquareHorizontal, ToggleLeft, ArrowLeftRight } from 'lucide-svelte';
+import { Columns3, SplitSquareHorizontal, ToggleLeft, ArrowLeftRight } from '@lucide/svelte';
 
 // Get mock data from centralized location
 const compareImages = getMockCompareImages();

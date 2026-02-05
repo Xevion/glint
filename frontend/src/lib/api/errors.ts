@@ -13,51 +13,57 @@ export class ApiError extends Error {
 		public readonly type: ApiErrorType,
 		message: string,
 		public readonly statusCode?: number,
-		public readonly details?: unknown
+		public readonly details?: unknown,
+		public readonly code?: string
 	) {
 		super(message);
 		this.name = 'ApiError';
 	}
 
 	static fromResponse(response: Response, body?: unknown): ApiError {
-		let message: string;
+		let message: string | undefined;
+		let code: string | undefined;
 
-		if (typeof body === 'object' && body && 'message' in body && typeof body.message === 'string') {
-			message = body.message;
-		} else if (response.statusText) {
-			message = `HTTP ${response.status}: ${response.statusText}`;
-		} else {
-			// Fallback when statusText is empty
-			const statusMessages: Record<number, string> = {
-				400: 'Bad Request',
-				401: 'Unauthorized',
-				403: 'Forbidden',
-				404: 'Not Found',
-				500: 'Internal Server Error',
-				502: 'Bad Gateway',
-				503: 'Service Unavailable',
-				504: 'Gateway Timeout'
-			};
-			const statusName = statusMessages[response.status] || 'Unknown Error';
-			message = `HTTP ${response.status}: ${statusName}`;
+		if (typeof body === 'object' && body) {
+			if ('error' in body && typeof body.error === 'string') message = body.error;
+			if ('code' in body && typeof body.code === 'string') code = body.code;
+		}
+
+		if (!message) {
+			if (response.statusText) {
+				message = `HTTP ${response.status}: ${response.statusText}`;
+			} else {
+				const statusMessages: Record<number, string> = {
+					400: 'Bad Request',
+					401: 'Unauthorized',
+					403: 'Forbidden',
+					404: 'Not Found',
+					500: 'Internal Server Error',
+					502: 'Bad Gateway',
+					503: 'Service Unavailable',
+					504: 'Gateway Timeout'
+				};
+				const statusName = statusMessages[response.status] || 'Unknown Error';
+				message = `HTTP ${response.status}: ${statusName}`;
+			}
 		}
 
 		switch (response.status) {
 			case 400:
-				return new ApiError(ApiErrorType.BadRequest, message, 400, body);
+				return new ApiError(ApiErrorType.BadRequest, message, 400, body, code);
 			case 401:
-				return new ApiError(ApiErrorType.Unauthorized, message, 401, body);
+				return new ApiError(ApiErrorType.Unauthorized, message, 401, body, code);
 			case 403:
-				return new ApiError(ApiErrorType.Forbidden, message, 403, body);
+				return new ApiError(ApiErrorType.Forbidden, message, 403, body, code);
 			case 404:
-				return new ApiError(ApiErrorType.NotFound, message, 404, body);
+				return new ApiError(ApiErrorType.NotFound, message, 404, body, code);
 			case 500:
 			case 502:
 			case 503:
 			case 504:
-				return new ApiError(ApiErrorType.ServerError, message, response.status, body);
+				return new ApiError(ApiErrorType.ServerError, message, response.status, body, code);
 			default:
-				return new ApiError(ApiErrorType.Unknown, message, response.status, body);
+				return new ApiError(ApiErrorType.Unknown, message, response.status, body, code);
 		}
 	}
 

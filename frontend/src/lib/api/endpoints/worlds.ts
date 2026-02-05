@@ -1,8 +1,6 @@
-import type { Result } from 'true-myth';
-import type { ApiError } from '../errors';
-import { API_BASE_URL } from '../config';
-import { ApiError as ApiErrorClass, ApiErrorType } from '../errors';
-import { Result as TrueMythResult } from 'true-myth';
+import { Result } from 'true-myth';
+import { ApiClient } from '../client';
+import { ApiError, ApiErrorType } from '../errors';
 import type { World, CreateWorldUploadResponse } from '$lib/bindings';
 
 export type { CreateWorldUploadResponse };
@@ -26,77 +24,20 @@ export interface UploadProgress {
 	percentage: number;
 }
 
-export class WorldsEndpoints {
-	private baseUrl: string;
-
-	constructor(baseUrl: string = API_BASE_URL) {
-		this.baseUrl = baseUrl;
+export class WorldsEndpoints extends ApiClient {
+	async list(): Promise<Result<World[], ApiError>> {
+		return this.get<World[]>('/api/worlds');
 	}
 
-	/**
-	 * List all worlds
-	 */
-	async listWorlds(): Promise<Result<World[], ApiError>> {
-		const url = `${this.baseUrl}/api/worlds`;
-
-		try {
-			const response = await fetch(url);
-
-			if (!response.ok) {
-				let body: unknown;
-				try {
-					body = await response.json();
-				} catch {
-					// Response body isn't JSON, ignore
-				}
-				return TrueMythResult.err(ApiErrorClass.fromResponse(response, body));
-			}
-
-			const data = (await response.json()) as World[];
-			return TrueMythResult.ok(data);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Network request failed';
-			return TrueMythResult.err(ApiErrorClass.network(message));
-		}
-	}
-
-	/**
-	 * Step 1: Request a presigned URL for world upload
-	 */
 	async createWorldUpload(
 		request: CreateWorldUploadRequest
 	): Promise<Result<CreateWorldUploadResponse, ApiError>> {
-		const url = `${this.baseUrl}/api/worlds`;
-
-		try {
-			const response = await fetch(url, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(request)
-			});
-
-			if (!response.ok) {
-				let body: unknown;
-				try {
-					body = await response.json();
-				} catch {
-					// Response body isn't JSON
-				}
-				return TrueMythResult.err(ApiErrorClass.fromResponse(response, body));
-			}
-
-			const data = (await response.json()) as CreateWorldUploadResponse;
-			return TrueMythResult.ok(data);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Network request failed';
-			return TrueMythResult.err(ApiErrorClass.network(message));
-		}
+		return this.post<CreateWorldUploadResponse>('/api/worlds', request);
 	}
 
 	/**
-	 * Step 2: Upload file directly to R2 using presigned URL
+	 * Upload file directly to R2 using presigned URL.
+	 * Uses XHR for upload progress tracking — talks to R2, not our API.
 	 */
 	async uploadToPresignedUrl(
 		presignedUrl: string,
@@ -119,11 +60,11 @@ export class WorldsEndpoints {
 
 			xhr.addEventListener('load', () => {
 				if (xhr.status >= 200 && xhr.status < 300) {
-					resolve(TrueMythResult.ok(undefined));
+					resolve(Result.ok(undefined));
 				} else {
 					resolve(
-						TrueMythResult.err(
-							new ApiErrorClass(
+						Result.err(
+							new ApiError(
 								ApiErrorType.Unknown,
 								`Upload failed with status ${xhr.status}: ${xhr.statusText}`,
 								xhr.status
@@ -134,54 +75,24 @@ export class WorldsEndpoints {
 			});
 
 			xhr.addEventListener('error', () => {
-				resolve(TrueMythResult.err(ApiErrorClass.network('Upload to storage failed')));
+				resolve(Result.err(ApiError.network('Upload to storage failed')));
 			});
 
 			xhr.addEventListener('abort', () => {
-				resolve(TrueMythResult.err(ApiErrorClass.network('Upload was aborted')));
+				resolve(Result.err(ApiError.network('Upload was aborted')));
 			});
 
 			xhr.open('PUT', presignedUrl);
 			xhr.setRequestHeader('Content-Type', 'application/zip');
-			// Set the hash metadata header (must match what backend expects)
 			xhr.setRequestHeader('x-amz-meta-sha256', hash);
 			xhr.send(file);
 		});
 	}
 
-	/**
-	 * Step 3: Complete the upload and create the world record
-	 */
 	async completeWorldUpload(
 		slug: string,
 		request: CompleteWorldUploadRequest
 	): Promise<Result<World, ApiError>> {
-		const url = `${this.baseUrl}/api/worlds/${encodeURIComponent(slug)}/complete`;
-
-		try {
-			const response = await fetch(url, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(request)
-			});
-
-			if (!response.ok) {
-				let body: unknown;
-				try {
-					body = await response.json();
-				} catch {
-					// Response body isn't JSON
-				}
-				return TrueMythResult.err(ApiErrorClass.fromResponse(response, body));
-			}
-
-			const data = (await response.json()) as World;
-			return TrueMythResult.ok(data);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Network request failed';
-			return TrueMythResult.err(ApiErrorClass.network(message));
-		}
+		return this.post<World>(`/api/worlds/${encodeURIComponent(slug)}/complete`, request);
 	}
 }

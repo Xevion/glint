@@ -1,10 +1,9 @@
 <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
 <script lang="ts" generics="T extends Record<string, any>">
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
+import type { Snippet } from 'svelte';
 import { DataTable } from '@careswitch/svelte-data-table';
 import * as Table from '$lib/components/ui/table';
-import TimeAgo from './time-ago.svelte';
+import TimeAgo from './TimeAgo.svelte';
 import { goto } from '$app/navigation';
 import { Button } from '$lib/components/ui/button';
 import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -14,7 +13,6 @@ interface Column {
 	id: string;
 	key: string;
 	name: string;
-	render?: (value: any, row: T) => any;
 	component?: 'time' | 'link-button' | 'delete-button' | 'job-actions';
 	href?: (row: T) => string;
 	onAction?: (action: string, row: T) => void;
@@ -30,9 +28,10 @@ interface Props {
 	selectedId?: string | null;
 	onRowClick?: (item: T) => void;
 	getRowId?: (item: T) => string;
+	cell?: Snippet<[{ columnId: string; value: unknown; row: T }]>;
 }
 
-let { data, columns, selectedId = null, onRowClick, getRowId }: Props = $props();
+let { data, columns, selectedId = null, onRowClick, getRowId, cell }: Props = $props();
 
 // Find the title column for mobile cards (first column with cardTitle=true, or first column)
 const titleColumn = $derived(columns.find((c) => c.cardTitle) ?? columns[0]);
@@ -143,14 +142,8 @@ const table = $derived(
 											</DropdownMenu.Item>
 										</DropdownMenu.Content>
 									</DropdownMenu.Root>
-								{:else if colDef?.render}
-									<!--
-									WARNING: XSS RISK - render functions return raw HTML.
-									All dynamic values MUST be escaped using escapeHtml() from '$lib/utils/display'.
-									Example: `<a href="${escapeHtml(url)}">${escapeHtml(name)}</a>`
-								-->
-									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-									{@html colDef.render(row[column.key], row)}
+								{:else if cell}
+									{@render cell({ columnId: column.id, value: row[column.key], row })}
 								{:else}
 									{row[column.key] ?? '-'}
 								{/if}
@@ -182,9 +175,8 @@ const table = $derived(
 			>
 				<!-- Card title -->
 				<div class="mb-2 font-medium">
-					{#if titleColumn.render}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html titleColumn.render(row[titleColumn.key], row)}
+					{#if cell}
+						{@render cell({ columnId: titleColumn.id, value: row[titleColumn.key], row })}
 					{:else}
 						{row[titleColumn.key] ?? '-'}
 					{/if}
@@ -198,9 +190,8 @@ const table = $derived(
 							<span class="truncate text-right">
 								{#if col.component === 'time' && row[col.key]}
 									<TimeAgo timestamp={row[col.key]} />
-								{:else if col.render}
-									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-									{@html col.render(row[col.key], row)}
+								{:else if cell}
+									{@render cell({ columnId: col.id, value: row[col.key], row })}
 								{:else}
 									{row[col.key] ?? '-'}
 								{/if}

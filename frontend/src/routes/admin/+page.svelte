@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount, onDestroy } from 'svelte';
+import { invalidateAll } from '$app/navigation';
 import { Button } from '$lib/components/ui/button';
 import {
 	RefreshCw,
@@ -13,30 +14,29 @@ import {
 	Users,
 	ArrowRight
 } from '@lucide/svelte';
-import TimeAgo from '$lib/components/time-ago.svelte';
-import { api } from '$lib/api';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import type { CaptureWithContext } from '$lib/bindings';
 import type { JobWithDetails } from '$lib/api/endpoints/admin';
+import type { PageData } from './$types';
 
-// Stats
-let shaderCount = $state(0);
-let worldCount = $state(0);
-let sceneCount = $state(0);
-let captureCount = $state(0);
-let userCount = $state(0);
-let jobCounts = $state({ pending: 0, running: 0, completed: 0, failed: 0 });
+let { data } = $props<{ data: PageData }>();
 
-// Recent activity
-let recentJobs = $state<JobWithDetails[]>([]);
-let recentCaptures = $state<CaptureWithContext[]>([]);
+let shaderCount: number = $derived(data.shaderCount);
+let worldCount: number = $derived(data.worldCount);
+let sceneCount: number = $derived(data.sceneCount);
+let captureCount: number = $derived(data.captureCount);
+let userCount: number = $derived(data.userCount);
+let jobCounts: { pending: number; running: number; completed: number; failed: number } = $derived(
+	data.jobCounts
+);
+let recentJobs: JobWithDetails[] = $derived(data.recentJobs);
+let recentCaptures: CaptureWithContext[] = $derived(data.recentCaptures);
+let healthStatus: 'ok' | 'error' = $derived(data.healthStatus);
+let errors: Record<string, string> = $derived(data.errors);
 
-// Loading state
-let loading = $state(true);
 let refreshing = $state(false);
 let autoRefresh = $state(true);
 let lastRefreshed = $state<Date | null>(null);
-let healthStatus = $state<'ok' | 'error' | 'checking'>('checking');
-let errors = $state<Record<string, string>>({});
 
 let refreshInterval: number | undefined;
 
@@ -55,61 +55,10 @@ const statCards = $derived<StatCard[]>([
 	{ label: 'Users', count: userCount, href: '/admin/users', icon: Users }
 ]);
 
-async function loadData() {
+async function refresh() {
 	refreshing = true;
-	errors = {};
-
-	const [shadersRes, worldsRes, scenesRes, capturesRes, usersRes, jobsRes, healthRes] =
-		await Promise.all([
-			api.shaders.list(),
-			api.worlds.listWorlds(),
-			api.scenes.list(),
-			api.admin.listCaptures(),
-			api.admin.listUsers(),
-			api.admin.listJobs(),
-			api.admin.health()
-		]);
-
-	if (shadersRes.isOk) shaderCount = shadersRes.value.length;
-	else errors.shaders = shadersRes.error.message;
-
-	if (worldsRes.isOk) worldCount = worldsRes.value.length;
-	else errors.worlds = worldsRes.error.message;
-
-	if (scenesRes.isOk) sceneCount = scenesRes.value.length;
-	else errors.scenes = scenesRes.error.message;
-
-	if (capturesRes.isOk) {
-		captureCount = capturesRes.value.length;
-		recentCaptures = capturesRes.value.slice(0, 5);
-	} else {
-		errors.captures = capturesRes.error.message;
-	}
-
-	if (usersRes.isOk) userCount = usersRes.value.length;
-	else errors.users = usersRes.error.message;
-
-	if (jobsRes.isOk) {
-		const jobs = jobsRes.value;
-		jobCounts = {
-			pending: jobs.filter((j) => j.status === 'pending').length,
-			running: jobs.filter((j) => j.status === 'running' || j.status === 'claimed').length,
-			completed: jobs.filter((j) => j.status === 'completed').length,
-			failed: jobs.filter((j) => j.status === 'failed').length
-		};
-		recentJobs = jobs.slice(0, 5);
-	} else {
-		errors.jobs = jobsRes.error.message;
-	}
-
-	if (healthRes.isOk) healthStatus = 'ok';
-	else {
-		healthStatus = 'error';
-		errors.health = healthRes.error.message;
-	}
-
+	await invalidateAll();
 	lastRefreshed = new Date();
-	loading = false;
 	refreshing = false;
 }
 
@@ -117,7 +66,7 @@ function toggleAutoRefresh() {
 	autoRefresh = !autoRefresh;
 	if (autoRefresh) {
 		refreshInterval = window.setInterval(() => {
-			void loadData();
+			void refresh();
 		}, 10000);
 	} else if (refreshInterval) {
 		clearInterval(refreshInterval);
@@ -126,10 +75,10 @@ function toggleAutoRefresh() {
 }
 
 onMount(() => {
-	void loadData();
+	lastRefreshed = new Date();
 	if (autoRefresh) {
 		refreshInterval = window.setInterval(() => {
-			void loadData();
+			void refresh();
 		}, 10000);
 	}
 });
@@ -149,12 +98,9 @@ onDestroy(() => {
 				class="flex h-3 w-3 items-center justify-center rounded-full"
 				class:bg-green-500={healthStatus === 'ok'}
 				class:bg-red-500={healthStatus === 'error'}
-				class:bg-gray-400={healthStatus === 'checking'}
 				title={healthStatus === 'ok'
 					? 'API healthy'
-					: healthStatus === 'error'
-						? `API error: ${errors.health || 'Unknown'}`
-						: 'Checking API health'}
+					: `API error: ${errors.health || 'Unknown'}`}
 			></div>
 		</div>
 		<div class="flex items-center gap-4">
@@ -180,17 +126,14 @@ onDestroy(() => {
 						<Play class="h-4 w-4" />
 					{/if}
 				</Button>
-				<Button variant="outline" size="icon" onclick={loadData} disabled={refreshing}>
+				<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
 					<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
 				</Button>
 			</div>
 		</div>
 	</header>
 
-	{#if loading}
-		<div class="text-center text-muted-foreground">Loading...</div>
-	{:else}
-		<!-- Stats Grid -->
+	<!-- Stats Grid -->
 		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
 			{#each statCards as card (card.label)}
 				<a
@@ -330,5 +273,4 @@ onDestroy(() => {
 				{/if}
 			</div>
 		</div>
-	{/if}
 </div>

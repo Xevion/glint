@@ -1,83 +1,36 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { invalidateAll } from '$app/navigation';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { RefreshCw, Trash2 } from '@lucide/svelte';
-import AdminTable from '$lib/components/admin-table.svelte';
+import AdminTable from '$lib/components/AdminTable.svelte';
 import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
-import TimeAgo from '$lib/components/time-ago.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { api } from '$lib/api';
 import type { CaptureWithContext } from '$lib/bindings';
-import { escapeHtml } from '$lib/utils/display';
+import type { PageData } from './$types';
 
-let captures = $state<CaptureWithContext[]>([]);
+let { data } = $props<{ data: PageData }>();
+let captures = $derived(data.captures);
 let selected = $state<CaptureWithContext | null>(null);
-let loading = $state(true);
 let refreshing = $state(false);
 let error = $state<string | null>(null);
 let showDeleteConfirm = $state(false);
 let captureToDelete = $state<CaptureWithContext | null>(null);
 
 const columns = [
-	{
-		id: 'preview',
-		key: 'screenshot_url',
-		name: 'Preview',
-		render: (value: string | null, row: CaptureWithContext) => {
-			if (value) {
-				const safeUrl = escapeHtml(value);
-				return `<img src="${safeUrl}" alt="Capture preview" class="h-12 w-20 rounded object-cover" />`;
-			} else if (row.screenshot_path) {
-				return '<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">No URL</div>';
-			}
-			return '<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">N/A</div>';
-		}
-	},
-	{
-		id: 'shader',
-		key: 'shader_name',
-		name: 'Shader',
-		render: (_value: unknown, row: CaptureWithContext) => {
-			const safeName = escapeHtml(row.shader_name);
-			const safeSlug = escapeHtml(row.shader_slug);
-			const safeVersion = escapeHtml(row.shader_version);
-			return `<div><a href="/shaders/${safeSlug}" class="font-medium text-primary hover:underline">${safeName}</a><div class="text-xs text-muted-foreground">${safeVersion}</div></div>`;
-		}
-	},
+	{ id: 'preview', key: 'screenshot_url', name: 'Preview' },
+	{ id: 'shader', key: 'shader_name', name: 'Shader' },
 	{ id: 'scene_id', key: 'scene_id', name: 'Scene' },
-	{
-		id: 'profile',
-		key: 'profile',
-		name: 'Profile',
-		render: (value: string | null) => value ?? '-'
-	},
-	{
-		id: 'resolution',
-		key: 'resolution_width',
-		name: 'Resolution',
-		render: (_value: unknown, row: CaptureWithContext) =>
-			row.resolution_width && row.resolution_height
-				? `${row.resolution_width}x${row.resolution_height}`
-				: '-'
-	},
-	{
-		id: 'captured_at',
-		key: 'captured_at',
-		name: 'Captured',
-		component: 'time' as const
-	}
+	{ id: 'profile', key: 'profile', name: 'Profile' },
+	{ id: 'resolution', key: 'resolution_width', name: 'Resolution' },
+	{ id: 'captured_at', key: 'captured_at', name: 'Captured', component: 'time' as const }
 ];
 
-async function load() {
+async function refresh() {
 	refreshing = true;
 	error = null;
-	const result = await api.admin.listCaptures();
-	if (result.isOk) {
-		captures = result.value;
-	} else {
-		error = result.error.message;
-	}
-	loading = false;
+	await invalidateAll();
 	refreshing = false;
 }
 
@@ -89,36 +42,31 @@ function handleDelete(capture: CaptureWithContext) {
 async function confirmDelete() {
 	if (!captureToDelete) return;
 	const result = await api.admin.deleteCapture(captureToDelete.id);
-	if (result.isOk) {
-		selected = null;
-		captureToDelete = null;
-		void load();
-	} else {
-		error = result.error.message;
-	}
+	result.match({
+		Ok: () => {
+			selected = null;
+			captureToDelete = null;
+			void refresh();
+		},
+		Err: (err) => {
+			error = err.message;
+		}
+	});
 }
-
-onMount(() => {
-	void load();
-});
 </script>
 
 <div class="space-y-4">
 	<header class="flex items-center justify-between">
 		<div class="flex items-baseline gap-3">
 			<h1 class="text-2xl font-semibold">Captures</h1>
-			{#if !loading}
-				<span class="text-lg text-muted-foreground">{captures.length}</span>
-			{/if}
+			<span class="text-lg text-muted-foreground">{captures.length}</span>
 		</div>
-		<Button variant="outline" size="icon" onclick={load} disabled={refreshing}>
+		<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
 			<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
 		</Button>
 	</header>
 
-	{#if loading}
-		<div class="text-center text-muted-foreground">Loading...</div>
-	{:else if error}
+	{#if error}
 		<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
 			Error: {error}
 		</div>
@@ -131,7 +79,32 @@ onMount(() => {
 			selectedId={selected?.id}
 			onRowClick={(capture: CaptureWithContext) => (selected = capture)}
 			getRowId={(c: CaptureWithContext) => c.id}
-		/>
+		>
+			{#snippet cell({ columnId, value, row }: { columnId: string; value: unknown; row: CaptureWithContext })}
+				{#if columnId === 'preview'}
+					{#if value}
+						<img src={value as string} alt="Capture preview" class="h-12 w-20 rounded object-cover" />
+					{:else if row.screenshot_path}
+						<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">No URL</div>
+					{:else}
+						<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">N/A</div>
+					{/if}
+				{:else if columnId === 'shader'}
+					<div>
+						<a href="/shaders/{row.shader_slug}" class="font-medium text-primary hover:underline">{row.shader_name}</a>
+						<div class="text-xs text-muted-foreground">{row.shader_version}</div>
+					</div>
+				{:else if columnId === 'profile'}
+					{value ?? '-'}
+				{:else if columnId === 'resolution'}
+					{row.resolution_width && row.resolution_height
+						? `${row.resolution_width}x${row.resolution_height}`
+						: '-'}
+				{:else}
+					{value ?? '-'}
+				{/if}
+			{/snippet}
+		</AdminTable>
 	{/if}
 </div>
 

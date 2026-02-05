@@ -111,6 +111,16 @@ export class ApiClient {
 	}
 
 	/**
+	 * PATCH request
+	 */
+	protected patch<T>(path: string, body?: unknown): Promise<Result<T, ApiError>> {
+		return this.fetchJson<T>(path, {
+			method: 'PATCH',
+			body: body ? JSON.stringify(body) : undefined
+		});
+	}
+
+	/**
 	 * DELETE request
 	 */
 	protected delete<T>(path: string): Promise<Result<T, ApiError>> {

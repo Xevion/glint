@@ -5,7 +5,7 @@ import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
 import Progress from '$lib/components/ui/progress/progress.svelte';
-import { Plus, Folder, FileArchive } from 'lucide-svelte';
+import { Plus, Folder, FileArchive } from '@lucide/svelte';
 import { api } from '$lib/api';
 import {
 	compressDirectory,

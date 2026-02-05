@@ -5,7 +5,7 @@ import { createApiClient } from '$lib/api';
 import { ApiErrorType } from '$lib/api/errors';
 import { Button } from '$lib/components/ui/button';
 import { resolve } from '$app/paths';
-import { Monitor, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-svelte';
+import { Monitor, CheckCircle, XCircle, Clock, Loader2 } from '@lucide/svelte';
 import type { DeviceCodeStatus } from '$lib/bindings';
 
 interface Props {

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { fade, scale } from 'svelte/transition';
-import { X, ChevronLeft, ChevronRight } from 'lucide-svelte';
+import { X, ChevronLeft, ChevronRight } from '@lucide/svelte';
 import { Button } from '$lib/components/ui/button';
 
 interface CaptureItem {

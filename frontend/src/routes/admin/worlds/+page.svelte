@@ -1,23 +1,24 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { invalidateAll } from '$app/navigation';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
 import { RefreshCw, Trash2 } from '@lucide/svelte';
-import AdminTable from '$lib/components/admin-table.svelte';
+import AdminTable from '$lib/components/AdminTable.svelte';
 import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
-import WorldUploadDialog from '$lib/components/world-upload-dialog.svelte';
-import TimeAgo from '$lib/components/time-ago.svelte';
+import WorldUploadDialog from '$lib/components/WorldUploadDialog.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { api } from '$lib/api';
 import type { World } from '$lib/bindings';
 import type { UpdateWorldRequest } from '$lib/api/endpoints/admin';
-import { escapeHtml, formatBytes } from '$lib/utils/display';
+import { formatBytes } from '$lib/utils/display';
+import type { PageData } from './$types';
 
-let worlds = $state<World[]>([]);
+let { data } = $props<{ data: PageData }>();
+let worlds = $derived(data.worlds);
 let selected = $state<World | null>(null);
-let loading = $state(true);
 let refreshing = $state(false);
 let saving = $state(false);
 let error = $state<string | null>(null);
@@ -28,44 +29,17 @@ let editName = $state('');
 let editDescription = $state('');
 
 const columns = [
-	{
-		id: 'name',
-		key: 'name',
-		name: 'Name',
-		render: (value: string) => `<span class="font-medium">${escapeHtml(value)}</span>`
-	},
+	{ id: 'name', key: 'name', name: 'Name' },
 	{ id: 'slug', key: 'slug', name: 'Slug' },
-	{
-		id: 'minecraft_version',
-		key: 'minecraft_version',
-		name: 'MC Version',
-		render: (v: string) =>
-			`<code class="rounded bg-muted px-1.5 py-0.5 text-xs">${escapeHtml(v)}</code>`
-	},
-	{
-		id: 'size',
-		key: 'size_bytes',
-		name: 'Size',
-		render: (bytes: number | null) => (bytes ? formatBytes(bytes) : '-')
-	},
-	{
-		id: 'created_at',
-		key: 'created_at',
-		name: 'Created',
-		component: 'time' as const
-	}
+	{ id: 'minecraft_version', key: 'minecraft_version', name: 'MC Version' },
+	{ id: 'size', key: 'size_bytes', name: 'Size' },
+	{ id: 'created_at', key: 'created_at', name: 'Created', component: 'time' as const }
 ];
 
-async function load() {
+async function refresh() {
 	refreshing = true;
 	error = null;
-	const result = await api.worlds.listWorlds();
-	if (result.isOk) {
-		worlds = result.value;
-	} else {
-		error = result.error.message;
-	}
-	loading = false;
+	await invalidateAll();
 	refreshing = false;
 }
 
@@ -92,12 +66,15 @@ async function handleSave() {
 	}
 
 	const result = await api.admin.updateWorld(selected.id, request);
-	if (result.isOk) {
-		selected = result.value;
-		worlds = worlds.map((w) => (w.id === selected!.id ? result.value : w));
-	} else {
-		error = result.error.message;
-	}
+	result.match({
+		Ok: (value) => {
+			selected = value;
+			void refresh();
+		},
+		Err: (err) => {
+			error = err.message;
+		}
+	});
 	saving = false;
 }
 
@@ -110,38 +87,33 @@ async function confirmDelete() {
 	if (!selected) return;
 
 	const result = await api.admin.deleteWorld(selected.id);
-	if (result.isOk) {
-		selected = null;
-		void load();
-	} else {
-		error = result.error.message;
-	}
+	result.match({
+		Ok: () => {
+			selected = null;
+			void refresh();
+		},
+		Err: (err) => {
+			error = err.message;
+		}
+	});
 }
-
-onMount(() => {
-	void load();
-});
 </script>
 
 <div class="space-y-4">
 	<header class="flex items-center justify-between">
 		<div class="flex items-baseline gap-3">
 			<h1 class="text-2xl font-semibold">Worlds</h1>
-			{#if !loading}
-				<span class="text-lg text-muted-foreground">{worlds.length}</span>
-			{/if}
+			<span class="text-lg text-muted-foreground">{worlds.length}</span>
 		</div>
 		<div class="flex items-center gap-2">
-			<Button variant="outline" size="icon" onclick={load} disabled={refreshing}>
+			<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
 				<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
 			</Button>
-			<WorldUploadDialog onWorldCreated={load} />
+			<WorldUploadDialog onWorldCreated={refresh} />
 		</div>
 	</header>
 
-	{#if loading}
-		<div class="text-center text-muted-foreground">Loading...</div>
-	{:else if error && !selected}
+	{#if error && !selected}
 		<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
 			Error: {error}
 		</div>
@@ -154,7 +126,19 @@ onMount(() => {
 			selectedId={selected?.id}
 			onRowClick={openWorld}
 			getRowId={(w: World) => w.id}
-		/>
+		>
+			{#snippet cell({ columnId, value })}
+				{#if columnId === 'name'}
+					<span class="font-medium">{value}</span>
+				{:else if columnId === 'minecraft_version'}
+					<code class="rounded bg-muted px-1.5 py-0.5 text-xs">{value}</code>
+				{:else if columnId === 'size'}
+					{value ? formatBytes(value as number) : '-'}
+				{:else}
+					{value ?? '-'}
+				{/if}
+			{/snippet}
+		</AdminTable>
 	{/if}
 </div>
 

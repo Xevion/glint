@@ -3,7 +3,7 @@ import { fly, fade, scale } from 'svelte/transition';
 import { SvelteMap } from 'svelte/reactivity';
 import { resolve } from '$app/paths';
 import { Button } from '$lib/components/ui/button';
-import { ChevronRight, ImageOff } from 'lucide-svelte';
+import { ChevronRight, ImageOff } from '@lucide/svelte';
 import type { CaptureWithContext, ShaderWithCaptures } from '$lib/bindings';
 
 interface Props {

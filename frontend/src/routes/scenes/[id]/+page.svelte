@@ -2,7 +2,7 @@
 import { fly, fade, scale } from 'svelte/transition';
 import { SvelteMap } from 'svelte/reactivity';
 import { resolve } from '$app/paths';
-import { ChevronRight, ImageOff } from 'lucide-svelte';
+import { ChevronRight, ImageOff } from '@lucide/svelte';
 import type { CaptureWithContext, SceneWithCaptures } from '$lib/bindings';
 
 interface Props {
@@ -14,10 +14,10 @@ const scene = $derived(data.scene);
 const captures = $derived(scene.captures);
 
 // Selected capture for the main preview
-let selectedCapture = $derived.by(() => captures[0] || null);
+let selectedCapture = $derived(captures[0] ?? null);
 
 // Group captures by shader
-const capturesByShader = $derived(() => {
+const capturesByShader = $derived.by(() => {
 	const map = new SvelteMap<string, CaptureWithContext>();
 	for (const capture of captures) {
 		if (!map.has(capture.shader_slug)) {
@@ -28,7 +28,7 @@ const capturesByShader = $derived(() => {
 });
 
 // Weather display helper
-const weatherLabel = $derived(() => {
+const weatherLabel = $derived.by(() => {
 	if (scene.weather === 'clear') return 'Clear';
 	if (scene.weather === 'rain') return `Rain (${Math.round(scene.weather_intensity * 100)}%)`;
 	if (scene.weather === 'thunder') return `Thunder (${Math.round(scene.weather_intensity * 100)}%)`;
@@ -36,7 +36,7 @@ const weatherLabel = $derived(() => {
 });
 
 // Time display helper
-const timeLabel = $derived(() => {
+const timeLabel = $derived.by(() => {
 	const ticks = scene.time_of_day_ticks;
 	const hours = Math.floor(ticks / 1000);
 	if (hours < 6) return 'Night';
@@ -116,9 +116,9 @@ const timeLabel = $derived(() => {
 					</div>
 
 					<!-- Shader Thumbnails -->
-					{#if capturesByShader().length > 0}
+					{#if capturesByShader.length > 0}
 						<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-							{#each capturesByShader() as capture (capture.id)}
+							{#each capturesByShader as capture (capture.id)}
 								<button
 									type="button"
 									onclick={() => (selectedCapture = capture)}
@@ -153,18 +153,18 @@ const timeLabel = $derived(() => {
 						<div class="mb-4 space-y-2">
 							<div class="flex items-center justify-between text-sm">
 								<span class="text-muted-foreground">Time</span>
-								<span class="font-medium text-foreground">{timeLabel()}</span>
+								<span class="font-medium text-foreground">{timeLabel}</span>
 							</div>
 							<div class="flex items-center justify-between text-sm">
 								<span class="text-muted-foreground">Weather</span>
-								<span class="font-medium text-foreground">{weatherLabel()}</span>
+								<span class="font-medium text-foreground">{weatherLabel}</span>
 							</div>
 						</div>
 
 						<!-- Stats -->
 						<div class="border-t border-border pt-4">
 							<div class="text-2xl font-bold text-foreground">
-								{capturesByShader().length}
+								{capturesByShader.length}
 							</div>
 							<div class="text-xs text-muted-foreground">Shaders</div>
 						</div>
