@@ -313,7 +313,8 @@ impl ShaderRepo {
         executor: impl sqlx::PgExecutor<'_>,
         shader_id: &str,
     ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = sqlx::query_as::<_, CaptureWithContext>(
+        let captures = sqlx::query_as!(
+            CaptureWithContext,
             r#"
             SELECT
                 c.id,
@@ -327,8 +328,8 @@ impl ShaderRepo {
                 c.captured_at,
                 c.resolution_width,
                 c.resolution_height,
-                cri.run_id,
-                cr.status as run_status,
+                cri.run_id as "run_id?: String",
+                cr.status as "run_status?: String",
                 (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
@@ -338,8 +339,8 @@ impl ShaderRepo {
             WHERE s.id = $1 AND c.status = 'completed'
             ORDER BY sv.created_at DESC
             "#,
+            shader_id
         )
-        .bind(shader_id)
         .fetch_all(executor)
         .await
         .context(format!("failed to get captures for shader '{}'", shader_id))?;
