@@ -37,7 +37,7 @@ class Orchestrator {
     private var ticksInState: Int = 0
 
     private var spec: CaptureSpec? = null
-    private var worldScenePairs: List<WorldScenePair> = emptyList()
+    private var worldScenePairs: List<WorldSceneEntry> = emptyList()
     private var currentPairIndex: Int = 0
 
     private var captureSession: CaptureSession? = null
@@ -46,7 +46,7 @@ class Orchestrator {
     private var startedAt: Instant? = null
     private val sessionDataList = mutableListOf<CaptureSessionData>()
 
-    private data class WorldScenePair(
+    private data class WorldSceneEntry(
         val worldFolder: String,
         val scene: ResolvedScene,
         val sceneId: String,
@@ -168,9 +168,21 @@ class Orchestrator {
     }
 
     private fun handleRunningScene() {
-        val pair = getCurrentPair()!!
-        val currentSessionDir = sessionDir!!
-        val currentSpec = spec!!
+        val pair =
+            getCurrentPair() ?: run {
+                finishWithError("No current pair in RunningScene")
+                return
+            }
+        val currentSessionDir =
+            sessionDir ?: run {
+                finishWithError("No session directory in RunningScene")
+                return
+            }
+        val currentSpec =
+            spec ?: run {
+                finishWithError("No capture spec in RunningScene")
+                return
+            }
 
         if (captureSession == null) {
             log.info("Running scene") {
@@ -185,7 +197,7 @@ class Orchestrator {
                 return
             }
 
-            captureSession =
+            val newSession =
                 CaptureSession(
                     sceneId = pair.sceneId,
                     shaders = currentSpec.shaders,
@@ -207,29 +219,32 @@ class Orchestrator {
                     }
                 }
 
-            if (!captureSession!!.start()) {
+            if (!newSession.start()) {
                 log.error("Failed to start capture session") { "scene_id" to pair.sceneId }
-                captureSession = null
                 finishWithError("Failed to start capture session")
                 return
             }
+            captureSession = newSession
         }
 
-        captureSession!!.tick()
+        val session = captureSession ?: return
 
-        if (!captureSession!!.isRunning) {
+        session.tick()
+
+        if (!session.isRunning) {
             finalizeCaptureSession(pair, currentSessionDir)
             advanceToNextPair()
         }
     }
 
     private fun finalizeCaptureSession(
-        pair: WorldScenePair,
+        pair: WorldSceneEntry,
         currentSessionDir: File,
     ) {
         log.info("Scene capture complete") { "scene_id" to pair.sceneId }
 
-        val sessionData = captureSession!!.getSessionData()
+        val session = captureSession ?: return
+        val sessionData = session.getSessionData()
         if (sessionData != null) {
             if (sessionData.screenshots.isNotEmpty()) {
                 sessionDataList.add(sessionData)
@@ -245,7 +260,7 @@ class Orchestrator {
     }
 
     private fun renameScreenshotsDirectory(
-        pair: WorldScenePair,
+        pair: WorldSceneEntry,
         currentSessionDir: File,
     ) {
         val worldDir = File(currentSessionDir, pair.worldFolder)
@@ -346,10 +361,10 @@ class Orchestrator {
      * Resolves scene IDs from the spec into (world, scene) pairs, grouped by world
      * and preserving scene order.
      */
-    private fun buildWorldScenePairs(): List<WorldScenePair> {
+    private fun buildWorldScenePairs(): List<WorldSceneEntry> {
         val currentSpec = spec ?: return emptyList()
 
-        val pairs = mutableListOf<WorldScenePair>()
+        val pairs = mutableListOf<WorldSceneEntry>()
         for (sceneId in currentSpec.sceneIds) {
             val resolvedScene = SceneManager.loadScene(sceneId)
             if (resolvedScene == null) {
@@ -365,7 +380,7 @@ class Orchestrator {
                 continue
             }
 
-            pairs.add(WorldScenePair(resolvedScene.worldFolderName, resolvedScene, sceneId))
+            pairs.add(WorldSceneEntry(resolvedScene.worldFolderName, resolvedScene, sceneId))
         }
 
         // Group by world to minimize world loads, preserving first-seen order
@@ -437,7 +452,7 @@ class Orchestrator {
         }
     }
 
-    private fun getCurrentPair(): WorldScenePair? = worldScenePairs.getOrNull(currentPairIndex)
+    private fun getCurrentPair(): WorldSceneEntry? = worldScenePairs.getOrNull(currentPairIndex)
 
     private enum class State {
         Idle,

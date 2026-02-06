@@ -32,7 +32,7 @@ class CaptureSession(
     private var ticksInState: Int = 0
 
     private var originalShaderPack: String? = null
-    private var shadersToCapture: List<ShaderConfig> = emptyList()
+    private var shadersToCapture: List<ShaderSpec> = emptyList()
     private var currentIndex: Int = 0
     private var startedAt: Instant? = null
     private val screenshotEntries: MutableList<ScreenshotEntry> = mutableListOf()
@@ -44,24 +44,8 @@ class CaptureSession(
 
     private var sessionData: CaptureSessionData? = null
 
-    /** Called on main thread after each screenshot is taken, with the entry and the file on disk. */
+    /** Called on Util.ioPool() thread after the screenshot file is written to disk. */
     var onScreenshotTaken: ((ScreenshotEntry, File) -> Unit)? = null
-
-    /**
-     * Internal shader configuration (pack name + optional profile).
-     */
-    private data class ShaderConfig(
-        val packName: String?,
-        val profile: String? = null,
-    ) {
-        val displayName: String
-            get() =
-                when {
-                    packName == null -> "Vanilla"
-                    profile != null -> "$packName ($profile)"
-                    else -> packName
-                }
-    }
 
     /**
      * Starts a new capture session.
@@ -93,7 +77,7 @@ class CaptureSession(
 
         if (!IrisIntegration.isAvailable) {
             log.warn("Iris is not available, capturing vanilla only")
-            shadersToCapture = listOf(ShaderConfig(packName = null))
+            shadersToCapture = listOf(ShaderSpec(filename = null))
             originalShaderPack = null
         } else {
             originalShaderPack =
@@ -103,10 +87,7 @@ class CaptureSession(
                     null
                 }
 
-            shadersToCapture =
-                shaders.map { spec ->
-                    ShaderConfig(packName = spec.filename, profile = spec.profile)
-                }
+            shadersToCapture = shaders
 
             log.info("Starting capture session") {
                 "config_count" to shadersToCapture.size
@@ -229,12 +210,12 @@ class CaptureSession(
             }
 
             val result =
-                if (config.packName == null) {
+                if (config.filename == null) {
                     IrisIntegration.disableShaders()
                 } else {
-                    IrisIntegration.enableShaders(config.packName).onFailure {
+                    IrisIntegration.enableShaders(config.filename).onFailure {
                         log.error("Failed to load shader pack") {
-                            "pack" to config.packName
+                            "pack" to config.filename
                         }
                         advanceToNextShader()
                         return
@@ -307,11 +288,11 @@ class CaptureSession(
         }
 
         val timestamp = Instant.now().toString()
-        val shaderInfo = config.packName?.let { parseShaderPackName(it) }
+        val shaderInfo = config.filename?.let { parseShaderPackName(it) }
         val shaderMeta =
-            if (config.packName != null && shaderInfo != null) {
+            if (config.filename != null && shaderInfo != null) {
                 ShaderMetadata(
-                    packFile = config.packName,
+                    packFile = config.filename,
                     id = shaderInfo.id,
                     version = shaderInfo.version,
                     profile = config.profile,
@@ -354,12 +335,12 @@ class CaptureSession(
         transitionTo(State.PostCaptureCooldown)
     }
 
-    private fun buildScreenshotFilename(config: ShaderConfig): String {
-        if (config.packName == null) {
+    private fun buildScreenshotFilename(config: ShaderSpec): String {
+        if (config.filename == null) {
             return "vanilla.png"
         }
 
-        val shaderInfo = parseShaderPackName(config.packName)
+        val shaderInfo = parseShaderPackName(config.filename)
         val profileSuffix = config.profile?.let { "_${sanitizeForFilename(it)}" } ?: ""
         return "${shaderInfo.id}_${shaderInfo.version}$profileSuffix.png"
     }
@@ -470,7 +451,7 @@ class CaptureSession(
             startedAt = startedAt.toString(),
             completedAt = completedAt.toString(),
             totalScreenshots = screenshotEntries.size,
-            shaderPacks = shadersToCapture.mapNotNull { it.packName }.distinct(),
+            shaderPacks = shadersToCapture.mapNotNull { it.filename }.distinct(),
             minecraft =
                 MinecraftInfo(
                     version = mc.launchedVersion,

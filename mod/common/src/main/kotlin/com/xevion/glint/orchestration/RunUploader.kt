@@ -1,0 +1,249 @@
+package com.xevion.glint.orchestration
+
+import com.xevion.glint.Loggers
+import com.xevion.glint.api.AgentApi
+import com.xevion.glint.api.ClaimItemRequest
+import com.xevion.glint.api.ConfirmUploadRequest
+import com.xevion.glint.api.FailItemRequest
+import com.xevion.glint.api.ReportFailureRequest
+import com.xevion.glint.api.WorkItem
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+
+/**
+ * Manages the screenshot-to-upload pipeline for a single capture run.
+ *
+ * Thread-safe for cross-thread access from both IO pool (screenshot events) and game thread (failure reporting).
+ */
+class RunUploader(
+    private val apiUrl: String,
+    private val apiToken: String,
+    private val runId: String,
+    private val itemLookup: Map<Triple<String, String, String?>, String>,
+    maxConcurrent: Int = 4,
+) {
+    private val log = Loggers.Orchestration.get()
+    private val executor: ExecutorService = Executors.newFixedThreadPool(maxConcurrent)
+    private val submittedItemIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val pendingCount = AtomicInteger(0)
+    private val completedCount = AtomicInteger(0)
+    private val failedCount = AtomicInteger(0)
+    private val pendingFutures: ConcurrentLinkedQueue<CompletableFuture<*>> = ConcurrentLinkedQueue()
+
+    val hasPending: Boolean get() = pendingCount.get() > 0
+    val completed: Int get() = completedCount.get()
+    val failed: Int get() = failedCount.get()
+
+    /**
+     * Handles a screenshot capture event by looking up the item ID and submitting an upload task.
+     *
+     * Called from IO pool threads.
+     */
+    fun handleScreenshot(
+        shaderVersionId: String,
+        event: ScreenshotCapturedEvent,
+    ) {
+        val key = Triple(shaderVersionId, event.sceneId, event.entry.shader?.profile)
+        val itemId = itemLookup[key]
+        if (itemId == null) {
+            log.warn("No run item found for captured screenshot") {
+                "scene_id" to event.sceneId
+                "profile" to (event.entry.shader?.profile ?: "null")
+            }
+            return
+        }
+
+        submittedItemIds.add(itemId)
+        val pending = pendingCount.incrementAndGet()
+        log.debug("Upload queued") {
+            "item_id" to itemId
+            "scene_id" to event.sceneId
+            "bytes" to event.fileBytes.size
+            "pending" to pending
+        }
+
+        executor.submit {
+            try {
+                executeUpload(itemId, event)
+                val completed = completedCount.incrementAndGet()
+                log.debug("Upload succeeded") {
+                    "item_id" to itemId
+                    "completed" to completed
+                    "failed" to failedCount.get()
+                }
+            } catch (e: Exception) {
+                val failed = failedCount.incrementAndGet()
+                log.error("Upload failed") {
+                    "item_id" to itemId
+                    "error" to e.message
+                    "completed" to completedCount.get()
+                    "failed" to failed
+                }
+                try {
+                    AgentApi.failItem(
+                        apiUrl,
+                        apiToken,
+                        runId,
+                        itemId,
+                        FailItemRequest(errorMessage = "Upload failed: ${e.message}"),
+                    )
+                } catch (failError: Exception) {
+                    log.error("Failed to report item failure") {
+                        "item_id" to itemId
+                        "error" to failError.message
+                    }
+                }
+            } finally {
+                pendingCount.decrementAndGet()
+            }
+        }
+    }
+
+    /**
+     * Asynchronously fails items that never received a screenshot.
+     *
+     * Called from game thread (tick).
+     */
+    fun failUnsubmittedItems(
+        shaderVersionId: String,
+        items: List<WorkItem>,
+    ) {
+        val unsubmittedEntries =
+            items.mapNotNull { item ->
+                val key = Triple(shaderVersionId, item.sceneId, item.profile)
+                val itemId = itemLookup[key] ?: return@mapNotNull null
+                if (itemId in submittedItemIds) return@mapNotNull null
+                item to itemId
+            }
+
+        for ((item, itemId) in unsubmittedEntries) {
+            val future =
+                CompletableFuture.runAsync({
+                    try {
+                        AgentApi.failItem(
+                            apiUrl,
+                            apiToken,
+                            runId,
+                            itemId,
+                            FailItemRequest(errorMessage = "Screenshot not captured"),
+                        )
+                        log.debug("Failed unsubmitted item") {
+                            "item_id" to itemId
+                            "scene_id" to item.sceneId
+                        }
+                    } catch (e: Exception) {
+                        log.error("Failed to report unsubmitted item failure") {
+                            "item_id" to itemId
+                            "error" to e.message
+                        }
+                    }
+                }, executor)
+            pendingFutures.add(future)
+        }
+    }
+
+    /**
+     * Reports a shader-level failure asynchronously.
+     *
+     * Called from game thread (tick).
+     */
+    fun reportShaderFailure(
+        shaderVersionId: String,
+        message: String,
+    ) {
+        val future =
+            CompletableFuture.runAsync({
+                try {
+                    AgentApi.reportFailure(
+                        apiUrl,
+                        apiToken,
+                        ReportFailureRequest(
+                            shaderVersionId = shaderVersionId,
+                            errorMessage = message,
+                        ),
+                    )
+                    log.debug("Reported shader failure") {
+                        "shader_version_id" to shaderVersionId
+                        "message" to message
+                    }
+                } catch (e: Exception) {
+                    log.error("Failed to report shader failure") {
+                        "shader_version_id" to shaderVersionId
+                        "error" to e.message
+                    }
+                }
+            }, executor)
+        pendingFutures.add(future)
+    }
+
+    /**
+     * Drains pending uploads and failure-report futures, then shuts down the executor.
+     *
+     * Called from game thread (tick) at end of run.
+     */
+    fun drainAndShutdown(timeout: Duration = 5.minutes) {
+        executor.shutdown()
+        if (!executor.awaitTermination(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)) {
+            log.warn("Upload executor timed out, forcing shutdown")
+            executor.shutdownNow()
+        }
+
+        val futures = mutableListOf<CompletableFuture<*>>()
+        while (true) {
+            val future = pendingFutures.poll() ?: break
+            futures.add(future)
+        }
+
+        for (future in futures) {
+            try {
+                future.get(10, TimeUnit.SECONDS)
+            } catch (e: Exception) {
+                log.error("Failure report did not complete") { "error" to e.message }
+            }
+        }
+
+        log.info("RunUploader drained") {
+            "completed" to completedCount.get()
+            "failed" to failedCount.get()
+        }
+    }
+
+    /**
+     * Executes the three-phase upload pipeline: claim → upload → confirm.
+     */
+    private fun executeUpload(
+        itemId: String,
+        event: ScreenshotCapturedEvent,
+    ) {
+        log.debug("Claiming item") { "item_id" to itemId }
+        val claimResponse =
+            AgentApi
+                .claimItem(
+                    apiUrl,
+                    apiToken,
+                    runId,
+                    itemId,
+                    ClaimItemRequest(
+                        resolutionWidth = event.entry.resolution.width,
+                        resolutionHeight = event.entry.resolution.height,
+                        capturedAt = event.entry.timestamp,
+                    ),
+                ).getOrThrow()
+
+        log.debug("Uploading to R2") {
+            "item_id" to itemId
+            "capture_id" to claimResponse.captureId
+        }
+        AgentApi.uploadFile(claimResponse.presignedUrl, event.fileBytes).getOrThrow()
+
+        log.debug("Confirming upload") { "item_id" to itemId }
+        AgentApi.confirmUpload(apiUrl, apiToken, runId, itemId, ConfirmUploadRequest()).getOrThrow()
+    }
+}

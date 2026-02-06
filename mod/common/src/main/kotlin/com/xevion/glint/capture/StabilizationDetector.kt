@@ -276,8 +276,6 @@ class StabilizationDetector(
         } else {
             return levelRenderer.hasRenderedAllSections()
         }
-
-        return true
     }
 
     companion object {
