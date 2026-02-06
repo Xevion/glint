@@ -142,6 +142,40 @@ export class BackendWatcher {
 			}
 		});
 		this.watchers.push(manifestWatcher);
+
+		// Watch .sqlx/ cache — offline query validation at compile time
+		this.tryWatch("backend/.sqlx", { recursive: true }, (_event, filename) => {
+			if (filename && filename.toString().endsWith(".json")) {
+				this.onFileChange();
+			}
+		});
+
+		// Watch migrations — schema changes invalidate the .sqlx cache
+		this.tryWatch("backend/migrations", { recursive: true }, (_event, filename) => {
+			if (filename && filename.toString().endsWith(".sql")) {
+				this.onFileChange();
+			}
+		});
+
+		// Watch .cargo/config.toml — env vars and build configuration
+		this.tryWatch("backend/.cargo", { recursive: false }, (_event, filename) => {
+			if (filename?.toString() === "config.toml") {
+				this.onFileChange();
+			}
+		});
+	}
+
+	/** Watch a path if it exists — some directories (e.g., .sqlx) may not exist yet. */
+	private tryWatch(
+		path: string,
+		options: { recursive: boolean },
+		cb: (event: string, filename: string | Buffer | null) => void,
+	): void {
+		try {
+			this.watchers.push(watch(path, options, cb));
+		} catch {
+			// Directory doesn't exist — skip silently
+		}
 	}
 
 	private onFileChange(): void {
