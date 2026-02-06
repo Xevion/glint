@@ -20,7 +20,11 @@ internal object LogConfig {
     private var globalLevel = Level.DEBUG
 
     private const val APPENDER_NAME = "GlintConsole"
-    private const val PATTERN = "[%d{HH:mm:ss.SSS}] [%-5level] [%logger{1}] %msg%n"
+    private const val PATTERN =
+        "%style{[%d{HH:mm:ss.SSS}]}{blue} " +
+            "%highlight{[%-5level]}{FATAL=red, ERROR=red, WARN=yellow, INFO=green, DEBUG=green, TRACE=blue} " +
+            "%style{[%logger{1}]}{cyan} " +
+            "%highlight{%msg%n}{FATAL=red, ERROR=red, WARN=normal, INFO=normal, DEBUG=normal, TRACE=normal}"
 
     @Synchronized
     fun configure() {

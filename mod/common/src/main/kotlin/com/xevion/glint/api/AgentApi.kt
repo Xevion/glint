@@ -1,13 +1,14 @@
 package com.xevion.glint.api
 
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.charset.StandardCharsets
 
 /**
- * HTTP client for the Glint backend agent API endpoints.
- * Used in autonomous mode to claim jobs, upload screenshots, and report results.
+ * HTTP client for the Glint backend API endpoints.
+ * Used in autonomous mode to fetch work, manage capture runs, upload screenshots, and report results.
  */
 object AgentApi {
     private val JSON =
@@ -20,15 +21,23 @@ object AgentApi {
         setRequestProperty("Authorization", "Bearer $token")
     }
 
-    /**
-     * Claims the next available job from the backend.
-     * Returns null if no jobs are available.
-     */
-    fun claimJob(
+    /** Fetches the list of needed captures from the backend. */
+    fun fetchWork(
         apiUrl: String,
         token: String,
-    ): Result<JobPayload?> {
-        val url = "$apiUrl/api/agent/jobs/next"
+        limit: Int = 100,
+        force: Boolean = false,
+        shaders: String? = null,
+        scenes: String? = null,
+    ): Result<List<WorkItem>> {
+        val params =
+            buildString {
+                append("?limit=$limit")
+                if (force) append("&force=true")
+                if (shaders != null) append("&shaders=$shaders")
+                if (scenes != null) append("&scenes=$scenes")
+            }
+        val url = "$apiUrl/api/work$params"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
@@ -40,16 +49,8 @@ object AgentApi {
             when (connection.responseCode) {
                 200 -> {
                     val body = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
-                    if (body.isBlank() || body.trim() == "null") {
-                        Result.success(null)
-                    } else {
-                        try {
-                            val payload = JSON.decodeFromString<JobPayload>(body)
-                            Result.success(payload)
-                        } catch (e: Exception) {
-                            Result.failure(ApiError.ParseError("Failed to parse job payload", e))
-                        }
-                    }
+                    val items = JSON.decodeFromString(ListSerializer(WorkItem.serializer()), body)
+                    Result.success(items)
                 }
 
                 else -> {
@@ -62,17 +63,13 @@ object AgentApi {
         }
     }
 
-    /**
-     * Force-creates a job using selector syntax.
-     * Returns a fully claimed JobPayload ready for execution.
-     */
-    fun forceJob(
+    /** Creates a capture run with planned items. */
+    fun createRun(
         apiUrl: String,
         token: String,
-        scenes: String?,
-        shaders: String?,
-    ): Result<JobPayload> {
-        val url = "$apiUrl/api/agent/jobs/force"
+        request: CreateRunRequest,
+    ): Result<CaptureRun> {
+        val url = "$apiUrl/api/runs"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
@@ -83,14 +80,46 @@ object AgentApi {
             connection.connectTimeout = 10000
             connection.readTimeout = 30000
 
-            val requestBody = JSON.encodeToString(ForceJobRequest.serializer(), ForceJobRequest(scenes, shaders))
+            val requestBody = JSON.encodeToString(CreateRunRequest.serializer(), request)
             connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                in 200..299 -> {
+                    val body = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    val run = JSON.decodeFromString<CaptureRun>(body)
+                    Result.success(run)
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /** Lists items for a capture run (to get server-assigned item IDs). */
+    fun listRunItems(
+        apiUrl: String,
+        token: String,
+        runId: String,
+    ): Result<List<CaptureRunItem>> {
+        val url = "$apiUrl/api/runs/$runId/items"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setBearerAuth(token)
+            connection.connectTimeout = 5000
+            connection.readTimeout = 30000
 
             when (connection.responseCode) {
                 200 -> {
                     val body = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
-                    val payload = JSON.decodeFromString<JobPayload>(body)
-                    Result.success(payload)
+                    val items = JSON.decodeFromString(ListSerializer(CaptureRunItem.serializer()), body)
+                    Result.success(items)
                 }
 
                 else -> {
@@ -103,48 +132,13 @@ object AgentApi {
         }
     }
 
-    /**
-     * Sends a heartbeat for an active job.
-     */
-    fun heartbeat(
+    /** Gets a presigned upload URL and capture ID for a single file. */
+    fun getUploadUrl(
         apiUrl: String,
         token: String,
-        jobId: String,
-    ): Result<Unit> {
-        val url = "$apiUrl/api/agent/jobs/$jobId/heartbeat"
-
-        return try {
-            val connection = URI(url).toURL().openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.setBearerAuth(token)
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-            connection.connectTimeout = 5000
-            connection.readTimeout = 10000
-            connection.outputStream.use { it.write("{}".toByteArray(StandardCharsets.UTF_8)) }
-
-            when (connection.responseCode) {
-                in 200..299 -> Result.success(Unit)
-                else -> {
-                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
-                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
-                }
-            }
-        } catch (e: Exception) {
-            Result.failure(ApiError.fromException(e))
-        }
-    }
-
-    /**
-     * Requests pre-signed upload URLs for screenshot files.
-     */
-    fun prepareUpload(
-        apiUrl: String,
-        token: String,
-        jobId: String,
-        files: List<PrepareUploadFile>,
-    ): Result<PrepareUploadResponse> {
-        val url = "$apiUrl/api/agent/jobs/$jobId/prepare"
+        request: UploadUrlRequest,
+    ): Result<UploadUrlResponse> {
+        val url = "$apiUrl/api/upload-url"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
@@ -155,13 +149,13 @@ object AgentApi {
             connection.connectTimeout = 5000
             connection.readTimeout = 30000
 
-            val requestBody = JSON.encodeToString(PrepareUploadRequest.serializer(), PrepareUploadRequest(files))
+            val requestBody = JSON.encodeToString(UploadUrlRequest.serializer(), request)
             connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
 
             when (connection.responseCode) {
                 200 -> {
                     val body = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
-                    val response = JSON.decodeFromString<PrepareUploadResponse>(body)
+                    val response = JSON.decodeFromString<UploadUrlResponse>(body)
                     Result.success(response)
                 }
 
@@ -175,9 +169,7 @@ object AgentApi {
         }
     }
 
-    /**
-     * Uploads a file to a pre-signed URL.
-     */
+    /** Uploads a file to a presigned URL. */
     fun uploadFile(
         presignedUrl: String,
         fileBytes: ByteArray,
@@ -204,16 +196,15 @@ object AgentApi {
             Result.failure(ApiError.fromException(e))
         }
 
-    /**
-     * Reports job completion with capture records.
-     */
-    fun completeJob(
+    /** Reports a run item as successfully completed. */
+    fun completeItem(
         apiUrl: String,
         token: String,
-        jobId: String,
-        request: CompleteJobRequest,
+        runId: String,
+        itemId: String,
+        request: CompleteItemRequest,
     ): Result<Unit> {
-        val url = "$apiUrl/api/agent/jobs/$jobId/complete"
+        val url = "$apiUrl/api/runs/$runId/items/$itemId/complete"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
@@ -224,7 +215,7 @@ object AgentApi {
             connection.connectTimeout = 5000
             connection.readTimeout = 30000
 
-            val requestBody = JSON.encodeToString(CompleteJobRequest.serializer(), request)
+            val requestBody = JSON.encodeToString(CompleteItemRequest.serializer(), request)
             connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
 
             when (connection.responseCode) {
@@ -239,16 +230,15 @@ object AgentApi {
         }
     }
 
-    /**
-     * Reports job failure.
-     */
-    fun failJob(
+    /** Reports a run item as failed. */
+    fun failItem(
         apiUrl: String,
         token: String,
-        jobId: String,
-        errorMessage: String,
+        runId: String,
+        itemId: String,
+        request: FailItemRequest,
     ): Result<Unit> {
-        val url = "$apiUrl/api/agent/jobs/$jobId/fail"
+        val url = "$apiUrl/api/runs/$runId/items/$itemId/fail"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
@@ -259,7 +249,74 @@ object AgentApi {
             connection.connectTimeout = 5000
             connection.readTimeout = 10000
 
-            val requestBody = JSON.encodeToString(FailJobRequest.serializer(), FailJobRequest(errorMessage))
+            val requestBody = JSON.encodeToString(FailItemRequest.serializer(), request)
+            connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                in 200..299 -> Result.success(Unit)
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /** Finalizes a capture run. */
+    fun completeRun(
+        apiUrl: String,
+        token: String,
+        runId: String,
+    ): Result<CaptureRun> {
+        val url = "$apiUrl/api/runs/$runId/complete"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setBearerAuth(token)
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 30000
+            connection.outputStream.use { it.write("{}".toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                in 200..299 -> {
+                    val body = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    val run = JSON.decodeFromString<CaptureRun>(body)
+                    Result.success(run)
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /** Reports a persistent shader failure (increments failure count). */
+    fun reportFailure(
+        apiUrl: String,
+        token: String,
+        request: ReportFailureRequest,
+    ): Result<Unit> {
+        val url = "$apiUrl/api/report-failure"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setBearerAuth(token)
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 10000
+
+            val requestBody = JSON.encodeToString(ReportFailureRequest.serializer(), request)
             connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
 
             when (connection.responseCode) {

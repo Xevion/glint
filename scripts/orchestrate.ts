@@ -17,9 +17,9 @@
  *   -u, --url         Override GLINT_API_URL
  *   -v, --verbose     Show full Minecraft output
  *   -h, --help        Show this help message and exit
- *   --force           Force-create a job from available DB resources
- *   --scenes SEL      Scene selector: + (1 random), ! (all), 3+ (N random), or slug
- *   --shaders SEL     Shader selector: same syntax as --scenes
+ *   --force           Re-capture existing shader×scene combinations
+ *   --scenes SEL      Scene filter: slug to capture specific scene
+ *   --shaders SEL     Shader filter: slug to capture specific shader
  */
 
 import { spawn, type Subprocess } from "bun";
@@ -70,21 +70,15 @@ Flags:
   -u, --url <url>         Override GLINT_API_URL (default: http://localhost:8080)
   -v, --verbose           Show full Minecraft output
   -h, --help              Show this help message and exit
-  -F, --force             Force-create a job from available DB resources
-      --scenes <SEL>      Scene selector (requires --force or implies it)
-      --shaders <SEL>     Shader selector (requires --force or implies it)
-
-Selector syntax:
-  +          1 random (default)
-  !          All available
-  3+         N random (e.g. 3 random)
-  <slug>     Specific item by slug
+  -F, --force             Re-capture existing shader×scene combinations
+      --scenes <SEL>      Scene filter: slug to capture specific scene (implies --force)
+      --shaders <SEL>     Shader filter: slug to capture specific shader (implies --force)
 
 Examples:
-  bun scripts/orchestrate.ts                        # Run pending jobs
-  bun scripts/orchestrate.ts --force                # Force job, 1 random scene + shader
-  bun scripts/orchestrate.ts --scenes !             # Force job, all scenes, 1 random shader
-  bun scripts/orchestrate.ts --shaders bsl --scenes 3+  # BSL shader, 3 random scenes`);
+  bun scripts/orchestrate.ts                        # Capture needed work
+  bun scripts/orchestrate.ts --force                # Re-capture all combinations
+  bun scripts/orchestrate.ts --shaders bsl          # Capture BSL shader only
+  bun scripts/orchestrate.ts --shaders bsl --scenes meadow  # BSL + meadow scene`);
 	process.exit(0);
 }
 
@@ -208,7 +202,7 @@ process.on("SIGTERM", async () => {
 // Terminal markers - orchestration is done (game should be exiting)
 const TERMINAL_MARKERS = [
 	/Autonomous runner shutting down/,
-	/No jobs available, shutting down/,
+	/No work available, shutting down/,
 	/Cannot start autonomous mode/,
 ];
 
@@ -227,14 +221,15 @@ const FATAL_PATTERNS = [
 // Informational markers
 const PROGRESS_MARKERS = [
 	{ pattern: /Autonomous runner started/, msg: "Runner started" },
-	{ pattern: /Claimed job/, msg: "Job claimed" },
+	{ pattern: /Fetched work/, msg: "Work fetched" },
+	{ pattern: /Created capture run/, msg: "Capture run created" },
 	{ pattern: /Force mode:/, msg: "Force mode active" },
-	{ pattern: /Force-created job/, msg: "Force job created" },
 	{ pattern: /Starting capture/, msg: "Capture starting" },
 	{ pattern: /Orchestration complete/, msg: "Capture complete" },
-	{ pattern: /Job completed/, msg: "Job uploaded" },
-	{ pattern: /Upload\/completion failed/, msg: "Upload failed" },
-	{ pattern: /No jobs available/, msg: "No jobs available" },
+	{ pattern: /Capture run finalized/, msg: "Run finalized" },
+	{ pattern: /Group upload complete/, msg: "Upload complete" },
+	{ pattern: /Group upload failed/, msg: "Upload failed" },
+	{ pattern: /No work available/, msg: "No work available" },
 ];
 
 let outputBuffer = "";
@@ -245,14 +240,16 @@ let terminateCode = 0;
 let gameStarted = false;
 let jobFailed = false;
 
-// Patterns that indicate the job failed (not fatal to the process, but the work wasn't done)
+// Patterns that indicate work failed (not fatal to the process, but the work wasn't done)
 const JOB_ERROR_MARKERS = [
-	/Upload\/completion failed/,
-	/Failed to claim job/,
+	/Failed to upload\/complete item/,
+	/Failed to fetch work/,
+	/Failed to create capture run/,
 	/Error preparing capture/,
 	/Failed to start orchestration/,
 	/Failed to download shader/,
 	/Failed to download any worlds/,
+	/Group upload failed/,
 ];
 
 const GAME_STARTED_MARKERS = [
@@ -384,7 +381,7 @@ const forceScenes = (flags.scenes as string) || undefined;
 const forceShaders = (flags.shaders as string) || undefined;
 
 if (forceMode) {
-	console.log(c("1;33", `→ Force mode: scenes=${forceScenes ?? "+"}, shaders=${forceShaders ?? "+"}`));
+	console.log(c("1;33", `→ Force mode: scenes=${forceScenes ?? "all"}, shaders=${forceShaders ?? "all"}`));
 }
 console.log(c("1;36", `→ Launching Minecraft (${platform}) in autonomous mode...`));
 console.log(`   API: ${apiUrl}`);

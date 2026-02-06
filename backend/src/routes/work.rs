@@ -31,6 +31,9 @@ pub struct WorkItem {
 #[derive(Debug, Deserialize)]
 pub struct WorkQuery {
     pub limit: Option<i64>,
+    pub force: Option<bool>,
+    pub shaders: Option<String>,
+    pub scenes: Option<String>,
 }
 
 pub fn router() -> Router<AppState> {
@@ -42,6 +45,9 @@ async fn get_work(
     axum::extract::Query(query): axum::extract::Query<WorkQuery>,
 ) -> AppResult<Json<Vec<WorkItem>>> {
     let limit = query.limit.unwrap_or(100).min(1000);
+    let force = query.force.unwrap_or(false);
+    let shaders_filter: Option<String> = query.shaders;
+    let scenes_filter: Option<String> = query.scenes;
     let db = state.db();
 
     let items = sqlx::query_as!(
@@ -62,15 +68,15 @@ async fn get_work(
                 END
             ) AS p(profile)
             WHERE s.active = TRUE
-              AND sv.capture_failure_count < 3
-              AND NOT EXISTS (
+              AND ($2 OR sv.capture_failure_count < 3)
+              AND ($2 OR NOT EXISTS (
                 SELECT 1 FROM captures c
                 WHERE c.shader_version_id = sv.id
                   AND c.scene_id = s.id
                   AND c.profile = p.profile
                   AND c.status = 'completed'
                   AND c.outdated = FALSE
-              )
+              ))
 
             UNION ALL
 
@@ -81,16 +87,16 @@ async fn get_work(
             FROM shader_versions sv
             CROSS JOIN scenes s
             WHERE s.active = TRUE
-              AND sv.capture_failure_count < 3
+              AND ($2 OR sv.capture_failure_count < 3)
               AND (sv.supported_profiles IS NULL OR sv.supported_profiles = '[]')
-              AND NOT EXISTS (
+              AND ($2 OR NOT EXISTS (
                 SELECT 1 FROM captures c
                 WHERE c.shader_version_id = sv.id
                   AND c.scene_id = s.id
                   AND c.profile IS NULL
                   AND c.status = 'completed'
                   AND c.outdated = FALSE
-              )
+              ))
         )
         SELECT
             n.shader_version_id AS "shader_version_id!",
@@ -116,6 +122,8 @@ async fn get_work(
         JOIN shaders sh ON sh.id = sv.shader_id
         JOIN scenes sc ON sc.id = n.scene_id
         JOIN worlds w ON w.id = sc.world_id
+        WHERE ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))
+          AND ($4::text IS NULL OR sc.slug = ANY(string_to_array($4, ',')))
         ORDER BY
             EXISTS(
                 SELECT 1 FROM captures c2
@@ -127,12 +135,15 @@ async fn get_work(
             sh.name ASC
         LIMIT $1
         "#,
-        limit
+        limit,
+        force,
+        shaders_filter as Option<String>,
+        scenes_filter as Option<String>,
     )
     .fetch_all(db)
     .await
     .map_err(|e| crate::error::AppError::Internal(e.into()))?;
 
-    debug!(count = items.len(), "Computed work items");
+    debug!(count = items.len(), force, "Computed work items");
     Ok(Json(items))
 }

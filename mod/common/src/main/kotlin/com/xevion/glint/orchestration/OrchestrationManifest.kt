@@ -18,7 +18,7 @@ data class OrchestrationManifest(
             sessions: List<CaptureSessionData>,
             sessionId: String,
             startedAt: Instant,
-            jobId: String? = null,
+            runId: String? = null,
         ): OrchestrationManifest {
             val completedAt = Instant.now()
 
@@ -26,7 +26,7 @@ data class OrchestrationManifest(
                 orchestration =
                     OrchestrationInfo(
                         id = sessionId,
-                        jobId = jobId,
+                        runId = runId,
                         startedAt = startedAt.toString(),
                         completedAt = completedAt.toString(),
                         totalSessions = sessions.size,
@@ -41,8 +41,8 @@ data class OrchestrationManifest(
 @Serializable
 data class OrchestrationInfo(
     val id: String,
-    /** Job ID from the agent's job definition (null for interactive captures) */
-    val jobId: String? = null,
+    /** Run ID from the capture run (null for interactive captures) */
+    val runId: String? = null,
     val startedAt: String,
     val completedAt: String,
     val totalSessions: Int,

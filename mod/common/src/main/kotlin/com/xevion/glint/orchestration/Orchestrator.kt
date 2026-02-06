@@ -372,7 +372,7 @@ class Orchestrator {
                     log.error("Failed to create output directory") { "path" to dir.absolutePath }
                     return false
                 }
-                sessionId = currentSpec.jobId?.let { "job_$it" } ?: dir.name
+                sessionId = currentSpec.runId?.let { "run_$it" } ?: dir.name
                 sessionDir = dir
             } else {
                 val capturesDir = File(mc.gameDirectory, "glint/captures")
@@ -398,7 +398,7 @@ class Orchestrator {
                 sessionDataList,
                 sessionId,
                 startedAt ?: Instant.now(),
-                jobId = spec?.jobId,
+                runId = spec?.runId,
             )
 
         try {

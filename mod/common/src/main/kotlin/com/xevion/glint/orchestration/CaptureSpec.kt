@@ -17,8 +17,8 @@ data class CaptureSpec(
     val outputDir: String? = null,
     /** Shutdown Minecraft after completion. */
     val shutdownOnComplete: Boolean = false,
-    /** Job ID from agent, echoed in manifest. */
-    val jobId: String? = null,
+    /** Run ID from capture run, echoed in manifest. */
+    val runId: String? = null,
 )
 
 /**

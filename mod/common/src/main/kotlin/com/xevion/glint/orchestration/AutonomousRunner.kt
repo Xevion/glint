@@ -2,15 +2,17 @@ package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.AgentApi
-import com.xevion.glint.api.CaptureRecord
-import com.xevion.glint.api.CompleteJobRequest
-import com.xevion.glint.api.JobPayload
-import com.xevion.glint.api.PrepareUploadFile
+import com.xevion.glint.api.CompleteItemRequest
+import com.xevion.glint.api.CreateRunItemRequest
+import com.xevion.glint.api.CreateRunRequest
+import com.xevion.glint.api.FailItemRequest
+import com.xevion.glint.api.ReportFailureRequest
+import com.xevion.glint.api.UploadUrlRequest
+import com.xevion.glint.api.WorkItem
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.session.SessionRegistry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -19,7 +21,7 @@ import java.io.File
 import java.util.concurrent.CompletableFuture
 
 /**
- * Drives the autonomous capture loop: claim job → capture → upload → repeat.
+ * Drives the autonomous capture loop: fetch work → create run → capture → upload → repeat.
  *
  * Started once from TitleScreenMixin, advances each tick.
  * HTTP calls run on background threads; game-state operations run on the main thread.
@@ -29,124 +31,218 @@ class AutonomousRunner(
     private val apiToken: String,
     private val forceScenes: String? = null,
     private val forceShaders: String? = null,
+    private val workLimit: Int = 50,
 ) {
     private val log = Loggers.Orchestration.get()
     private val json = Json { ignoreUnknownKeys = true }
 
     private val isForceMode: Boolean = forceScenes != null || forceShaders != null
 
-    private var state: State = State.ClaimingJob
-    private var currentJob: JobPayload? = null
+    private var state: State = State.FetchingWork
     private var pendingFuture: CompletableFuture<*>? = null
-    private var lastHeartbeat: Long = 0
-    private var forceJobCreated: Boolean = false
+
+    // Work batch
+    private var currentRunId: String? = null
+    private var itemLookup: Map<Triple<String, String, String?>, String> = emptyMap()
+
+    // Shader group processing
+    private var shaderGroups: List<ShaderGroup> = emptyList()
+    private var currentGroupIndex: Int = 0
 
     private enum class State {
-        ClaimingJob,
+        FetchingWork,
+        CreatingRun,
         PreparingCapture,
         Capturing,
         UploadingResults,
+        FinalizingRun,
         Done,
     }
 
-    /** Call once to kick off the first job claim. */
+    private data class ShaderGroup(
+        val shaderVersionId: String,
+        val shaderId: String,
+        val shaderSlug: String,
+        val shaderName: String,
+        val version: String,
+        val downloadUrl: String?,
+        val fileHash: String?,
+        val items: List<WorkItem>,
+    )
+
+    /** Call once to kick off the first work fetch. */
     fun start() {
         log.info("Autonomous runner started")
-        claimNextJob()
+        fetchWork()
     }
 
     /** Call every client tick from SessionRegistry or Glint.onClientTick(). */
     fun tick() {
         when (state) {
-            State.ClaimingJob -> {
-                tickClaimingJob()
-            }
-
-            State.PreparingCapture -> {
-                tickPreparingCapture()
-            }
-
-            State.Capturing -> {
-                tickCapturing()
-            }
-
-            State.UploadingResults -> {
-                tickUploadingResults()
-            }
-
+            State.FetchingWork -> tickFetchingWork()
+            State.CreatingRun -> tickCreatingRun()
+            State.PreparingCapture -> tickPreparingCapture()
+            State.Capturing -> tickCapturing()
+            State.UploadingResults -> tickUploadingResults()
+            State.FinalizingRun -> tickFinalizingRun()
             State.Done -> {}
         }
     }
 
     val isRunning: Boolean get() = state != State.Done
 
-    // -- ClaimingJob: waiting for background HTTP to return --
+    // -- FetchingWork --
 
-    private fun claimNextJob() {
-        state = State.ClaimingJob
+    private fun fetchWork() {
+        state = State.FetchingWork
         pendingFuture =
-            if (isForceMode && !forceJobCreated) {
-                forceJobCreated = true
-                CompletableFuture.supplyAsync {
-                    AgentApi
-                        .forceJob(apiUrl, apiToken, forceScenes, forceShaders)
-                        .map { it as JobPayload? }
-                }
-            } else {
-                CompletableFuture.supplyAsync {
-                    AgentApi.claimJob(apiUrl, apiToken)
-                }
+            CompletableFuture.supplyAsync {
+                AgentApi.fetchWork(
+                    apiUrl,
+                    apiToken,
+                    limit = workLimit,
+                    force = isForceMode,
+                    shaders = forceShaders,
+                    scenes = forceScenes,
+                )
             }
     }
 
-    private fun tickClaimingJob() {
+    private fun tickFetchingWork() {
         val future = pendingFuture as? CompletableFuture<*> ?: return
         if (!future.isDone) return
 
         pendingFuture = null
 
         @Suppress("UNCHECKED_CAST")
-        val result = (future as CompletableFuture<Result<JobPayload?>>).join()
+        val result = (future as CompletableFuture<Result<List<WorkItem>>>).join()
 
         result
-            .onSuccess { payload ->
-                if (payload == null) {
-                    log.info("No jobs available, shutting down")
+            .onSuccess { items ->
+                if (items.isEmpty()) {
+                    log.info("No work available, shutting down")
                     shutdown()
                     return
                 }
-                log.info("Claimed job") {
-                    "job_id" to payload.id
-                    "shader" to payload.shader.name
-                }
-                currentJob = payload
-                lastHeartbeat = System.currentTimeMillis()
-                state = State.PreparingCapture
+                log.info("Fetched work") { "items" to items.size }
+                startCreatingRun(items)
             }.onFailure { error ->
-                log.error("Failed to claim job") { "error" to error.message }
+                log.error("Failed to fetch work") { "error" to error.message }
                 shutdown()
             }
     }
 
-    // -- PreparingCapture: write scenes, build CaptureSpec, start orchestration --
+    // -- CreatingRun --
 
-    private fun tickPreparingCapture() {
-        val job = currentJob ?: return
+    private fun startCreatingRun(workItems: List<WorkItem>) {
+        state = State.CreatingRun
+        pendingFuture =
+            CompletableFuture.supplyAsync {
+                val createRequest =
+                    CreateRunRequest(
+                        items =
+                            workItems.map { item ->
+                                CreateRunItemRequest(
+                                    shaderVersionId = item.shaderVersionId,
+                                    sceneId = item.sceneId,
+                                    profile = item.profile,
+                                )
+                            },
+                    )
+
+                val runResult = AgentApi.createRun(apiUrl, apiToken, createRequest)
+                val run = runResult.getOrThrow()
+
+                val itemsResult = AgentApi.listRunItems(apiUrl, apiToken, run.id)
+                val runItems = itemsResult.getOrThrow()
+
+                Triple(run.id, runItems, workItems)
+            }
+    }
+
+    private fun tickCreatingRun() {
+        val future = pendingFuture as? CompletableFuture<*> ?: return
+        if (!future.isDone) return
+
+        pendingFuture = null
 
         try {
-            // Download worlds
-            val worldFolders = downloadWorlds(job)
+            @Suppress("UNCHECKED_CAST")
+            val triple =
+                (future as CompletableFuture<Triple<String, List<com.xevion.glint.api.CaptureRunItem>, List<WorkItem>>>).join()
+            val (runId, runItems, workItems) = triple
+
+            currentRunId = runId
+            log.info("Created capture run") {
+                "run_id" to runId
+                "items" to runItems.size
+            }
+
+            // Build lookup: (shaderVersionId, sceneId, profile) → runItemId
+            itemLookup =
+                runItems.associate { item ->
+                    Triple(item.shaderVersionId, item.sceneId, item.profile) to item.id
+                }
+
+            // Group work items by shader version
+            shaderGroups =
+                workItems
+                    .groupBy { it.shaderVersionId }
+                    .map { (_, items) ->
+                        val first = items.first()
+                        ShaderGroup(
+                            shaderVersionId = first.shaderVersionId,
+                            shaderId = first.shaderId,
+                            shaderSlug = first.shaderSlug,
+                            shaderName = first.shaderName,
+                            version = first.version,
+                            downloadUrl = first.downloadUrl,
+                            fileHash = first.fileHash,
+                            items = items,
+                        )
+                    }
+
+            currentGroupIndex = 0
+            state = State.PreparingCapture
+        } catch (e: Exception) {
+            log.error("Failed to create capture run") { "error" to e.message }
+            shutdown()
+        }
+    }
+
+    // -- PreparingCapture --
+
+    private fun tickPreparingCapture() {
+        val group =
+            shaderGroups.getOrNull(currentGroupIndex) ?: run {
+                state = State.FinalizingRun
+                startFinalizingRun()
+                return
+            }
+
+        try {
+            log.info("Preparing shader group") {
+                "progress" to "${currentGroupIndex + 1}/${shaderGroups.size}"
+                "shader" to group.shaderName
+                "items" to group.items.size
+            }
+
+            // Download worlds (deduplicated across items in this group)
+            val worldFolders = downloadWorlds(group)
             if (worldFolders.isEmpty()) {
-                failJobAsync(job.id, "Failed to download any worlds")
+                failGroupItems(group, "Failed to download any worlds")
+                advanceToNextGroup()
                 return
             }
 
             // Download shader if needed
             val shaderFilename =
-                if (job.shader.slug != "vanilla") {
-                    val filename = downloadShader(job.shader)
+                if (group.shaderSlug != "vanilla") {
+                    val filename = downloadShader(group)
                     if (filename == null) {
-                        failJobAsync(job.id, "Failed to download shader: ${job.shader.name}")
+                        failGroupItems(group, "Failed to download shader: ${group.shaderName}")
+                        reportShaderFailure(group, "Failed to download shader")
+                        advanceToNextGroup()
                         return
                     }
                     filename
@@ -154,12 +250,13 @@ class AutonomousRunner(
                     null
                 }
 
-            writeSceneDefinitions(job)
-            val spec = buildCaptureSpec(job, shaderFilename)
+            writeSceneDefinitions(group)
+            val spec = buildCaptureSpec(group, shaderFilename)
 
             if (spec == null) {
-                log.error("Failed to build capture spec") { "job_id" to job.id }
-                failJobAsync(job.id, "No valid scenes found for job")
+                log.error("Failed to build capture spec") { "shader" to group.shaderName }
+                failGroupItems(group, "No valid scenes found")
+                advanceToNextGroup()
                 return
             }
 
@@ -171,44 +268,36 @@ class AutonomousRunner(
                 state = State.Capturing
             } else {
                 log.error("Failed to start orchestration")
-                failJobAsync(job.id, "Orchestrator failed to start")
+                failGroupItems(group, "Orchestrator failed to start")
+                advanceToNextGroup()
             }
         } catch (e: Exception) {
             log.error(e, "Error preparing capture")
-            failJobAsync(job.id, "Preparation failed: ${e.message}")
+            failGroupItems(group, "Preparation failed: ${e.message}")
+            advanceToNextGroup()
         }
     }
 
-    // -- Capturing: orchestrator is running, send heartbeats --
+    // -- Capturing --
 
     private fun tickCapturing() {
-        // Send periodic heartbeats (every 30 seconds)
-        val now = System.currentTimeMillis()
-        if (now - lastHeartbeat > 30_000) {
-            lastHeartbeat = now
-            CompletableFuture.runAsync {
-                AgentApi.heartbeat(apiUrl, apiToken, currentJob!!.id).onFailure { error ->
-                    log.warn("Heartbeat failed") { "error" to error.message }
-                }
-            }
-        }
-
-        // Check if orchestration is complete
         if (!SessionRegistry.isOrchestrationActive()) {
-            log.info("Orchestration complete") { "job_id" to currentJob!!.id }
+            log.info("Orchestration complete") {
+                "shader" to shaderGroups[currentGroupIndex].shaderName
+            }
             startUpload()
         }
     }
 
-    // -- UploadingResults: background upload + completion report --
+    // -- UploadingResults --
 
     private fun startUpload() {
         state = State.UploadingResults
-        val job = currentJob!!
+        val group = shaderGroups[currentGroupIndex]
 
         pendingFuture =
             CompletableFuture.supplyAsync {
-                uploadAndComplete(job)
+                uploadGroupResults(group)
             }
     }
 
@@ -223,30 +312,32 @@ class AutonomousRunner(
 
         result
             .onSuccess {
-                log.info("Job completed") { "job_id" to currentJob!!.id }
+                log.info("Group upload complete") {
+                    "shader" to shaderGroups[currentGroupIndex].shaderName
+                }
             }.onFailure { error ->
-                log.error("Upload/completion failed") { "error" to error.message }
+                log.error("Group upload failed") { "error" to error.message }
             }
 
-        currentJob = null
-        claimNextJob()
+        advanceToNextGroup()
     }
 
-    private fun uploadAndComplete(job: JobPayload): Result<Unit> {
+    private fun uploadGroupResults(group: ShaderGroup): Result<Unit> {
         val mc = Minecraft.getInstance()
-        val outputDir = File(mc.gameDirectory, "glint/jobs/${job.id}")
+        val runId = currentRunId!!
+        val outputDir = File(mc.gameDirectory, "glint/runs/$runId")
         val manifestFile = File(outputDir, "manifest.json")
 
         if (!manifestFile.exists()) {
             val partialFile = File(outputDir, "manifest_partial.json")
             val message =
                 if (partialFile.exists()) {
-                    log.warn("Only partial manifest found") { "job_id" to job.id }
+                    log.warn("Only partial manifest found") { "shader" to group.shaderName }
                     "Capture only partially completed"
                 } else {
                     "No manifest produced"
                 }
-            AgentApi.failJob(apiUrl, apiToken, job.id, message)
+            failGroupItems(group, message)
             return Result.failure(RuntimeException(message))
         }
 
@@ -255,11 +346,11 @@ class AutonomousRunner(
                 json.decodeFromString<OrchestrationManifest>(manifestFile.readText())
             } catch (e: Exception) {
                 val message = "Failed to parse manifest: ${e.message}"
-                AgentApi.failJob(apiUrl, apiToken, job.id, message)
+                failGroupItems(group, message)
                 return Result.failure(RuntimeException(message))
             }
 
-        // Collect screenshot files with structured metadata for prepare request
+        // Build a set of successfully captured (sceneId, profile) pairs from manifest
         data class ScreenshotInfo(
             val file: File,
             val sceneId: String,
@@ -268,122 +359,244 @@ class AutonomousRunner(
             val timestamp: String,
         )
 
-        val screenshotsByPath = mutableMapOf<String, ScreenshotInfo>()
+        val capturedScreenshots = mutableListOf<ScreenshotInfo>()
 
         for (session in manifest.sessions) {
             for (screenshot in session.screenshots) {
                 val sessionBase = File(mc.gameDirectory, session.sessionDir)
                 val file = File(sessionBase, "${session.sceneId}/${screenshot.file}")
                 if (file.exists()) {
-                    val relativePath = file.relativeTo(mc.gameDirectory).path
-                    screenshotsByPath[relativePath] =
+                    capturedScreenshots.add(
                         ScreenshotInfo(
                             file = file,
                             sceneId = session.sceneId,
                             profile = screenshot.shader?.profile,
                             resolution = screenshot.resolution,
                             timestamp = screenshot.timestamp,
-                        )
+                        ),
+                    )
                 } else {
                     log.warn("Screenshot file not found") { "path" to file.absolutePath }
                 }
             }
         }
 
-        if (screenshotsByPath.isEmpty()) {
-            AgentApi.failJob(apiUrl, apiToken, job.id, "No screenshot files found")
-            return Result.failure(RuntimeException("No screenshot files found"))
-        }
+        // Track which items were successfully uploaded
+        val completedKeys = mutableSetOf<Triple<String, String, String?>>()
 
-        // Build structured prepare request
-        val prepareFiles =
-            screenshotsByPath.map { (path, info) ->
-                PrepareUploadFile(
-                    localPath = path,
-                    sceneId = info.sceneId,
-                    profile = info.profile,
-                )
-            }
-
-        val prepareResult = AgentApi.prepareUpload(apiUrl, apiToken, job.id, prepareFiles)
-        val uploads = prepareResult.getOrElse { return Result.failure(it) }.uploads
-
-        // Upload each file using presigned URLs
-        for ((path, info) in screenshotsByPath) {
-            val target = uploads[path] ?: continue
-            val uploadResult = AgentApi.uploadFile(target.presignedUrl, info.file.readBytes())
-            uploadResult.onFailure { error ->
-                log.error("Failed to upload file") {
-                    "path" to path
-                    "error" to error.message
+        for (info in capturedScreenshots) {
+            val key = Triple(group.shaderVersionId, info.sceneId, info.profile)
+            val itemId = itemLookup[key]
+            if (itemId == null) {
+                log.warn("No run item found for screenshot") {
+                    "scene_id" to info.sceneId
+                    "profile" to (info.profile ?: "null")
                 }
+                continue
+            }
+
+            try {
+                // Get presigned upload URL
+                val uploadUrlResult =
+                    AgentApi.getUploadUrl(
+                        apiUrl,
+                        apiToken,
+                        UploadUrlRequest(shaderId = group.shaderId, sceneId = info.sceneId),
+                    )
+                val uploadUrl = uploadUrlResult.getOrThrow()
+
+                // Upload the file
+                val uploadResult = AgentApi.uploadFile(uploadUrl.presignedUrl, info.file.readBytes())
+                uploadResult.getOrThrow()
+
+                // Report completion
+                val relativePath = info.file.relativeTo(mc.gameDirectory).path
+                val completeResult =
+                    AgentApi.completeItem(
+                        apiUrl,
+                        apiToken,
+                        runId,
+                        itemId,
+                        CompleteItemRequest(
+                            captureId = uploadUrl.captureId,
+                            screenshotPath = relativePath,
+                            screenshotUrl = uploadUrl.screenshotUrl,
+                            resolutionWidth = info.resolution.width,
+                            resolutionHeight = info.resolution.height,
+                            capturedAt = info.timestamp,
+                        ),
+                    )
+                completeResult.getOrThrow()
+                completedKeys.add(key)
+            } catch (e: Exception) {
+                log.error("Failed to upload/complete item") {
+                    "item_id" to itemId
+                    "error" to e.message
+                }
+                AgentApi.failItem(
+                    apiUrl,
+                    apiToken,
+                    runId,
+                    itemId,
+                    FailItemRequest(errorMessage = "Upload failed: ${e.message}"),
+                )
             }
         }
 
-        // Build capture records referencing pre-assigned capture IDs
-        val captures =
-            screenshotsByPath.mapNotNull { (path, info) ->
-                val target = uploads[path] ?: return@mapNotNull null
-                CaptureRecord(
-                    captureId = target.captureId,
-                    sceneId = info.sceneId,
-                    profile = info.profile,
-                    screenshotPath = path,
-                    resolutionWidth = info.resolution.width,
-                    resolutionHeight = info.resolution.height,
-                    capturedAt = info.timestamp,
+        // Fail any items that had no matching screenshot
+        for (item in group.items) {
+            val key = Triple(group.shaderVersionId, item.sceneId, item.profile)
+            if (key !in completedKeys) {
+                val itemId = itemLookup[key] ?: continue
+                AgentApi.failItem(
+                    apiUrl,
+                    apiToken,
+                    runId,
+                    itemId,
+                    FailItemRequest(errorMessage = "No screenshot produced"),
                 )
             }
+        }
 
-        return AgentApi.completeJob(
-            apiUrl,
-            apiToken,
-            job.id,
-            CompleteJobRequest(captures = captures),
-        )
+        return Result.success(Unit)
+    }
+
+    // -- FinalizingRun --
+
+    private fun startFinalizingRun() {
+        state = State.FinalizingRun
+        val runId =
+            currentRunId ?: run {
+                shutdown()
+                return
+            }
+
+        pendingFuture =
+            CompletableFuture.supplyAsync {
+                AgentApi.completeRun(apiUrl, apiToken, runId)
+            }
+    }
+
+    private fun tickFinalizingRun() {
+        val future = pendingFuture as? CompletableFuture<*> ?: return
+        if (!future.isDone) return
+
+        pendingFuture = null
+
+        @Suppress("UNCHECKED_CAST")
+        val result = (future as CompletableFuture<Result<com.xevion.glint.api.CaptureRun>>).join()
+
+        result
+            .onSuccess { run ->
+                log.info("Capture run finalized") {
+                    "run_id" to run.id
+                    "completed" to run.completedItems
+                    "failed" to run.failedItems
+                }
+            }.onFailure { error ->
+                log.error("Failed to finalize run") { "error" to error.message }
+            }
+
+        // Clear state and fetch more work
+        currentRunId = null
+        itemLookup = emptyMap()
+        shaderGroups = emptyList()
+        currentGroupIndex = 0
+        fetchWork()
     }
 
     // -- Helpers --
 
-    private fun writeSceneDefinitions(job: JobPayload) {
+    private fun advanceToNextGroup() {
+        currentGroupIndex++
+        if (currentGroupIndex >= shaderGroups.size) {
+            startFinalizingRun()
+        } else {
+            state = State.PreparingCapture
+        }
+    }
+
+    private fun failGroupItems(
+        group: ShaderGroup,
+        message: String,
+    ) {
+        val runId = currentRunId ?: return
+        CompletableFuture.runAsync {
+            for (item in group.items) {
+                val key = Triple(group.shaderVersionId, item.sceneId, item.profile)
+                val itemId = itemLookup[key] ?: continue
+                AgentApi
+                    .failItem(
+                        apiUrl,
+                        apiToken,
+                        runId,
+                        itemId,
+                        FailItemRequest(errorMessage = message),
+                    ).onFailure { error ->
+                        log.error("Failed to report item failure") { "error" to error.message }
+                    }
+            }
+        }
+    }
+
+    private fun reportShaderFailure(
+        group: ShaderGroup,
+        message: String,
+    ) {
+        CompletableFuture.runAsync {
+            AgentApi
+                .reportFailure(
+                    apiUrl,
+                    apiToken,
+                    ReportFailureRequest(
+                        shaderVersionId = group.shaderVersionId,
+                        errorMessage = message,
+                    ),
+                ).onFailure { error ->
+                    log.error("Failed to report shader failure") { "error" to error.message }
+                }
+        }
+    }
+
+    private fun writeSceneDefinitions(group: ShaderGroup) {
         val mc = Minecraft.getInstance()
         val scenesDir = File(mc.gameDirectory, "glint/scenes")
         scenesDir.mkdirs()
 
-        val worldMap = job.worlds.associateBy { it.id }
-        val scenesByWorld = job.scenes.groupBy { it.worldId }
+        // Group items by world
+        val itemsByWorld = group.items.groupBy { it.worldSlug }
 
-        for ((worldId, scenes) in scenesByWorld) {
-            val world = worldMap[worldId] ?: continue
-            val collectionFile = File(scenesDir, "${world.slug}.json")
+        for ((worldSlug, items) in itemsByWorld) {
+            val collectionFile = File(scenesDir, "$worldSlug.json")
 
             val sceneElements =
-                scenes.mapNotNull { scene ->
-                    try {
-                        val parsed = json.parseToJsonElement(scene.definitionJson)
-                        // Override id with backend UUID to avoid collisions with pre-existing collections
-                        buildJsonObject {
-                            for ((key, value) in parsed.jsonObject) {
-                                if (key == "id") {
-                                    put("id", scene.id)
-                                } else {
-                                    put(key, value)
+                items
+                    .distinctBy { it.sceneId }
+                    .mapNotNull { item ->
+                        try {
+                            val parsed = json.parseToJsonElement(item.sceneDefinitionJson)
+                            buildJsonObject {
+                                for ((key, value) in parsed.jsonObject) {
+                                    if (key == "id") {
+                                        put("id", item.sceneId)
+                                    } else {
+                                        put(key, value)
+                                    }
                                 }
                             }
+                        } catch (e: Exception) {
+                            log.warn("Failed to parse scene definition") {
+                                "scene_id" to item.sceneId
+                                "error" to e.message
+                            }
+                            null
                         }
-                    } catch (e: Exception) {
-                        log.warn("Failed to parse scene definition") {
-                            "scene_id" to scene.id
-                            "error" to e.message
-                        }
-                        null
                     }
-                }
 
             val collection =
                 buildJsonObject {
-                    put("world", world.slug)
-                    put("folder", world.slug)
+                    put("world", worldSlug)
+                    put("folder", worldSlug)
                     put("version", "1.21.4")
                     put("scenes", JsonArray(sceneElements))
                 }
@@ -397,7 +610,7 @@ class AutonomousRunner(
             )
             log.info("Wrote scene collection") {
                 "file" to collectionFile.name
-                "scene_count" to scenes.size
+                "scene_count" to sceneElements.size
             }
         }
 
@@ -405,22 +618,22 @@ class AutonomousRunner(
     }
 
     private fun buildCaptureSpec(
-        job: JobPayload,
+        group: ShaderGroup,
         shaderFilename: String?,
     ): CaptureSpec? {
-        // Use scene UUIDs from the job payload directly (written to collections in writeSceneDefinitions)
-        val allSceneIds = job.scenes.map { it.id }
+        val allSceneIds = group.items.map { it.sceneId }.distinct()
         if (allSceneIds.isEmpty()) return null
 
-        // Build shader list
+        // Build shader list — group profiles for this shader version
+        val profiles = group.items.mapNotNull { it.profile }.distinct()
         val shaders =
             buildList {
                 if (shaderFilename == null) {
                     add(ShaderSpec(filename = null))
-                } else if (job.profiles.isEmpty()) {
+                } else if (profiles.isEmpty()) {
                     add(ShaderSpec(filename = shaderFilename))
                 } else {
-                    for (profile in job.profiles) {
+                    for (profile in profiles) {
                         add(ShaderSpec(filename = shaderFilename, profile = profile))
                     }
                 }
@@ -429,18 +642,32 @@ class AutonomousRunner(
         return CaptureSpec(
             sceneIds = allSceneIds,
             shaders = shaders,
-            outputDir = "glint/jobs/${job.id}",
-            shutdownOnComplete = false, // We handle shutdown ourselves after upload
-            jobId = job.id,
+            outputDir = "glint/runs/$currentRunId",
+            shutdownOnComplete = false,
+            runId = currentRunId,
         )
     }
 
-    private fun downloadWorlds(job: JobPayload): Map<String, String> {
+    private fun downloadWorlds(group: ShaderGroup): Map<String, String> {
         val mc = Minecraft.getInstance()
         val savesDir = File(mc.gameDirectory, "saves")
         val worldFolders = mutableMapOf<String, String>()
 
-        for (world in job.worlds) {
+        // Deduplicate worlds across items
+        val uniqueWorlds =
+            group.items
+                .distinctBy { it.worldId }
+                .map { item ->
+                    object {
+                        val id = item.worldId
+                        val slug = item.worldSlug
+                        val name = item.worldName
+                        val fileUrl = item.worldFileUrl
+                        val fileHash = item.worldFileHash
+                    }
+                }
+
+        for (world in uniqueWorlds) {
             val existingDir = File(savesDir, world.slug)
             if (existingDir.exists() && existingDir.isDirectory) {
                 log.debug("World already present") { "slug" to world.slug }
@@ -505,7 +732,7 @@ class AutonomousRunner(
         return worldFolders
     }
 
-    private fun downloadShader(shader: com.xevion.glint.api.JobShaderInfo): String? {
+    private fun downloadShader(group: ShaderGroup): String? {
         val mc = Minecraft.getInstance()
         val shaderpacksDir = File(mc.gameDirectory, "shaderpacks")
         shaderpacksDir.mkdirs()
@@ -513,25 +740,25 @@ class AutonomousRunner(
         // Check if already present
         val files = shaderpacksDir.listFiles() ?: emptyArray()
         val existingFile =
-            files.firstOrNull { it.name.contains(shader.slug, ignoreCase = true) }
-                ?: files.firstOrNull { it.nameWithoutExtension.contains(shader.name, ignoreCase = true) }
+            files.firstOrNull { it.name.contains(group.shaderSlug, ignoreCase = true) }
+                ?: files.firstOrNull { it.nameWithoutExtension.contains(group.shaderName, ignoreCase = true) }
 
         if (existingFile != null) {
             log.debug("Shader already present") { "file" to existingFile.name }
             return existingFile.name
         }
 
-        val downloadUrl = shader.downloadUrl
+        val downloadUrl = group.downloadUrl
         if (downloadUrl == null) {
-            log.error("No download URL for shader") { "name" to shader.name }
+            log.error("No download URL for shader") { "name" to group.shaderName }
             return null
         }
 
-        val filename = "${shader.slug}-${shader.version}.zip"
+        val filename = "${group.shaderSlug}-${group.version}.zip"
         val targetFile = File(shaderpacksDir, filename)
 
         log.info("Downloading shader") {
-            "name" to shader.name
+            "name" to group.shaderName
             "file" to filename
         }
         try {
@@ -565,19 +792,6 @@ class AutonomousRunner(
             targetFile.delete()
             return null
         }
-    }
-
-    private fun failJobAsync(
-        jobId: String,
-        message: String,
-    ) {
-        CompletableFuture.runAsync {
-            AgentApi.failJob(apiUrl, apiToken, jobId, message).onFailure { error ->
-                log.error("Failed to report job failure") { "error" to error.message }
-            }
-        }
-        currentJob = null
-        claimNextJob()
     }
 
     private fun shutdown() {
