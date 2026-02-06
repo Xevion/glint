@@ -8,18 +8,11 @@ Automated. Rust uses `rustfmt`, Kotlin uses Spotless + KtLint, frontend uses Bio
 
 ## Naming & Domain Vocabulary
 
-Use language-idiomatic casing (snake_case in Rust, camelCase in Kotlin/TypeScript). Use consistent domain terms across all stacks:
+Use language-idiomatic casing (snake_case in Rust, camelCase in Kotlin/TypeScript). Use consistent domain terms across all stacks.
 
-| Concept | Name | Notes |
-|---------|------|-------|
-| A shader pack | `Shader` | Not "pack", "shaderpack", or "mod" |
-| A screenshot configuration | `Scene` | A specific location + time + weather + settings |
-| A screenshot result | `Capture` | Not "screenshot" or "image" |
-| A capture batch task | `Job` | Backend-assigned unit of work for the mod |
-| A Minecraft world save | `World` | The world a scene exists in |
-| A shader version | `ShaderVersion` | Specific release of a shader |
+**See [VOCABULARY.md](VOCABULARY.md)** for the full glossary — core entities, composite concepts (ShaderVariant, CaptureTarget), taxonomy, orchestration layers, status lifecycles, and anti-patterns.
 
-These names are used in types, API endpoints, database tables, and UI copy. When in doubt, check the Rust backend models — they're the source of truth.
+The Rust backend models are the source of truth for structure; VOCABULARY.md is the source of truth for naming.
 
 ## Comments
 
