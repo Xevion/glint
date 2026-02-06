@@ -3,6 +3,7 @@ import type { ApiError } from '../errors';
 import { ApiClient } from '../client';
 import type {
 	CaptureWithContext,
+	PaginatedCaptures,
 	Scene,
 	SceneWithWorld,
 	Shader,
@@ -90,8 +91,23 @@ export class AdminEndpoints extends ApiClient {
 
 	// ============== Captures ==============
 
-	listCaptures(): Promise<Result<CaptureWithContext[], ApiError>> {
-		return super.get<CaptureWithContext[]>('/api/captures/all');
+	listCaptures(params?: {
+		page?: number;
+		pageSize?: number;
+		shader?: string;
+		scene?: string;
+		status?: string;
+		runId?: string;
+	}): Promise<Result<PaginatedCaptures, ApiError>> {
+		const searchParams = new URLSearchParams();
+		if (params?.page != null) searchParams.set('page', String(params.page));
+		if (params?.pageSize != null) searchParams.set('page_size', String(params.pageSize));
+		if (params?.shader) searchParams.set('shader', params.shader);
+		if (params?.scene) searchParams.set('scene', params.scene);
+		if (params?.status) searchParams.set('status', params.status);
+		if (params?.runId) searchParams.set('run_id', params.runId);
+		const qs = searchParams.toString();
+		return super.get<PaginatedCaptures>(`/api/captures/all${qs ? `?${qs}` : ''}`);
 	}
 
 	getCapture(id: string): Promise<Result<CaptureWithContext, ApiError>> {

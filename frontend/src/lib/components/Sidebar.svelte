@@ -16,7 +16,8 @@ import {
 	Camera,
 	Users,
 	Menu,
-	Download
+	Download,
+	Activity
 } from '@lucide/svelte';
 import * as Sheet from '$lib/components/ui/sheet';
 import { Button } from '$lib/components/ui/button';
@@ -71,6 +72,7 @@ const adminItems = [
 	{ href: '/admin/worlds', label: 'Worlds', icon: Globe },
 	{ href: '/admin/scenes', label: 'Scenes', icon: Mountain },
 	{ href: '/admin/captures', label: 'Captures', icon: Camera },
+	{ href: '/admin/runs', label: 'Runs', icon: Activity },
 	{ href: '/admin/users', label: 'Users', icon: Users },
 	{ href: '/admin/settings', label: 'Settings', icon: Settings }
 ];

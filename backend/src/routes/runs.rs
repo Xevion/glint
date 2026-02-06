@@ -9,7 +9,7 @@ use serde::Deserialize;
 use tracing::{debug, info};
 
 use crate::error::{AppError, AppResult};
-use crate::models::{CaptureRun, CaptureRunItem};
+use crate::models::{CaptureRun, CaptureRunItemWithContext};
 use crate::repo::{CaptureRepo, CaptureRunRepo};
 use crate::state::AppState;
 
@@ -127,8 +127,8 @@ async fn get_run(
 async fn list_run_items(
     State(state): State<AppState>,
     Path(run_id): Path<String>,
-) -> AppResult<Json<Vec<CaptureRunItem>>> {
-    let items = CaptureRunRepo::list_items(state.db(), &run_id).await?;
+) -> AppResult<Json<Vec<CaptureRunItemWithContext>>> {
+    let items = CaptureRunRepo::list_items_with_context(state.db(), &run_id).await?;
     Ok(Json(items))
 }
 

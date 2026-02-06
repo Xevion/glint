@@ -11,7 +11,8 @@ import {
 	Mountain,
 	Camera,
 	Users,
-	ArrowRight
+	ArrowRight,
+	Activity
 } from '@lucide/svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import type { CaptureWithContext } from '$lib/bindings';
@@ -24,6 +25,7 @@ let worldCount: number = $derived(data.worldCount);
 let sceneCount: number = $derived(data.sceneCount);
 let captureCount: number = $derived(data.captureCount);
 let userCount: number = $derived(data.userCount);
+let runCount: number = $derived(data.runCount);
 let recentCaptures: CaptureWithContext[] = $derived(data.recentCaptures);
 let healthStatus: 'ok' | 'error' = $derived(data.healthStatus);
 let errors: Record<string, string> = $derived(data.errors);
@@ -46,6 +48,7 @@ const statCards = $derived<StatCard[]>([
 	{ label: 'Worlds', count: worldCount, href: '/admin/worlds', icon: Globe },
 	{ label: 'Scenes', count: sceneCount, href: '/admin/scenes', icon: Mountain },
 	{ label: 'Captures', count: captureCount, href: '/admin/captures', icon: Camera },
+	{ label: 'Runs', count: runCount, href: '/admin/runs', icon: Activity },
 	{ label: 'Users', count: userCount, href: '/admin/users', icon: Users }
 ]);
 
@@ -128,7 +131,7 @@ onDestroy(() => {
 	</header>
 
 	<!-- Stats Grid -->
-		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
 			{#each statCards as card (card.label)}
 				<a
 					href={card.href}

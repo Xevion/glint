@@ -1,17 +1,28 @@
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::get,
 };
+use serde::Deserialize;
 
 use crate::{
     auth::AdminUser,
     error::{AppError, AppResult},
-    models::{Capture, CaptureWithContext},
+    models::{Capture, CaptureWithContext, PaginatedCaptures},
     repo::CaptureRepo,
     state::AppState,
 };
+
+#[derive(Debug, Deserialize)]
+pub struct CaptureListParams {
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+    pub shader: Option<String>,
+    pub scene: Option<String>,
+    pub status: Option<String>,
+    pub run_id: Option<String>,
+}
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -27,13 +38,33 @@ async fn list_captures_public(State(state): State<AppState>) -> AppResult<Json<V
     Ok(Json(captures))
 }
 
-/// GET /api/captures/all - List all captures with context (admin)
+/// GET /api/captures/all - List all captures with context, paginated (admin)
 async fn list_captures_all(
     _admin: AdminUser,
     State(state): State<AppState>,
-) -> AppResult<Json<Vec<CaptureWithContext>>> {
-    let captures = CaptureRepo::list_all_with_context(state.db()).await?;
-    Ok(Json(captures))
+    Query(params): Query<CaptureListParams>,
+) -> AppResult<Json<PaginatedCaptures>> {
+    let page = params.page.unwrap_or(1).max(1);
+    let page_size = params.page_size.unwrap_or(50).clamp(1, 250);
+    let offset = (page - 1) * page_size;
+
+    let (items, total_count) = CaptureRepo::list_all_with_context_paginated(
+        state.db(),
+        page_size,
+        offset,
+        params.shader.as_deref(),
+        params.scene.as_deref(),
+        params.status.as_deref(),
+        params.run_id.as_deref(),
+    )
+    .await?;
+
+    Ok(Json(PaginatedCaptures {
+        items,
+        total_count,
+        page,
+        page_size,
+    }))
 }
 
 /// GET /api/captures/{id} - Get capture by ID (public)

@@ -5,14 +5,16 @@ import type { PageLoad } from './$types';
 export const load: PageLoad = async ({ fetch }) => {
 	const api = createApiClient(fetch);
 
-	const [shadersRes, worldsRes, scenesRes, capturesRes, usersRes, healthRes] = await Promise.all([
-		api.shaders.list(),
-		api.worlds.list(),
-		api.scenes.list(),
-		api.admin.listCaptures(),
-		api.admin.listUsers(),
-		api.admin.health()
-	]);
+	const [shadersRes, worldsRes, scenesRes, capturesRes, usersRes, healthRes, runsRes] =
+		await Promise.all([
+			api.shaders.list(),
+			api.worlds.list(),
+			api.scenes.list(),
+			api.admin.listCaptures(),
+			api.admin.listUsers(),
+			api.admin.health(),
+			api.runs.list()
+		]);
 
 	const errors: Record<string, string> = {};
 
@@ -41,7 +43,7 @@ export const load: PageLoad = async ({ fetch }) => {
 	});
 
 	const { captureCount, recentCaptures } = capturesRes.match({
-		Ok: (v) => ({ captureCount: v.length, recentCaptures: v.slice(0, 5) }),
+		Ok: (v) => ({ captureCount: v.total_count, recentCaptures: v.items.slice(0, 5) }),
 		Err: (e) => {
 			errors.captures = e.message;
 			return { captureCount: 0, recentCaptures: [] as CaptureWithContext[] };
@@ -52,6 +54,14 @@ export const load: PageLoad = async ({ fetch }) => {
 		Ok: (v) => v.length,
 		Err: (e) => {
 			errors.users = e.message;
+			return 0;
+		}
+	});
+
+	const runCount = runsRes.match({
+		Ok: (v) => v.length,
+		Err: (e) => {
+			errors.runs = e.message;
 			return 0;
 		}
 	});
@@ -70,6 +80,7 @@ export const load: PageLoad = async ({ fetch }) => {
 		sceneCount,
 		captureCount,
 		userCount,
+		runCount,
 		recentCaptures,
 		healthStatus,
 		errors

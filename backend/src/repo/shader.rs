@@ -158,8 +158,7 @@ impl ShaderRepo {
         db: &DbPool,
         shader_id: &str,
     ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = sqlx::query_as!(
-            CaptureWithContext,
+        let captures = sqlx::query_as::<_, CaptureWithContext>(
             r#"
             SELECT
                 c.id,
@@ -172,15 +171,19 @@ impl ShaderRepo {
                 c.screenshot_url,
                 c.captured_at,
                 c.resolution_width,
-                c.resolution_height
+                c.resolution_height,
+                cri.run_id,
+                cr.status as run_status
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             JOIN shaders s ON sv.shader_id = s.id
+            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
+            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
             WHERE s.id = $1 AND c.status = 'completed'
             ORDER BY sv.created_at DESC
             "#,
-            shader_id
         )
+        .bind(shader_id)
         .fetch_all(db)
         .await
         .context(format!("failed to get captures for shader '{}'", shader_id))?;

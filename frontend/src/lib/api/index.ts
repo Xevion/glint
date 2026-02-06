@@ -5,6 +5,7 @@ import { AdminEndpoints } from './endpoints/admin';
 import { AdoptEndpoints } from './endpoints/adopt';
 import { WorldsEndpoints } from './endpoints/worlds';
 import { DeviceEndpoints } from './endpoints/device';
+import { RunEndpoints } from './endpoints/runs';
 import { API_BASE_URL } from './config';
 
 /**
@@ -28,7 +29,8 @@ export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
 		admin: new AdminEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
 		adopt: new AdoptEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
 		worlds: new WorldsEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		device: new DeviceEndpoints(baseUrl ?? API_BASE_URL, fetchFn)
+		device: new DeviceEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
+		runs: new RunEndpoints(baseUrl ?? API_BASE_URL, fetchFn)
 	};
 }
 

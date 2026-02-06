@@ -109,7 +109,7 @@ if (runBackend) {
 // Mod: Minecraft client via Gradle
 if (runMod) {
   console.log(c("1;36", `→ Starting Minecraft client (${platform})...`));
-  group.spawn(["./gradlew", `:${platform}:runClient`], { cwd: "mod" });
+  group.spawn(["./gradlew", `--console=plain`, `:${platform}:runClient`], { cwd: "mod" });
 }
 
 const code = await group.waitForFirst();

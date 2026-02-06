@@ -181,6 +181,31 @@ pub struct CaptureRunItem {
     pub completed_at: Option<DateTime<Utc>>,
 }
 
+/// Capture run item with denormalized shader/scene info for API responses
+#[derive(Debug, Clone, Serialize, FromRow, TS)]
+#[ts(export)]
+pub struct CaptureRunItemWithContext {
+    pub id: String,
+    pub run_id: String,
+    pub shader_version_id: String,
+    pub scene_id: String,
+    pub profile: Option<String>,
+    pub status: String,
+    pub capture_id: Option<String>,
+    pub error_message: Option<String>,
+    pub error_log: Option<String>,
+    pub duration_ms: Option<i32>,
+    #[ts(type = "string | null")]
+    pub started_at: Option<DateTime<Utc>>,
+    #[ts(type = "string | null")]
+    pub completed_at: Option<DateTime<Utc>>,
+    // Denormalized context
+    pub shader_name: String,
+    pub shader_slug: String,
+    pub shader_version: String,
+    pub scene_name: String,
+}
+
 /// Discord OAuth user
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
@@ -343,6 +368,19 @@ pub struct CaptureWithContext {
     pub captured_at: Option<DateTime<Utc>>,
     pub resolution_width: Option<i32>,
     pub resolution_height: Option<i32>,
+    // Run context
+    pub run_id: Option<String>,
+    pub run_status: Option<String>,
+}
+
+/// Paginated captures response envelope
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct PaginatedCaptures {
+    pub items: Vec<CaptureWithContext>,
+    pub total_count: i64,
+    pub page: i64,
+    pub page_size: i64,
 }
 
 /// Shader author from upstream platform

@@ -3,7 +3,7 @@ use tracing::{debug, instrument};
 
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
-use crate::models::{CaptureRun, CaptureRunItem};
+use crate::models::{CaptureRun, CaptureRunItem, CaptureRunItemWithContext};
 
 pub struct CaptureRunRepo;
 
@@ -187,6 +187,43 @@ impl CaptureRunRepo {
         .fetch_all(db)
         .await
         .context(format!("failed to list items for run '{}'", run_id))?;
+
+        Ok(items)
+    }
+
+    /// List items for a capture run with shader/scene context
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_items_with_context(
+        db: &DbPool,
+        run_id: &str,
+    ) -> AppResult<Vec<CaptureRunItemWithContext>> {
+        let items = sqlx::query_as!(
+            CaptureRunItemWithContext,
+            r#"
+            SELECT
+                cri.id, cri.run_id, cri.shader_version_id, cri.scene_id,
+                cri.profile, cri.status, cri.capture_id,
+                cri.error_message, cri.error_log, cri.duration_ms,
+                cri.started_at, cri.completed_at,
+                s.name as shader_name,
+                s.slug as shader_slug,
+                sv.version as shader_version,
+                sc.name as scene_name
+            FROM capture_run_items cri
+            JOIN shader_versions sv ON cri.shader_version_id = sv.id
+            JOIN shaders s ON sv.shader_id = s.id
+            JOIN scenes sc ON cri.scene_id = sc.id
+            WHERE cri.run_id = $1
+            ORDER BY cri.started_at ASC NULLS LAST
+            "#,
+            run_id
+        )
+        .fetch_all(db)
+        .await
+        .context(format!(
+            "failed to list items with context for run '{}'",
+            run_id
+        ))?;
 
         Ok(items)
     }

@@ -46,7 +46,8 @@ function extractRowId(row: T): string {
 const table = $derived(
 	new DataTable({
 		data,
-		columns
+		columns,
+		pageSize: data.length || 1
 	})
 );
 </script>

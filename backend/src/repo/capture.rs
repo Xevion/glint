@@ -86,8 +86,7 @@ impl CaptureRepo {
         db: &DbPool,
         scene_id: &str,
     ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = sqlx::query_as!(
-            CaptureWithContext,
+        let captures = sqlx::query_as::<_, CaptureWithContext>(
             r#"
             SELECT
                 c.id,
@@ -100,15 +99,19 @@ impl CaptureRepo {
                 c.screenshot_url,
                 c.captured_at,
                 c.resolution_width,
-                c.resolution_height
+                c.resolution_height,
+                cri.run_id,
+                cr.status as run_status
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             JOIN shaders s ON sv.shader_id = s.id
+            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
+            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
             WHERE c.scene_id = $1 AND c.status = 'completed'
             ORDER BY s.name, sv.created_at DESC
             "#,
-            scene_id
         )
+        .bind(scene_id)
         .fetch_all(db)
         .await
         .context(format!(
@@ -223,8 +226,7 @@ impl CaptureRepo {
     /// List all captures with context (for admin dashboard)
     #[instrument(skip(db), level = "debug")]
     pub async fn list_all_with_context(db: &DbPool) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = sqlx::query_as!(
-            CaptureWithContext,
+        let captures = sqlx::query_as::<_, CaptureWithContext>(
             r#"
             SELECT
                 c.id,
@@ -237,12 +239,16 @@ impl CaptureRepo {
                 c.screenshot_url,
                 c.captured_at,
                 c.resolution_width,
-                c.resolution_height
+                c.resolution_height,
+                cri.run_id,
+                cr.status as run_status
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             JOIN shaders s ON sv.shader_id = s.id
+            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
+            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
             ORDER BY c.created_at DESC
-            "#
+            "#,
         )
         .fetch_all(db)
         .await
@@ -255,8 +261,7 @@ impl CaptureRepo {
     /// Get a single capture with context (for admin detail view)
     #[instrument(skip(db), level = "debug")]
     pub async fn get_with_context(db: &DbPool, id: &str) -> AppResult<CaptureWithContext> {
-        sqlx::query_as!(
-            CaptureWithContext,
+        sqlx::query_as::<_, CaptureWithContext>(
             r#"
             SELECT
                 c.id,
@@ -269,18 +274,96 @@ impl CaptureRepo {
                 c.screenshot_url,
                 c.captured_at,
                 c.resolution_width,
-                c.resolution_height
+                c.resolution_height,
+                cri.run_id,
+                cr.status as run_status
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             JOIN shaders s ON sv.shader_id = s.id
+            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
+            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
             WHERE c.id = $1
             "#,
-            id
         )
+        .bind(id)
         .fetch_optional(db)
         .await
         .context(format!("failed to get capture with context '{}'", id))?
         .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
+    }
+
+    /// List captures with context, pagination, and filtering (admin)
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_all_with_context_paginated(
+        db: &DbPool,
+        limit: i64,
+        offset: i64,
+        shader: Option<&str>,
+        scene: Option<&str>,
+        status: Option<&str>,
+        run_id: Option<&str>,
+    ) -> AppResult<(Vec<CaptureWithContext>, i64)> {
+        let items = sqlx::query_as::<_, CaptureWithContext>(
+            r#"
+            SELECT
+                c.id,
+                c.scene_id,
+                s.slug as shader_slug,
+                s.name as shader_name,
+                sv.version as shader_version,
+                c.profile,
+                c.screenshot_path,
+                c.screenshot_url,
+                c.captured_at,
+                c.resolution_width,
+                c.resolution_height,
+                cri.run_id,
+                cr.status as run_status
+            FROM captures c
+            JOIN shader_versions sv ON c.shader_version_id = sv.id
+            JOIN shaders s ON sv.shader_id = s.id
+            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
+            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
+            WHERE ($1::text IS NULL OR s.slug = $1)
+              AND ($2::text IS NULL OR c.scene_id = $2)
+              AND ($3::text IS NULL OR c.status = $3)
+              AND ($4::text IS NULL OR cri.run_id = $4)
+            ORDER BY c.created_at DESC
+            LIMIT $5 OFFSET $6
+            "#,
+        )
+        .bind(shader)
+        .bind(scene)
+        .bind(status)
+        .bind(run_id)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(db)
+        .await
+        .context("failed to list captures with context (paginated)")?;
+
+        let count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*)
+            FROM captures c
+            JOIN shader_versions sv ON c.shader_version_id = sv.id
+            JOIN shaders s ON sv.shader_id = s.id
+            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
+            WHERE ($1::text IS NULL OR s.slug = $1)
+              AND ($2::text IS NULL OR c.scene_id = $2)
+              AND ($3::text IS NULL OR c.status = $3)
+              AND ($4::text IS NULL OR cri.run_id = $4)
+            "#,
+        )
+        .bind(shader)
+        .bind(scene)
+        .bind(status)
+        .bind(run_id)
+        .fetch_one(db)
+        .await
+        .context("failed to count captures (paginated)")?;
+
+        Ok((items, count.0))
     }
 
     /// Delete a capture
