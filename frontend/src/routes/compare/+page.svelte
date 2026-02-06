@@ -28,7 +28,7 @@ const images: CompareImageOption[] = $derived(
 			shader: {
 				name: c.shader_name,
 				version: c.shader_version,
-				author: null,
+				author: c.shader_author ?? null,
 				profile: c.profile
 			}
 		};

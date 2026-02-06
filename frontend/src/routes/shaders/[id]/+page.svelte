@@ -2,6 +2,7 @@
 import { resolve } from '$app/paths';
 import type { CaptureWithContext, ShaderWithCaptures } from '$lib/bindings';
 import { Button } from '$lib/components/ui/button';
+import { formatVersion } from '$lib/utils/display';
 import { cfImageUrl } from '$lib/utils/image';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
 import { SvelteMap } from 'svelte/reactivity';
@@ -87,7 +88,7 @@ const uniqueSceneCaptures = $derived.by(() => {
 												{/if}
 												{#if selectedCapture.shader_version}
 													<span class="rounded bg-muted px-2 py-0.5 text-xs font-bold">
-														v{selectedCapture.shader_version}
+														{formatVersion(selectedCapture.shader_version)}
 													</span>
 												{/if}
 											</div>
@@ -240,7 +241,7 @@ const uniqueSceneCaptures = $derived.by(() => {
 													<span
 														class="rounded bg-white/20 px-2 py-0.5 text-xs font-bold text-white"
 													>
-														v{capture.shader_version}
+														{formatVersion(capture.shader_version)}
 													</span>
 												{/if}
 											</div>

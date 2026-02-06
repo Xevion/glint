@@ -24,7 +24,8 @@ const CAPTURE_WITH_CONTEXT_BASE: &str = r#"
         c.resolution_width,
         c.resolution_height,
         cri.run_id,
-        cr.status as run_status
+        cr.status as run_status,
+        (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author
     FROM captures c
     JOIN shader_versions sv ON c.shader_version_id = sv.id
     JOIN shaders s ON sv.shader_id = s.id

@@ -371,6 +371,8 @@ pub struct CaptureWithContext {
     // Run context
     pub run_id: Option<String>,
     pub run_status: Option<String>,
+    // Shader author
+    pub shader_author: Option<String>,
 }
 
 /// Paginated captures response envelope

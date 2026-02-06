@@ -6,6 +6,8 @@ import { comparisonStore } from '$lib/stores/comparison.svelte';
 import { cn } from '$lib/utils';
 import {
 	formatDate,
+	formatGameVersions,
+	formatVersion,
 	getCurseforgeUrl,
 	getModrinthUrl,
 	hashStringToNumber
@@ -175,20 +177,19 @@ function handleCheckboxClick(e: MouseEvent) {
 
 		<!-- Footer: Version & Links -->
 		<div class="mt-auto flex items-center justify-between border-t border-border pt-3">
-			<div class="flex items-center gap-3">
+			<div class="flex min-w-0 items-center gap-3">
 				<!-- Version -->
-				<span class="inline-flex items-center gap-1 text-xs">
-					<span class="text-muted-foreground/70">v</span>
-					<span class="font-medium text-card-foreground">{shader.latest_version ?? '\u2014'}</span>
+				<span class="inline-flex shrink-0 items-center gap-1 text-xs">
+					<span class="font-medium text-card-foreground">{shader.latest_version ? formatVersion(shader.latest_version) : '\u2014'}</span>
 				</span>
 
 				<!-- Separator -->
-				<span class="h-4 w-px bg-border"></span>
+				<span class="h-4 w-px shrink-0 bg-border"></span>
 
 				<!-- MC Version -->
-				<span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-					<Layers class="h-3.5 w-3.5" />
-					{shader.game_versions ?? '\u2014'}
+				<span class="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+					<Layers class="h-3.5 w-3.5 shrink-0" />
+					<span class="truncate">{formatGameVersions(shader.game_versions)}</span>
 				</span>
 			</div>
 

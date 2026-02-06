@@ -90,6 +90,32 @@ export function getWeatherDisplayName(weather: string): string {
 }
 
 /**
+ * Parse a JSON-encoded game versions string into a comma-separated display string.
+ * Returns an em dash if null/undefined/empty or unparseable.
+ */
+export function formatGameVersions(raw: string | null | undefined): string {
+	if (!raw) return '\u2014';
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		if (!Array.isArray(parsed) || parsed.length === 0) return raw;
+		const versions = parsed as string[];
+		if (versions.length <= 5) return versions.join(', ');
+		return `${versions[0]} \u2013 ${versions[versions.length - 1]}`;
+	} catch {
+		return raw;
+	}
+}
+
+/**
+ * Format a version string for display. Adds a "v" prefix only when the
+ * version starts with a digit (e.g. "2.0.3" → "v2.0.3"). Versions that
+ * already carry a prefix like "v" or "r" are returned as-is.
+ */
+export function formatVersion(version: string): string {
+	return /^\d/.test(version) ? `v${version}` : version;
+}
+
+/**
  * Format bytes to human-readable size with KiB/MiB/GiB units.
  */
 export function formatBytes(bytes: number): string {

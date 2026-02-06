@@ -1,6 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { fade } from 'svelte/transition';
+import { formatVersion } from '$lib/utils/display';
 import { LUMINANCE } from './constants';
 import type { ElementBounds, ElementLuminances, ShaderDisplayInfo } from './types';
 
@@ -89,7 +90,7 @@ const authorShadow = $derived(brightnessToShadow(authorBrightness));
 
 const displayAuthor = $derived(shader.author ?? 'Unknown Author');
 const displayMeta = $derived(
-	[`v${shader.version}`, shader.profile].filter(Boolean).join(' \u2022 ')
+	[formatVersion(shader.version), shader.profile].filter(Boolean).join(' \u2022 ')
 );
 
 // Chase a single value toward its target

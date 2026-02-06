@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM shader_versions WHERE shader_id = $1",
+  "query": "SELECT * FROM shader_versions WHERE shader_id = $1 ORDER BY upstream_published_at DESC NULLS LAST, created_at DESC",
   "describe": {
     "columns": [
       {
@@ -102,5 +102,5 @@
       true
     ]
   },
-  "hash": "6b2fb2d60739feb6b9cd8a6522762d278726a0a81525876355cace514a61e5f7"
+  "hash": "f308c1885ea0ec00da7db7028dabe1fc15b59e3656e680f28af309cbbf433e24"
 }
