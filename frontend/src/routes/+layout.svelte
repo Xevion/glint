@@ -1,7 +1,6 @@
 <script lang="ts">
 import type { Snippet } from 'svelte';
 import { onMount } from 'svelte';
-import { browser } from '$app/environment';
 import { OverlayScrollbars } from 'overlayscrollbars';
 import type { OverlayScrollbars as OverlayScrollbarsInstance } from 'overlayscrollbars';
 import 'overlayscrollbars/overlayscrollbars.css';
@@ -21,14 +20,6 @@ let { children }: Props = $props();
 let osInstance: OverlayScrollbarsInstance | null = null;
 
 initNavigation();
-
-// Update favicon when theme changes (client-side only to avoid hydration mismatch)
-$effect(() => {
-	if (!browser) return;
-	const favicon = themeStore.isDark ? '/favicon-dark.ico' : '/favicon-light.ico';
-	const link = document.querySelector('link[rel="icon"]');
-	if (link && link instanceof HTMLLinkElement) link.href = favicon;
-});
 
 // Reactively update scrollbar theme when theme changes
 $effect(() => {
@@ -55,8 +46,6 @@ onMount(() => {
 	};
 });
 </script>
-
-<svelte:head><link rel="icon" href="/favicon-light.ico" /></svelte:head>
 
 <BackgroundImage
 	lightWallpapers={[13, 53, 31, 71, 18, 65, 32, 97]}
