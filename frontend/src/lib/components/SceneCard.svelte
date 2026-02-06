@@ -1,15 +1,16 @@
 <script lang="ts">
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
 import type { SceneListItem } from '$lib/bindings';
+import { cn } from '$lib/utils';
 import {
 	getBiomeDisplayName,
 	getDimensionDisplayName,
 	getWeatherDisplayName,
 	hashStringToNumber
 } from '$lib/utils/display';
-import { goto } from '$app/navigation';
-import { resolve } from '$app/paths';
-import { cn } from '$lib/utils';
-import { Sun, ArrowRight } from '@lucide/svelte';
+import { cfImageUrl } from '$lib/utils/image';
+import { ArrowRight, Sun } from '@lucide/svelte';
 
 interface Props {
 	scene: SceneListItem;
@@ -59,7 +60,7 @@ function handleKeyDown(e: KeyboardEvent) {
 	<!-- Thumbnail Image -->
 	<div class="relative aspect-video w-full overflow-hidden">
 		<img
-			src={scene.thumbnail_url ?? `/wallpapers/${wallpaperIndex}.jpg`}
+			src={cfImageUrl(scene.thumbnail_url, 'card') ?? `/wallpapers/${wallpaperIndex}.jpg`}
 			alt="{scene.name} scene preview"
 			class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
 			style="will-change: transform; backface-visibility: hidden;"

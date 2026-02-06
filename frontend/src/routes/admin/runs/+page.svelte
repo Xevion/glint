@@ -1,9 +1,9 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
+import type { CaptureRun } from '$lib/bindings';
+import AdminTable from '$lib/components/AdminTable.svelte';
 import { Button } from '$lib/components/ui/button';
 import { RefreshCw } from '@lucide/svelte';
-import AdminTable from '$lib/components/AdminTable.svelte';
-import type { CaptureRun } from '$lib/bindings';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

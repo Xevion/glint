@@ -1,9 +1,10 @@
 <script lang="ts">
-import { fly, fade, scale } from 'svelte/transition';
-import { SvelteMap } from 'svelte/reactivity';
 import { resolve } from '$app/paths';
-import { ChevronRight, ImageOff } from '@lucide/svelte';
 import type { CaptureWithContext, SceneWithCaptures } from '$lib/bindings';
+import { cfImageUrl } from '$lib/utils/image';
+import { ChevronRight, ImageOff } from '@lucide/svelte';
+import { SvelteMap } from 'svelte/reactivity';
+import { fade, fly, scale } from 'svelte/transition';
 
 interface Props {
 	data: { scene: SceneWithCaptures };
@@ -72,7 +73,7 @@ const timeLabel = $derived.by(() => {
 					>
 						{#if selectedCapture}
 							<img
-								src={selectedCapture.screenshot_url}
+								src={cfImageUrl(selectedCapture.screenshot_url, 'hero')}
 								alt="{scene.name} with {selectedCapture.shader_name}"
 								class="h-full w-full object-cover"
 							/>
@@ -129,7 +130,7 @@ const timeLabel = $derived.by(() => {
 								>
 									{#if capture.screenshot_url}
 										<img
-											src={capture.screenshot_url}
+											src={cfImageUrl(capture.screenshot_url, 'thumbnail')}
 											alt="{capture.shader_name} thumbnail"
 											class="h-full w-full object-cover"
 										/>
@@ -186,7 +187,7 @@ const timeLabel = $derived.by(() => {
 							>
 								{#if capture.screenshot_url}
 									<img
-										src={capture.screenshot_url}
+										src={cfImageUrl(capture.screenshot_url, 'card')}
 										alt="{capture.shader_name} render"
 										class="h-full w-full object-cover"
 									/>

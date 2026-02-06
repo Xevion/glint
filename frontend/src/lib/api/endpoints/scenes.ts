@@ -1,7 +1,7 @@
+import type { SceneListItem, SceneWithCaptures } from '$lib/bindings';
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
-import type { SceneListItem, SceneWithCaptures } from '$lib/bindings';
 
 export class SceneEndpoints extends ApiClient {
 	/**
@@ -17,8 +17,8 @@ export class SceneEndpoints extends ApiClient {
 	getBySlug(slug: string, worldId?: string): Promise<Result<SceneWithCaptures[], ApiError>> {
 		// TODO: backend uses snake_case query params (world_id) — migrate to camelCase (worldId)
 		const url = worldId
-			? `/api/scenes/${encodeURIComponent(slug)}?world_id=${encodeURIComponent(worldId)}`
-			: `/api/scenes/${encodeURIComponent(slug)}`;
+			? `/api/scenes/by-slug/${encodeURIComponent(slug)}?world_id=${encodeURIComponent(worldId)}`
+			: `/api/scenes/by-slug/${encodeURIComponent(slug)}`;
 		return super.get<SceneWithCaptures[]>(url);
 	}
 }

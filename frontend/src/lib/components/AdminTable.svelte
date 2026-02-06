@@ -1,12 +1,12 @@
 <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
 <script lang="ts" generics="T extends Record<string, any>">
-import type { Snippet } from 'svelte';
-import { DataTable } from '@careswitch/svelte-data-table';
-import * as Table from '$lib/components/ui/table';
-import TimeAgo from './TimeAgo.svelte';
 import { goto } from '$app/navigation';
 import { Button } from '$lib/components/ui/button';
+import * as Table from '$lib/components/ui/table';
+import { DataTable } from '@careswitch/svelte-data-table';
 import { ExternalLink, Trash2 } from '@lucide/svelte';
+import type { Snippet } from 'svelte';
+import TimeAgo from './TimeAgo.svelte';
 
 interface Column {
 	id: string;

@@ -1,7 +1,7 @@
-import type { Result } from 'true-myth';
-import type { ApiError } from '../errors';
 import type { CaptureRun, CaptureRunItemWithContext } from '$lib/bindings';
+import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
+import type { ApiError } from '../errors';
 
 export class RunEndpoints extends ApiClient {
 	list(): Promise<Result<CaptureRun[], ApiError>> {

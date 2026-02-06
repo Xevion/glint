@@ -1,8 +1,8 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import ShaderInfoOverlay from './ShaderInfoOverlay.svelte';
-import type { ShaderDisplayInfo, ElementBounds, ElementLuminances } from './types';
-import { LUMINANCE, ZOOM, TOUCH } from './constants';
+import { LUMINANCE, TOUCH, ZOOM } from './constants';
+import type { ElementBounds, ElementLuminances, ShaderDisplayInfo } from './types';
 
 interface Props {
 	leftImage: string;

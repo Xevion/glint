@@ -1,8 +1,8 @@
 <script lang="ts">
-import { fly, fade, scale } from 'svelte/transition';
-import { Button } from '$lib/components/ui/button';
 import SceneCard from '$lib/components/SceneCard.svelte';
+import { Button } from '$lib/components/ui/button';
 import { Search } from '@lucide/svelte';
+import { fade, fly, scale } from 'svelte/transition';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

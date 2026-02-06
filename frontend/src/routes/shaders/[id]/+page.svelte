@@ -1,10 +1,11 @@
 <script lang="ts">
-import { fly, fade, scale } from 'svelte/transition';
-import { SvelteMap } from 'svelte/reactivity';
 import { resolve } from '$app/paths';
-import { Button } from '$lib/components/ui/button';
-import { ChevronRight, ImageOff } from '@lucide/svelte';
 import type { CaptureWithContext, ShaderWithCaptures } from '$lib/bindings';
+import { Button } from '$lib/components/ui/button';
+import { cfImageUrl } from '$lib/utils/image';
+import { ChevronRight, ImageOff } from '@lucide/svelte';
+import { SvelteMap } from 'svelte/reactivity';
+import { fade, fly, scale } from 'svelte/transition';
 
 interface Props {
 	data: { shader: ShaderWithCaptures };
@@ -65,7 +66,7 @@ const uniqueSceneCaptures = $derived.by(() => {
 					>
 						{#if selectedCapture}
 							<img
-								src={selectedCapture.screenshot_url}
+								src={cfImageUrl(selectedCapture.screenshot_url, 'hero')}
 								alt="{shader.name} capture"
 								class="h-full w-full object-cover"
 							/>
@@ -118,7 +119,7 @@ const uniqueSceneCaptures = $derived.by(() => {
 							>
 								{#if capture.screenshot_url}
 									<img
-										src={capture.screenshot_url}
+										src={cfImageUrl(capture.screenshot_url, 'thumbnail')}
 										alt="Scene thumbnail"
 										class="h-full w-full object-cover"
 									/>
@@ -221,7 +222,7 @@ const uniqueSceneCaptures = $derived.by(() => {
 							>
 								{#if capture.screenshot_url}
 									<img
-										src={capture.screenshot_url}
+										src={cfImageUrl(capture.screenshot_url, 'card')}
 										alt="Capture"
 										class="h-full w-full object-cover"
 									/>

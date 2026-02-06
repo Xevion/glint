@@ -1,19 +1,19 @@
 <script lang="ts">
+import { api } from '$lib/api';
 import { Button } from '$lib/components/ui/button';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
-import { Textarea } from '$lib/components/ui/textarea';
 import Progress from '$lib/components/ui/progress/progress.svelte';
-import { Plus, Folder, FileArchive } from '@lucide/svelte';
-import { api } from '$lib/api';
+import { Textarea } from '$lib/components/ui/textarea';
 import {
-	compressDirectory,
+	type CompressionProgress,
 	calculateDirectorySize,
-	validateFileSize,
-	type CompressionProgress
+	compressDirectory,
+	validateFileSize
 } from '$lib/utils/compression';
 import { calculateSHA256 } from '$lib/utils/hash';
+import { FileArchive, Folder, Plus } from '@lucide/svelte';
 
 interface Props {
 	onWorldCreated?: () => void;

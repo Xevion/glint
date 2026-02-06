@@ -1,16 +1,17 @@
 <script lang="ts">
-import { fly, fade } from 'svelte/transition';
-import { Button } from '$lib/components/ui/button';
-import {
-	ShaderCompare,
-	ImagePicker,
-	getMockCompareImages,
-	type ImageOption,
-	type ShaderDisplayInfo,
-	type CompareMode
-} from '$lib/components/compare';
 import ErrorBoundaryFallback from '$lib/components/ErrorBoundaryFallback.svelte';
-import { Columns3, SplitSquareHorizontal, ToggleLeft, ArrowLeftRight } from '@lucide/svelte';
+import {
+	type CompareMode,
+	type ImageOption,
+	ImagePicker,
+	ShaderCompare,
+	type ShaderDisplayInfo,
+	getMockCompareImages
+} from '$lib/components/compare';
+import { Button } from '$lib/components/ui/button';
+import { cfImageUrl } from '$lib/utils/image';
+import { ArrowLeftRight, Columns3, SplitSquareHorizontal, ToggleLeft } from '@lucide/svelte';
+import { fade, fly } from 'svelte/transition';
 
 // Get mock data from centralized location
 const compareImages = getMockCompareImages();
@@ -76,7 +77,7 @@ function setMode(newMode: CompareMode) {
 		<!-- Shader comparison -->
 		<div in:fade={{ duration: 300, delay: 100 }} class="mb-6 overflow-hidden rounded-xl border border-border bg-card">
 			<svelte:boundary onerror={(e) => console.error('[Compare]', e)}>
-				<ShaderCompare {leftImage} {rightImage} {mode} {leftShader} {rightShader} />
+				<ShaderCompare leftImage={cfImageUrl(leftImage, 'full') ?? leftImage} rightImage={cfImageUrl(rightImage, 'full') ?? rightImage} {mode} {leftShader} {rightShader} />
 
 				{#snippet failed(error, reset)}
 					<ErrorBoundaryFallback

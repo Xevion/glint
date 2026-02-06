@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE capture_run_items SET status = 'running', capture_id = $2, started_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "357a52547c5317e7e8d8c19ea9884fc906d6eea562b3c4bb0c3c961b871e2a4d"
+}

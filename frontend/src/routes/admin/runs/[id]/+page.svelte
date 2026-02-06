@@ -1,9 +1,9 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
-import { Button } from '$lib/components/ui/button';
-import { RefreshCw, ArrowLeft, ExternalLink } from '@lucide/svelte';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
 import type { CaptureRun, CaptureRunItemWithContext } from '$lib/bindings';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
+import { Button } from '$lib/components/ui/button';
+import { ArrowLeft, ExternalLink, RefreshCw } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

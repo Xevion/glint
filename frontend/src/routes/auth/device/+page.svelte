@@ -1,12 +1,12 @@
 <script lang="ts">
-import { onMount } from 'svelte';
-import { fly, fade } from 'svelte/transition';
+import { resolve } from '$app/paths';
 import { createApiClient } from '$lib/api';
 import { ApiErrorType } from '$lib/api/errors';
-import { Button } from '$lib/components/ui/button';
-import { resolve } from '$app/paths';
-import { Monitor, CheckCircle, XCircle, Clock, Loader2 } from '@lucide/svelte';
 import type { DeviceCodeStatus } from '$lib/bindings';
+import { Button } from '$lib/components/ui/button';
+import { CheckCircle, Clock, Loader2, Monitor, XCircle } from '@lucide/svelte';
+import { onMount } from 'svelte';
+import { fade, fly } from 'svelte/transition';
 
 interface Props {
 	data: { userCode: string | null };

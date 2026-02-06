@@ -1,8 +1,8 @@
 <script lang="ts">
-import { fly, scale } from 'svelte/transition';
-import { Button } from '$lib/components/ui/button';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
+import { Button } from '$lib/components/ui/button';
 import { Search } from '@lucide/svelte';
+import { fly, scale } from 'svelte/transition';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

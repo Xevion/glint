@@ -1,7 +1,8 @@
 <script lang="ts">
-import { fade, scale } from 'svelte/transition';
-import { X, ChevronLeft, ChevronRight } from '@lucide/svelte';
 import { Button } from '$lib/components/ui/button';
+import { cfImageUrl } from '$lib/utils/image';
+import { ChevronLeft, ChevronRight, X } from '@lucide/svelte';
+import { fade, scale } from 'svelte/transition';
 
 interface CaptureItem {
 	id: string;
@@ -98,7 +99,7 @@ function handleBackdropClick(e: MouseEvent) {
 				class="relative max-h-[90vh] max-w-[90vw]"
 			>
 				<img
-					src={currentCapture.screenshot_url}
+					src={cfImageUrl(currentCapture.screenshot_url, 'full')}
 					alt="Capture fullscreen view"
 					class="max-h-[90vh] max-w-[90vw] object-contain"
 				/>

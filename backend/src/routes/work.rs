@@ -90,7 +90,7 @@ async fn get_work(
                 WHERE c.shader_version_id = sv.id
                   AND c.scene_id = s.id
                   AND c.profile = p.profile
-                  AND c.status = 'completed'
+                  AND c.status IN ('completed', 'uploading')
                   AND c.outdated = FALSE
               ))
 
@@ -111,7 +111,7 @@ async fn get_work(
                 WHERE c.shader_version_id = sv.id
                   AND c.scene_id = s.id
                   AND c.profile IS NULL
-                  AND c.status = 'completed'
+                  AND c.status IN ('completed', 'uploading')
                   AND c.outdated = FALSE
               ))
         )

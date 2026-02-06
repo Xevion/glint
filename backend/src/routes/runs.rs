@@ -9,7 +9,7 @@ use serde::Deserialize;
 use tracing::{debug, info};
 
 use crate::error::{AppError, AppResult};
-use crate::models::{CaptureRun, CaptureRunItemWithContext};
+use crate::models::{CaptureRun, CaptureRunItem, CaptureRunItemWithContext};
 use crate::repo::{CaptureRepo, CaptureRunRepo};
 use crate::state::AppState;
 
@@ -52,6 +52,25 @@ pub struct ReportFailureRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ClaimItemRequest {
+    pub resolution_width: i32,
+    pub resolution_height: i32,
+    pub captured_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct ClaimItemResponse {
+    pub capture_id: String,
+    pub presigned_url: String,
+    pub screenshot_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConfirmUploadRequest {
+    pub screenshot_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct UploadUrlRequest {
     pub shader_id: String,
     pub scene_id: String,
@@ -72,6 +91,8 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/items", get(list_run_items))
         .route("/{id}/items/{item_id}/complete", post(complete_item))
         .route("/{id}/items/{item_id}/fail", post(fail_item))
+        .route("/{id}/items/{item_id}/claim", post(claim_item))
+        .route("/{id}/items/{item_id}/confirm-upload", post(confirm_upload))
         .route("/{id}/complete", post(complete_run))
 }
 
@@ -179,6 +200,126 @@ async fn fail_item(
     )
     .await?;
 
+    Ok(StatusCode::OK)
+}
+
+async fn claim_item(
+    State(state): State<AppState>,
+    Path((run_id, item_id)): Path<(String, String)>,
+    Json(request): Json<ClaimItemRequest>,
+) -> AppResult<Json<ClaimItemResponse>> {
+    let db = state.db();
+
+    let items = CaptureRunRepo::list_items(db, &run_id).await?;
+    let item = items
+        .iter()
+        .find(|i| i.id == item_id)
+        .ok_or_else(|| AppError::NotFound(format!("Run item '{}' not found", item_id)))?;
+
+    // Look up shader_id from shader_version
+    struct ShaderIdRow {
+        shader_id: String,
+    }
+    let shader_row = sqlx::query_as!(
+        ShaderIdRow,
+        "SELECT shader_id FROM shader_versions WHERE id = $1",
+        item.shader_version_id
+    )
+    .fetch_one(db)
+    .await
+    .map_err(|e| AppError::Internal(e.into()))?;
+
+    let capture_id = nanoid!();
+    let r2_key = format!(
+        "captures/{}/{}/{}.png",
+        shader_row.shader_id, item.scene_id, capture_id
+    );
+
+    let r2_config = &state.config().r2;
+    let screenshot_url = r2_config.public_url_for_key(&r2_key);
+
+    // Generate presigned URL
+    let presigned_url = if let Some(s3) = state.s3() {
+        let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+        let presigned = s3
+            .put_object()
+            .bucket(bucket)
+            .key(&r2_key)
+            .content_type("image/png")
+            .presigned(
+                aws_sdk_s3::presigning::PresigningConfig::builder()
+                    .expires_in(std::time::Duration::from_secs(3600))
+                    .build()
+                    .expect("valid presigning config"),
+            )
+            .await
+            .map_err(|e| {
+                AppError::Internal(anyhow::anyhow!("Failed to generate presigned URL: {}", e))
+            })?;
+        presigned.uri().to_string()
+    } else {
+        format!("https://r2.example.com/{}", r2_key)
+    };
+
+    // Insert capture in 'uploading' status
+    CaptureRepo::insert_uploading(
+        db,
+        &capture_id,
+        &item.shader_version_id,
+        &item.scene_id,
+        item.profile.as_deref(),
+        Some(&screenshot_url),
+        Some(request.resolution_width),
+        Some(request.resolution_height),
+        Some(request.captured_at),
+    )
+    .await?;
+
+    // Update run item status to 'running' with capture_id
+    sqlx::query!(
+        "UPDATE capture_run_items SET status = 'running', capture_id = $2, started_at = now() WHERE id = $1",
+        item_id,
+        capture_id,
+    )
+    .execute(db)
+    .await
+    .map_err(|e| AppError::Internal(e.into()))?;
+
+    debug!(run_id, item_id, capture_id = %capture_id, "Claimed run item");
+    Ok(Json(ClaimItemResponse {
+        capture_id,
+        presigned_url,
+        screenshot_url,
+    }))
+}
+
+async fn confirm_upload(
+    State(state): State<AppState>,
+    Path((_run_id, item_id)): Path<(String, String)>,
+    Json(request): Json<ConfirmUploadRequest>,
+) -> AppResult<StatusCode> {
+    let db = state.db();
+
+    // Look up the run item to get capture_id
+    let item = sqlx::query_as!(
+        CaptureRunItem,
+        "SELECT * FROM capture_run_items WHERE id = $1",
+        item_id
+    )
+    .fetch_optional(db)
+    .await
+    .map_err(|e| AppError::Internal(e.into()))?
+    .ok_or_else(|| AppError::NotFound(format!("Run item '{}' not found", item_id)))?;
+
+    let capture_id = item
+        .capture_id
+        .as_deref()
+        .ok_or_else(|| AppError::BadRequest("Run item has no capture_id".to_string()))?;
+
+    CaptureRepo::confirm_upload(db, capture_id, request.screenshot_path.as_deref()).await?;
+    CaptureRunRepo::complete_item(db, &item_id, capture_id, None).await?;
+
+    debug!(item_id, capture_id, "Upload confirmed");
     Ok(StatusCode::OK)
 }
 

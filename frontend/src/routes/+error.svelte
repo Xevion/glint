@@ -1,8 +1,8 @@
 <script lang="ts">
-import { page } from '$app/stores';
 import { resolve } from '$app/paths';
-import { fly, fade } from 'svelte/transition';
+import { page } from '$app/stores';
 import { Button } from '$lib/components/ui/button';
+import { fade, fly } from 'svelte/transition';
 
 const statusMessages: Record<number, { title: string; description: string }> = {
 	404: {

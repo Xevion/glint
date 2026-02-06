@@ -1,7 +1,7 @@
 <script lang="ts">
 import { page } from '$app/state';
 import { navbar } from '$lib/stores/navigation.svelte';
-import { Home, Layers, GitCompare } from '@lucide/svelte';
+import { GitCompare, Home, Layers } from '@lucide/svelte';
 import ThemeToggle from './ThemeToggle.svelte';
 
 const staticTabs = [

@@ -1,10 +1,10 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import 'img-comparison-slider';
-import SplitCanvas from './SplitCanvas.svelte';
 import ShaderInfoOverlay from './ShaderInfoOverlay.svelte';
-import type { ShaderDisplayInfo, ElementLuminances, CompareMode } from './types';
-import { SLIDER, SAMPLING } from './constants';
+import SplitCanvas from './SplitCanvas.svelte';
+import { SAMPLING, SLIDER } from './constants';
+import type { CompareMode, ElementLuminances, ShaderDisplayInfo } from './types';
 
 interface Props {
 	leftImage: string;

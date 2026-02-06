@@ -1,18 +1,18 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
+import { api } from '$lib/api';
+import type { UpdateShaderRequest } from '$lib/api/endpoints/admin';
+import type { Shader } from '$lib/bindings';
+import AdminTable from '$lib/components/AdminTable.svelte';
+import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
+import { AdminDetailField, AdminSlideOver } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
 import { RefreshCw, Trash2 } from '@lucide/svelte';
-import AdminTable from '$lib/components/AdminTable.svelte';
-import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
-import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { api } from '$lib/api';
-import type { Shader } from '$lib/bindings';
-import type { UpdateShaderRequest } from '$lib/api/endpoints/admin';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

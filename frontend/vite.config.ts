@@ -1,8 +1,8 @@
-import devtoolsJson from 'vite-plugin-devtools-json';
-import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
 import { sveltePhosphorOptimize } from 'phosphor-svelte/vite';
+import { defineConfig } from 'vite';
+import devtoolsJson from 'vite-plugin-devtools-json';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit(), sveltePhosphorOptimize(), devtoolsJson()],

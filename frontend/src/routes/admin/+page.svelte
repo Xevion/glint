@@ -1,21 +1,21 @@
 <script lang="ts">
-import { onMount, onDestroy } from 'svelte';
 import { invalidateAll } from '$app/navigation';
+import type { CaptureWithContext } from '$lib/bindings';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Button } from '$lib/components/ui/button';
 import {
-	RefreshCw,
-	Play,
-	Pause,
-	Sparkles,
+	Activity,
+	ArrowRight,
+	Camera,
 	Globe,
 	Mountain,
-	Camera,
-	Users,
-	ArrowRight,
-	Activity
+	Pause,
+	Play,
+	RefreshCw,
+	Sparkles,
+	Users
 } from '@lucide/svelte';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
-import type { CaptureWithContext } from '$lib/bindings';
+import { onDestroy, onMount } from 'svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

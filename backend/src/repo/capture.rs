@@ -166,6 +166,71 @@ impl CaptureRepo {
         Ok(())
     }
 
+    /// Insert a capture in 'uploading' status (upload in flight, not yet confirmed)
+    #[instrument(skip(db), level = "debug")]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_uploading(
+        db: &DbPool,
+        id: &str,
+        shader_version_id: &str,
+        scene_id: &str,
+        profile: Option<&str>,
+        screenshot_url: Option<&str>,
+        resolution_width: Option<i32>,
+        resolution_height: Option<i32>,
+        captured_at: Option<DateTime<Utc>>,
+    ) -> AppResult<()> {
+        sqlx::query!(
+            r#"
+            INSERT INTO captures (
+                id, shader_version_id, scene_id, profile, screenshot_url,
+                resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, 'uploading', $8, $8, $8)
+            "#,
+            id,
+            shader_version_id,
+            scene_id,
+            profile,
+            screenshot_url,
+            resolution_width,
+            resolution_height,
+            captured_at
+        )
+        .execute(db)
+        .await
+        .context(format!(
+            "failed to insert uploading capture for scene '{}' with shader version '{}'",
+            scene_id, shader_version_id
+        ))?;
+
+        debug!(scene_id, shader_version_id, "Uploading capture inserted");
+        Ok(())
+    }
+
+    /// Confirm an upload: transition capture from 'uploading' to 'completed'
+    #[instrument(skip(db), level = "debug")]
+    pub async fn confirm_upload(
+        db: &DbPool,
+        id: &str,
+        screenshot_path: Option<&str>,
+    ) -> AppResult<bool> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE captures
+            SET status = 'completed', screenshot_path = $2, updated_at = now()
+            WHERE id = $1 AND status = 'uploading'
+            "#,
+            id,
+            screenshot_path
+        )
+        .execute(db)
+        .await
+        .context(format!("failed to confirm upload for capture '{}'", id))?;
+
+        debug!(id, "Capture upload confirmed");
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Mark captures as outdated for a scene (when scene is updated)
     #[instrument(skip(db), level = "debug")]
     pub async fn mark_outdated_for_scene(db: &DbPool, scene_id: &str) -> AppResult<u64> {

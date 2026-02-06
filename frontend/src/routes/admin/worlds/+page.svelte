@@ -1,19 +1,19 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
+import { api } from '$lib/api';
+import type { UpdateWorldRequest } from '$lib/api/endpoints/admin';
+import type { World } from '$lib/bindings';
+import AdminTable from '$lib/components/AdminTable.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
+import WorldUploadDialog from '$lib/components/WorldUploadDialog.svelte';
+import { AdminDetailField, AdminSlideOver } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
-import { RefreshCw, Trash2 } from '@lucide/svelte';
-import AdminTable from '$lib/components/AdminTable.svelte';
-import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
-import WorldUploadDialog from '$lib/components/WorldUploadDialog.svelte';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { api } from '$lib/api';
-import type { World } from '$lib/bindings';
-import type { UpdateWorldRequest } from '$lib/api/endpoints/admin';
 import { formatBytes } from '$lib/utils/display';
+import { RefreshCw, Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

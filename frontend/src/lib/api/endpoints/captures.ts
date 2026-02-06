@@ -1,7 +1,7 @@
-import type { Result } from 'true-myth';
-import type { ApiError } from '../errors';
 import type { CaptureWithContext } from '$lib/bindings';
+import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
+import type { ApiError } from '../errors';
 
 export class CaptureEndpoints extends ApiClient {
 	/**

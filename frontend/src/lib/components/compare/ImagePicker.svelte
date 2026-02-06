@@ -1,6 +1,7 @@
 <script lang="ts">
-import { Popover } from 'bits-ui';
+import { cfImageUrl } from '$lib/utils/image';
 import { ChevronDown } from '@lucide/svelte';
+import { Popover } from 'bits-ui';
 import type { ImageOption } from './types';
 
 interface Props {
@@ -31,7 +32,7 @@ function selectImage(url: string) {
 		<Popover.Trigger class="picker-trigger">
 			<div class="trigger-content">
 				<div class="thumbnail-wrapper">
-					<img src={value} alt={currentImage?.label ?? 'Selected'} class="thumbnail" />
+					<img src={cfImageUrl(value, 'thumbnail') ?? value} alt={currentImage?.label ?? 'Selected'} class="thumbnail" />
 				</div>
 				<span class="current-label">{currentImage?.label ?? 'Select image'}</span>
 				<ChevronDown class="chevron" size={16} />
@@ -47,7 +48,7 @@ function selectImage(url: string) {
 						class:selected={image.url === value}
 						onclick={() => selectImage(image.url)}
 					>
-						<img src={image.url} alt={image.label} />
+						<img src={cfImageUrl(image.url, 'thumbnail') ?? image.url} alt={image.label} />
 						<span class="grid-label">{image.label}</span>
 					</button>
 				{/each}

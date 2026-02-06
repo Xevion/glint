@@ -106,6 +106,28 @@ data class FailItemRequest(
     @SerialName("duration_ms") val durationMs: Int? = null,
 )
 
+/** Request to claim a run item for upload. */
+@Serializable
+data class ClaimItemRequest(
+    @SerialName("resolution_width") val resolutionWidth: Int,
+    @SerialName("resolution_height") val resolutionHeight: Int,
+    @SerialName("captured_at") val capturedAt: String,
+)
+
+/** Response from claiming a run item. */
+@Serializable
+data class ClaimItemResponse(
+    @SerialName("capture_id") val captureId: String,
+    @SerialName("presigned_url") val presignedUrl: String,
+    @SerialName("screenshot_url") val screenshotUrl: String,
+)
+
+/** Request to confirm an upload has completed. */
+@Serializable
+data class ConfirmUploadRequest(
+    @SerialName("screenshot_path") val screenshotPath: String? = null,
+)
+
 /** Request to report a persistent shader failure. */
 @Serializable
 data class ReportFailureRequest(

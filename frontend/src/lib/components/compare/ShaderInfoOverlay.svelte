@@ -1,8 +1,8 @@
 <script lang="ts">
-import { fade } from 'svelte/transition';
 import { onMount } from 'svelte';
-import type { ShaderDisplayInfo, ElementLuminances, ElementBounds } from './types';
+import { fade } from 'svelte/transition';
 import { LUMINANCE } from './constants';
+import type { ElementBounds, ElementLuminances, ShaderDisplayInfo } from './types';
 
 interface Props {
 	shader: ShaderDisplayInfo;

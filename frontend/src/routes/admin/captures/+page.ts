@@ -1,5 +1,5 @@
 import { createApiClient } from '$lib/api';
-import type { CaptureWithContext, Shader, SceneWithWorld } from '$lib/bindings';
+import type { CaptureWithContext, SceneWithWorld, Shader } from '$lib/bindings';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch, url }) => {

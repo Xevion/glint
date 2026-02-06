@@ -1,7 +1,7 @@
 <script lang="ts">
-import { DropdownMenu as DropdownMenuPrimitive } from 'bits-ui';
-import CircleIcon from '@lucide/svelte/icons/circle';
 import { cn } from '$lib/utils.js';
+import CircleIcon from '@lucide/svelte/icons/circle';
+import { DropdownMenu as DropdownMenuPrimitive } from 'bits-ui';
 
 type Props = Omit<DropdownMenuPrimitive.RadioItemProps, 'child'> & {
 	ref?: HTMLElement | null;

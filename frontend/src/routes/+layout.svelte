@@ -1,14 +1,14 @@
 <script lang="ts">
-import type { Snippet } from 'svelte';
-import { onMount } from 'svelte';
 import { OverlayScrollbars } from 'overlayscrollbars';
 import type { OverlayScrollbars as OverlayScrollbarsInstance } from 'overlayscrollbars';
+import type { Snippet } from 'svelte';
+import { onMount } from 'svelte';
 import 'overlayscrollbars/overlayscrollbars.css';
-import { themeStore } from '$lib/stores/theme.svelte';
-import { initNavigation } from '$lib/stores/navigation.svelte';
 import BackgroundImage from '$lib/components/BackgroundImage.svelte';
 import Navigation from '$lib/components/Navigation.svelte';
 import Sidebar from '$lib/components/Sidebar.svelte';
+import { initNavigation } from '$lib/stores/navigation.svelte';
+import { themeStore } from '$lib/stores/theme.svelte';
 import './layout.css';
 
 interface Props {

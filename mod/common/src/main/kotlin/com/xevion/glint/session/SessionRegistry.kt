@@ -14,10 +14,13 @@ object SessionRegistry {
      * Starts orchestration with the given capture spec.
      * @return true if orchestration started successfully, false if already running
      */
-    fun startOrchestration(spec: CaptureSpec): Boolean =
+    fun startOrchestration(
+        spec: CaptureSpec,
+        configure: ((Orchestrator) -> Unit)? = null,
+    ): Boolean =
         orchestratorManager.start(
             name = "Orchestration",
-            factory = { Orchestrator() },
+            factory = { Orchestrator().also { configure?.invoke(it) } },
             starter = { it.start(spec) },
             isRunning = { it.isRunning },
         )

@@ -1,10 +1,10 @@
 <script lang="ts">
-import { Button } from '$lib/components/ui/button';
-import { Input } from '$lib/components/ui/input';
-import { Search, LoaderCircle, Download, CircleAlert } from '@lucide/svelte';
 import { api } from '$lib/api';
 import type { ShaderSearchResult } from '$lib/bindings';
 import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
+import { Button } from '$lib/components/ui/button';
+import { Input } from '$lib/components/ui/input';
+import { CircleAlert, Download, LoaderCircle, Search } from '@lucide/svelte';
 
 let query = $state('');
 let results = $state<ShaderSearchResult[]>([]);

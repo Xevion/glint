@@ -1,11 +1,11 @@
 <script lang="ts">
+import { api } from '$lib/api';
+import type { AdoptPreviewResponse } from '$lib/bindings';
 import { Button } from '$lib/components/ui/button';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
-import { Download, LoaderCircle, CircleAlert, ArrowLeft, Check } from '@lucide/svelte';
-import { api } from '$lib/api';
-import type { AdoptPreviewResponse } from '$lib/bindings';
+import { ArrowLeft, Check, CircleAlert, Download, LoaderCircle } from '@lucide/svelte';
 import type { Snippet } from 'svelte';
 
 interface Props {

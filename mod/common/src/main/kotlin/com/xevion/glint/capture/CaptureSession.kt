@@ -44,6 +44,9 @@ class CaptureSession(
 
     private var sessionData: CaptureSessionData? = null
 
+    /** Called on main thread after each screenshot is taken, with the entry and the file on disk. */
+    var onScreenshotTaken: ((ScreenshotEntry, File) -> Unit)? = null
+
     /**
      * Internal shader configuration (pack name + optional profile).
      */
@@ -339,6 +342,9 @@ class CaptureSession(
                 "message" to message.string
             }
         }
+
+        val screenshotFile = File(outputDir, "screenshots/$screenshotName")
+        onScreenshotTaken?.invoke(screenshotEntries.last(), screenshotFile)
 
         transitionTo(State.PostCaptureCooldown)
     }

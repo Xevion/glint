@@ -12,6 +12,13 @@ import net.minecraft.client.Minecraft
 import java.io.File
 import java.time.Instant
 
+/** Event fired when a single screenshot is captured during orchestration. */
+data class ScreenshotCapturedEvent(
+    val entry: com.xevion.glint.screenshot.ScreenshotEntry,
+    val fileBytes: ByteArray,
+    val sceneId: String,
+)
+
 /**
  * Orchestrates multi-world, multi-scene capture sessions.
  *
@@ -22,6 +29,9 @@ import java.time.Instant
 class Orchestrator {
     private val log = Loggers.Orchestration.get()
     private val worldLoader = WorldLoader()
+
+    /** Called on main thread after each screenshot is captured, with file bytes read eagerly. */
+    var onScreenshotCaptured: ((ScreenshotCapturedEvent) -> Unit)? = null
 
     private var state: State = State.Idle
     private var ticksInState: Int = 0
@@ -181,7 +191,16 @@ class Orchestrator {
                     shaders = currentSpec.shaders,
                     outputDir = worldDir,
                     worldName = pair.worldFolder,
-                )
+                ).also { session ->
+                    session.onScreenshotTaken = { entry, file ->
+                        if (file.exists()) {
+                            val bytes = file.readBytes()
+                            onScreenshotCaptured?.invoke(
+                                ScreenshotCapturedEvent(entry, bytes, pair.sceneId),
+                            )
+                        }
+                    }
+                }
 
             if (!captureSession!!.start()) {
                 log.error("Failed to start capture session") { "scene_id" to pair.sceneId }

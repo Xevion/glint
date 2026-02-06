@@ -1,17 +1,18 @@
 <script lang="ts">
-import type { ShaderListItem } from '$lib/bindings';
-import {
-	formatDate,
-	getModrinthUrl,
-	getCurseforgeUrl,
-	hashStringToNumber
-} from '$lib/utils/display';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import type { ShaderListItem } from '$lib/bindings';
 import { comparisonStore } from '$lib/stores/comparison.svelte';
 import { cn } from '$lib/utils';
+import {
+	formatDate,
+	getCurseforgeUrl,
+	getModrinthUrl,
+	hashStringToNumber
+} from '$lib/utils/display';
+import { cfImageUrl } from '$lib/utils/image';
+import { Check, ExternalLink, Layers } from '@lucide/svelte';
 import BrandIcon from './icons/BrandIcon.svelte';
-import { Check, Layers, ExternalLink } from '@lucide/svelte';
 
 interface Props {
 	shader: ShaderListItem;
@@ -86,7 +87,7 @@ function handleCheckboxClick(e: MouseEvent) {
 	<!-- Thumbnail Image -->
 	<div class="relative aspect-video w-full overflow-hidden">
 		<img
-			src={shader.thumbnail_url ?? shader.icon_url ?? `/wallpapers/${wallpaperIndex}.jpg`}
+			src={cfImageUrl(shader.thumbnail_url, 'card') ?? shader.icon_url ?? `/wallpapers/${wallpaperIndex}.jpg`}
 			alt="{shader.name} preview"
 			class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
 			style="will-change: transform; backface-visibility: hidden;"

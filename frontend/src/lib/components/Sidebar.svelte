@@ -1,26 +1,26 @@
 <script lang="ts">
 import { page } from '$app/state';
-import {
-	Sparkles,
-	Mountain,
-	BookOpen,
-	Layers,
-	Palette,
-	Zap,
-	Sun,
-	Cloud,
-	TreePine,
-	LayoutDashboard,
-	Settings,
-	Globe,
-	Camera,
-	Users,
-	Menu,
-	Download,
-	Activity
-} from '@lucide/svelte';
-import * as Sheet from '$lib/components/ui/sheet';
 import { Button } from '$lib/components/ui/button';
+import * as Sheet from '$lib/components/ui/sheet';
+import {
+	Activity,
+	BookOpen,
+	Camera,
+	Cloud,
+	Download,
+	Globe,
+	Layers,
+	LayoutDashboard,
+	Menu,
+	Mountain,
+	Palette,
+	Settings,
+	Sparkles,
+	Sun,
+	TreePine,
+	Users,
+	Zap
+} from '@lucide/svelte';
 
 // Placeholder: would come from auth context
 const isAdmin = true;

@@ -1,12 +1,12 @@
-import { ShaderEndpoints } from './endpoints/shaders';
-import { SceneEndpoints } from './endpoints/scenes';
-import { CaptureEndpoints } from './endpoints/captures';
+import { API_BASE_URL } from './config';
 import { AdminEndpoints } from './endpoints/admin';
 import { AdoptEndpoints } from './endpoints/adopt';
-import { WorldsEndpoints } from './endpoints/worlds';
+import { CaptureEndpoints } from './endpoints/captures';
 import { DeviceEndpoints } from './endpoints/device';
 import { RunEndpoints } from './endpoints/runs';
-import { API_BASE_URL } from './config';
+import { SceneEndpoints } from './endpoints/scenes';
+import { ShaderEndpoints } from './endpoints/shaders';
+import { WorldsEndpoints } from './endpoints/worlds';
 
 /**
  * Create API client with optional custom fetch function

@@ -1,7 +1,7 @@
+import type { CreateWorldUploadResponse, World } from '$lib/bindings';
 import { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import { ApiError, ApiErrorType } from '../errors';
-import type { World, CreateWorldUploadResponse } from '$lib/bindings';
 
 export type { CreateWorldUploadResponse };
 

@@ -1,14 +1,15 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import { page as pageStore } from '$app/state';
-import { Button } from '$lib/components/ui/button';
-import { ConfirmDialog } from '$lib/components/ui/dialog';
-import { RefreshCw, Trash2 } from '@lucide/svelte';
-import AdminTable from '$lib/components/AdminTable.svelte';
-import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { api } from '$lib/api';
 import type { CaptureWithContext } from '$lib/bindings';
+import AdminTable from '$lib/components/AdminTable.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
+import { AdminDetailField, AdminSlideOver } from '$lib/components/admin';
+import { Button } from '$lib/components/ui/button';
+import { ConfirmDialog } from '$lib/components/ui/dialog';
+import { cfImageUrl } from '$lib/utils/image';
+import { RefreshCw, Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -164,7 +165,7 @@ async function confirmDelete() {
 			{#snippet cell({ columnId, value, row }: { columnId: string; value: unknown; row: CaptureWithContext })}
 				{#if columnId === 'preview'}
 					{#if value}
-						<img src={value as string} alt="Capture preview" class="h-12 w-20 rounded object-cover" />
+						<img src={cfImageUrl(value as string, 'thumbnail')} alt="Capture preview" class="h-12 w-20 rounded object-cover" />
 					{:else if row.screenshot_path}
 						<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">No URL</div>
 					{:else}
@@ -240,7 +241,7 @@ async function confirmDelete() {
 			{#if selected.screenshot_url}
 				<div>
 					<img
-						src={selected.screenshot_url}
+						src={cfImageUrl(selected.screenshot_url, 'hero')}
 						alt="Capture"
 						class="w-full rounded-lg border"
 					/>

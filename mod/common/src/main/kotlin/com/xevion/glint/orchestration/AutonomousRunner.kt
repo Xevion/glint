@@ -2,12 +2,10 @@ package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.AgentApi
-import com.xevion.glint.api.CompleteItemRequest
 import com.xevion.glint.api.CreateRunItemRequest
 import com.xevion.glint.api.CreateRunRequest
 import com.xevion.glint.api.FailItemRequest
 import com.xevion.glint.api.ReportFailureRequest
-import com.xevion.glint.api.UploadUrlRequest
 import com.xevion.glint.api.WorkItem
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.session.SessionRegistry
@@ -19,12 +17,13 @@ import kotlinx.serialization.json.put
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Drives the autonomous capture loop: fetch work → create run → capture → upload → repeat.
  *
- * Started once from TitleScreenMixin, advances each tick.
- * HTTP calls run on background threads; game-state operations run on the main thread.
+ * Screenshots are uploaded concurrently as they are captured via [UploadManager],
+ * rather than waiting for the entire capture group to finish.
  */
 class AutonomousRunner(
     private val apiUrl: String,
@@ -51,12 +50,17 @@ class AutonomousRunner(
     private var groupSuccessCount: Int = 0
     private var consecutiveEmptyRuns: Int = 0
 
+    // Concurrent upload state
+    private var uploadManager: UploadManager? = null
+    private val submittedItemIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private var waitStartTime: Long = 0
+
     private enum class State {
         FetchingWork,
         CreatingRun,
         PreparingCapture,
         Capturing,
-        UploadingResults,
+        WaitingForUploads,
         FinalizingRun,
         Done,
     }
@@ -97,8 +101,8 @@ class AutonomousRunner(
                 tickCapturing()
             }
 
-            State.UploadingResults -> {
-                tickUploadingResults()
+            State.WaitingForUploads -> {
+                tickWaitingForUploads()
             }
 
             State.FinalizingRun -> {
@@ -284,7 +288,11 @@ class AutonomousRunner(
                 "scene_count" to spec.sceneIds.size
                 "shader_count" to spec.shaders.size
             }
-            if (SessionRegistry.startOrchestration(spec)) {
+            val started =
+                SessionRegistry.startOrchestration(spec) { orchestrator ->
+                    orchestrator.onScreenshotCaptured = { event -> handleScreenshotCaptured(event) }
+                }
+            if (started) {
                 state = State.Capturing
             } else {
                 log.error("Failed to start orchestration")
@@ -298,188 +306,117 @@ class AutonomousRunner(
         }
     }
 
+    // -- Screenshot callback (called on main thread) --
+
+    private fun handleScreenshotCaptured(event: ScreenshotCapturedEvent) {
+        val group = shaderGroups.getOrNull(currentGroupIndex) ?: return
+        val runId = currentRunId ?: return
+
+        val key = Triple(group.shaderVersionId, event.sceneId, event.entry.shader?.profile)
+        val itemId = itemLookup[key]
+        if (itemId == null) {
+            log.warn("No run item found for captured screenshot") {
+                "scene_id" to event.sceneId
+                "profile" to (event.entry.shader?.profile ?: "null")
+            }
+            return
+        }
+
+        // Lazily create the upload manager for this run
+        if (uploadManager == null) {
+            uploadManager = UploadManager(apiUrl, apiToken, runId)
+        }
+
+        submittedItemIds.add(itemId)
+
+        uploadManager!!.submit(
+            UploadManager.UploadTask(
+                itemId = itemId,
+                fileBytes = event.fileBytes,
+                resolutionWidth = event.entry.resolution.width,
+                resolutionHeight = event.entry.resolution.height,
+                capturedAt = event.entry.timestamp,
+                sceneId = event.sceneId,
+                profile = event.entry.shader?.profile,
+            ),
+        )
+
+        log.debug("Submitted upload") {
+            "item_id" to itemId
+            "scene_id" to event.sceneId
+            "bytes" to event.fileBytes.size
+        }
+    }
+
     // -- Capturing --
 
     private fun tickCapturing() {
         if (!SessionRegistry.isOrchestrationActive()) {
+            val group = shaderGroups[currentGroupIndex]
             log.info("Orchestration complete") {
-                "shader" to shaderGroups[currentGroupIndex].shaderName
+                "shader" to group.shaderName
             }
-            startUpload()
+
+            // Fail any items that didn't produce a screenshot
+            val runId = currentRunId
+            if (runId != null) {
+                for (item in group.items) {
+                    val key = Triple(group.shaderVersionId, item.sceneId, item.profile)
+                    val itemId = itemLookup[key] ?: continue
+                    if (itemId !in submittedItemIds) {
+                        AgentApi.failItem(
+                            apiUrl,
+                            apiToken,
+                            runId,
+                            itemId,
+                            FailItemRequest(errorMessage = "No screenshot produced"),
+                        )
+                    }
+                }
+            }
+
+            // Check if uploads are still pending
+            if (uploadManager?.hasPending == true) {
+                waitStartTime = System.currentTimeMillis()
+                state = State.WaitingForUploads
+            } else {
+                if (uploadManager != null) {
+                    groupSuccessCount++
+                }
+                advanceToNextGroup()
+            }
         }
     }
 
-    // -- UploadingResults --
+    // -- WaitingForUploads --
 
-    private fun startUpload() {
-        state = State.UploadingResults
-        val group = shaderGroups[currentGroupIndex]
-
-        pendingFuture =
-            CompletableFuture.supplyAsync {
-                uploadGroupResults(group)
+    private fun tickWaitingForUploads() {
+        val manager =
+            uploadManager ?: run {
+                advanceToNextGroup()
+                return
             }
-    }
 
-    private fun tickUploadingResults() {
-        val future = pendingFuture as? CompletableFuture<*> ?: return
-        if (!future.isDone) return
-
-        pendingFuture = null
-
-        @Suppress("UNCHECKED_CAST")
-        val result = (future as CompletableFuture<Result<Unit>>).join()
-
-        result
-            .onSuccess {
+        if (!manager.hasPending) {
+            log.info("All uploads drained") {
+                "completed" to manager.completed
+                "failed" to manager.failed
+            }
+            if (manager.completed > 0) {
                 groupSuccessCount++
-                log.info("Group upload complete") {
-                    "shader" to shaderGroups[currentGroupIndex].shaderName
-                }
-            }.onFailure { error ->
-                log.error("Group upload failed") { "error" to error.message }
             }
-
-        advanceToNextGroup()
-    }
-
-    private fun uploadGroupResults(group: ShaderGroup): Result<Unit> {
-        val mc = Minecraft.getInstance()
-        val runId = currentRunId!!
-        val outputDir = File(mc.gameDirectory, "glint/runs/$runId")
-        val manifestFile = File(outputDir, "manifest.json")
-
-        if (!manifestFile.exists()) {
-            val partialFile = File(outputDir, "manifest_partial.json")
-            val message =
-                if (partialFile.exists()) {
-                    log.warn("Only partial manifest found") { "shader" to group.shaderName }
-                    "Capture only partially completed"
-                } else {
-                    "No manifest produced"
-                }
-            failGroupItems(group, message)
-            return Result.failure(RuntimeException(message))
+            advanceToNextGroup()
+            return
         }
 
-        val manifest =
-            try {
-                json.decodeFromString<OrchestrationManifest>(manifestFile.readText())
-            } catch (e: Exception) {
-                val message = "Failed to parse manifest: ${e.message}"
-                failGroupItems(group, message)
-                return Result.failure(RuntimeException(message))
+        val elapsed = System.currentTimeMillis() - waitStartTime
+        if (elapsed > UPLOAD_DRAIN_TIMEOUT_MS) {
+            log.warn("Upload drain timed out after ${elapsed}ms, proceeding") {
+                "completed" to manager.completed
+                "failed" to manager.failed
             }
-
-        // Build a set of successfully captured (sceneId, profile) pairs from manifest
-        data class ScreenshotInfo(
-            val file: File,
-            val sceneId: String,
-            val profile: String?,
-            val resolution: com.xevion.glint.screenshot.Resolution,
-            val timestamp: String,
-        )
-
-        val capturedScreenshots = mutableListOf<ScreenshotInfo>()
-
-        for (session in manifest.sessions) {
-            for (screenshot in session.screenshots) {
-                val sessionBase = File(mc.gameDirectory, session.sessionDir)
-                val file = File(sessionBase, "${session.sceneId}/${screenshot.file}")
-                if (file.exists()) {
-                    capturedScreenshots.add(
-                        ScreenshotInfo(
-                            file = file,
-                            sceneId = session.sceneId,
-                            profile = screenshot.shader?.profile,
-                            resolution = screenshot.resolution,
-                            timestamp = screenshot.timestamp,
-                        ),
-                    )
-                } else {
-                    log.warn("Screenshot file not found") { "path" to file.absolutePath }
-                }
-            }
+            advanceToNextGroup()
         }
-
-        // Track which items were successfully uploaded
-        val completedKeys = mutableSetOf<Triple<String, String, String?>>()
-
-        for (info in capturedScreenshots) {
-            val key = Triple(group.shaderVersionId, info.sceneId, info.profile)
-            val itemId = itemLookup[key]
-            if (itemId == null) {
-                log.warn("No run item found for screenshot") {
-                    "scene_id" to info.sceneId
-                    "profile" to (info.profile ?: "null")
-                }
-                continue
-            }
-
-            try {
-                // Get presigned upload URL
-                val uploadUrlResult =
-                    AgentApi.getUploadUrl(
-                        apiUrl,
-                        apiToken,
-                        UploadUrlRequest(shaderId = group.shaderId, sceneId = info.sceneId),
-                    )
-                val uploadUrl = uploadUrlResult.getOrThrow()
-
-                // Upload the file
-                val uploadResult = AgentApi.uploadFile(uploadUrl.presignedUrl, info.file.readBytes())
-                uploadResult.getOrThrow()
-
-                // Report completion
-                val relativePath = info.file.relativeTo(mc.gameDirectory).path
-                val completeResult =
-                    AgentApi.completeItem(
-                        apiUrl,
-                        apiToken,
-                        runId,
-                        itemId,
-                        CompleteItemRequest(
-                            captureId = uploadUrl.captureId,
-                            screenshotPath = relativePath,
-                            screenshotUrl = uploadUrl.screenshotUrl,
-                            resolutionWidth = info.resolution.width,
-                            resolutionHeight = info.resolution.height,
-                            capturedAt = info.timestamp,
-                        ),
-                    )
-                completeResult.getOrThrow()
-                completedKeys.add(key)
-            } catch (e: Exception) {
-                log.error("Failed to upload/complete item") {
-                    "item_id" to itemId
-                    "error" to e.message
-                }
-                AgentApi.failItem(
-                    apiUrl,
-                    apiToken,
-                    runId,
-                    itemId,
-                    FailItemRequest(errorMessage = "Upload failed: ${e.message}"),
-                )
-            }
-        }
-
-        // Fail any items that had no matching screenshot
-        for (item in group.items) {
-            val key = Triple(group.shaderVersionId, item.sceneId, item.profile)
-            if (key !in completedKeys) {
-                val itemId = itemLookup[key] ?: continue
-                AgentApi.failItem(
-                    apiUrl,
-                    apiToken,
-                    runId,
-                    itemId,
-                    FailItemRequest(errorMessage = "No screenshot produced"),
-                )
-            }
-        }
-
-        return Result.success(Unit)
     }
 
     // -- FinalizingRun --
@@ -532,6 +469,9 @@ class AutonomousRunner(
         shaderGroups = emptyList()
         currentGroupIndex = 0
         groupSuccessCount = 0
+        uploadManager?.shutdown()
+        uploadManager = null
+        submittedItemIds.clear()
 
         if (consecutiveEmptyRuns >= 2) {
             log.warn("Stopping after $consecutiveEmptyRuns consecutive runs with no successful uploads")
@@ -544,6 +484,9 @@ class AutonomousRunner(
     // -- Helpers --
 
     private fun advanceToNextGroup() {
+        // Clean up per-group upload state
+        submittedItemIds.clear()
+
         currentGroupIndex++
         if (currentGroupIndex >= shaderGroups.size) {
             startFinalizingRun()
@@ -831,8 +774,20 @@ class AutonomousRunner(
     }
 
     private fun shutdown() {
+        uploadManager?.let { manager ->
+            if (manager.hasPending) {
+                log.info("Draining pending uploads before shutdown...")
+                manager.awaitAll(timeoutMs = 60_000)
+            }
+            manager.shutdown()
+        }
+
         state = State.Done
         log.info("Autonomous runner shutting down")
         Minecraft.getInstance().stop()
+    }
+
+    companion object {
+        private const val UPLOAD_DRAIN_TIMEOUT_MS = 5 * 60 * 1000L // 5 minutes
     }
 }

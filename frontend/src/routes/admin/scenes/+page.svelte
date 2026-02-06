@@ -1,18 +1,18 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
+import { api } from '$lib/api';
+import type { UpdateSceneMetadataRequest } from '$lib/api/endpoints/admin';
+import type { SceneWithWorld } from '$lib/bindings';
+import AdminTable from '$lib/components/AdminTable.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
+import { AdminDetailField, AdminSlideOver } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
+import * as Checkbox from '$lib/components/ui/checkbox';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
-import * as Checkbox from '$lib/components/ui/checkbox';
-import { RefreshCw, Trash2, RotateCcw } from '@lucide/svelte';
-import AdminTable from '$lib/components/AdminTable.svelte';
-import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { api } from '$lib/api';
-import type { SceneWithWorld } from '$lib/bindings';
-import type { UpdateSceneMetadataRequest } from '$lib/api/endpoints/admin';
+import { RefreshCw, RotateCcw, Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

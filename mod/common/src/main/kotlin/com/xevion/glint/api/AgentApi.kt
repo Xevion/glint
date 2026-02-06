@@ -264,6 +264,79 @@ object AgentApi {
         }
     }
 
+    /** Claims a run item, returning a presigned URL for upload. */
+    fun claimItem(
+        apiUrl: String,
+        token: String,
+        runId: String,
+        itemId: String,
+        request: ClaimItemRequest,
+    ): Result<ClaimItemResponse> {
+        val url = "$apiUrl/api/runs/$runId/items/$itemId/claim"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setBearerAuth(token)
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 10000
+            connection.readTimeout = 30000
+
+            val requestBody = JSON.encodeToString(ClaimItemRequest.serializer(), request)
+            connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                in 200..299 -> {
+                    val body = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    val response = JSON.decodeFromString<ClaimItemResponse>(body)
+                    Result.success(response)
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /** Confirms that an upload has completed successfully. */
+    fun confirmUpload(
+        apiUrl: String,
+        token: String,
+        runId: String,
+        itemId: String,
+        request: ConfirmUploadRequest,
+    ): Result<Unit> {
+        val url = "$apiUrl/api/runs/$runId/items/$itemId/confirm-upload"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setBearerAuth(token)
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 30000
+
+            val requestBody = JSON.encodeToString(ConfirmUploadRequest.serializer(), request)
+            connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                in 200..299 -> Result.success(Unit)
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
     /** Finalizes a capture run. */
     fun completeRun(
         apiUrl: String,

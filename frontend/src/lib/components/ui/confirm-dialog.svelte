@@ -1,6 +1,6 @@
 <script lang="ts">
-import * as Dialog from './dialog';
 import { Button } from './button';
+import * as Dialog from './dialog';
 
 interface Props {
 	open: boolean;

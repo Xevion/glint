@@ -1,14 +1,14 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
+import { api } from '$lib/api';
+import type { User, UserWithSessions } from '$lib/bindings';
+import AdminTable from '$lib/components/AdminTable.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
+import { AdminDetailField, AdminSlideOver } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
 import { RefreshCw, Trash2 } from '@lucide/svelte';
-import AdminTable from '$lib/components/AdminTable.svelte';
-import { AdminSlideOver, AdminDetailField } from '$lib/components/admin';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { api } from '$lib/api';
-import type { User, UserWithSessions } from '$lib/bindings';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
