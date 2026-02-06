@@ -3,7 +3,6 @@ use chrono::{Duration, Utc};
 use rand::Rng;
 use tracing::{debug, instrument};
 
-use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
 use crate::models::{Session, SessionInfo, User};
 
@@ -35,8 +34,12 @@ struct UserSessionRow {
 impl SessionRepo {
     /// Create a new session for a user
     /// `source` indicates how the session was created: "web" (browser) or "device" (mod)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn create(db: &DbPool, user_id: i32, source: &str) -> AppResult<Session> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn create(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_id: i32,
+        source: &str,
+    ) -> AppResult<Session> {
         let token = generate_session_token();
         let expires_at = Utc::now() + Duration::days(SESSION_DURATION_DAYS);
 
@@ -52,7 +55,7 @@ impl SessionRepo {
             expires_at,
             source
         )
-        .fetch_one(db)
+        .fetch_one(executor)
         .await
         .context(format!("failed to create session for user '{}'", user_id))?;
 
@@ -61,8 +64,11 @@ impl SessionRepo {
     }
 
     /// Validate a session token and return the associated user and session
-    #[instrument(skip(db, token), level = "debug")]
-    pub async fn validate(db: &DbPool, token: &str) -> AppResult<(User, Session)> {
+    #[instrument(skip(executor, token), level = "debug")]
+    pub async fn validate(
+        executor: impl sqlx::PgExecutor<'_>,
+        token: &str,
+    ) -> AppResult<(User, Session)> {
         let result = sqlx::query_as!(
             UserSessionRow,
             r#"
@@ -83,7 +89,7 @@ impl SessionRepo {
             "#,
             token
         )
-        .fetch_optional(db)
+        .fetch_optional(executor)
         .await
         .context("failed to validate session")?;
 
@@ -114,10 +120,10 @@ impl SessionRepo {
     }
 
     /// Delete a session by token
-    #[instrument(skip(db, token), level = "debug")]
-    pub async fn delete(db: &DbPool, token: &str) -> AppResult<bool> {
+    #[instrument(skip(executor, token), level = "debug")]
+    pub async fn delete(executor: impl sqlx::PgExecutor<'_>, token: &str) -> AppResult<bool> {
         let result = sqlx::query!("DELETE FROM sessions WHERE token = $1", token)
-            .execute(db)
+            .execute(executor)
             .await
             .context("failed to delete session")?;
 
@@ -129,10 +135,10 @@ impl SessionRepo {
     }
 
     /// Delete all expired sessions (cleanup task)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn delete_expired(db: &DbPool) -> AppResult<u64> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn delete_expired(executor: impl sqlx::PgExecutor<'_>) -> AppResult<u64> {
         let result = sqlx::query!("DELETE FROM sessions WHERE expires_at < now()")
-            .execute(db)
+            .execute(executor)
             .await
             .context("failed to delete expired sessions")?;
 
@@ -144,10 +150,13 @@ impl SessionRepo {
     }
 
     /// Delete all sessions for a user (e.g., when changing password or role)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn delete_for_user(db: &DbPool, user_id: i32) -> AppResult<u64> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn delete_for_user(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_id: i32,
+    ) -> AppResult<u64> {
         let result = sqlx::query!("DELETE FROM sessions WHERE user_id = $1", user_id)
-            .execute(db)
+            .execute(executor)
             .await
             .context(format!("failed to delete sessions for user '{}'", user_id))?;
 
@@ -159,8 +168,11 @@ impl SessionRepo {
     }
 
     /// List sessions for a user (for admin dashboard)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn list_for_user(db: &DbPool, user_id: i32) -> AppResult<Vec<SessionInfo>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_for_user(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_id: i32,
+    ) -> AppResult<Vec<SessionInfo>> {
         let sessions = sqlx::query!(
             r#"
             SELECT token, created_at, expires_at
@@ -170,7 +182,7 @@ impl SessionRepo {
             "#,
             user_id
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context(format!("failed to list sessions for user '{}'", user_id))?;
 

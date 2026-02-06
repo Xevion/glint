@@ -6,7 +6,8 @@ use oauth2::{EndpointNotSet, EndpointSet};
 
 use crate::{
     config::Config,
-    db::DbPool,
+    db::{DbPool, DbTransaction},
+    error::AppResult,
     platform::{curseforge::CurseForgeClient, modrinth::ModrinthClient},
 };
 
@@ -76,6 +77,10 @@ impl AppState {
 
     pub fn curseforge(&self) -> Option<&CurseForgeClient> {
         self.inner.curseforge.as_ref()
+    }
+
+    pub async fn begin_tx(&self) -> AppResult<DbTransaction<'_>> {
+        Ok(self.inner.db.begin().await?)
     }
 }
 

@@ -16,8 +16,8 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 pub struct CaptureListParams {
-    pub page: Option<i64>,
-    pub page_size: Option<i64>,
+    pub page: Option<i32>,
+    pub page_size: Option<i32>,
     pub shader: Option<String>,
     pub scene: Option<String>,
     pub status: Option<String>,
@@ -48,10 +48,10 @@ async fn list_captures_all(
     let page_size = params.page_size.unwrap_or(50).clamp(1, 250);
     let offset = (page - 1) * page_size;
 
-    let (items, total_count) = CaptureRepo::list_all_with_context_paginated(
+    let (items, total) = CaptureRepo::list_all_with_context_paginated(
         state.db(),
-        page_size,
-        offset,
+        page_size as i64,
+        offset as i64,
         params.shader.as_deref(),
         params.scene.as_deref(),
         params.status.as_deref(),
@@ -61,7 +61,7 @@ async fn list_captures_all(
 
     Ok(Json(PaginatedCaptures {
         items,
-        total_count,
+        total,
         page,
         page_size,
     }))

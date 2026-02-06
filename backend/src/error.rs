@@ -6,6 +6,8 @@ use axum::{
 use serde_json::json;
 use tracing::error;
 
+use crate::platform::PlatformError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("Not found: {0}")]
@@ -19,6 +21,9 @@ pub enum AppError {
 
     #[error("Gone: {0}")]
     Gone(String),
+
+    #[error("Rate limited, retry after {retry_after_secs}s")]
+    RateLimited { retry_after_secs: u64 },
 
     #[error("Service unavailable: {0}")]
     ServiceUnavailable(String),
@@ -48,8 +53,45 @@ impl From<anyhow::Error> for AppError {
     }
 }
 
+impl From<PlatformError> for AppError {
+    fn from(e: PlatformError) -> Self {
+        match e {
+            PlatformError::NotFound => AppError::NotFound("Resource not found on platform".into()),
+            PlatformError::RateLimited { retry_after_secs } => {
+                AppError::RateLimited { retry_after_secs }
+            }
+            PlatformError::BadStatus { status, body } => {
+                error!(status, body = %body, "Platform API error");
+                AppError::ServiceUnavailable(format!("Platform API returned status {}", status))
+            }
+            PlatformError::Http(e) => {
+                error!(error = ?e, "Platform HTTP error");
+                AppError::ServiceUnavailable("Failed to connect to platform API".into())
+            }
+            PlatformError::Deserialize { url, source, .. } => {
+                error!(url = %url, error = ?source, "Failed to parse platform response");
+                AppError::Internal(source.into())
+            }
+        }
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        // Handle RateLimited separately to add Retry-After header
+        if let AppError::RateLimited { retry_after_secs } = &self {
+            let body = Json(json!({
+                "error": self.to_string(),
+                "code": "RATE_LIMITED"
+            }));
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                [("retry-after", retry_after_secs.to_string())],
+                body,
+            )
+                .into_response();
+        }
+
         let (status, error_code, message) = match &self {
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone()),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg.clone()),
@@ -79,6 +121,7 @@ impl IntoResponse for AppError {
                     "Internal server error occurred".to_string(),
                 )
             }
+            AppError::RateLimited { .. } => unreachable!("handled above"),
         };
 
         let body = Json(json!({

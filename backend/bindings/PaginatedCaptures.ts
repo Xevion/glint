@@ -4,4 +4,4 @@ import type { CaptureWithContext } from "./CaptureWithContext";
 /**
  * Paginated captures response envelope
  */
-export type PaginatedCaptures = { items: Array<CaptureWithContext>, total: number, page: number, pageSize: number, };
+export type PaginatedCaptures = { items: Array<CaptureWithContext>, total: bigint, page: number, pageSize: number, };

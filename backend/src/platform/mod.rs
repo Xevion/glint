@@ -1,6 +1,7 @@
 pub mod curseforge;
 pub mod modrinth;
 
+use chrono::{DateTime, Utc};
 use reqwest::Response;
 use serde::de::DeserializeOwned;
 use tracing::debug;
@@ -92,6 +93,45 @@ pub enum PlatformError {
 }
 
 pub type PlatformResult<T> = Result<T, PlatformError>;
+
+/// Platform-agnostic shader project data (metadata + authors)
+pub struct ProjectData {
+    pub metadata: PlatformMetadata,
+    pub authors: Vec<PlatformAuthor>,
+}
+
+/// Platform-agnostic shader metadata
+pub struct PlatformMetadata {
+    pub platform_id: String,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub icon_url: Option<String>,
+    pub source_url: Option<String>,
+    pub website_url: Option<String>,
+    pub license_id: Option<String>,
+    pub downloads: u64,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// A version/file from a platform, normalized to a common format
+pub struct PlatformVersion {
+    pub version_number: String,
+    pub modrinth_version_id: Option<String>,
+    pub curseforge_file_id: Option<i32>,
+    pub download_url: Option<String>,
+    pub file_hash: Option<String>,
+    pub file_size: Option<i64>,
+    pub game_versions_json: Option<String>,
+    pub release_channel: Option<String>,
+    pub published_at: Option<DateTime<Utc>>,
+}
+
+/// An author from a platform
+pub struct PlatformAuthor {
+    pub name: String,
+    pub url: Option<String>,
+}
 
 /// Extension trait on reqwest::RequestBuilder for shared response handling
 pub(crate) trait RequestBuilderExt {

@@ -375,12 +375,13 @@ pub struct CaptureWithContext {
 
 /// Paginated captures response envelope
 #[derive(Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct PaginatedCaptures {
     pub items: Vec<CaptureWithContext>,
-    pub total_count: i64,
-    pub page: i64,
-    pub page_size: i64,
+    pub total: i64,
+    pub page: i32,
+    pub page_size: i32,
 }
 
 /// Shader author from upstream platform

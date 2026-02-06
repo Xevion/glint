@@ -288,7 +288,9 @@ function getStepDescription(currentStep: Step): string {
 
 <Dialog.Root bind:open>
 	<Dialog.Trigger>
-		<Button><Plus class="mr-2 h-4 w-4" />Create World</Button>
+		{#snippet child({ props })}
+			<Button {...props}><Plus class="mr-2 h-4 w-4" />Create World</Button>
+		{/snippet}
 	</Dialog.Trigger>
 
 	<Dialog.Content class="sm:max-w-125">

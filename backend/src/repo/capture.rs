@@ -10,31 +10,56 @@ use crate::models::{Capture, CaptureWithContext};
 
 pub struct CaptureRepo;
 
+const CAPTURE_WITH_CONTEXT_BASE: &str = r#"
+    SELECT
+        c.id,
+        c.scene_id,
+        s.slug as shader_slug,
+        s.name as shader_name,
+        sv.version as shader_version,
+        c.profile,
+        c.screenshot_path,
+        c.screenshot_url,
+        c.captured_at,
+        c.resolution_width,
+        c.resolution_height,
+        cri.run_id,
+        cr.status as run_status
+    FROM captures c
+    JOIN shader_versions sv ON c.shader_version_id = sv.id
+    JOIN shaders s ON sv.shader_id = s.id
+    LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
+    LEFT JOIN capture_runs cr ON cri.run_id = cr.id
+"#;
+
 impl CaptureRepo {
-    #[instrument(skip(db), level = "debug")]
-    pub async fn find_by_id(db: &DbPool, id: &str) -> AppResult<Option<Capture>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn find_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+    ) -> AppResult<Option<Capture>> {
         sqlx::query_as!(Capture, "SELECT * FROM captures WHERE id = $1", id)
-            .fetch_optional(db)
+            .fetch_optional(executor)
             .await
             .context(format!("failed to find capture '{}'", id))
             .map_err(Into::into)
     }
 
-    #[instrument(skip(db), level = "debug")]
-    pub async fn get_by_id(db: &DbPool, id: &str) -> AppResult<Capture> {
-        Self::find_by_id(db, id)
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn get_by_id(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<Capture> {
+        Self::find_by_id(executor, id)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
     }
 
     /// List all completed captures
-    #[instrument(skip(db), level = "debug")]
-    pub async fn list_completed(db: &DbPool) -> AppResult<Vec<Capture>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_completed(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<Capture>> {
         let captures = sqlx::query_as!(
             Capture,
             "SELECT * FROM captures WHERE status = 'completed' ORDER BY created_at DESC"
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context("failed to list completed captures")?;
 
@@ -43,9 +68,9 @@ impl CaptureRepo {
     }
 
     /// List captures by shader version
-    #[instrument(skip(db), level = "debug")]
+    #[instrument(skip(executor), level = "debug")]
     pub async fn list_by_shader_version(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         shader_version_id: &str,
     ) -> AppResult<Vec<Capture>> {
         let captures = sqlx::query_as!(
@@ -53,7 +78,7 @@ impl CaptureRepo {
             "SELECT * FROM captures WHERE shader_version_id = $1 ORDER BY created_at DESC",
             shader_version_id
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context(format!(
             "failed to list captures for shader version '{}'",
@@ -65,14 +90,17 @@ impl CaptureRepo {
     }
 
     /// List captures by scene
-    #[instrument(skip(db), level = "debug")]
-    pub async fn list_by_scene(db: &DbPool, scene_id: &str) -> AppResult<Vec<Capture>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_by_scene(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_id: &str,
+    ) -> AppResult<Vec<Capture>> {
         let captures = sqlx::query_as!(
             Capture,
             "SELECT * FROM captures WHERE scene_id = $1 ORDER BY created_at DESC",
             scene_id
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context(format!("failed to list captures for scene '{}'", scene_id))?;
 
@@ -81,53 +109,33 @@ impl CaptureRepo {
     }
 
     /// Fetch captures with shader/version context for a scene (for scene detail page)
-    #[instrument(skip(db), level = "debug")]
+    #[instrument(skip(executor), level = "debug")]
     pub async fn list_with_context_for_scene(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         scene_id: &str,
     ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = sqlx::query_as::<_, CaptureWithContext>(
-            r#"
-            SELECT
-                c.id,
-                c.scene_id,
-                s.slug as shader_slug,
-                s.name as shader_name,
-                sv.version as shader_version,
-                c.profile,
-                c.screenshot_path,
-                c.screenshot_url,
-                c.captured_at,
-                c.resolution_width,
-                c.resolution_height,
-                cri.run_id,
-                cr.status as run_status
-            FROM captures c
-            JOIN shader_versions sv ON c.shader_version_id = sv.id
-            JOIN shaders s ON sv.shader_id = s.id
-            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
-            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
-            WHERE c.scene_id = $1 AND c.status = 'completed'
-            ORDER BY s.name, sv.created_at DESC
-            "#,
-        )
-        .bind(scene_id)
-        .fetch_all(db)
-        .await
-        .context(format!(
-            "failed to get captures with context for scene '{}'",
-            scene_id
-        ))?;
+        let sql = format!(
+            "{} WHERE c.scene_id = $1 AND c.status = 'completed' ORDER BY s.name, sv.created_at DESC",
+            CAPTURE_WITH_CONTEXT_BASE
+        );
+        let captures = sqlx::query_as::<_, CaptureWithContext>(&sql)
+            .bind(scene_id)
+            .fetch_all(executor)
+            .await
+            .context(format!(
+                "failed to get captures with context for scene '{}'",
+                scene_id
+            ))?;
 
         debug!(count = captures.len(), "Fetched captures with context");
         Ok(captures)
     }
 
     /// Insert a new capture (append-only — no upsert)
-    #[instrument(skip(db), level = "debug")]
+    #[instrument(skip(executor), level = "debug")]
     #[allow(clippy::too_many_arguments)]
     pub async fn insert(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         id: &str,
         shader_version_id: &str,
         scene_id: &str,
@@ -155,7 +163,7 @@ impl CaptureRepo {
             resolution_height,
             captured_at
         )
-        .execute(db)
+        .execute(executor)
         .await
         .context(format!(
             "failed to insert capture for scene '{}' with shader version '{}'",
@@ -167,10 +175,10 @@ impl CaptureRepo {
     }
 
     /// Insert a capture in 'uploading' status (upload in flight, not yet confirmed)
-    #[instrument(skip(db), level = "debug")]
+    #[instrument(skip(executor), level = "debug")]
     #[allow(clippy::too_many_arguments)]
     pub async fn insert_uploading(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         id: &str,
         shader_version_id: &str,
         scene_id: &str,
@@ -196,7 +204,7 @@ impl CaptureRepo {
             resolution_height,
             captured_at
         )
-        .execute(db)
+        .execute(executor)
         .await
         .context(format!(
             "failed to insert uploading capture for scene '{}' with shader version '{}'",
@@ -208,9 +216,9 @@ impl CaptureRepo {
     }
 
     /// Confirm an upload: transition capture from 'uploading' to 'completed'
-    #[instrument(skip(db), level = "debug")]
+    #[instrument(skip(executor), level = "debug")]
     pub async fn confirm_upload(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         id: &str,
         screenshot_path: Option<&str>,
     ) -> AppResult<bool> {
@@ -223,7 +231,7 @@ impl CaptureRepo {
             id,
             screenshot_path
         )
-        .execute(db)
+        .execute(executor)
         .await
         .context(format!("failed to confirm upload for capture '{}'", id))?;
 
@@ -232,13 +240,16 @@ impl CaptureRepo {
     }
 
     /// Mark captures as outdated for a scene (when scene is updated)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn mark_outdated_for_scene(db: &DbPool, scene_id: &str) -> AppResult<u64> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn mark_outdated_for_scene(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_id: &str,
+    ) -> AppResult<u64> {
         let result = sqlx::query!(
             "UPDATE captures SET outdated = TRUE WHERE scene_id = $1 AND status = 'completed'",
             scene_id
         )
-        .execute(db)
+        .execute(executor)
         .await
         .context(format!(
             "failed to mark captures outdated for scene '{}'",
@@ -254,8 +265,10 @@ impl CaptureRepo {
     }
 
     /// Count captures by status for dashboard stats
-    #[instrument(skip(db), level = "debug")]
-    pub async fn count_by_status(db: &DbPool) -> AppResult<CaptureStatusCounts> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn count_by_status(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<CaptureStatusCounts> {
         let row = sqlx::query!(
             r#"
             SELECT
@@ -266,7 +279,7 @@ impl CaptureRepo {
             FROM captures
             "#
         )
-        .fetch_one(db)
+        .fetch_one(executor)
         .await
         .context("failed to count captures by status")?;
 
@@ -289,72 +302,33 @@ pub struct CaptureStatusCounts {
 
 impl CaptureRepo {
     /// List all captures with context (for admin dashboard)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn list_all_with_context(db: &DbPool) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = sqlx::query_as::<_, CaptureWithContext>(
-            r#"
-            SELECT
-                c.id,
-                c.scene_id,
-                s.slug as shader_slug,
-                s.name as shader_name,
-                sv.version as shader_version,
-                c.profile,
-                c.screenshot_path,
-                c.screenshot_url,
-                c.captured_at,
-                c.resolution_width,
-                c.resolution_height,
-                cri.run_id,
-                cr.status as run_status
-            FROM captures c
-            JOIN shader_versions sv ON c.shader_version_id = sv.id
-            JOIN shaders s ON sv.shader_id = s.id
-            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
-            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
-            ORDER BY c.created_at DESC
-            "#,
-        )
-        .fetch_all(db)
-        .await
-        .context("failed to list all captures with context")?;
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_all_with_context(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<Vec<CaptureWithContext>> {
+        let sql = format!("{} ORDER BY c.created_at DESC", CAPTURE_WITH_CONTEXT_BASE);
+        let captures = sqlx::query_as::<_, CaptureWithContext>(&sql)
+            .fetch_all(executor)
+            .await
+            .context("failed to list all captures with context")?;
 
         debug!(count = captures.len(), "Listed all captures with context");
         Ok(captures)
     }
 
     /// Get a single capture with context (for admin detail view)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn get_with_context(db: &DbPool, id: &str) -> AppResult<CaptureWithContext> {
-        sqlx::query_as::<_, CaptureWithContext>(
-            r#"
-            SELECT
-                c.id,
-                c.scene_id,
-                s.slug as shader_slug,
-                s.name as shader_name,
-                sv.version as shader_version,
-                c.profile,
-                c.screenshot_path,
-                c.screenshot_url,
-                c.captured_at,
-                c.resolution_width,
-                c.resolution_height,
-                cri.run_id,
-                cr.status as run_status
-            FROM captures c
-            JOIN shader_versions sv ON c.shader_version_id = sv.id
-            JOIN shaders s ON sv.shader_id = s.id
-            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
-            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
-            WHERE c.id = $1
-            "#,
-        )
-        .bind(id)
-        .fetch_optional(db)
-        .await
-        .context(format!("failed to get capture with context '{}'", id))?
-        .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn get_with_context(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+    ) -> AppResult<CaptureWithContext> {
+        let sql = format!("{} WHERE c.id = $1", CAPTURE_WITH_CONTEXT_BASE);
+        sqlx::query_as::<_, CaptureWithContext>(&sql)
+            .bind(id)
+            .fetch_optional(executor)
+            .await
+            .context(format!("failed to get capture with context '{}'", id))?
+            .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
     }
 
     /// List captures with context, pagination, and filtering (admin)
@@ -368,27 +342,8 @@ impl CaptureRepo {
         status: Option<&str>,
         run_id: Option<&str>,
     ) -> AppResult<(Vec<CaptureWithContext>, i64)> {
-        let items = sqlx::query_as::<_, CaptureWithContext>(
-            r#"
-            SELECT
-                c.id,
-                c.scene_id,
-                s.slug as shader_slug,
-                s.name as shader_name,
-                sv.version as shader_version,
-                c.profile,
-                c.screenshot_path,
-                c.screenshot_url,
-                c.captured_at,
-                c.resolution_width,
-                c.resolution_height,
-                cri.run_id,
-                cr.status as run_status
-            FROM captures c
-            JOIN shader_versions sv ON c.shader_version_id = sv.id
-            JOIN shaders s ON sv.shader_id = s.id
-            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
-            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
+        let sql = format!(
+            r#"{}
             WHERE ($1::text IS NULL OR s.slug = $1)
               AND ($2::text IS NULL OR c.scene_id = $2)
               AND ($3::text IS NULL OR c.status = $3)
@@ -396,16 +351,18 @@ impl CaptureRepo {
             ORDER BY c.created_at DESC
             LIMIT $5 OFFSET $6
             "#,
-        )
-        .bind(shader)
-        .bind(scene)
-        .bind(status)
-        .bind(run_id)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(db)
-        .await
-        .context("failed to list captures with context (paginated)")?;
+            CAPTURE_WITH_CONTEXT_BASE
+        );
+        let items = sqlx::query_as::<_, CaptureWithContext>(&sql)
+            .bind(shader)
+            .bind(scene)
+            .bind(status)
+            .bind(run_id)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(db)
+            .await
+            .context("failed to list captures with context (paginated)")?;
 
         let count: (i64,) = sqlx::query_as(
             r#"
@@ -432,10 +389,10 @@ impl CaptureRepo {
     }
 
     /// Delete a capture
-    #[instrument(skip(db), level = "debug")]
-    pub async fn delete(db: &DbPool, id: &str) -> AppResult<bool> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn delete(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<bool> {
         let result = sqlx::query!("DELETE FROM captures WHERE id = $1", id)
-            .execute(db)
+            .execute(executor)
             .await
             .context(format!("failed to delete capture '{}'", id))?;
 
@@ -443,8 +400,10 @@ impl CaptureRepo {
     }
 
     /// Get the most recent completed non-outdated thumbnail per shader
-    #[instrument(skip(db), level = "debug")]
-    pub async fn batch_thumbnails_by_shader(db: &DbPool) -> AppResult<HashMap<String, String>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn batch_thumbnails_by_shader(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<HashMap<String, String>> {
         struct Row {
             shader_id: String,
             screenshot_url: String,
@@ -461,7 +420,7 @@ impl CaptureRepo {
             ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST
             "#
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context("failed to batch fetch shader thumbnails")?;
 
@@ -472,8 +431,10 @@ impl CaptureRepo {
     }
 
     /// Get the most recent completed non-outdated thumbnail per scene
-    #[instrument(skip(db), level = "debug")]
-    pub async fn batch_thumbnails_by_scene(db: &DbPool) -> AppResult<HashMap<String, String>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn batch_thumbnails_by_scene(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<HashMap<String, String>> {
         struct Row {
             scene_id: String,
             screenshot_url: String,
@@ -489,7 +450,7 @@ impl CaptureRepo {
             ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
             "#
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context("failed to batch fetch scene thumbnails")?;
 
@@ -500,8 +461,10 @@ impl CaptureRepo {
     }
 
     /// Count completed captures per scene
-    #[instrument(skip(db), level = "debug")]
-    pub async fn batch_count_by_scene(db: &DbPool) -> AppResult<HashMap<String, i64>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn batch_count_by_scene(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<HashMap<String, i64>> {
         struct Row {
             scene_id: String,
             count: i64,
@@ -515,7 +478,7 @@ impl CaptureRepo {
             GROUP BY scene_id
             "#
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context("failed to batch count captures by scene")?;
 

@@ -322,10 +322,20 @@ async fn delete_world(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<StatusCode> {
-    // TODO: cleanup R2 storage
+    let world = WorldRepo::get_by_id(state.db(), &id).await?;
     let deleted = WorldRepo::delete(state.db(), &id).await?;
     if !deleted {
         return Err(AppError::NotFound("World not found".into()));
     }
+
+    if let Some(s3) = state.s3() {
+        let r2_config = &state.config().r2;
+        let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+        let r2_key = format!("worlds/{}.zip", world.slug);
+        if let Err(e) = s3.delete_object().bucket(bucket).key(&r2_key).send().await {
+            warn!(key = %r2_key, error = %e, "Failed to delete world file from R2");
+        }
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }

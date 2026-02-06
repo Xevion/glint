@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE scenes SET active = FALSE WHERE slug = ANY($1) AND world_id = $2 AND active = TRUE",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1e25e161aa1bc950f347a3fcd2c64c30a0df960051c60cf179a889f638d44c7b"
+}

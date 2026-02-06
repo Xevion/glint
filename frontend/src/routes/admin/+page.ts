@@ -43,7 +43,7 @@ export const load: PageLoad = async ({ fetch }) => {
 	});
 
 	const { captureCount, recentCaptures } = capturesRes.match({
-		Ok: (v) => ({ captureCount: v.total_count, recentCaptures: v.items.slice(0, 5) }),
+		Ok: (v) => ({ captureCount: v.total, recentCaptures: v.items.slice(0, 5) }),
 		Err: (e) => {
 			errors.captures = e.message;
 			return { captureCount: 0, recentCaptures: [] as CaptureWithContext[] };

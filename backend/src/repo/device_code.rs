@@ -3,7 +3,6 @@ use chrono::{Duration, Utc};
 use rand::Rng;
 use tracing::{debug, instrument};
 
-use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
 use crate::models::device::DeviceCode;
 
@@ -40,8 +39,8 @@ fn generate_user_code() -> String {
 
 impl DeviceCodeRepo {
     /// Create a new device authorization code pair
-    #[instrument(skip(db), level = "debug")]
-    pub async fn create(db: &DbPool) -> AppResult<DeviceCode> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn create(executor: impl sqlx::PgExecutor<'_>) -> AppResult<DeviceCode> {
         let device_code = generate_device_code();
         let user_code = generate_user_code();
         let expires_at = Utc::now() + Duration::minutes(DEVICE_CODE_EXPIRY_MINUTES);
@@ -57,7 +56,7 @@ impl DeviceCodeRepo {
             user_code,
             expires_at
         )
-        .fetch_one(db)
+        .fetch_one(executor)
         .await
         .context("failed to create device code")?;
 
@@ -66,9 +65,9 @@ impl DeviceCodeRepo {
     }
 
     /// Find a device code by its secret device_code (for mod polling)
-    #[instrument(skip(db, device_code), level = "debug")]
+    #[instrument(skip(executor, device_code), level = "debug")]
     pub async fn find_by_device_code(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         device_code: &str,
     ) -> AppResult<Option<DeviceCode>> {
         let code = sqlx::query_as!(
@@ -80,7 +79,7 @@ impl DeviceCodeRepo {
             "#,
             device_code
         )
-        .fetch_optional(db)
+        .fetch_optional(executor)
         .await
         .context("failed to find device code")?;
 
@@ -88,8 +87,11 @@ impl DeviceCodeRepo {
     }
 
     /// Find a device code by its user-facing code (for user confirmation)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn find_by_user_code(db: &DbPool, user_code: &str) -> AppResult<Option<DeviceCode>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn find_by_user_code(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_code: &str,
+    ) -> AppResult<Option<DeviceCode>> {
         // Normalize user code (uppercase, handle with or without GLINT- prefix)
         let normalized = user_code.to_uppercase();
         let normalized = if normalized.starts_with("GLINT-") {
@@ -107,7 +109,7 @@ impl DeviceCodeRepo {
             "#,
             normalized
         )
-        .fetch_optional(db)
+        .fetch_optional(executor)
         .await
         .context("failed to find device code by user code")?;
 
@@ -115,8 +117,12 @@ impl DeviceCodeRepo {
     }
 
     /// Authorize a device code (user confirms in browser)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn authorize(db: &DbPool, user_code: &str, user_id: i32) -> AppResult<DeviceCode> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn authorize(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_code: &str,
+        user_id: i32,
+    ) -> AppResult<DeviceCode> {
         // Normalize user code
         let normalized = user_code.to_uppercase();
         let normalized = if normalized.starts_with("GLINT-") {
@@ -138,7 +144,7 @@ impl DeviceCodeRepo {
             user_id,
             normalized
         )
-        .fetch_optional(db)
+        .fetch_optional(executor)
         .await
         .context("failed to authorize device code")?;
 
@@ -154,8 +160,11 @@ impl DeviceCodeRepo {
     }
 
     /// Mark a device code as used (after token is issued)
-    #[instrument(skip(db, device_code), level = "debug")]
-    pub async fn mark_used(db: &DbPool, device_code: &str) -> AppResult<()> {
+    #[instrument(skip(executor, device_code), level = "debug")]
+    pub async fn mark_used(
+        executor: impl sqlx::PgExecutor<'_>,
+        device_code: &str,
+    ) -> AppResult<()> {
         let result = sqlx::query!(
             r#"
             UPDATE device_codes
@@ -164,7 +173,7 @@ impl DeviceCodeRepo {
             "#,
             device_code
         )
-        .execute(db)
+        .execute(executor)
         .await
         .context("failed to mark device code as used")?;
 
@@ -175,10 +184,10 @@ impl DeviceCodeRepo {
     }
 
     /// Delete expired device codes (cleanup task)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn delete_expired(db: &DbPool) -> AppResult<u64> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn delete_expired(executor: impl sqlx::PgExecutor<'_>) -> AppResult<u64> {
         let result = sqlx::query!("DELETE FROM device_codes WHERE expires_at < now()")
-            .execute(db)
+            .execute(executor)
             .await
             .context("failed to delete expired device codes")?;
 

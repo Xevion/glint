@@ -6,7 +6,10 @@ pub use types::*;
 
 use std::marker::PhantomData;
 
-use crate::platform::{PlatformResult, RequestBuilderExt};
+use crate::platform::{
+    PlatformAuthor, PlatformError, PlatformMetadata, PlatformResult, PlatformVersion, ProjectData,
+    RequestBuilderExt,
+};
 
 pub struct Authenticated;
 
@@ -140,5 +143,77 @@ impl CurseForgeClient<Authenticated> {
     pub async fn get_mod_by_slug(&self, slug: &str) -> PlatformResult<Option<CfMod>> {
         let results = self.search_shaders(slug, 50, 0).await?;
         Ok(results.data.into_iter().find(|m| m.slug == slug))
+    }
+
+    /// Fetch mod metadata and authors as platform-agnostic types
+    pub async fn fetch_shader_data(&self, id_or_slug: &str) -> PlatformResult<ProjectData> {
+        let cf_mod = if let Ok(id) = id_or_slug.parse::<i32>() {
+            self.get_mod(id).await?
+        } else {
+            self.get_mod_by_slug(id_or_slug)
+                .await?
+                .ok_or(PlatformError::NotFound)?
+        };
+
+        let source_url = cf_mod.links.as_ref().and_then(|l| l.source_url.clone());
+        let website_url = cf_mod.links.as_ref().and_then(|l| l.website_url.clone());
+
+        Ok(ProjectData {
+            metadata: PlatformMetadata {
+                platform_id: cf_mod.id.to_string(),
+                name: cf_mod.name,
+                slug: cf_mod.slug,
+                description: Some(cf_mod.summary),
+                icon_url: cf_mod.logo.map(|l| l.url),
+                source_url,
+                website_url,
+                license_id: None,
+                downloads: cf_mod.download_count,
+                updated_at: None,
+            },
+            authors: cf_mod
+                .authors
+                .into_iter()
+                .map(|a| PlatformAuthor {
+                    name: a.name,
+                    url: Some(a.url),
+                })
+                .collect(),
+        })
+    }
+
+    /// Fetch files/versions as platform-agnostic types
+    pub async fn fetch_shader_versions(
+        &self,
+        platform_id: &str,
+    ) -> PlatformResult<Vec<PlatformVersion>> {
+        let mod_id: i32 = platform_id.parse().map_err(|_| PlatformError::NotFound)?;
+        let files = self.list_files(mod_id, None).await?;
+        Ok(files
+            .into_iter()
+            .map(|f| {
+                let sha1_hash = f
+                    .hashes
+                    .iter()
+                    .find(|h| matches!(h.algo, CfHashAlgo::Sha1))
+                    .map(|h| h.value.clone());
+                PlatformVersion {
+                    version_number: f
+                        .file_name
+                        .strip_suffix(".zip")
+                        .or(f.file_name.strip_suffix(".jar"))
+                        .unwrap_or(&f.file_name)
+                        .to_string(),
+                    modrinth_version_id: None,
+                    curseforge_file_id: Some(f.id),
+                    download_url: f.download_url,
+                    file_hash: sha1_hash,
+                    file_size: Some(f.file_length as i64),
+                    game_versions_json: serde_json::to_string(&f.game_versions).ok(),
+                    release_channel: Some(format!("{:?}", f.release_type).to_lowercase()),
+                    published_at: None,
+                }
+            })
+            .collect())
     }
 }

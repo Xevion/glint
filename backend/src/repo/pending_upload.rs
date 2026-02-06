@@ -2,37 +2,42 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use tracing::{debug, instrument, trace};
 
-use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
 use crate::models::PendingUpload;
 
 pub struct PendingUploadRepo;
 
 impl PendingUploadRepo {
-    #[instrument(skip(db), level = "debug")]
-    pub async fn find_by_id(db: &DbPool, upload_id: &str) -> AppResult<Option<PendingUpload>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn find_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        upload_id: &str,
+    ) -> AppResult<Option<PendingUpload>> {
         sqlx::query_as!(
             PendingUpload,
             "SELECT * FROM pending_uploads WHERE upload_id = $1",
             upload_id
         )
-        .fetch_optional(db)
+        .fetch_optional(executor)
         .await
         .context(format!("failed to find pending upload '{}'", upload_id))
         .map_err(Into::into)
     }
 
-    #[instrument(skip(db), level = "debug")]
-    pub async fn get_by_id(db: &DbPool, upload_id: &str) -> AppResult<PendingUpload> {
-        Self::find_by_id(db, upload_id)
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn get_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        upload_id: &str,
+    ) -> AppResult<PendingUpload> {
+        Self::find_by_id(executor, upload_id)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("Upload ID '{}' not found", upload_id)))
     }
 
-    #[instrument(skip(db), level = "debug")]
+    #[instrument(skip(executor), level = "debug")]
     #[allow(clippy::too_many_arguments)]
     pub async fn create(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         upload_id: &str,
         slug: &str,
         name: &str,
@@ -58,7 +63,7 @@ impl PendingUploadRepo {
             upload_key,
             expires_at
         )
-        .execute(db)
+        .execute(executor)
         .await
         .context(format!("failed to create pending upload '{}'", upload_id))?;
 
@@ -66,13 +71,13 @@ impl PendingUploadRepo {
         Ok(())
     }
 
-    #[instrument(skip(db), level = "debug")]
-    pub async fn delete(db: &DbPool, upload_id: &str) -> AppResult<bool> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn delete(executor: impl sqlx::PgExecutor<'_>, upload_id: &str) -> AppResult<bool> {
         let result = sqlx::query!(
             "DELETE FROM pending_uploads WHERE upload_id = $1",
             upload_id
         )
-        .execute(db)
+        .execute(executor)
         .await
         .context(format!("failed to delete pending upload '{}'", upload_id))?;
 
@@ -80,8 +85,10 @@ impl PendingUploadRepo {
     }
 
     /// Find all expired pending uploads
-    #[instrument(skip(db), level = "debug")]
-    pub async fn list_expired(db: &DbPool) -> AppResult<Vec<ExpiredUpload>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_expired(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<Vec<ExpiredUpload>> {
         let expired = sqlx::query_as!(
             ExpiredUpload,
             r#"
@@ -90,7 +97,7 @@ impl PendingUploadRepo {
             WHERE expires_at < now()
             "#
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context("failed to list expired uploads")?;
 
@@ -101,13 +108,16 @@ impl PendingUploadRepo {
     }
 
     /// Delete a single expired upload by ID
-    #[instrument(skip(db), level = "trace")]
-    pub async fn delete_expired_by_id(db: &DbPool, upload_id: &str) -> AppResult<bool> {
+    #[instrument(skip(executor), level = "trace")]
+    pub async fn delete_expired_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        upload_id: &str,
+    ) -> AppResult<bool> {
         let result = sqlx::query!(
             "DELETE FROM pending_uploads WHERE upload_id = $1",
             upload_id
         )
-        .execute(db)
+        .execute(executor)
         .await
         .context(format!(
             "failed to delete expired pending upload '{}'",

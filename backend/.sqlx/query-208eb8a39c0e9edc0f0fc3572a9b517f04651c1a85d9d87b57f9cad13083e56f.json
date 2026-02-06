@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE shaders SET\n                name = $1,\n                description = $2,\n                icon_url = $3,\n                source_url = $4,\n                license_id = $5,\n                upstream_downloads = $6,\n                upstream_updated_at = $7,\n                last_synced_at = $8,\n                updated_at = $8\n            WHERE id = $9\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8",
+        "Timestamptz",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "208eb8a39c0e9edc0f0fc3572a9b517f04651c1a85d9d87b57f9cad13083e56f"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM shader_versions WHERE shader_id = $1 ORDER BY created_at DESC LIMIT 1",
+  "query": "\n            INSERT INTO shaders (id, name, slug, description, modrinth_id, curseforge_id, website_url, created_at, updated_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())\n            RETURNING *\n            ",
   "describe": {
     "columns": [
       {
@@ -10,32 +10,32 @@
       },
       {
         "ordinal": 1,
-        "name": "shader_id",
+        "name": "name",
         "type_info": "Text"
       },
       {
         "ordinal": 2,
-        "name": "version",
+        "name": "slug",
         "type_info": "Text"
       },
       {
         "ordinal": 3,
-        "name": "modrinth_version_id",
+        "name": "description",
         "type_info": "Text"
       },
       {
         "ordinal": 4,
-        "name": "download_url",
+        "name": "modrinth_id",
         "type_info": "Text"
       },
       {
         "ordinal": 5,
-        "name": "file_hash",
+        "name": "curseforge_id",
         "type_info": "Text"
       },
       {
         "ordinal": 6,
-        "name": "supported_profiles",
+        "name": "website_url",
         "type_info": "Text"
       },
       {
@@ -45,42 +45,48 @@
       },
       {
         "ordinal": 8,
-        "name": "curseforge_file_id",
-        "type_info": "Int4"
+        "name": "updated_at",
+        "type_info": "Timestamptz"
       },
       {
         "ordinal": 9,
-        "name": "file_size",
-        "type_info": "Int8"
+        "name": "icon_url",
+        "type_info": "Text"
       },
       {
         "ordinal": 10,
-        "name": "game_versions",
+        "name": "source_url",
         "type_info": "Text"
       },
       {
         "ordinal": 11,
-        "name": "release_channel",
+        "name": "license_id",
         "type_info": "Text"
       },
       {
         "ordinal": 12,
-        "name": "upstream_published_at",
-        "type_info": "Timestamptz"
+        "name": "upstream_downloads",
+        "type_info": "Int8"
       },
       {
         "ordinal": 13,
-        "name": "capture_failure_count",
-        "type_info": "Int4"
+        "name": "upstream_updated_at",
+        "type_info": "Timestamptz"
       },
       {
         "ordinal": 14,
-        "name": "last_capture_error",
-        "type_info": "Text"
+        "name": "last_synced_at",
+        "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
         "Text"
       ]
     },
@@ -93,14 +99,14 @@
       true,
       true,
       false,
-      true,
-      true,
-      true,
-      true,
-      true,
       false,
+      true,
+      true,
+      true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "68c70ae85d8f3d22b9de0c536a988329ba5e543d7948a5cf824ae25887a8f5bf"
+  "hash": "2976335ac8a421d559238152b1e8703019e4d2b769d042241d83c6fda63f3495"
 }

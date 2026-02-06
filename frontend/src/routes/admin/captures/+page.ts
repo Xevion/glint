@@ -31,9 +31,9 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	return result.match({
 		Ok: (data) => ({
 			captures: data.items,
-			totalCount: data.total_count,
+			totalCount: data.total,
 			page: data.page,
-			pageSize: data.page_size,
+			pageSize: data.pageSize,
 			error: null as string | null,
 			filters: { shader, scene, status, runId },
 			shaders,

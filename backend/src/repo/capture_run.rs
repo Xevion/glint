@@ -1,7 +1,6 @@
 use anyhow::Context;
 use tracing::{debug, instrument};
 
-use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
 use crate::models::{CaptureRun, CaptureRunItem, CaptureRunItemWithContext};
 
@@ -9,9 +8,9 @@ pub struct CaptureRunRepo;
 
 impl CaptureRunRepo {
     /// Create a new capture run
-    #[instrument(skip(db), level = "debug")]
+    #[instrument(skip(executor), level = "debug")]
     pub async fn create(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         id: &str,
         agent_id: Option<&str>,
         total_items: i32,
@@ -29,7 +28,7 @@ impl CaptureRunRepo {
             total_items,
             metadata_json,
         )
-        .fetch_one(db)
+        .fetch_one(executor)
         .await
         .context("failed to create capture run")?;
 
@@ -38,23 +37,23 @@ impl CaptureRunRepo {
     }
 
     /// Get a capture run by ID
-    #[instrument(skip(db), level = "debug")]
-    pub async fn get_by_id(db: &DbPool, id: &str) -> AppResult<CaptureRun> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn get_by_id(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<CaptureRun> {
         sqlx::query_as!(CaptureRun, "SELECT * FROM capture_runs WHERE id = $1", id)
-            .fetch_optional(db)
+            .fetch_optional(executor)
             .await
             .context(format!("failed to find capture run '{}'", id))?
             .ok_or_else(|| AppError::NotFound(format!("Capture run '{}' not found", id)))
     }
 
     /// List all capture runs (admin)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn list(db: &DbPool) -> AppResult<Vec<CaptureRun>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<CaptureRun>> {
         let runs = sqlx::query_as!(
             CaptureRun,
             "SELECT * FROM capture_runs ORDER BY started_at DESC"
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context("failed to list capture runs")?;
 
@@ -62,8 +61,8 @@ impl CaptureRunRepo {
     }
 
     /// Complete a capture run (update counters and status)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn complete(db: &DbPool, id: &str) -> AppResult<CaptureRun> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn complete(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<CaptureRun> {
         let run = sqlx::query_as!(
             CaptureRun,
             r#"
@@ -90,7 +89,7 @@ impl CaptureRunRepo {
             "#,
             id
         )
-        .fetch_optional(db)
+        .fetch_optional(executor)
         .await
         .context(format!("failed to complete capture run '{}'", id))?
         .ok_or_else(|| AppError::NotFound(format!("Capture run '{}' not found", id)))?;
@@ -99,35 +98,45 @@ impl CaptureRunRepo {
         Ok(run)
     }
 
-    /// Insert a batch of run items
-    #[instrument(skip(db, items), level = "debug")]
+    /// Insert a batch of run items in a single query
+    #[instrument(skip(executor, items), level = "debug")]
     pub async fn insert_items(
-        db: &DbPool,
-        items: &[(String, String, String, String, Option<String>)], // (id, run_id, shader_version_id, scene_id, profile)
+        executor: impl sqlx::PgExecutor<'_>,
+        items: &[(&str, &str, &str, &str, Option<&str>)], // (id, run_id, shader_version_id, scene_id, profile)
     ) -> AppResult<()> {
-        for (id, run_id, shader_version_id, scene_id, profile) in items {
-            sqlx::query!(
-                r#"
-                INSERT INTO capture_run_items (id, run_id, shader_version_id, scene_id, profile, status)
-                VALUES ($1, $2, $3, $4, $5, 'pending')
-                "#,
-                id,
-                run_id,
-                shader_version_id,
-                scene_id,
-                profile.as_deref(),
-            )
-            .execute(db)
-            .await
-            .context("failed to insert capture run item")?;
+        if items.is_empty() {
+            return Ok(());
         }
+
+        let ids: Vec<&str> = items.iter().map(|i| i.0).collect();
+        let run_ids: Vec<&str> = items.iter().map(|i| i.1).collect();
+        let sv_ids: Vec<&str> = items.iter().map(|i| i.2).collect();
+        let scene_ids: Vec<&str> = items.iter().map(|i| i.3).collect();
+        let profiles: Vec<Option<&str>> = items.iter().map(|i| i.4).collect();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO capture_run_items (id, run_id, shader_version_id, scene_id, profile, status)
+            SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::text[]), unnest($4::text[]), unnest($5::text[]), 'pending'
+            "#,
+            &ids as &[&str],
+            &run_ids as &[&str],
+            &sv_ids as &[&str],
+            &scene_ids as &[&str],
+            &profiles as &[Option<&str>],
+        )
+        .execute(executor)
+        .await
+        .context("failed to insert capture run items")?;
+
+        debug!(count = items.len(), "Inserted capture run items");
         Ok(())
     }
 
     /// Mark a run item as completed with a linked capture
-    #[instrument(skip(db), level = "debug")]
+    #[instrument(skip(executor), level = "debug")]
     pub async fn complete_item(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         item_id: &str,
         capture_id: &str,
         duration_ms: Option<i32>,
@@ -142,7 +151,7 @@ impl CaptureRunRepo {
             capture_id,
             duration_ms,
         )
-        .execute(db)
+        .execute(executor)
         .await
         .context(format!("failed to complete run item '{}'", item_id))?;
 
@@ -150,9 +159,9 @@ impl CaptureRunRepo {
     }
 
     /// Mark a run item as failed
-    #[instrument(skip(db), level = "debug")]
+    #[instrument(skip(executor), level = "debug")]
     pub async fn fail_item(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         item_id: &str,
         error_message: &str,
         error_log: Option<&str>,
@@ -169,22 +178,60 @@ impl CaptureRunRepo {
             error_log,
             duration_ms,
         )
-        .execute(db)
+        .execute(executor)
         .await
         .context(format!("failed to fail run item '{}'", item_id))?;
 
         Ok(result.rows_affected() > 0)
     }
 
+    /// Get a single run item by ID
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn get_item_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        item_id: &str,
+    ) -> AppResult<CaptureRunItem> {
+        sqlx::query_as!(
+            CaptureRunItem,
+            "SELECT * FROM capture_run_items WHERE id = $1",
+            item_id
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to find run item '{}'", item_id))?
+        .ok_or_else(|| AppError::NotFound(format!("Run item '{}' not found", item_id)))
+    }
+
+    /// Claim a run item: set status to 'running' and link a capture
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn claim_item(
+        executor: impl sqlx::PgExecutor<'_>,
+        item_id: &str,
+        capture_id: &str,
+    ) -> AppResult<()> {
+        sqlx::query!(
+            "UPDATE capture_run_items SET status = 'running', capture_id = $2, started_at = now() WHERE id = $1",
+            item_id,
+            capture_id,
+        )
+        .execute(executor)
+        .await
+        .context(format!("failed to claim run item '{}'", item_id))?;
+        Ok(())
+    }
+
     /// List items for a capture run
-    #[instrument(skip(db), level = "debug")]
-    pub async fn list_items(db: &DbPool, run_id: &str) -> AppResult<Vec<CaptureRunItem>> {
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_items(
+        executor: impl sqlx::PgExecutor<'_>,
+        run_id: &str,
+    ) -> AppResult<Vec<CaptureRunItem>> {
         let items = sqlx::query_as!(
             CaptureRunItem,
             "SELECT * FROM capture_run_items WHERE run_id = $1 ORDER BY started_at ASC NULLS LAST",
             run_id
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context(format!("failed to list items for run '{}'", run_id))?;
 
@@ -192,9 +239,9 @@ impl CaptureRunRepo {
     }
 
     /// List items for a capture run with shader/scene context
-    #[instrument(skip(db), level = "debug")]
+    #[instrument(skip(executor), level = "debug")]
     pub async fn list_items_with_context(
-        db: &DbPool,
+        executor: impl sqlx::PgExecutor<'_>,
         run_id: &str,
     ) -> AppResult<Vec<CaptureRunItemWithContext>> {
         let items = sqlx::query_as!(
@@ -218,7 +265,7 @@ impl CaptureRunRepo {
             "#,
             run_id
         )
-        .fetch_all(db)
+        .fetch_all(executor)
         .await
         .context(format!(
             "failed to list items with context for run '{}'",

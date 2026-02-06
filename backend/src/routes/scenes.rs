@@ -265,8 +265,6 @@ async fn batch_disable_scenes(
     Query(params): Query<BatchDisableQuery>,
     Json(body): Json<BatchDisableRequest>,
 ) -> AppResult<StatusCode> {
-    for slug in &body.slugs {
-        SceneRepo::disable(state.db(), slug, &params.world_id).await?;
-    }
+    SceneRepo::batch_disable(state.db(), &body.slugs, &params.world_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

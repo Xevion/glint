@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT DISTINCT ON (shader_id) *\n            FROM shader_versions\n            ORDER BY shader_id, created_at DESC\n            ",
+  "query": "\n            SELECT DISTINCT ON (shader_id) *\n            FROM shader_versions\n            ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -100,5 +100,5 @@
       true
     ]
   },
-  "hash": "7f2a48922fc5c1fe1f51da09133f0fab0bcd33670e7a7c15e9ea2fe50cf95276"
+  "hash": "d1059a7096ba74c318e801a54d3529327c0e661fdf5e0798cf877e35801145aa"
 }

@@ -4,7 +4,10 @@ mod types;
 pub use facets::{Facet, ProjectType};
 pub use types::*;
 
-use crate::platform::{PlatformResult, RequestBuilderExt};
+use crate::platform::{
+    PlatformAuthor, PlatformMetadata, PlatformResult, PlatformVersion, ProjectData,
+    RequestBuilderExt,
+};
 
 /// Modrinth API v2 client. No authentication needed for read operations.
 pub struct ModrinthClient {
@@ -100,5 +103,58 @@ impl ModrinthClient {
             .get(format!("{}/project/{}/members", Self::BASE_URL, project_id))
             .send_and_parse()
             .await
+    }
+
+    /// Fetch project metadata and authors as platform-agnostic types
+    pub async fn fetch_shader_data(&self, id_or_slug: &str) -> PlatformResult<ProjectData> {
+        let project = self.get_project(id_or_slug).await?;
+        let members = self.get_team_members(&project.id).await.unwrap_or_default();
+
+        Ok(ProjectData {
+            metadata: PlatformMetadata {
+                platform_id: project.id,
+                name: project.title,
+                slug: project.slug,
+                description: Some(project.description),
+                icon_url: project.icon_url,
+                source_url: project.source_url.clone(),
+                website_url: project.source_url,
+                license_id: project.license.map(|l| l.id),
+                downloads: project.downloads,
+                updated_at: Some(project.updated),
+            },
+            authors: members
+                .into_iter()
+                .map(|m| PlatformAuthor {
+                    url: Some(format!("https://modrinth.com/user/{}", m.user.username)),
+                    name: m.user.username,
+                })
+                .collect(),
+        })
+    }
+
+    /// Fetch versions as platform-agnostic types
+    pub async fn fetch_shader_versions(
+        &self,
+        platform_id: &str,
+    ) -> PlatformResult<Vec<PlatformVersion>> {
+        let versions = self.list_versions(platform_id, None, None).await?;
+        Ok(versions
+            .into_iter()
+            .map(|v| {
+                let primary_file = v.files.iter().find(|f| f.primary).or(v.files.first());
+                PlatformVersion {
+                    version_number: v.version_number,
+                    modrinth_version_id: Some(v.id),
+                    curseforge_file_id: None,
+                    download_url: primary_file.map(|f| f.url.clone()),
+                    file_hash: primary_file.map(|f| f.hashes.sha1.clone()),
+                    file_size: primary_file.map(|f| f.size as i64),
+                    game_versions_json: serde_json::to_string(&v.game_versions).ok(),
+                    release_channel: Some(format!("{:?}", v.version_type).to_lowercase()),
+                    published_at: Some(v.date_published),
+                }
+            })
+            .collect())
     }
 }

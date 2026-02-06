@@ -8,6 +8,7 @@ pub mod shader;
 pub mod shader_author;
 pub mod taxonomy;
 pub mod user;
+pub mod work;
 pub mod world;
 
 pub use capture::CaptureRepo;
@@ -20,4 +21,5 @@ pub use shader::{ShaderRepo, ShaderVersionRepo};
 pub use shader_author::ShaderAuthorRepo;
 pub use taxonomy::{CategoryRepo, FeatureRepo, TagRepo};
 pub use user::UserRepo;
+pub use work::WorkRepo;
 pub use world::WorldRepo;
