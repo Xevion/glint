@@ -67,16 +67,32 @@ pub struct WorldInfo {
 
 // Agent Request Types
 
+/// A file entry in a prepare-upload request, with metadata for R2 key generation.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct PrepareUploadFile {
+    pub local_path: String,
+    pub scene_id: String,
+    pub profile: Option<String>,
+}
+
 /// Request to prepare upload URLs
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PrepareUploadRequest {
-    pub files: Vec<String>,
+    pub files: Vec<PrepareUploadFile>,
 }
 
-/// Response with pre-signed upload URLs
+/// A single upload target returned from prepare-upload.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct UploadTarget {
+    pub presigned_url: String,
+    pub r2_key: String,
+    pub capture_id: String,
+}
+
+/// Response with pre-signed upload URLs and capture metadata.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PrepareUploadResponse {
-    pub urls: HashMap<String, String>,
+    pub uploads: HashMap<String, UploadTarget>,
 }
 
 /// Request to complete a job
@@ -89,6 +105,7 @@ pub struct CompleteJobRequest {
 /// A single capture result
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CaptureRecord {
+    pub capture_id: String,
     pub scene_id: String,
     pub profile: Option<String>,
     pub screenshot_path: String,

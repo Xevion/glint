@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT s.slug FROM shaders s\n            JOIN shader_versions sv ON sv.shader_id = s.id\n            WHERE sv.id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "slug",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "74317ba19fb162b5143b98d778d331ae29f707ce7df2973d8fcf9816992f7534"
+}

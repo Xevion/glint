@@ -47,16 +47,32 @@ data class JobWorldInfo(
     @SerialName("size_bytes") val sizeBytes: Long? = null,
 )
 
+/** A file entry in a prepare-upload request, with metadata for R2 key generation. */
+@Serializable
+data class PrepareUploadFile(
+    @SerialName("local_path") val localPath: String,
+    @SerialName("scene_id") val sceneId: String,
+    val profile: String? = null,
+)
+
 /** Request to prepare pre-signed upload URLs. */
 @Serializable
 data class PrepareUploadRequest(
-    val files: List<String>,
+    val files: List<PrepareUploadFile>,
 )
 
-/** Response containing pre-signed upload URLs. */
+/** A single upload target returned from prepare-upload. */
+@Serializable
+data class UploadTarget(
+    @SerialName("presigned_url") val presignedUrl: String,
+    @SerialName("r2_key") val r2Key: String,
+    @SerialName("capture_id") val captureId: String,
+)
+
+/** Response containing pre-signed upload URLs and capture metadata. */
 @Serializable
 data class PrepareUploadResponse(
-    val urls: Map<String, String>,
+    val uploads: Map<String, UploadTarget>,
 )
 
 /** Request to mark a job as complete. */
@@ -69,6 +85,7 @@ data class CompleteJobRequest(
 /** A single capture result within a completion request. */
 @Serializable
 data class CaptureRecord(
+    @SerialName("capture_id") val captureId: String,
     @SerialName("scene_id") val sceneId: String,
     val profile: String? = null,
     @SerialName("screenshot_path") val screenshotPath: String,

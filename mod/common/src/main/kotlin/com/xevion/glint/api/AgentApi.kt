@@ -142,7 +142,7 @@ object AgentApi {
         apiUrl: String,
         token: String,
         jobId: String,
-        files: List<String>,
+        files: List<PrepareUploadFile>,
     ): Result<PrepareUploadResponse> {
         val url = "$apiUrl/api/agent/jobs/$jobId/prepare"
 

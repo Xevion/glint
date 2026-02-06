@@ -283,6 +283,26 @@ impl ShaderVersionRepo {
         Ok(())
     }
 
+    /// Get the parent shader's slug for a given shader version ID.
+    #[instrument(skip(db), level = "debug")]
+    pub async fn get_shader_slug(db: &DbPool, version_id: &str) -> AppResult<Option<String>> {
+        sqlx::query_scalar!(
+            r#"
+            SELECT s.slug FROM shaders s
+            JOIN shader_versions sv ON sv.shader_id = s.id
+            WHERE sv.id = $1
+            "#,
+            version_id
+        )
+        .fetch_optional(db)
+        .await
+        .context(format!(
+            "failed to get shader slug for version '{}'",
+            version_id
+        ))
+        .map_err(Into::into)
+    }
+
     #[instrument(skip(db), level = "debug")]
     pub async fn get_latest_for_shader(
         db: &DbPool,

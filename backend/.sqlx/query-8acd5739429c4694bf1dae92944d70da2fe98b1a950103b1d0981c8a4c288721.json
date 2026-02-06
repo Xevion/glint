@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT shader_version_id FROM jobs WHERE id = $1 AND status = 'running'",
+  "query": "SELECT shader_version_id FROM jobs WHERE id = $1 AND status IN ('claimed', 'running')",
   "describe": {
     "columns": [
       {
@@ -18,5 +18,5 @@
       false
     ]
   },
-  "hash": "bc24308bfd7e1166a44a4ff8f9d9f2538820231af44abc9021cdadbf303bcf0a"
+  "hash": "8acd5739429c4694bf1dae92944d70da2fe98b1a950103b1d0981c8a4c288721"
 }

@@ -5,14 +5,14 @@ use axum::{
     http::StatusCode,
     routing::{get, post},
 };
+use nanoid::nanoid;
 use rand::seq::SliceRandom;
 use tracing::{info, warn};
-use uuid::Uuid;
 
 use crate::models::CreateJobRequest;
 use crate::models::agent::{
     CompleteJobRequest, FailJobRequest, ForceJobRequest, JobPayload, PrepareUploadRequest,
-    PrepareUploadResponse, SceneInfo, ShaderInfo, WorldInfo,
+    PrepareUploadResponse, SceneInfo, ShaderInfo, UploadTarget, WorldInfo,
 };
 
 use crate::db::DbPool;
@@ -162,7 +162,7 @@ async fn force_job(
         .ok_or_else(|| AppError::BadRequest(format!("Shader '{}' has no versions", shader.slug)))?;
 
     // Create a real job in the DB
-    let job_id = Uuid::new_v4().to_string();
+    let job_id = nanoid!();
     let scene_ids: Vec<String> = selected_scenes.iter().map(|s| s.id.clone()).collect();
 
     let create_req = CreateJobRequest {
@@ -315,45 +315,70 @@ async fn heartbeat(
 }
 
 /// POST /api/agent/jobs/{id}/prepare
-/// Returns pre-signed upload URLs for the given file paths
+/// Returns pre-signed upload URLs with semantic R2 keys for each file.
 async fn prepare_upload(
     State(state): State<AppState>,
     Path(job_id): Path<String>,
     Json(request): Json<PrepareUploadRequest>,
 ) -> AppResult<Json<PrepareUploadResponse>> {
-    // Verify job exists and is active (claimed or running)
-    if !JobRepo::is_active(state.db(), &job_id).await? {
-        return Err(AppError::NotFound("Job not found or not active".into()));
-    }
+    let db = state.db();
 
-    let mut urls = std::collections::HashMap::new();
+    // Get shader_version_id for active job
+    let shader_version_id = JobRepo::get_active_shader_version_id(db, &job_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Job not found or not active".into()))?;
+
+    // Resolve the shader slug for R2 key generation
+    let shader_slug = ShaderVersionRepo::get_shader_slug(db, &shader_version_id)
+        .await?
+        .ok_or_else(|| {
+            AppError::Internal(anyhow::anyhow!(
+                "Shader version '{}' has no parent shader",
+                shader_version_id
+            ))
+        })?;
+
+    let mut uploads = std::collections::HashMap::new();
 
     // Check if R2/S3 is configured
     let Some(s3) = state.s3() else {
-        // R2 not configured - return placeholder URLs for development
+        // R2 not configured — return placeholder URLs for development
         for file in request.files {
-            let url = format!("https://r2.example.com/captures/{}/{}", job_id, file);
-            urls.insert(file, url);
+            let capture_id = nanoid!();
+            let r2_key = format!(
+                "captures/{}/{}/{}.png",
+                shader_slug, file.scene_id, capture_id
+            );
+            uploads.insert(
+                file.local_path,
+                UploadTarget {
+                    presigned_url: format!("https://r2.example.com/{}", r2_key),
+                    r2_key,
+                    capture_id,
+                },
+            );
         }
-        return Ok(Json(PrepareUploadResponse { urls }));
+        return Ok(Json(PrepareUploadResponse { uploads }));
     };
 
     let r2_config = &state.config().r2;
     let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
 
-    // Generate pre-signed URLs for each file
     for file in request.files {
-        // Structure: captures/{job_id}/{file}
-        let key = format!("captures/{}/{}", job_id, file);
+        let capture_id = nanoid!();
+        let r2_key = format!(
+            "captures/{}/{}/{}.png",
+            shader_slug, file.scene_id, capture_id
+        );
 
         let presigned = s3
             .put_object()
             .bucket(bucket)
-            .key(&key)
+            .key(&r2_key)
             .content_type("image/png")
             .presigned(
                 aws_sdk_s3::presigning::PresigningConfig::builder()
-                    .expires_in(std::time::Duration::from_secs(3600)) // 1 hour
+                    .expires_in(std::time::Duration::from_secs(3600))
                     .build()
                     .expect("valid presigning config"),
             )
@@ -362,33 +387,54 @@ async fn prepare_upload(
                 AppError::Internal(anyhow::anyhow!("Failed to generate presigned URL: {}", e))
             })?;
 
-        urls.insert(file, presigned.uri().to_string());
+        uploads.insert(
+            file.local_path,
+            UploadTarget {
+                presigned_url: presigned.uri().to_string(),
+                r2_key,
+                capture_id,
+            },
+        );
     }
 
-    Ok(Json(PrepareUploadResponse { urls }))
+    Ok(Json(PrepareUploadResponse { uploads }))
 }
 
 /// POST /api/agent/jobs/{id}/complete
-/// Marks job as completed and records capture results
+/// Marks job as completed and records capture results.
+/// Capture IDs come from the prepare-upload step.
 async fn complete_job(
     State(state): State<AppState>,
     Path(job_id): Path<String>,
     Json(request): Json<CompleteJobRequest>,
 ) -> AppResult<StatusCode> {
+    let db = state.db();
+
     // Get shader_version_id for active job (claimed or running)
-    let shader_version_id = JobRepo::get_active_shader_version_id(state.db(), &job_id)
+    let shader_version_id = JobRepo::get_active_shader_version_id(db, &job_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Job not found or not active".into()))?;
 
-    // Insert captures with R2 public URLs
+    // Resolve shader slug to reconstruct R2 keys
+    let shader_slug = ShaderVersionRepo::get_shader_slug(db, &shader_version_id)
+        .await?
+        .ok_or_else(|| {
+            AppError::Internal(anyhow::anyhow!(
+                "Shader version '{}' has no parent shader",
+                shader_version_id
+            ))
+        })?;
+
     let r2_config = &state.config().r2;
     for capture in &request.captures {
-        let capture_id = Uuid::new_v4().to_string();
-        let r2_key = format!("captures/{}/{}", job_id, capture.screenshot_path);
+        let r2_key = format!(
+            "captures/{}/{}/{}.png",
+            shader_slug, capture.scene_id, capture.capture_id
+        );
         let screenshot_url = r2_config.public_url_for_key(&r2_key);
         CaptureRepo::upsert(
-            state.db(),
-            &capture_id,
+            db,
+            &capture.capture_id,
             &shader_version_id,
             &capture.scene_id,
             capture.profile.as_deref(),
@@ -404,16 +450,12 @@ async fn complete_job(
     // Update discovered profiles on shader version if provided
     if let Some(profiles) = &request.discovered_profiles {
         let profiles_json = serde_json::to_string(profiles).unwrap_or_else(|_| "[]".to_string());
-        ShaderVersionRepo::update_supported_profiles(
-            state.db(),
-            &shader_version_id,
-            &profiles_json,
-        )
-        .await?;
+        ShaderVersionRepo::update_supported_profiles(db, &shader_version_id, &profiles_json)
+            .await?;
     }
 
     // Mark job as completed
-    JobRepo::complete(state.db(), &job_id).await?;
+    JobRepo::complete(db, &job_id).await?;
 
     Ok(StatusCode::OK)
 }

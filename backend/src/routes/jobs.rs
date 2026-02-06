@@ -42,7 +42,7 @@ async fn create_job(
         return Err(AppError::NotFound("Shader version not found".into()));
     }
 
-    let id = uuid::Uuid::new_v4().to_string();
+    let id = nanoid::nanoid!();
     let job = JobRepo::create(state.db(), &id, &request).await?;
 
     Ok((StatusCode::CREATED, Json(job)))

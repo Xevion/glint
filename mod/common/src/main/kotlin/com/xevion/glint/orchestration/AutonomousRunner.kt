@@ -5,6 +5,7 @@ import com.xevion.glint.api.AgentApi
 import com.xevion.glint.api.CaptureRecord
 import com.xevion.glint.api.CompleteJobRequest
 import com.xevion.glint.api.JobPayload
+import com.xevion.glint.api.PrepareUploadFile
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.session.SessionRegistry
 import kotlinx.serialization.json.Json
@@ -262,9 +263,16 @@ class AutonomousRunner(
                 return Result.failure(RuntimeException(message))
             }
 
-        // Collect screenshot files and build capture records
-        val screenshotFiles = mutableMapOf<String, File>()
-        val captures = mutableListOf<CaptureRecord>()
+        // Collect screenshot files with structured metadata for prepare request
+        data class ScreenshotInfo(
+            val file: File,
+            val sceneId: String,
+            val profile: String?,
+            val resolution: com.xevion.glint.screenshot.Resolution,
+            val timestamp: String,
+        )
+
+        val screenshotsByPath = mutableMapOf<String, ScreenshotInfo>()
 
         for (session in manifest.sessions) {
             for (screenshot in session.screenshots) {
@@ -272,45 +280,65 @@ class AutonomousRunner(
                 val file = File(sessionBase, "${session.sceneId}/${screenshot.file}")
                 if (file.exists()) {
                     val relativePath = file.relativeTo(mc.gameDirectory).path
-                    screenshotFiles[relativePath] = file
-                    captures.add(
-                        CaptureRecord(
+                    screenshotsByPath[relativePath] =
+                        ScreenshotInfo(
+                            file = file,
                             sceneId = session.sceneId,
                             profile = screenshot.shader?.profile,
-                            screenshotPath = relativePath,
-                            resolutionWidth = screenshot.resolution.width,
-                            resolutionHeight = screenshot.resolution.height,
-                            capturedAt = screenshot.timestamp,
-                        ),
-                    )
+                            resolution = screenshot.resolution,
+                            timestamp = screenshot.timestamp,
+                        )
                 } else {
                     log.warn("Screenshot file not found") { "path" to file.absolutePath }
                 }
             }
         }
 
-        if (screenshotFiles.isEmpty()) {
+        if (screenshotsByPath.isEmpty()) {
             AgentApi.failJob(apiUrl, apiToken, job.id, "No screenshot files found")
             return Result.failure(RuntimeException("No screenshot files found"))
         }
 
-        // Request pre-signed URLs
-        val prepareResult = AgentApi.prepareUpload(apiUrl, apiToken, job.id, screenshotFiles.keys.toList())
-        val urls = prepareResult.getOrElse { return Result.failure(it) }.urls
+        // Build structured prepare request
+        val prepareFiles =
+            screenshotsByPath.map { (path, info) ->
+                PrepareUploadFile(
+                    localPath = path,
+                    sceneId = info.sceneId,
+                    profile = info.profile,
+                )
+            }
 
-        // Upload each file
-        for ((key, file) in screenshotFiles) {
-            val url = urls[key] ?: continue
-            val uploadResult = AgentApi.uploadFile(url, file.readBytes())
+        val prepareResult = AgentApi.prepareUpload(apiUrl, apiToken, job.id, prepareFiles)
+        val uploads = prepareResult.getOrElse { return Result.failure(it) }.uploads
+
+        // Upload each file using presigned URLs
+        for ((path, info) in screenshotsByPath) {
+            val target = uploads[path] ?: continue
+            val uploadResult = AgentApi.uploadFile(target.presignedUrl, info.file.readBytes())
             uploadResult.onFailure { error ->
                 log.error("Failed to upload file") {
-                    "key" to key
+                    "path" to path
                     "error" to error.message
                 }
             }
         }
 
-        // Report completion
+        // Build capture records referencing pre-assigned capture IDs
+        val captures =
+            screenshotsByPath.mapNotNull { (path, info) ->
+                val target = uploads[path] ?: return@mapNotNull null
+                CaptureRecord(
+                    captureId = target.captureId,
+                    sceneId = info.sceneId,
+                    profile = info.profile,
+                    screenshotPath = path,
+                    resolutionWidth = info.resolution.width,
+                    resolutionHeight = info.resolution.height,
+                    capturedAt = info.timestamp,
+                )
+            }
+
         return AgentApi.completeJob(
             apiUrl,
             apiToken,

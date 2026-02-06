@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO captures (\n                id, shader_version_id, scene_id, profile, screenshot_path, screenshot_url,\n                resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, 'completed', $9, $9, $9)\n            ON CONFLICT (shader_version_id, scene_id, profile)\n            DO UPDATE SET\n                screenshot_path = excluded.screenshot_path,\n                screenshot_url = excluded.screenshot_url,\n                resolution_width = excluded.resolution_width,\n                resolution_height = excluded.resolution_height,\n                outdated = FALSE,\n                status = 'completed',\n                updated_at = excluded.updated_at,\n                captured_at = excluded.captured_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int4",
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3a6c59177b4e852a95fb28c98b8952dfca2ed2d5047f24c99c586410b92b7bf4"
+}

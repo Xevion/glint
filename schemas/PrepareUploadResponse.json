@@ -1,17 +1,39 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "PrepareUploadResponse",
-  "description": "Response with pre-signed upload URLs",
+  "description": "Response with pre-signed upload URLs and capture metadata.",
   "type": "object",
   "properties": {
-    "urls": {
+    "uploads": {
       "type": "object",
       "additionalProperties": {
-        "type": "string"
+        "$ref": "#/$defs/UploadTarget"
       }
     }
   },
   "required": [
-    "urls"
-  ]
+    "uploads"
+  ],
+  "$defs": {
+    "UploadTarget": {
+      "description": "A single upload target returned from prepare-upload.",
+      "type": "object",
+      "properties": {
+        "capture_id": {
+          "type": "string"
+        },
+        "presigned_url": {
+          "type": "string"
+        },
+        "r2_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "presigned_url",
+        "r2_key",
+        "capture_id"
+      ]
+    }
+  }
 }

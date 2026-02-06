@@ -4,6 +4,9 @@
   "description": "A single capture result",
   "type": "object",
   "properties": {
+    "capture_id": {
+      "type": "string"
+    },
     "captured_at": {
       "type": "string",
       "format": "date-time"
@@ -30,6 +33,7 @@
     }
   },
   "required": [
+    "capture_id",
     "scene_id",
     "screenshot_path",
     "resolution_width",

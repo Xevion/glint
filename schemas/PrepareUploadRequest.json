@@ -7,11 +7,35 @@
     "files": {
       "type": "array",
       "items": {
-        "type": "string"
+        "$ref": "#/$defs/PrepareUploadFile"
       }
     }
   },
   "required": [
     "files"
-  ]
+  ],
+  "$defs": {
+    "PrepareUploadFile": {
+      "description": "A file entry in a prepare-upload request, with metadata for R2 key generation.",
+      "type": "object",
+      "properties": {
+        "local_path": {
+          "type": "string"
+        },
+        "profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scene_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "local_path",
+        "scene_id"
+      ]
+    }
+  }
 }
