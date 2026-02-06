@@ -39,27 +39,21 @@ class ConfirmDisableScreen(
     }
 
     private fun executeDisable() {
-        SceneManager
-            .disableScene(worldFileName, sceneId)
-            .thenAccept { success ->
-                minecraft?.execute {
-                    if (success) {
-                        Loggers.Ui.get().info("Disabled scene") {
-                            "scene_id" to sceneId
-                        }
-                    } else {
-                        Loggers.Ui.get().error("Failed to disable scene") {
-                            "scene_id" to sceneId
-                        }
-                    }
-                    minecraft?.setScreen(parent)
-
-                    // Refresh the parent screen if it supports refresh
-                    if (parent is GlintMainScreen) {
-                        parent.refreshWorlds()
-                    }
-                }
+        val success = SceneManager.disableScene(worldFileName, sceneId)
+        if (success) {
+            Loggers.Ui.get().info("Disabled scene") {
+                "scene_id" to sceneId
             }
+        } else {
+            Loggers.Ui.get().error("Failed to disable scene") {
+                "scene_id" to sceneId
+            }
+        }
+        minecraft?.setScreen(parent)
+
+        if (parent is GlintMainScreen) {
+            parent.refreshWorlds()
+        }
     }
 
     override fun onClose() {

@@ -2,7 +2,6 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
-import com.xevion.glint.api.DeviceTokenResponse
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintScreen
 import com.xevion.glint.ui.base.GlintTheme
@@ -26,17 +25,12 @@ import net.minecraft.network.chat.Component as McComponent
  * Wizard flow:
  * 1. ServerConnectionScreen - validate URL
  * 2. DeviceAuthScreen - authenticate user
- * 3. WorldSelectionScreen - select world
  */
 class ApiConfigWizardScreen(
     private val parent: Screen,
     private val showConnectionFirst: Boolean = false,
 ) : GlintScreen(McComponent.literal("API Configuration")) {
     private val config: ApiConfig = ApiConfig.load()
-
-    // Store token response from device auth for world selection
-    private var pendingToken: DeviceTokenResponse? = null
-    private var pendingServerUrl: String? = null
 
     override fun buildContent(root: FlowLayout) {
         // This screen immediately forwards to another screen
@@ -78,26 +72,26 @@ class ApiConfigWizardScreen(
                 parent = parent,
                 serverUrl = serverUrl,
                 onAuthorized = { tokenResponse ->
-                    pendingToken = tokenResponse
-                    pendingServerUrl = serverUrl
-                    showWorldSelection(serverUrl, tokenResponse)
+                    val tokenExpiresAt =
+                        if (tokenResponse.accessToken.isNotBlank() && tokenResponse.expiresIn > 0) {
+                            System.currentTimeMillis() + (tokenResponse.expiresIn * 1000)
+                        } else {
+                            0L
+                        }
+                    val newConfig =
+                        ApiConfig(
+                            apiUrl = serverUrl,
+                            enabled = true,
+                            validated = true,
+                            accessToken = tokenResponse.accessToken,
+                            tokenExpiresAt = tokenExpiresAt,
+                        )
+                    if (ApiConfig.save(newConfig)) {
+                        Loggers.Ui.get().info("API config saved: connected to {}", serverUrl)
+                        minecraft?.setScreen(parent)
+                    }
                 },
                 onBack = { showConnectionScreen() },
-            ),
-        )
-    }
-
-    private fun showWorldSelection(
-        serverUrl: String,
-        tokenResponse: DeviceTokenResponse,
-    ) {
-        minecraft?.setScreen(
-            WorldSelectionScreen(
-                parent = parent,
-                serverUrl = serverUrl,
-                accessToken = tokenResponse.accessToken,
-                tokenExpiresIn = tokenResponse.expiresIn,
-                onBack = { showDeviceAuth(serverUrl) },
             ),
         )
     }
@@ -151,24 +145,6 @@ class ApiConfigWizardScreen(
                     .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
             )
 
-            // World
-            infoSection.child(
-                Components
-                    .label(McComponent.literal("Selected World:"))
-                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
-            )
-            val worldDisplay =
-                if (apiConfig.worldName.isNotEmpty()) {
-                    "${apiConfig.worldName} (${apiConfig.worldId.take(8)}...)"
-                } else {
-                    apiConfig.worldId.take(16) + "..."
-                }
-            infoSection.child(
-                Components
-                    .label(McComponent.literal(worldDisplay))
-                    .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
-            )
-
             content.child(infoSection as Component)
 
             // Buttons
@@ -190,8 +166,6 @@ class ApiConfigWizardScreen(
             val disabledConfig =
                 ApiConfig(
                     apiUrl = "",
-                    worldId = "",
-                    worldName = "",
                     enabled = false,
                     validated = false,
                 )

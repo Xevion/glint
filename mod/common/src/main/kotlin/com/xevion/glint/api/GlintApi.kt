@@ -403,6 +403,82 @@ object GlintApi {
     }
 
     /**
+     * Fetches active scenes for a specific world from the backend.
+     * Requires authentication token.
+     */
+    fun fetchScenes(
+        apiUrl: String,
+        worldId: String,
+        token: String,
+    ): Result<List<ApiScene>> {
+        val url = "$apiUrl/api/scenes?world_id=$worldId"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setAuthHeader(token)
+            connection.connectTimeout = 5000
+            connection.readTimeout = 10000
+
+            when (connection.responseCode) {
+                200 -> {
+                    val responseBody = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    try {
+                        val scenes = JSON.decodeFromString<List<ApiScene>>(responseBody)
+                        Result.success(scenes)
+                    } catch (e: Exception) {
+                        Result.failure(ApiError.ParseError("Failed to parse scenes list", e))
+                    }
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /**
+     * Batch disables scenes on the backend (soft delete by slugs within a world).
+     * Requires authentication token.
+     */
+    fun batchDisableScenes(
+        apiUrl: String,
+        worldId: String,
+        slugs: List<String>,
+        token: String,
+    ): Result<Unit> {
+        val url = "$apiUrl/api/scenes/batch?world_id=$worldId"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "DELETE"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setAuthHeader(token)
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 10000
+
+            val requestBody = JSON.encodeToString(BatchDisableRequest.serializer(), BatchDisableRequest(slugs))
+            connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                204 -> Result.success(Unit)
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /**
      * Disables a scene on the backend (soft delete).
      * Requires authentication token.
      */
@@ -457,6 +533,14 @@ data class CreateSceneRequest(
     val weatherIntensity: Double,
     val moonPhase: Int?,
     val biome: String?,
+)
+
+/**
+ * Request payload for batch disabling scenes.
+ */
+@Serializable
+data class BatchDisableRequest(
+    val slugs: List<String>,
 )
 
 /**

@@ -2,7 +2,7 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    routing::{get, put},
+    routing::{delete, get, put},
 };
 use serde::Deserialize;
 
@@ -21,6 +21,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_scenes_public).post(create_scene))
         .route("/all", get(list_scenes_all))
+        .route("/batch", delete(batch_disable_scenes))
         .route(
             "/{id}",
             get(get_scene_by_id)
@@ -36,9 +37,16 @@ pub fn router() -> Router<AppState> {
         )
 }
 
-/// GET /api/scenes - List active scenes (public)
-async fn list_scenes_public(State(state): State<AppState>) -> AppResult<Json<Vec<Scene>>> {
-    let scenes = SceneRepo::list_active(state.db()).await?;
+/// GET /api/scenes - List active scenes (public), optionally filtered by world_id
+async fn list_scenes_public(
+    State(state): State<AppState>,
+    Query(params): Query<SceneQuery>,
+) -> AppResult<Json<Vec<Scene>>> {
+    let scenes = if let Some(ref world_id) = params.world_id {
+        SceneRepo::list_by_world(state.db(), world_id).await?
+    } else {
+        SceneRepo::list_active(state.db()).await?
+    };
     Ok(Json(scenes))
 }
 
@@ -209,4 +217,27 @@ async fn reactivate_scene(
     }
     let scene = SceneRepo::get_by_id(state.db(), &id).await?;
     Ok(Json(scene))
+}
+
+#[derive(Deserialize)]
+struct BatchDisableRequest {
+    slugs: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct BatchDisableQuery {
+    world_id: String,
+}
+
+/// DELETE /api/scenes/batch - Batch disable scenes by slug within a world (admin)
+async fn batch_disable_scenes(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Query(params): Query<BatchDisableQuery>,
+    Json(body): Json<BatchDisableRequest>,
+) -> AppResult<StatusCode> {
+    for slug in &body.slugs {
+        SceneRepo::disable(state.db(), slug, &params.world_id).await?;
+    }
+    Ok(StatusCode::NO_CONTENT)
 }

@@ -206,8 +206,6 @@ class ServerConnectionScreen(
         val config =
             ApiConfig(
                 apiUrl = "",
-                worldId = "",
-                worldName = "",
                 enabled = false,
                 validated = false,
             )

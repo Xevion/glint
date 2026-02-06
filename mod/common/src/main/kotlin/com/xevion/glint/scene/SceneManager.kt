@@ -326,30 +326,13 @@ object SceneManager {
     }
 
     /**
-     * Disables a scene locally and on API.
-     * Removes from local JSON and calls API disable endpoint if configured.
+     * Disables a scene locally by removing it from the collection.
+     * API-side disabling is handled exclusively through the push diff flow.
      */
     fun disableScene(
         fileName: String,
         sceneId: String,
-    ): CompletableFuture<Boolean> {
-        val localResult = removeScene(fileName, sceneId)
-
-        if (!localResult) {
-            return CompletableFuture.completedFuture(false)
-        }
-
-        val config =
-            com.xevion.glint.api.ApiConfig
-                .load()
-        if (!config.isValid()) {
-            log.debug("API not configured, scene disabled locally only")
-            return CompletableFuture.completedFuture(true)
-        }
-
-        return com.xevion.glint.api.SceneSyncManager
-            .disableScene(sceneId, config)
-    }
+    ): Boolean = removeScene(fileName, sceneId)
 
     /**
      * Updates the apiWorldId for a collection, linking it to a backend world.

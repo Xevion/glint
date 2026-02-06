@@ -3,8 +3,9 @@ package com.xevion.glint.ui
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.GlintApi
+import com.xevion.glint.api.PullResult
+import com.xevion.glint.api.PushResult
 import com.xevion.glint.api.SceneSyncManager
-import com.xevion.glint.api.SyncResult
 import com.xevion.glint.api.WorldInfo
 import com.xevion.glint.download.WorldDownloader
 import com.xevion.glint.orchestration.CaptureSpec
@@ -409,30 +410,20 @@ class GlintMainScreen(
                 )
             }
 
-            "synced" -> {
+            "synced", "stale" -> {
                 buttonRow.child(
                     GlintComponents.smallButton(
-                        McComponent.literal("Sync"),
-                        width = 45,
-                        tooltip = McComponent.literal("Sync scenes to API"),
-                    ) { syncWorld(world) } as Component,
+                        McComponent.literal("Pull"),
+                        width = 40,
+                        tooltip = McComponent.literal("Replace local scenes with API scenes"),
+                    ) { pullWorldScenes(world) } as Component,
                 )
                 buttonRow.child(
                     GlintComponents.smallButton(
-                        McComponent.literal("Delete"),
-                        width = 55,
-                        tooltip = McComponent.literal("Delete local collection"),
-                    ) { confirmDeleteWorld(world) } as Component,
-                )
-            }
-
-            "stale" -> {
-                buttonRow.child(
-                    GlintComponents.smallButton(
-                        McComponent.literal("Sync"),
+                        McComponent.literal("Push"),
                         width = 45,
-                        tooltip = McComponent.literal("Sync scenes to API (out of date)"),
-                    ) { syncWorld(world) } as Component,
+                        tooltip = McComponent.literal("Push local scenes to API (preview changes first)"),
+                    ) { pushWorldScenes(world) } as Component,
                 )
                 buttonRow.child(
                     GlintComponents.smallButton(
@@ -583,20 +574,6 @@ class GlintMainScreen(
                 .color(Color.ofRgb(statusColor)) as Component,
         )
 
-        // World
-        if (config.worldName.isNotBlank()) {
-            infoContainer.child(
-                Components
-                    .label(McComponent.literal("World"))
-                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
-            )
-            infoContainer.child(
-                Components
-                    .label(McComponent.literal(config.worldName))
-                    .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
-            )
-        }
-
         master.child(infoContainer as Component)
 
         // Action buttons
@@ -639,14 +616,6 @@ class GlintMainScreen(
                 minecraft?.setScreen(ApiConfigWizardScreen(this, showConnectionFirst = true))
             } as Component,
         )
-        row2.child(
-            GlintComponents.smallButton(
-                McComponent.literal("Change World"),
-                width = 90,
-            ) {
-                minecraft?.setScreen(ApiConfigWizardScreen(this))
-            } as Component,
-        )
 
         master.child(row2 as Component)
 
@@ -686,7 +655,7 @@ class GlintMainScreen(
                 Components
                     .label(
                         McComponent.literal(
-                            "The wizard will guide you through server URL validation, authentication, and world selection.",
+                            "The wizard will guide you through server URL validation and authentication.",
                         ),
                     ).maxWidth(detailTextWidth)
                     .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
@@ -740,21 +709,6 @@ class GlintMainScreen(
                 .maxWidth(detailTextWidth)
                 .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
         )
-
-        // World ID
-        if (config.worldId.isNotBlank()) {
-            detail.child(
-                Components
-                    .label(McComponent.literal("World ID"))
-                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
-            )
-            detail.child(
-                Components
-                    .label(McComponent.literal(config.worldId))
-                    .maxWidth(detailTextWidth)
-                    .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
-            )
-        }
     }
 
     private fun testConnection(config: ApiConfig) {
@@ -995,44 +949,114 @@ class GlintMainScreen(
         }
     }
 
-    private fun syncWorld(world: WorldEntry) {
-        val collection = world.collection ?: return
+    private fun pullWorldScenes(world: WorldEntry) {
         val config = ApiConfig.load()
-
         if (!config.isValid()) {
             StatusLog.warn("API config not valid - open API Config to set it up")
             rebuildStatusBar()
             return
         }
 
-        StatusLog.info("Syncing ${world.name}...")
+        val apiWorldId = world.apiWorld?.id ?: return
+        val collectionFileName = world.collectionFileName ?: return
+
+        minecraft?.setScreen(
+            ConfirmPullDialog(
+                parent = this,
+                worldName = world.name,
+                localSceneCount = world.sceneCount,
+                onConfirm = {
+                    StatusLog.info("Pulling scenes for ${world.name}...")
+                    rebuildStatusBar()
+
+                    SceneSyncManager
+                        .pullScenes(apiWorldId, collectionFileName, config)
+                        .thenAccept { result ->
+                            minecraft?.execute {
+                                when (result) {
+                                    is PullResult.Success -> {
+                                        StatusLog.info("Pulled ${result.count} scenes for ${world.name}")
+                                    }
+                                    is PullResult.Failure -> {
+                                        StatusLog.error("Pull failed: ${result.error.userMessage}")
+                                    }
+                                }
+                                SceneManager.clearCache()
+                                refreshWorlds()
+                                rebuildStatusBar()
+                            }
+                        }
+                },
+            ),
+        )
+    }
+
+    private fun pushWorldScenes(world: WorldEntry) {
+        val config = ApiConfig.load()
+        if (!config.isValid()) {
+            StatusLog.warn("API config not valid - open API Config to set it up")
+            rebuildStatusBar()
+            return
+        }
+
+        val apiWorldId = world.apiWorld?.id ?: return
+
+        StatusLog.info("Computing diff for ${world.name}...")
         rebuildStatusBar()
 
-        SceneSyncManager
-            .syncCollection(collection, config)
-            .thenAccept { results ->
+        CompletableFuture
+            .supplyAsync {
+                GlintApi.fetchScenes(config.apiUrl, apiWorldId, config.accessToken)
+            }.thenAccept { fetchResult ->
                 minecraft?.execute {
-                    val successes = results.count { it is SyncResult.Success }
-                    val failures = results.count { it is SyncResult.Failure }
+                    fetchResult.fold(
+                        onSuccess = { apiScenes ->
+                            val diff = SceneSyncManager.computeDiff(world.scenes, apiScenes)
+                            if (!diff.hasChanges) {
+                                StatusLog.info("${world.name}: already in sync")
+                                rebuildStatusBar()
+                                return@execute
+                            }
 
-                    // Link local collection to API world after successful sync
-                    if (successes > 0 && world.collectionFileName != null) {
-                        SceneManager.setApiWorldId(world.collectionFileName, config.worldId)
-                    }
+                            minecraft?.setScreen(
+                                PushDiffDialog(
+                                    parent = this,
+                                    worldName = world.name,
+                                    diff = diff,
+                                    onConfirm = {
+                                        StatusLog.info("Pushing changes for ${world.name}...")
+                                        rebuildStatusBar()
 
-                    if (failures > 0) {
-                        StatusLog.warn("${world.name}: $successes/${results.size} synced ($failures failed)")
-                    } else {
-                        StatusLog.info("${world.name}: all $successes scenes synced")
-                    }
-                    rebuildStatusBar()
+                                        SceneSyncManager
+                                            .executePush(diff, apiWorldId, config)
+                                            .thenAccept { result ->
+                                                minecraft?.execute {
+                                                    when (result) {
+                                                        is PushResult.Success -> {
+                                                            StatusLog.info(
+                                                                "${world.name}: ${result.created} created, " +
+                                                                    "${result.updated} updated, ${result.removed} removed",
+                                                            )
+                                                        }
+                                                        is PushResult.Failure -> {
+                                                            StatusLog.error("Push failed: ${result.error.userMessage}")
+                                                        }
+                                                    }
+                                                    SceneManager.clearCache()
+                                                    refreshWorlds()
+                                                    rebuildStatusBar()
+                                                }
+                                            }
+                                    },
+                                ),
+                            )
+                        },
+                        onFailure = { error ->
+                            StatusLog.error("Failed to fetch API scenes: ${error.message}")
+                            rebuildStatusBar()
+                        },
+                    )
                 }
-            }.exceptionally { e ->
-                minecraft?.execute {
-                    StatusLog.error("Sync failed for ${world.name}: ${e.message}")
-                    rebuildStatusBar()
-                }
-                null
             }
     }
 
@@ -1065,6 +1089,31 @@ class GlintMainScreen(
                     SceneManager.clearCache()
                     refreshWorlds()
                     rebuildStatusBar()
+
+                    // Auto-pull scenes for the downloaded world
+                    val config = ApiConfig.load()
+                    if (config.isValid()) {
+                        val collectionFileName =
+                            apiWorld.name
+                                .lowercase()
+                                .replace(' ', '_')
+                                .replace(Regex("[^a-z0-9_-]"), "")
+                        SceneSyncManager
+                            .pullScenes(apiWorld.id, collectionFileName, config)
+                            .thenAccept { result ->
+                                minecraft?.execute {
+                                    when (result) {
+                                        is PullResult.Success ->
+                                            StatusLog.info("Pulled ${result.count} scenes for ${world.name}")
+                                        is PullResult.Failure ->
+                                            StatusLog.warn("Could not pull scenes: ${result.error.userMessage}")
+                                    }
+                                    SceneManager.clearCache()
+                                    refreshWorlds()
+                                    rebuildStatusBar()
+                                }
+                            }
+                    }
                 }
             }.exceptionally { e ->
                 minecraft?.execute {

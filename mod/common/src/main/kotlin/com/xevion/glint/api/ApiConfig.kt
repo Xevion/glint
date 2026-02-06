@@ -13,8 +13,6 @@ import java.io.File
 @Serializable
 data class ApiConfig(
     val apiUrl: String = "http://localhost:8080",
-    val worldId: String = "",
-    val worldName: String = "",
     val enabled: Boolean = false,
     val validated: Boolean = false,
     val accessToken: String = "",
@@ -78,7 +76,7 @@ data class ApiConfig(
     /**
      * Checks if the config is valid for API operations.
      */
-    fun isValid(): Boolean = enabled && apiUrl.isNotBlank() && worldId.isNotBlank() && validated && hasValidToken()
+    fun isValid(): Boolean = enabled && apiUrl.isNotBlank() && validated && hasValidToken()
 
     /**
      * Checks if the config needs validation (has URL but not validated).

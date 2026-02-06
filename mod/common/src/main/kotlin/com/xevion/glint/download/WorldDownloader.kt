@@ -14,7 +14,7 @@ import javax.net.ssl.SSLException
 
 /**
  * Handles downloading and extracting world files from the API.
- * Downloads to .minecraft/glint/worlds/{slug}_{random}/
+ * Downloads to .minecraft/glint/worlds/{uuid}/
  */
 object WorldDownloader {
     private val log = Loggers.Download.get()
@@ -41,7 +41,7 @@ object WorldDownloader {
         CompletableFuture.supplyAsync {
             var worldDir: File? = null
             try {
-                val folderName = generateFolderName(worldSlug)
+                val folderName = generateFolderName(worldId)
                 val worldsDir = getWorldsDirectory()
                 worldDir = File(worldsDir, folderName)
 
@@ -126,10 +126,7 @@ object WorldDownloader {
         return worldsDir
     }
 
-    private fun generateFolderName(slug: String): String {
-        val random = (1..6).map { ('a'..'z').random() }.joinToString("")
-        return "${slug}_$random"
-    }
+    private fun generateFolderName(worldId: String): String = worldId
 
     private fun downloadFile(
         url: String,
