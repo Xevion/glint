@@ -1,8 +1,8 @@
 //! Logging configuration with a compact timestamp formatter.
 //!
 //! Provides a less verbose log format compared to the default:
-//! - Before: `2026-02-04T05:02:06.344416Z  INFO glint_backend: Message`
-//! - After:  `05:02:06.34441  INFO glint_backend: Message`
+//! - Before: `2026-02-04T05:02:06.344416Z  INFO glint: Message`
+//! - After:  `05:02:06.34441  INFO glint: Message`
 //!
 //! ## Verbosity Control
 //!
@@ -189,7 +189,7 @@ pub fn init_with_verbosity(verbose_count: u8) {
     };
 
     // Build filter: app crates at determined level, deps at warn
-    let filter_str = format!("warn,glint_backend={app_level}");
+    let filter_str = format!("warn,glint={app_level}");
     let filter = EnvFilter::new(filter_str);
 
     tracing_subscriber::fmt()

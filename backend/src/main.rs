@@ -8,7 +8,7 @@ use tower_http::{
 };
 use tracing::{debug, info, warn};
 
-use glint_backend::{cli, config::Config, db, platform, routes, services, state::AppState};
+use glint::{cli, config::Config, db, platform, routes, services, state::AppState};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = cli::Cli::parse();
 
     // Initialize tracing with compact formatter
-    glint_backend::logging::init_with_verbosity(cli.verbose.verbose);
+    glint::logging::init_with_verbosity(cli.verbose.verbose);
 
     // Load configuration
     let config = Config::load()?;

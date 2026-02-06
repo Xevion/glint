@@ -14,7 +14,7 @@ pub struct VerboseArgs {
 
 /// Glint - Shader preview catalog and comparison tool
 #[derive(Parser, Debug)]
-#[command(name = "glint-backend")]
+#[command(name = "glint")]
 #[command(about = "Backend API server for shader screenshot catalog")]
 #[command(version)]
 pub struct Cli {

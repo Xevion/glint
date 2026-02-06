@@ -1164,7 +1164,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "glint-backend"
+name = "glint"
 version = "0.1.0"
 dependencies = [
  "anyhow",

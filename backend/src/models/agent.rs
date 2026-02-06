@@ -1,4 +1,4 @@
-//! Agent API types shared between glint-backend and the Minecraft mod.
+//! Agent API types shared between the backend and the Minecraft mod.
 //!
 //! These types are used for API request/response serialization.
 
