@@ -201,7 +201,7 @@ async function handleReactivate() {
 
 		{#if !selected.active}
 			<div class="mb-4 rounded-lg border border-yellow-500 bg-yellow-50 p-3 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300">
-				This scene is inactive and will not be included in capture jobs.
+				This scene is inactive and will not be included in captures.
 			</div>
 		{/if}
 
@@ -314,7 +314,7 @@ async function handleReactivate() {
 <ConfirmDialog
 	bind:open={showDisableConfirm}
 	title="Disable Scene"
-	description={`Disable scene "${selected?.name}"? It will be hidden from capture jobs.`}
+	description={`Disable scene "${selected?.name}"? It will be hidden from captures.`}
 	confirmLabel="Disable"
 	onConfirm={confirmDisable}
 />

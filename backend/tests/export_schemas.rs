@@ -18,9 +18,6 @@ fn export_all_schemas() {
     let dir = schema_dir();
     fs::create_dir_all(&dir).unwrap();
 
-    write_schema::<JobStatus>("JobStatus");
-    write_schema::<JobPayload>("JobPayload");
-    write_schema::<ShaderInfo>("ShaderInfo");
     write_schema::<SceneInfo>("SceneInfo");
     write_schema::<WorldInfo>("WorldInfo");
     write_schema::<PrepareUploadRequest>("PrepareUploadRequest");

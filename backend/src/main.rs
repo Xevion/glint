@@ -130,12 +130,6 @@ async fn main() -> anyhow::Result<()> {
         curseforge_client,
     );
 
-    // Start heartbeat monitoring background task
-    tokio::spawn(services::heartbeat::monitor_heartbeats(
-        pool.clone(),
-        config.heartbeat.clone(),
-    ));
-
     // Start upload cleanup background task
     let cleanup_bucket = config
         .r2

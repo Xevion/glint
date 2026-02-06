@@ -1,6 +1,6 @@
 pub mod capture;
+pub mod capture_run;
 pub mod device_code;
-pub mod job;
 pub mod pending_upload;
 pub mod scene;
 pub mod session;
@@ -11,8 +11,8 @@ pub mod user;
 pub mod world;
 
 pub use capture::CaptureRepo;
+pub use capture_run::CaptureRunRepo;
 pub use device_code::DeviceCodeRepo;
-pub use job::JobRepo;
 pub use pending_upload::PendingUploadRepo;
 pub use scene::SceneRepo;
 pub use session::SessionRepo;

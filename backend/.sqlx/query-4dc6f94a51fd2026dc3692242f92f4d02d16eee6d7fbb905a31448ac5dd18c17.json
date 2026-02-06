@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM capture_runs",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "4dc6f94a51fd2026dc3692242f92f4d02d16eee6d7fbb905a31448ac5dd18c17"
+}

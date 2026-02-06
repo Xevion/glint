@@ -1,21 +1,18 @@
 import { createApiClient } from '$lib/api';
 import type { CaptureWithContext } from '$lib/bindings';
-import type { JobWithDetails } from '$lib/api/endpoints/admin';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => {
 	const api = createApiClient(fetch);
 
-	const [shadersRes, worldsRes, scenesRes, capturesRes, usersRes, jobsRes, healthRes] =
-		await Promise.all([
-			api.shaders.list(),
-			api.worlds.list(),
-			api.scenes.list(),
-			api.admin.listCaptures(),
-			api.admin.listUsers(),
-			api.admin.listJobs(),
-			api.admin.health()
-		]);
+	const [shadersRes, worldsRes, scenesRes, capturesRes, usersRes, healthRes] = await Promise.all([
+		api.shaders.list(),
+		api.worlds.list(),
+		api.scenes.list(),
+		api.admin.listCaptures(),
+		api.admin.listUsers(),
+		api.admin.health()
+	]);
 
 	const errors: Record<string, string> = {};
 
@@ -59,25 +56,6 @@ export const load: PageLoad = async ({ fetch }) => {
 		}
 	});
 
-	const { jobCounts, recentJobs } = jobsRes.match({
-		Ok: (jobs) => ({
-			jobCounts: {
-				pending: jobs.filter((j) => j.status === 'pending').length,
-				running: jobs.filter((j) => j.status === 'running' || j.status === 'claimed').length,
-				completed: jobs.filter((j) => j.status === 'completed').length,
-				failed: jobs.filter((j) => j.status === 'failed').length
-			},
-			recentJobs: jobs.slice(0, 5)
-		}),
-		Err: (e) => {
-			errors.jobs = e.message;
-			return {
-				jobCounts: { pending: 0, running: 0, completed: 0, failed: 0 },
-				recentJobs: [] as JobWithDetails[]
-			};
-		}
-	});
-
 	const healthStatus = healthRes.match({
 		Ok: () => 'ok' as const,
 		Err: (e) => {
@@ -92,8 +70,6 @@ export const load: PageLoad = async ({ fetch }) => {
 		sceneCount,
 		captureCount,
 		userCount,
-		jobCounts,
-		recentJobs,
 		recentCaptures,
 		healthStatus,
 		errors

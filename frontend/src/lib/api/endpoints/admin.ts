@@ -3,7 +3,6 @@ import type { ApiError } from '../errors';
 import { ApiClient } from '../client';
 import type {
 	CaptureWithContext,
-	Job,
 	Scene,
 	SceneWithWorld,
 	Shader,
@@ -11,22 +10,6 @@ import type {
 	UserWithSessions,
 	World
 } from '$lib/bindings';
-
-export type { Job };
-
-export interface JobWithDetails extends Job {
-	shader_name: string;
-	shader_slug: string;
-	shader_version: string;
-	scene_count: number;
-}
-
-export interface CreateJobRequest {
-	shader_version_id: string;
-	scene_ids: string[];
-	profiles?: string[];
-	priority?: number;
-}
 
 export interface UpdateShaderRequest {
 	name?: string;
@@ -117,32 +100,6 @@ export class AdminEndpoints extends ApiClient {
 
 	deleteCapture(id: string): Promise<Result<null, ApiError>> {
 		return super.delete<null>(`/api/captures/${id}`);
-	}
-
-	// ============== Jobs ==============
-
-	listJobs(): Promise<Result<JobWithDetails[], ApiError>> {
-		return super.get<JobWithDetails[]>('/api/jobs');
-	}
-
-	createJob(request: CreateJobRequest): Promise<Result<Job, ApiError>> {
-		return super.post<Job>('/api/jobs', request);
-	}
-
-	deleteJob(jobId: string): Promise<Result<null, ApiError>> {
-		return super.delete<null>(`/api/jobs/${jobId}`);
-	}
-
-	cancelJob(jobId: string): Promise<Result<Job, ApiError>> {
-		return super.put<Job>(`/api/jobs/${jobId}/cancel`, {});
-	}
-
-	retryJob(jobId: string): Promise<Result<Job, ApiError>> {
-		return super.put<Job>(`/api/jobs/${jobId}/retry`, {});
-	}
-
-	releaseJob(jobId: string): Promise<Result<Job, ApiError>> {
-		return super.put<Job>(`/api/jobs/${jobId}/release`, {});
 	}
 
 	// ============== Users ==============

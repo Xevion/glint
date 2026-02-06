@@ -21,10 +21,6 @@ pub struct Config {
     #[serde(default)]
     pub r2: R2Config,
 
-    /// Job heartbeat monitoring configuration
-    #[serde(default)]
-    pub heartbeat: HeartbeatConfig,
-
     /// Discord OAuth configuration
     #[serde(default)]
     pub discord: DiscordConfig,
@@ -50,31 +46,6 @@ pub struct R2Config {
 
     /// Public URL prefix for serving files (e.g., https://cdn.glint.example.com)
     pub public_url: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct HeartbeatConfig {
-    /// Timeout duration in seconds before considering a job stale
-    #[serde(default = "default_heartbeat_timeout")]
-    pub timeout_seconds: u64,
-
-    /// Polling interval in seconds when there are active jobs
-    #[serde(default = "default_active_poll_interval")]
-    pub active_poll_seconds: u64,
-
-    /// Polling interval in seconds when there are no active jobs
-    #[serde(default = "default_idle_poll_interval")]
-    pub idle_poll_seconds: u64,
-}
-
-impl Default for HeartbeatConfig {
-    fn default() -> Self {
-        Self {
-            timeout_seconds: default_heartbeat_timeout(),
-            active_poll_seconds: default_active_poll_interval(),
-            idle_poll_seconds: default_idle_poll_interval(),
-        }
-    }
 }
 
 impl R2Config {
@@ -133,18 +104,6 @@ impl DiscordConfig {
     pub fn is_configured(&self) -> bool {
         self.client_id.is_some() && self.client_secret.is_some() && self.redirect_uri.is_some()
     }
-}
-
-fn default_heartbeat_timeout() -> u64 {
-    300 // 5 minutes
-}
-
-fn default_active_poll_interval() -> u64 {
-    10 // 10 seconds when jobs are active
-}
-
-fn default_idle_poll_interval() -> u64 {
-    60 // 1 minute when no jobs are active
 }
 
 /// Platform API configuration for Modrinth and CurseForge

@@ -14,7 +14,6 @@ import {
 	Settings,
 	Globe,
 	Camera,
-	Briefcase,
 	Users,
 	Menu,
 	Download
@@ -72,7 +71,6 @@ const adminItems = [
 	{ href: '/admin/worlds', label: 'Worlds', icon: Globe },
 	{ href: '/admin/scenes', label: 'Scenes', icon: Mountain },
 	{ href: '/admin/captures', label: 'Captures', icon: Camera },
-	{ href: '/admin/jobs', label: 'Jobs', icon: Briefcase },
 	{ href: '/admin/users', label: 'Users', icon: Users },
 	{ href: '/admin/settings', label: 'Settings', icon: Settings }
 ];

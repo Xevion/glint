@@ -67,6 +67,16 @@
         "ordinal": 12,
         "name": "upstream_published_at",
         "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "capture_failure_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "last_capture_error",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -87,6 +97,8 @@
       true,
       true,
       true,
+      true,
+      false,
       true
     ]
   },

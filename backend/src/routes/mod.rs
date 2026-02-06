@@ -1,14 +1,14 @@
 mod adopt;
-mod agent;
 mod auth;
 mod captures;
 mod device;
-mod jobs;
+mod runs;
 mod scenes;
 mod sessions;
 mod shaders;
 mod user;
 mod users;
+mod work;
 mod worlds;
 
 use axum::{Router, routing::get};
@@ -30,11 +30,13 @@ fn api_router() -> Router<AppState> {
         .nest("/scenes", scenes::router())
         .nest("/captures", captures::router())
         .nest("/worlds", worlds::router())
-        .nest("/jobs", jobs::router())
         .nest("/users", users::router())
         .nest("/sessions", sessions::router())
-        .nest("/agent", agent::router())
         .nest("/device", device::router())
+        .nest("/runs", runs::router())
+        .nest("/work", work::router())
+        .merge(runs::failure_router())
+        .merge(runs::upload_router())
 }
 
 async fn health() -> &'static str {

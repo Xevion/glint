@@ -5,7 +5,12 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
     println!("Seeding database...");
 
     // Clear existing data (cascades will handle related records)
-    sqlx::query!("DELETE FROM jobs").execute(pool).await?;
+    sqlx::query!("DELETE FROM capture_run_items")
+        .execute(pool)
+        .await?;
+    sqlx::query!("DELETE FROM capture_runs")
+        .execute(pool)
+        .await?;
     sqlx::query!("DELETE FROM captures").execute(pool).await?;
     sqlx::query!("DELETE FROM scenes").execute(pool).await?;
     sqlx::query!("DELETE FROM shader_versions WHERE id != 'vanilla-1.21.4'")

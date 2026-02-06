@@ -8,42 +8,6 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-// Job Types
-
-/// Job status enum
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum JobStatus {
-    Pending,
-    Claimed,
-    Running,
-    Completed,
-    Failed,
-}
-
-/// Full job payload returned when claiming a job
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct JobPayload {
-    pub id: String,
-    pub shader: ShaderInfo,
-    pub scenes: Vec<SceneInfo>,
-    pub worlds: Vec<WorldInfo>,
-    pub profiles: Vec<String>,
-    pub priority: i32,
-}
-
-/// Shader information for a job
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct ShaderInfo {
-    pub id: String,
-    pub slug: String,
-    pub name: String,
-    pub version_id: String,
-    pub version: String,
-    pub download_url: Option<String>,
-    pub file_hash: Option<String>,
-}
-
 /// Scene information for a job
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SceneInfo {
@@ -118,21 +82,6 @@ pub struct CaptureRecord {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FailJobRequest {
     pub error_message: String,
-}
-
-/// Request to force-create a job for testing.
-///
-/// Selectors use a compact syntax:
-/// - `"+"` or `"1+"` — 1 random choice (default if omitted)
-/// - `"!"` — all available
-/// - `"3+"` — 3 random choices
-/// - `"some-slug"` — specific item by slug
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct ForceJobRequest {
-    /// Scene selector (default: "+" = 1 random)
-    pub scenes: Option<String>,
-    /// Shader selector (default: "+" = 1 random)
-    pub shaders: Option<String>,
 }
 
 // Orchestration Manifest Types (matches mod output)

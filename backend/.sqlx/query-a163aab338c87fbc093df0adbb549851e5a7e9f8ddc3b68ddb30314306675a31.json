@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE shader_versions\n        SET capture_failure_count = capture_failure_count + 1,\n            last_capture_error = $2\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a163aab338c87fbc093df0adbb549851e5a7e9f8ddc3b68ddb30314306675a31"
+}

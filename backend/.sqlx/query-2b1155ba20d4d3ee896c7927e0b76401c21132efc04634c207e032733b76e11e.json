@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "DELETE FROM jobs",
+  "query": "DELETE FROM capture_run_items",
   "describe": {
     "columns": [],
     "parameters": {
@@ -8,5 +8,5 @@
     },
     "nullable": []
   },
-  "hash": "e7a9dc3c6002f79a1a4a4cf9aec66b8a1e99cfbd94a4938c00f15af197a880c2"
+  "hash": "2b1155ba20d4d3ee896c7927e0b76401c21132efc04634c207e032733b76e11e"
 }

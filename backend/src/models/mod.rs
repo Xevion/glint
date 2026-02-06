@@ -84,6 +84,8 @@ pub struct ShaderVersion {
     pub upstream_published_at: Option<DateTime<Utc>>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
+    pub capture_failure_count: i32,
+    pub last_capture_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
@@ -145,27 +147,38 @@ pub struct Capture {
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
-pub struct Job {
+pub struct CaptureRun {
     pub id: String,
-    pub shader_version_id: String,
-    pub scene_ids: Option<String>,
-    pub profiles: Option<String>,
-    pub priority: i32,
-    pub status: String,
-    pub attempts: i32,
-    pub max_attempts: i32,
     pub agent_id: Option<String>,
+    #[ts(type = "string")]
+    pub started_at: DateTime<Utc>,
     #[ts(type = "string | null")]
-    pub claimed_at: Option<DateTime<Utc>>,
-    #[ts(type = "string | null")]
-    pub last_heartbeat: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub status: String,
+    pub total_items: i32,
+    pub completed_items: i32,
+    pub failed_items: i32,
+    pub skipped_items: i32,
+    pub metadata_json: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
+pub struct CaptureRunItem {
+    pub id: String,
+    pub run_id: String,
+    pub shader_version_id: String,
+    pub scene_id: String,
+    pub profile: Option<String>,
+    pub status: String,
+    pub capture_id: Option<String>,
+    pub error_message: Option<String>,
+    pub error_log: Option<String>,
+    pub duration_ms: Option<i32>,
     #[ts(type = "string | null")]
     pub started_at: Option<DateTime<Utc>>,
     #[ts(type = "string | null")]
     pub completed_at: Option<DateTime<Utc>>,
-    pub error_message: Option<String>,
-    #[ts(type = "string")]
-    pub created_at: DateTime<Utc>,
 }
 
 /// Discord OAuth user
@@ -378,7 +391,7 @@ pub struct AdoptPreviewAuthor {
     pub url: Option<String>,
 }
 
-// Admin-only operations: create/update shaders, worlds, scenes, jobs
+// Admin-only operations: create/update shaders, worlds, scenes
 
 #[derive(Debug, Deserialize)]
 pub struct CreateShaderRequest {
@@ -486,14 +499,6 @@ pub struct UpdateSceneRequest {
     #[serde(rename = "moonPhase")]
     pub moon_phase: Option<i32>,
     pub biome: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateJobRequest {
-    pub shader_version_id: String,
-    pub scene_ids: Vec<String>,
-    pub profiles: Option<Vec<String>>,
-    pub priority: Option<i32>,
 }
 
 // Admin dashboard request/response types

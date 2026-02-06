@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM capture_runs WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "agent_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "total_items",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "completed_items",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "failed_items",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "skipped_items",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "metadata_json",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "73f1b0136ec39c5bc52f22d1b467ce36494269f855a70b9a23330a94ea0d3e03"
+}

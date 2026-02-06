@@ -120,10 +120,10 @@ impl CaptureRepo {
         Ok(captures)
     }
 
-    /// Create or update a capture (upsert on shader_version_id + scene_id + profile)
+    /// Insert a new capture (append-only — no upsert)
     #[instrument(skip(db), level = "debug")]
     #[allow(clippy::too_many_arguments)]
-    pub async fn upsert(
+    pub async fn insert(
         db: &DbPool,
         id: &str,
         shader_version_id: &str,
@@ -141,16 +141,6 @@ impl CaptureRepo {
                 id, shader_version_id, scene_id, profile, screenshot_path, screenshot_url,
                 resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, 'completed', $9, $9, $9)
-            ON CONFLICT (shader_version_id, scene_id, profile)
-            DO UPDATE SET
-                screenshot_path = excluded.screenshot_path,
-                screenshot_url = excluded.screenshot_url,
-                resolution_width = excluded.resolution_width,
-                resolution_height = excluded.resolution_height,
-                outdated = FALSE,
-                status = 'completed',
-                updated_at = excluded.updated_at,
-                captured_at = excluded.captured_at
             "#,
             id,
             shader_version_id,
@@ -165,11 +155,11 @@ impl CaptureRepo {
         .execute(db)
         .await
         .context(format!(
-            "failed to upsert capture for scene '{}' with shader version '{}'",
+            "failed to insert capture for scene '{}' with shader version '{}'",
             scene_id, shader_version_id
         ))?;
 
-        debug!(scene_id, shader_version_id, "Capture upserted");
+        debug!(scene_id, shader_version_id, "Capture inserted");
         Ok(())
     }
 

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE capture_run_items\n            SET status = 'failed', error_message = $2, error_log = $3, duration_ms = $4, completed_at = now()\n            WHERE id = $1 AND status IN ('pending', 'running')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "591858b82e85cfe11d12629d0eb1d4348ea1b8d99629abe456c63a05dd5f7685"
+}

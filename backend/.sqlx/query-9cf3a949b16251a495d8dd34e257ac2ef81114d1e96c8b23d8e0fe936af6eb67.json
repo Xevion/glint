@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM jobs WHERE id = $1",
+  "query": "SELECT * FROM capture_run_items WHERE run_id = $1 ORDER BY started_at ASC NULLS LAST",
   "describe": {
     "columns": [
       {
@@ -10,23 +10,23 @@
       },
       {
         "ordinal": 1,
-        "name": "shader_version_id",
+        "name": "run_id",
         "type_info": "Text"
       },
       {
         "ordinal": 2,
-        "name": "scene_ids",
+        "name": "shader_version_id",
         "type_info": "Text"
       },
       {
         "ordinal": 3,
-        "name": "profiles",
+        "name": "scene_id",
         "type_info": "Text"
       },
       {
         "ordinal": 4,
-        "name": "priority",
-        "type_info": "Int4"
+        "name": "profile",
+        "type_info": "Text"
       },
       {
         "ordinal": 5,
@@ -35,47 +35,32 @@
       },
       {
         "ordinal": 6,
-        "name": "attempts",
-        "type_info": "Int4"
-      },
-      {
-        "ordinal": 7,
-        "name": "max_attempts",
-        "type_info": "Int4"
-      },
-      {
-        "ordinal": 8,
-        "name": "agent_id",
+        "name": "capture_id",
         "type_info": "Text"
       },
       {
-        "ordinal": 9,
-        "name": "claimed_at",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 10,
-        "name": "last_heartbeat",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 11,
-        "name": "started_at",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 12,
-        "name": "completed_at",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 13,
+        "ordinal": 7,
         "name": "error_message",
         "type_info": "Text"
       },
       {
-        "ordinal": 14,
-        "name": "created_at",
+        "ordinal": 8,
+        "name": "error_log",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "duration_ms",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "completed_at",
         "type_info": "Timestamptz"
       }
     ],
@@ -87,20 +72,17 @@
     "nullable": [
       false,
       false,
+      false,
+      false,
       true,
-      true,
-      false,
-      false,
-      false,
       false,
       true,
       true,
       true,
       true,
       true,
-      true,
-      false
+      true
     ]
   },
-  "hash": "1780fdb6bb36b0233bfc6827267d09ec8037a3c9e474562ff062d49321d0c7a3"
+  "hash": "9cf3a949b16251a495d8dd34e257ac2ef81114d1e96c8b23d8e0fe936af6eb67"
 }

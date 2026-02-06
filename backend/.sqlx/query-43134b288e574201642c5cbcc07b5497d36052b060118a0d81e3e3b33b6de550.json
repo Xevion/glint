@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO captures (\n                id, shader_version_id, scene_id, profile, screenshot_path, screenshot_url,\n                resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, 'completed', $9, $9, $9)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int4",
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "43134b288e574201642c5cbcc07b5497d36052b060118a0d81e3e3b33b6de550"
+}

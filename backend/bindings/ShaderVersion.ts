@@ -7,4 +7,4 @@ export type ShaderVersion = { id: string, shader_id: string, version: string, mo
 /**
  * JSON array of profile names, discovered after first capture
  */
-supported_profiles: string | null, upstream_published_at: string | null, created_at: string, };
+supported_profiles: string | null, upstream_published_at: string | null, created_at: string, capture_failure_count: number, last_capture_error: string | null, };

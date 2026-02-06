@@ -6,16 +6,14 @@ import * as Table from '$lib/components/ui/table';
 import TimeAgo from './TimeAgo.svelte';
 import { goto } from '$app/navigation';
 import { Button } from '$lib/components/ui/button';
-import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-import { ExternalLink, Trash2, Ellipsis, CircleX, RotateCcw, LockOpen, Info } from '@lucide/svelte';
+import { ExternalLink, Trash2 } from '@lucide/svelte';
 
 interface Column {
 	id: string;
 	key: string;
 	name: string;
-	component?: 'time' | 'link-button' | 'delete-button' | 'job-actions';
+	component?: 'time' | 'link-button' | 'delete-button';
 	href?: (row: T) => string;
-	onAction?: (action: string, row: T) => void;
 	/** Column to use as card title on mobile (first truthy one wins) */
 	cardTitle?: boolean;
 	/** Hide this column in mobile card view */
@@ -36,11 +34,7 @@ let { data, columns, selectedId = null, onRowClick, getRowId, cell }: Props = $p
 // Find the title column for mobile cards (first column with cardTitle=true, or first column)
 const titleColumn = $derived(columns.find((c) => c.cardTitle) ?? columns[0]);
 // Other columns to show in card body (excluding title and hidden columns)
-const cardBodyColumns = $derived(
-	columns.filter((c) => c !== titleColumn && !c.hideOnMobile && c.component !== 'job-actions')
-);
-// Action columns (shown at bottom of card)
-const actionColumns = $derived(columns.filter((c) => c.component === 'job-actions'));
+const cardBodyColumns = $derived(columns.filter((c) => c !== titleColumn && !c.hideOnMobile));
 
 function extractRowId(row: T): string {
 	if (getRowId) return getRowId(row);
@@ -101,48 +95,7 @@ const table = $derived(
 									<Button variant="ghost" size="sm" title="Delete (not implemented)">
 										<Trash2 class="h-4 w-4" />
 									</Button>
-								{:else if colDef?.component === 'job-actions' && colDef.onAction}
-									{@const status = String(row.status)}
-									<DropdownMenu.Root>
-										<DropdownMenu.Trigger>
-											<Button variant="ghost" size="sm">
-												<Ellipsis class="h-4 w-4" />
-											</Button>
-										</DropdownMenu.Trigger>
-										<DropdownMenu.Content align="end">
-											<DropdownMenu.Item onclick={() => colDef.onAction?.('view-details', row)}>
-												<Info class="mr-2 h-4 w-4" />
-												View Details
-											</DropdownMenu.Item>
-											{#if status === 'pending' || status === 'claimed'}
-												<DropdownMenu.Item onclick={() => colDef.onAction?.('cancel', row)}>
-													<CircleX class="mr-2 h-4 w-4" />
-													Cancel Job
-												</DropdownMenu.Item>
-											{/if}
-											{#if status === 'failed'}
-												<DropdownMenu.Item onclick={() => colDef.onAction?.('retry', row)}>
-													<RotateCcw class="mr-2 h-4 w-4" />
-													Retry Job
-												</DropdownMenu.Item>
-											{/if}
-											{#if status === 'claimed' || status === 'running'}
-												<DropdownMenu.Item onclick={() => colDef.onAction?.('release', row)}>
-													<LockOpen class="mr-2 h-4 w-4" />
-													Release Claim
-												</DropdownMenu.Item>
-											{/if}
-											<DropdownMenu.Separator />
-											<DropdownMenu.Item
-												onclick={() => colDef.onAction?.('delete', row)}
-												class="text-destructive focus:text-destructive"
-											>
-												<Trash2 class="mr-2 h-4 w-4" />
-												Delete Job
-											</DropdownMenu.Item>
-										</DropdownMenu.Content>
-									</DropdownMenu.Root>
-								{:else if cell}
+							{:else if cell}
 									{@render cell({ columnId: column.id, value: row[column.key], row })}
 								{:else}
 									{row[column.key] ?? '-'}
@@ -200,57 +153,7 @@ const table = $derived(
 					{/each}
 				</div>
 
-				<!-- Card actions -->
-				{#if actionColumns.length > 0}
-					<div class="mt-3 flex items-center justify-end gap-2 border-t pt-3">
-						{#each actionColumns as col (col.id)}
-							{#if col.component === 'job-actions' && col.onAction}
-								{@const status = String(row.status)}
-								<DropdownMenu.Root>
-									<DropdownMenu.Trigger>
-										<Button variant="outline" size="sm" class="min-h-10 min-w-10">
-											<Ellipsis class="h-4 w-4" />
-											<span class="ml-1">Actions</span>
-										</Button>
-									</DropdownMenu.Trigger>
-									<DropdownMenu.Content align="end">
-										<DropdownMenu.Item onclick={() => col.onAction?.('view-details', row)}>
-											<Info class="mr-2 h-4 w-4" />
-											View Details
-										</DropdownMenu.Item>
-										{#if status === 'pending' || status === 'claimed'}
-											<DropdownMenu.Item onclick={() => col.onAction?.('cancel', row)}>
-												<CircleX class="mr-2 h-4 w-4" />
-												Cancel Job
-											</DropdownMenu.Item>
-										{/if}
-										{#if status === 'failed'}
-											<DropdownMenu.Item onclick={() => col.onAction?.('retry', row)}>
-												<RotateCcw class="mr-2 h-4 w-4" />
-												Retry Job
-											</DropdownMenu.Item>
-										{/if}
-										{#if status === 'claimed' || status === 'running'}
-											<DropdownMenu.Item onclick={() => col.onAction?.('release', row)}>
-												<LockOpen class="mr-2 h-4 w-4" />
-												Release Claim
-											</DropdownMenu.Item>
-										{/if}
-										<DropdownMenu.Separator />
-										<DropdownMenu.Item
-											onclick={() => col.onAction?.('delete', row)}
-											class="text-destructive focus:text-destructive"
-										>
-											<Trash2 class="mr-2 h-4 w-4" />
-											Delete Job
-										</DropdownMenu.Item>
-									</DropdownMenu.Content>
-								</DropdownMenu.Root>
-							{/if}
-						{/each}
-					</div>
-				{/if}
-			</button>
+				</button>
 		{/each}
 	{:else}
 		<div class="rounded-lg border bg-card p-8 text-center text-muted-foreground">No results.</div>

@@ -3,6 +3,8 @@
 export type { AdoptPreviewAuthor } from "./AdoptPreviewAuthor";
 export type { AdoptPreviewResponse } from "./AdoptPreviewResponse";
 export type { Capture } from "./Capture";
+export type { CaptureRun } from "./CaptureRun";
+export type { CaptureRunItem } from "./CaptureRunItem";
 export type { CaptureWithContext } from "./CaptureWithContext";
 export type { Category } from "./Category";
 export type { CreateWorldUploadResponse } from "./CreateWorldUploadResponse";
@@ -12,7 +14,6 @@ export type { DeviceConfirmResponse } from "./DeviceConfirmResponse";
 export type { DeviceTokenError } from "./DeviceTokenError";
 export type { DeviceTokenResponse } from "./DeviceTokenResponse";
 export type { Feature } from "./Feature";
-export type { Job } from "./Job";
 export type { Scene } from "./Scene";
 export type { SceneListItem } from "./SceneListItem";
 export type { SceneWithCaptures } from "./SceneWithCaptures";
