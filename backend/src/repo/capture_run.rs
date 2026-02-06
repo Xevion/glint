@@ -39,11 +39,32 @@ impl CaptureRunRepo {
     /// Get a capture run by ID
     #[instrument(skip(executor), level = "debug")]
     pub async fn get_by_id(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<CaptureRun> {
-        sqlx::query_as!(CaptureRun, "SELECT * FROM capture_runs WHERE id = $1", id)
-            .fetch_optional(executor)
-            .await
-            .context(format!("failed to find capture run '{}'", id))?
-            .ok_or_else(|| AppError::NotFound(format!("Capture run '{}' not found", id)))
+        sqlx::query_as!(
+            CaptureRun,
+            r#"
+            SELECT
+                cr.id, cr.agent_id, cr.started_at, cr.completed_at,
+                cr.status, cr.total_items,
+                COALESCE(counts.completed, 0)::int4 as "completed_items!",
+                COALESCE(counts.failed, 0)::int4 as "failed_items!",
+                COALESCE(counts.skipped, 0)::int4 as "skipped_items!",
+                cr.metadata_json
+            FROM capture_runs cr
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,
+                    COUNT(*) FILTER (WHERE status = 'skipped') AS skipped
+                FROM capture_run_items WHERE run_id = cr.id
+            ) counts ON TRUE
+            WHERE cr.id = $1
+            "#,
+            id
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to find capture run '{}'", id))?
+        .ok_or_else(|| AppError::NotFound(format!("Capture run '{}' not found", id)))
     }
 
     /// List all capture runs (admin)
@@ -51,7 +72,24 @@ impl CaptureRunRepo {
     pub async fn list(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<CaptureRun>> {
         let runs = sqlx::query_as!(
             CaptureRun,
-            "SELECT * FROM capture_runs ORDER BY started_at DESC"
+            r#"
+            SELECT
+                cr.id, cr.agent_id, cr.started_at, cr.completed_at,
+                cr.status, cr.total_items,
+                COALESCE(counts.completed, 0)::int4 as "completed_items!",
+                COALESCE(counts.failed, 0)::int4 as "failed_items!",
+                COALESCE(counts.skipped, 0)::int4 as "skipped_items!",
+                cr.metadata_json
+            FROM capture_runs cr
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,
+                    COUNT(*) FILTER (WHERE status = 'skipped') AS skipped
+                FROM capture_run_items WHERE run_id = cr.id
+            ) counts ON TRUE
+            ORDER BY cr.started_at DESC
+            "#
         )
         .fetch_all(executor)
         .await

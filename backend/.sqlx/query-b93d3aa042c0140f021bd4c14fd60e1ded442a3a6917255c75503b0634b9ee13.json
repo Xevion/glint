@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM capture_runs ORDER BY started_at DESC",
+  "query": "\n            SELECT\n                cr.id, cr.agent_id, cr.started_at, cr.completed_at,\n                cr.status, cr.total_items,\n                COALESCE(counts.completed, 0)::int4 as \"completed_items!\",\n                COALESCE(counts.failed, 0)::int4 as \"failed_items!\",\n                COALESCE(counts.skipped, 0)::int4 as \"skipped_items!\",\n                cr.metadata_json\n            FROM capture_runs cr\n            LEFT JOIN LATERAL (\n                SELECT\n                    COUNT(*) FILTER (WHERE status = 'completed') AS completed,\n                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,\n                    COUNT(*) FILTER (WHERE status = 'skipped') AS skipped\n                FROM capture_run_items WHERE run_id = cr.id\n            ) counts ON TRUE\n            ORDER BY cr.started_at DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -35,17 +35,17 @@
       },
       {
         "ordinal": 6,
-        "name": "completed_items",
+        "name": "completed_items!",
         "type_info": "Int4"
       },
       {
         "ordinal": 7,
-        "name": "failed_items",
+        "name": "failed_items!",
         "type_info": "Int4"
       },
       {
         "ordinal": 8,
-        "name": "skipped_items",
+        "name": "skipped_items!",
         "type_info": "Int4"
       },
       {
@@ -64,11 +64,11 @@
       true,
       false,
       false,
-      false,
-      false,
-      false,
+      null,
+      null,
+      null,
       true
     ]
   },
-  "hash": "8252dc53e31cd13901271a325d1bc0af57a318076a0bea8ed95db799fbd53d39"
+  "hash": "b93d3aa042c0140f021bd4c14fd60e1ded442a3a6917255c75503b0634b9ee13"
 }
