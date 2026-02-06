@@ -5,7 +5,7 @@ import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	const api = createApiClient(fetch);
-	const result = await api.shaders.getBySlug(params.id);
+	const result = await api.shaders.getShader(params.id);
 
 	return result.match({
 		Ok: (shader) => ({ shader }),

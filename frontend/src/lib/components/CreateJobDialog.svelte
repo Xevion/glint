@@ -52,7 +52,7 @@ async function loadData() {
 
 			// Load versions for all shaders in parallel
 			const versionResults = await Promise.all(
-				shaders.map((shader) => api.shaders.getBySlug(shader.slug))
+				shaders.map((shader) => api.shaders.getShader(shader.slug))
 			);
 			for (let i = 0; i < shaders.length; i++) {
 				const result = versionResults[i];

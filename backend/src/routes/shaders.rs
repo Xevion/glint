@@ -23,11 +23,8 @@ pub fn router() -> Router<AppState> {
         .route("/", get(list_shaders).post(create_shader))
         .route(
             "/{id}",
-            get(get_shader_by_id)
-                .put(update_shader)
-                .delete(delete_shader),
+            get(get_shader).put(update_shader).delete(delete_shader),
         )
-        .route("/by-slug/{slug}", get(get_shader_by_slug))
         .route("/{id}/versions", post(create_shader_version))
 }
 
@@ -37,12 +34,12 @@ async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shade
     Ok(Json(shaders))
 }
 
-/// GET /api/shaders/by-slug/{slug} - Get shader by slug with captures (public)
-async fn get_shader_by_slug(
+/// GET /api/shaders/{id} - Get shader by ID or slug with versions and captures (public)
+async fn get_shader(
     State(state): State<AppState>,
-    Path(slug): Path<String>,
+    Path(id): Path<String>,
 ) -> AppResult<Json<ShaderWithCaptures>> {
-    let shader = ShaderRepo::get_by_slug(state.db(), &slug).await?;
+    let shader = ShaderRepo::get(state.db(), &id).await?;
     let versions = ShaderVersionRepo::list_by_shader(state.db(), &shader.id).await?;
     let captures = ShaderRepo::get_captures_with_context(state.db(), &shader.id).await?;
 
@@ -51,16 +48,6 @@ async fn get_shader_by_slug(
         versions,
         captures,
     }))
-}
-
-/// GET /api/shaders/{id} - Get shader by ID (admin)
-async fn get_shader_by_id(
-    _admin: AdminUser,
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> AppResult<Json<Shader>> {
-    let shader = ShaderRepo::get_by_id(state.db(), &id).await?;
-    Ok(Json(shader))
 }
 
 /// POST /api/shaders - Create a new shader (admin)

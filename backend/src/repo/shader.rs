@@ -1,5 +1,6 @@
 use anyhow::Context;
 use tracing::{debug, instrument};
+use uuid::Uuid;
 
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
@@ -19,6 +20,17 @@ impl ShaderRepo {
             .context("failed to list shaders")?;
         debug!(count = shaders.len(), "Listed shaders");
         Ok(shaders)
+    }
+
+    /// Resolve a shader by UUID or slug. If the input parses as a UUID, looks up
+    /// by ID; otherwise falls back to slug.
+    #[instrument(skip(db), level = "debug")]
+    pub async fn get(db: &DbPool, id_or_slug: &str) -> AppResult<Shader> {
+        if Uuid::try_parse(id_or_slug).is_ok() {
+            Self::get_by_id(db, id_or_slug).await
+        } else {
+            Self::get_by_slug(db, id_or_slug).await
+        }
     }
 
     #[instrument(skip(db), level = "debug")]

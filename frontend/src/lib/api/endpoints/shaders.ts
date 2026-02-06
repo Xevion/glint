@@ -12,9 +12,9 @@ export class ShaderEndpoints extends ApiClient {
 	}
 
 	/**
-	 * Get a single shader by slug with versions and captures
+	 * Get a single shader by ID or slug, with versions and captures
 	 */
-	getBySlug(slug: string): Promise<Result<ShaderWithCaptures, ApiError>> {
-		return super.get<ShaderWithCaptures>(`/api/shaders/${encodeURIComponent(slug)}`);
+	getShader(idOrSlug: string): Promise<Result<ShaderWithCaptures, ApiError>> {
+		return super.get<ShaderWithCaptures>(`/api/shaders/${encodeURIComponent(idOrSlug)}`);
 	}
 }
