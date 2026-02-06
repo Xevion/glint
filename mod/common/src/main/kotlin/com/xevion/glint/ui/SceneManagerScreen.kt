@@ -4,8 +4,6 @@ import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.SceneSyncManager
 import com.xevion.glint.api.SyncResult
-import com.xevion.glint.error
-import com.xevion.glint.info
 import com.xevion.glint.orchestration.CaptureSpec
 import com.xevion.glint.orchestration.ShaderSpec
 import com.xevion.glint.scene.ResolvedScene
@@ -19,7 +17,6 @@ import com.xevion.glint.session.SessionRegistry
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintListScreen
 import com.xevion.glint.ui.base.GlintTheme
-import com.xevion.glint.warn
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout

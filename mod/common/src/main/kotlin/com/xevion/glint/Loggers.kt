@@ -1,7 +1,6 @@
 package com.xevion.glint
 
 import org.apache.logging.log4j.Level
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 /**
@@ -34,7 +33,7 @@ enum class Loggers(
     Ui("ui"),
     ;
 
-    fun get(): Logger = LoggerFactory.getLogger(category)
+    fun get(): GlintLogger = GlintLogger(LoggerFactory.getLogger(category))
 
     companion object {
         /**

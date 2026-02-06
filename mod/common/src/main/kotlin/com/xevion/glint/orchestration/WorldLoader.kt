@@ -1,9 +1,6 @@
 package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
-import com.xevion.glint.error
-import com.xevion.glint.info
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.AlertScreen
 import java.io.File

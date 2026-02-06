@@ -1,8 +1,6 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
-import com.xevion.glint.info
 
 /**
  * Integration with Sodium's chunk rendering system.

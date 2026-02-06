@@ -1,14 +1,10 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
-import com.xevion.glint.error
-import com.xevion.glint.info
 import com.xevion.glint.orchestration.ShaderSpec
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.screenshot.*
-import com.xevion.glint.warn
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.time.Instant
@@ -139,12 +135,30 @@ class CaptureSession(
 
         when (state) {
             State.Idle -> {}
-            State.ApplyingScene -> handleApplyingScene()
-            State.LoadingShader -> handleLoadingShader()
-            State.WaitingForStabilization -> handleWaitingForStabilization()
-            State.Capturing -> handleCapturing()
-            State.PostCaptureCooldown -> handlePostCaptureCooldown()
-            State.Finishing -> handleFinishing()
+
+            State.ApplyingScene -> {
+                handleApplyingScene()
+            }
+
+            State.LoadingShader -> {
+                handleLoadingShader()
+            }
+
+            State.WaitingForStabilization -> {
+                handleWaitingForStabilization()
+            }
+
+            State.Capturing -> {
+                handleCapturing()
+            }
+
+            State.PostCaptureCooldown -> {
+                handlePostCaptureCooldown()
+            }
+
+            State.Finishing -> {
+                handleFinishing()
+            }
         }
     }
 

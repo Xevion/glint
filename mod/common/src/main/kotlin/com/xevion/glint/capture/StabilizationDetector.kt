@@ -1,9 +1,6 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
-import com.xevion.glint.info
-import com.xevion.glint.warn
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.chunk.EmptyLevelChunk
 import net.minecraft.world.level.chunk.status.ChunkStatus

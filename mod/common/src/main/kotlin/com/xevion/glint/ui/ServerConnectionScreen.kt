@@ -4,11 +4,9 @@ import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.GlintApi
 import com.xevion.glint.api.UrlValidationResult
-import com.xevion.glint.info
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintScreen
 import com.xevion.glint.ui.base.GlintTheme
-import com.xevion.glint.warn
 import io.wispforest.owo.ui.component.ButtonComponent
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.component.LabelComponent
@@ -129,26 +127,31 @@ class ServerConnectionScreen(
                 feedbackLabel.text(McComponent.literal("Enter protocol://hostname:port (e.g., http://localhost:8080)"))
                 feedbackLabel.color(Color.ofRgb(GlintTheme.TEXT_MUTED))
             }
+
             is UrlValidationResult.Valid -> {
                 when {
                     testingConnection -> {
                         feedbackLabel.text(McComponent.literal("Testing connection..."))
                         feedbackLabel.color(Color.ofRgb(GlintTheme.TEXT_WARNING))
                     }
+
                     connectionTestResult != null -> {
                         feedbackLabel.text(McComponent.literal("OK: $connectionTestResult"))
                         feedbackLabel.color(Color.ofRgb(GlintTheme.TEXT_SUCCESS))
                     }
+
                     connectionTestError != null -> {
                         feedbackLabel.text(McComponent.literal("Error: $connectionTestError"))
                         feedbackLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
                     }
+
                     else -> {
                         feedbackLabel.text(McComponent.literal("URL format valid - click Test Connection"))
                         feedbackLabel.color(Color.ofRgb(GlintTheme.TEXT_MUTED))
                     }
                 }
             }
+
             is UrlValidationResult.Invalid -> {
                 val error = (validationResult as UrlValidationResult.Invalid).reason
                 feedbackLabel.text(McComponent.literal("Error: $error"))

@@ -2,8 +2,6 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.download.DownloadProgress
-import com.xevion.glint.error
-import com.xevion.glint.info
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintDialogScreen
 import com.xevion.glint.ui.base.GlintTheme
@@ -128,13 +126,16 @@ class WorldDownloadDialog(
 
                 statusLabel.text(McComponent.literal(""))
             }
+
             DownloadProgress.State.EXTRACTING -> {
                 statusLabel.text(McComponent.literal("Extracting world files..."))
                 statusLabel.color(Color.ofRgb(GlintTheme.TEXT_WARNING))
             }
+
             DownloadProgress.State.COMPLETE -> {
                 statusLabel.text(McComponent.literal(""))
             }
+
             DownloadProgress.State.FAILED -> {
                 statusLabel.text(McComponent.literal("Download failed!"))
                 statusLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))

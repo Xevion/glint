@@ -3,7 +3,6 @@ package com.xevion.glint.session
 import com.xevion.glint.Loggers
 import com.xevion.glint.orchestration.CaptureSpec
 import com.xevion.glint.orchestration.Orchestrator
-import com.xevion.glint.warn
 
 /**
  * Manages lifecycle of the orchestrator session globally.

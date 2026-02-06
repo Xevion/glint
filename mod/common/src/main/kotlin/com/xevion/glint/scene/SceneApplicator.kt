@@ -1,10 +1,6 @@
 package com.xevion.glint.scene
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
-import com.xevion.glint.error
-import com.xevion.glint.info
-import com.xevion.glint.warn
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.GameRules
 import net.minecraft.client.CameraType as MinecraftCameraType

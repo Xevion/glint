@@ -1,12 +1,9 @@
 package com.xevion.glint.scene
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
-import com.xevion.glint.error
 import com.xevion.glint.io.AsyncFileIO
 import com.xevion.glint.screenshot.Camera
 import com.xevion.glint.screenshot.Position
-import com.xevion.glint.warn
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import java.io.File

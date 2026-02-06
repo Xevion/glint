@@ -1,8 +1,6 @@
 package com.xevion.glint.api
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
-import com.xevion.glint.error
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft

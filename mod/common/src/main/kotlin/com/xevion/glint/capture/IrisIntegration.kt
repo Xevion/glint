@@ -1,11 +1,7 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
-import com.xevion.glint.error
-import com.xevion.glint.info
 import com.xevion.glint.mixin.ShaderPackAccessor
-import com.xevion.glint.warn
 import net.irisshaders.iris.Iris
 import java.nio.file.Path
 

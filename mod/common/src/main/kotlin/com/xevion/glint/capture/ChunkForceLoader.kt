@@ -1,7 +1,6 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.ChunkPos
 

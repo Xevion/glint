@@ -5,8 +5,6 @@ import com.xevion.glint.api.ApiError
 import com.xevion.glint.api.DeviceAuthResponse
 import com.xevion.glint.api.DeviceTokenResponse
 import com.xevion.glint.api.GlintApi
-import com.xevion.glint.error
-import com.xevion.glint.info
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintScreen
 import com.xevion.glint.ui.base.GlintTheme
@@ -217,6 +215,7 @@ class DeviceAuthScreen(
                                 is ApiError.AuthorizationPending -> {
                                     // Continue polling
                                 }
+
                                 is ApiError.TokenExpired -> {
                                     isPolling.set(false)
                                     minecraft?.execute {
@@ -229,6 +228,7 @@ class DeviceAuthScreen(
                                         contentContainer.removeChild(instructionsContainer as Component)
                                     }
                                 }
+
                                 is ApiError.InvalidGrant -> {
                                     isPolling.set(false)
                                     minecraft?.execute {
@@ -241,6 +241,7 @@ class DeviceAuthScreen(
                                         contentContainer.removeChild(instructionsContainer as Component)
                                     }
                                 }
+
                                 else -> {
                                     isPolling.set(false)
                                     minecraft?.execute {

@@ -1,9 +1,6 @@
 package com.xevion.glint.download
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
-import com.xevion.glint.error
-import com.xevion.glint.info
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.io.FileOutputStream

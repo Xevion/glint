@@ -1,8 +1,6 @@
 package com.xevion.glint.ui
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.error
-import com.xevion.glint.info
 import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.scene.Weather

@@ -19,7 +19,6 @@ import com.xevion.glint.session.SessionRegistry
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintTabbedScreen
 import com.xevion.glint.ui.base.GlintTheme
-import com.xevion.glint.warn
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
@@ -560,15 +559,18 @@ class GlintMainScreen(
                 statusColor = GlintTheme.TEXT_WARNING
                 statusText = "Not validated"
             }
+
             !config.hasValidToken() -> {
                 statusColor = GlintTheme.TEXT_ERROR
                 statusText = "Token expired"
             }
+
             config.isTokenExpiringSoon() -> {
                 statusColor = GlintTheme.TEXT_WARNING
                 val minutesLeft = ((config.tokenExpiresAt - System.currentTimeMillis()) / 60_000).toInt()
                 statusText = "Connected (token expires in ${minutesLeft}m)"
             }
+
             else -> {
                 statusColor = GlintTheme.TEXT_SUCCESS
                 val hoursLeft = ((config.tokenExpiresAt - System.currentTimeMillis()) / 3_600_000).toInt()

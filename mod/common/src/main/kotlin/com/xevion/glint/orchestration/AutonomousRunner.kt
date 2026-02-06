@@ -5,12 +5,8 @@ import com.xevion.glint.api.AgentApi
 import com.xevion.glint.api.CaptureRecord
 import com.xevion.glint.api.CompleteJobRequest
 import com.xevion.glint.api.JobPayload
-import com.xevion.glint.debug
-import com.xevion.glint.error
-import com.xevion.glint.info
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.session.SessionRegistry
-import com.xevion.glint.warn
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -55,10 +51,22 @@ class AutonomousRunner(
     /** Call every client tick from SessionRegistry or Glint.onClientTick(). */
     fun tick() {
         when (state) {
-            State.ClaimingJob -> tickClaimingJob()
-            State.PreparingCapture -> tickPreparingCapture()
-            State.Capturing -> tickCapturing()
-            State.UploadingResults -> tickUploadingResults()
+            State.ClaimingJob -> {
+                tickClaimingJob()
+            }
+
+            State.PreparingCapture -> {
+                tickPreparingCapture()
+            }
+
+            State.Capturing -> {
+                tickCapturing()
+            }
+
+            State.UploadingResults -> {
+                tickUploadingResults()
+            }
+
             State.Done -> {}
         }
     }

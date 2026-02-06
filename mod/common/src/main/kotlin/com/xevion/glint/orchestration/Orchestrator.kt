@@ -3,14 +3,10 @@ package com.xevion.glint.orchestration
 import com.xevion.glint.Loggers
 import com.xevion.glint.capture.CaptureSession
 import com.xevion.glint.capture.CaptureStateManager
-import com.xevion.glint.debug
-import com.xevion.glint.error
-import com.xevion.glint.info
 import com.xevion.glint.io.SessionDirectoryManager
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.screenshot.CaptureSessionData
-import com.xevion.glint.warn
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import java.io.File

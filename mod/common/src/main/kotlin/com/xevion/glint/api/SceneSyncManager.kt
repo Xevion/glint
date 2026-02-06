@@ -1,12 +1,8 @@
 package com.xevion.glint.api
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.debug
-import com.xevion.glint.error
-import com.xevion.glint.info
 import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneCollection
-import com.xevion.glint.warn
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 
