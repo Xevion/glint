@@ -152,6 +152,22 @@ External URLs (Modrinth, CurseForge, etc.) should NOT use `resolve()` — disabl
 - **Dark mode** via `dark:` prefix with class-based strategy
 - No CSS modules, no scoped `<style>` blocks except where Tailwind can't reach
 
+### SVG Icon Opacity
+
+Never apply transparent colors (`text-foreground/50`) directly to SVG icon components (Lucide, etc.). Each `<path>` renders independently, so overlapping strokes compound opacity and create visible hotspots.
+
+Use `opacity-*` on the element instead — this composites the entire SVG as one layer before fading:
+
+```svelte
+<!-- Bad: stroke overlap artifacts -->
+<Search class="text-muted-foreground/50" />
+
+<!-- Good: composited as one layer -->
+<Search class="text-muted-foreground opacity-50" />
+```
+
+Transparent text colors on regular HTML elements (spans, paragraphs) are fine — this only affects multi-path SVGs.
+
 ## Type Safety
 
 - Import backend types: `import type { Shader } from '$lib/bindings'`

@@ -81,7 +81,7 @@ const hasFilters = $derived(searchQuery !== '');
 		</div>
 	{:else}
 		<div class="flex flex-col items-center justify-center py-16 text-center">
-			<Search class="mb-4 h-16 w-16 text-muted-foreground/50" strokeWidth={1.5} />
+			<Search class="mb-4 h-16 w-16 text-muted-foreground opacity-50" strokeWidth={1.5} />
 			<h3 class="text-lg font-semibold text-muted-foreground">No scenes found</h3>
 			<p class="mt-1 text-sm text-muted-foreground/70">Try adjusting your filters</p>
 		</div>

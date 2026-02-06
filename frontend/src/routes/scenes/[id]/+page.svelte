@@ -221,7 +221,7 @@ const timeLabel = $derived.by(() => {
 					in:fade|local={{ duration: 300, delay: 200 }}
 					class="mb-8 rounded-xl border border-border bg-card p-12 text-center"
 				>
-					<ImageOff class="mx-auto mb-4 h-16 w-16 text-muted-foreground/30" strokeWidth={1.5} />
+					<ImageOff class="mx-auto mb-4 h-16 w-16 text-muted-foreground opacity-30" strokeWidth={1.5} />
 					<h3 class="mb-2 text-lg font-semibold text-card-foreground">No Captures Yet</h3>
 					<p class="text-sm text-muted-foreground">Captures for this scene are being generated.</p>
 				</div>
