@@ -5,17 +5,20 @@
  *
  * Flags:
  *   -f, --frontend-only   Frontend only (Vite dev server)
- *   -b, --backend-only    Backend only (cargo run)
+ *   -b, --backend-only    Backend only (watch + seamless reload)
  *   -m, --mod-only        Minecraft client only (Gradle)
  *   -W, --no-watch        Build once + run (no watch)
  *   -r, --release         Use release profile (Rust)
  *   -p, --platform        Mod platform: fabric (default) or neoforge
+ *   -I, --no-interrupt    Don't kill compiler on new changes; wait, then rebuild
+ *   -V, --verbose-build   Stream compilation output inline (default: buffered)
  *   -- <args>             Passthrough args to backend binary
  */
 
 import { existsSync } from "fs";
 import { parseFlags, c } from "./lib/fmt";
 import { run, ProcessGroup } from "./lib/proc";
+import { BackendWatcher } from "./lib/watch";
 
 const { flags, passthrough } = parseFlags(
   process.argv.slice(2),
@@ -26,6 +29,8 @@ const { flags, passthrough } = parseFlags(
     "no-watch": "bool",
     release: "bool",
     platform: "string",
+    "no-interrupt": "bool",
+    "verbose-build": "bool",
   } as const,
   {
     f: "frontend-only",
@@ -34,6 +39,8 @@ const { flags, passthrough } = parseFlags(
     W: "no-watch",
     r: "release",
     p: "platform",
+    I: "no-interrupt",
+    V: "verbose-build",
   },
   {
     "frontend-only": false,
@@ -42,6 +49,8 @@ const { flags, passthrough } = parseFlags(
     "no-watch": false,
     release: false,
     platform: "fabric",
+    "no-interrupt": false,
+    "verbose-build": false,
   },
 );
 
@@ -76,7 +85,7 @@ if (runFrontend) {
   group.spawn(["bun", "run", "--cwd", "frontend", "dev"]);
 }
 
-// Backend: cargo run or build once
+// Backend: seamless watch+reload or build-once
 if (runBackend) {
   const backendArgs = passthrough;
   const bin = `backend/target/${profile}/glint`;
@@ -97,12 +106,17 @@ if (runBackend) {
     console.log(c("1;36", `→ Running ${bin} (no watch)`));
     group.spawn([bin, ...backendArgs]);
   } else {
-    console.log(c("1;36", "→ Starting backend dev server..."));
-    const cargoArgs = ["cargo", "run", "--manifest-path", "backend/Cargo.toml"];
-    if (release) cargoArgs.push("--release");
-    cargoArgs.push("--");
-    cargoArgs.push(...backendArgs);
-    group.spawn(cargoArgs);
+    console.log(c("1;36", "→ Starting backend dev server (watch mode)..."));
+    const watcher = new BackendWatcher({
+      manifestPath: "backend/Cargo.toml",
+      binPath: bin,
+      release,
+      args: backendArgs,
+      interrupt: !flags["no-interrupt"],
+      verboseBuild: flags["verbose-build"],
+    });
+    group.onCleanup(() => watcher.killSync());
+    watcher.start();
   }
 }
 

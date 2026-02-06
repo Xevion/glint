@@ -210,6 +210,7 @@ export async function raceInOrder<T extends { name: string }>(
 export class ProcessGroup {
 	private procs: ReturnType<typeof Bun.spawn>[] = [];
 	private signalHandlers: { signal: NodeJS.Signals; handler: () => void }[] = [];
+	private cleanupFns: (() => void)[] = [];
 
 	constructor() {
 		// Register cleanup handlers to kill all processes on exit
@@ -222,6 +223,13 @@ export class ProcessGroup {
 					// Process may already be dead
 				}
 			}
+			for (const fn of this.cleanupFns) {
+				try {
+					fn();
+				} catch {
+					// Best-effort cleanup
+				}
+			}
 			// Remove our signal handlers
 			this.removeSignalHandlers();
 			process.exit(130); // 128 + SIGINT(2)
@@ -230,6 +238,16 @@ export class ProcessGroup {
 			process.on(sig, cleanup);
 			this.signalHandlers.push({ signal: sig, handler: cleanup });
 		}
+	}
+
+	/**
+	 * Register a synchronous cleanup function called on signal or killAll.
+	 *
+	 * Useful for tearing down resources that aren't managed as spawned
+	 * processes (e.g., BackendWatcher's internal processes and file watchers).
+	 */
+	onCleanup(fn: () => void): void {
+		this.cleanupFns.push(fn);
 	}
 
 	private removeSignalHandlers(): void {
@@ -270,7 +288,16 @@ export class ProcessGroup {
 	 * Uses a timeout to avoid hanging on unresponsive processes.
 	 */
 	async killAll(): Promise<void> {
-		// First, send SIGTERM to all
+		// Run registered cleanup functions (e.g., BackendWatcher.killSync)
+		for (const fn of this.cleanupFns) {
+			try {
+				fn();
+			} catch {
+				// Best-effort cleanup
+			}
+		}
+
+		// Send SIGTERM to all tracked processes
 		for (const p of this.procs) {
 			try {
 				p.kill("SIGTERM");
