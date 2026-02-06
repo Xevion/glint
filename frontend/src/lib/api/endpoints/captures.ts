@@ -1,20 +1,20 @@
-import type { CaptureWithContext } from '$lib/bindings';
+import type { Capture } from '$lib/bindings';
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
 
 export class CaptureEndpoints extends ApiClient {
 	/**
-	 * List all captures
+	 * List completed captures (public)
 	 */
-	list(): Promise<Result<CaptureWithContext[], ApiError>> {
-		return super.get<CaptureWithContext[]>('/api/captures');
+	list(): Promise<Result<Capture[], ApiError>> {
+		return super.get<Capture[]>('/api/captures');
 	}
 
 	/**
-	 * Get a single capture by ID
+	 * Get a single capture by ID (public)
 	 */
-	getById(id: string): Promise<Result<CaptureWithContext, ApiError>> {
-		return super.get<CaptureWithContext>(`/api/captures/${encodeURIComponent(id)}`);
+	getById(id: string): Promise<Result<Capture, ApiError>> {
+		return super.get<Capture>(`/api/captures/${encodeURIComponent(id)}`);
 	}
 }

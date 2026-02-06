@@ -1,5 +1,5 @@
 import { createApiClient } from '$lib/api';
-import type { CaptureWithContext, ShaderListItem } from '$lib/bindings';
+import type { Capture, ShaderListItem } from '$lib/bindings';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => {
@@ -13,10 +13,10 @@ export const load: PageLoad = async ({ fetch }) => {
 	const errors: string[] = [];
 
 	const captures = capturesResult.match({
-		Ok: (captures): CaptureWithContext[] => captures,
+		Ok: (captures): Capture[] => captures,
 		Err: (err) => {
 			errors.push(err.message);
-			return [] as CaptureWithContext[];
+			return [] as Capture[];
 		}
 	});
 
