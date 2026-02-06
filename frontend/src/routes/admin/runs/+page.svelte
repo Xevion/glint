@@ -3,7 +3,6 @@ import { goto, invalidateAll } from '$app/navigation';
 import { Button } from '$lib/components/ui/button';
 import { RefreshCw } from '@lucide/svelte';
 import AdminTable from '$lib/components/AdminTable.svelte';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
 import type { CaptureRun } from '$lib/bindings';
 import type { PageData } from './$types';
 

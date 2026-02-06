@@ -48,6 +48,8 @@ class AutonomousRunner(
     // Shader group processing
     private var shaderGroups: List<ShaderGroup> = emptyList()
     private var currentGroupIndex: Int = 0
+    private var groupSuccessCount: Int = 0
+    private var consecutiveEmptyRuns: Int = 0
 
     private enum class State {
         FetchingWork,
@@ -79,12 +81,30 @@ class AutonomousRunner(
     /** Call every client tick from SessionRegistry or Glint.onClientTick(). */
     fun tick() {
         when (state) {
-            State.FetchingWork -> tickFetchingWork()
-            State.CreatingRun -> tickCreatingRun()
-            State.PreparingCapture -> tickPreparingCapture()
-            State.Capturing -> tickCapturing()
-            State.UploadingResults -> tickUploadingResults()
-            State.FinalizingRun -> tickFinalizingRun()
+            State.FetchingWork -> {
+                tickFetchingWork()
+            }
+
+            State.CreatingRun -> {
+                tickCreatingRun()
+            }
+
+            State.PreparingCapture -> {
+                tickPreparingCapture()
+            }
+
+            State.Capturing -> {
+                tickCapturing()
+            }
+
+            State.UploadingResults -> {
+                tickUploadingResults()
+            }
+
+            State.FinalizingRun -> {
+                tickFinalizingRun()
+            }
+
             State.Done -> {}
         }
     }
@@ -312,6 +332,7 @@ class AutonomousRunner(
 
         result
             .onSuccess {
+                groupSuccessCount++
                 log.info("Group upload complete") {
                     "shader" to shaderGroups[currentGroupIndex].shaderName
                 }
@@ -497,12 +518,27 @@ class AutonomousRunner(
                 log.error("Failed to finalize run") { "error" to error.message }
             }
 
-        // Clear state and fetch more work
+        // Check if the run was productive before fetching more work
+        val wasProductive = groupSuccessCount > 0
+        if (!wasProductive) {
+            consecutiveEmptyRuns++
+        } else {
+            consecutiveEmptyRuns = 0
+        }
+
+        // Clear state
         currentRunId = null
         itemLookup = emptyMap()
         shaderGroups = emptyList()
         currentGroupIndex = 0
-        fetchWork()
+        groupSuccessCount = 0
+
+        if (consecutiveEmptyRuns >= 2) {
+            log.warn("Stopping after $consecutiveEmptyRuns consecutive runs with no successful uploads")
+            shutdown()
+        } else {
+            fetchWork()
+        }
     }
 
     // -- Helpers --

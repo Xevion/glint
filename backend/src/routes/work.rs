@@ -46,8 +46,10 @@ async fn get_work(
 ) -> AppResult<Json<Vec<WorkItem>>> {
     let limit = query.limit.unwrap_or(100).min(1000);
     let force = query.force.unwrap_or(false);
-    let shaders_filter: Option<String> = query.shaders;
-    let scenes_filter: Option<String> = query.scenes;
+
+    // "!" and "+" are wildcard sentinels meaning "all" — normalize to None
+    let shaders_filter: Option<String> = query.shaders.filter(|s| !matches!(s.as_str(), "!" | "+"));
+    let scenes_filter: Option<String> = query.scenes.filter(|s| !matches!(s.as_str(), "!" | "+"));
     let db = state.db();
 
     let items = sqlx::query_as!(
@@ -109,7 +111,19 @@ async fn get_work(
             n.scene_id AS "scene_id!",
             sc.slug AS "scene_slug!",
             sc.name AS "scene_name!",
-            COALESCE(sc.definition_json, '{}') AS "scene_definition_json!",
+            COALESCE(
+                NULLIF(sc.definition_json, '{}'),
+                jsonb_build_object(
+                    'id', sc.slug,
+                    'name', sc.name,
+                    'position', jsonb_build_object('x', sc.x, 'y', sc.y, 'z', sc.z),
+                    'camera', jsonb_build_object('yaw', sc.yaw, 'pitch', sc.pitch),
+                    'timeOfDay', sc.time_of_day_ticks,
+                    'dimension', sc.dimension,
+                    'weather', UPPER(sc.weather),
+                    'weatherIntensity', sc.weather_intensity
+                )::text
+            ) AS "scene_definition_json!",
             w.id AS "world_id!",
             w.slug AS "world_slug!",
             w.name AS "world_name!",
