@@ -340,12 +340,6 @@ class AutonomousRunner(
                 profile = event.entry.shader?.profile,
             ),
         )
-
-        log.debug("Submitted upload") {
-            "item_id" to itemId
-            "scene_id" to event.sceneId
-            "bytes" to event.fileBytes.size
-        }
     }
 
     // -- Capturing --

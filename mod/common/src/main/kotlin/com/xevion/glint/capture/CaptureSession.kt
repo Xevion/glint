@@ -333,6 +333,13 @@ class CaptureSession(
             ),
         )
 
+        // Capture values before the async write — Screenshot.grab() writes the file
+        // asynchronously on Util.ioPool(), so we invoke the callback from inside the
+        // consumer where the file is guaranteed to exist.
+        val capturedEntry = screenshotEntries.last()
+        val screenshotFile = File(outputDir, "screenshots/$screenshotName")
+        val callback = onScreenshotTaken
+
         net.minecraft.client.Screenshot.grab(
             outputDir,
             screenshotName,
@@ -341,10 +348,8 @@ class CaptureSession(
             log.debug("Screenshot saved") {
                 "message" to message.string
             }
+            callback?.invoke(capturedEntry, screenshotFile)
         }
-
-        val screenshotFile = File(outputDir, "screenshots/$screenshotName")
-        onScreenshotTaken?.invoke(screenshotEntries.last(), screenshotFile)
 
         transitionTo(State.PostCaptureCooldown)
     }

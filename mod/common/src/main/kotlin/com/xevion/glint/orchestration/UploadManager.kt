@@ -43,14 +43,30 @@ class UploadManager(
     val failed: Int get() = failedCount.get()
 
     fun submit(task: UploadTask) {
-        pendingCount.incrementAndGet()
+        val pending = pendingCount.incrementAndGet()
+        log.info("Upload queued") {
+            "item_id" to task.itemId
+            "scene_id" to task.sceneId
+            "bytes" to task.fileBytes.size
+            "pending" to pending
+        }
         executor.submit {
             try {
                 executeUpload(task)
-                completedCount.incrementAndGet()
+                val completed = completedCount.incrementAndGet()
+                log.info("Upload succeeded") {
+                    "item_id" to task.itemId
+                    "completed" to completed
+                    "failed" to failedCount.get()
+                }
             } catch (e: Exception) {
-                failedCount.incrementAndGet()
-                log.error("Upload failed for item ${task.itemId}: ${e.message}")
+                val failed = failedCount.incrementAndGet()
+                log.error("Upload failed") {
+                    "item_id" to task.itemId
+                    "error" to e.message
+                    "completed" to completedCount.get()
+                    "failed" to failed
+                }
                 try {
                     AgentApi.failItem(
                         apiUrl,
@@ -69,7 +85,7 @@ class UploadManager(
     }
 
     private fun executeUpload(task: UploadTask) {
-        // 1. Claim the item (get presigned URL)
+        log.debug("Claiming item") { "item_id" to task.itemId }
         val claimResponse =
             AgentApi
                 .claimItem(
@@ -84,10 +100,13 @@ class UploadManager(
                     ),
                 ).getOrThrow()
 
-        // 2. Upload the file
+        log.debug("Uploading to R2") {
+            "item_id" to task.itemId
+            "capture_id" to claimResponse.captureId
+        }
         AgentApi.uploadFile(claimResponse.presignedUrl, task.fileBytes).getOrThrow()
 
-        // 3. Confirm the upload
+        log.debug("Confirming upload") { "item_id" to task.itemId }
         AgentApi
             .confirmUpload(
                 apiUrl,
@@ -96,11 +115,6 @@ class UploadManager(
                 task.itemId,
                 ConfirmUploadRequest(),
             ).getOrThrow()
-
-        log.debug("Upload complete") {
-            "item_id" to task.itemId
-            "capture_id" to claimResponse.captureId
-        }
     }
 
     fun awaitAll(timeoutMs: Long = 30_000) {

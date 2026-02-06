@@ -198,6 +198,11 @@ class Orchestrator {
                             onScreenshotCaptured?.invoke(
                                 ScreenshotCapturedEvent(entry, bytes, pair.sceneId),
                             )
+                        } else {
+                            log.warn("Screenshot file not found, skipping upload") {
+                                "path" to file.absolutePath
+                                "scene_id" to pair.sceneId
+                            }
                         }
                     }
                 }
