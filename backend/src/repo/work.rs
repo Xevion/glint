@@ -1,12 +1,12 @@
 use anyhow::Context;
+use schemars::JsonSchema;
 use tracing::{debug, instrument};
 use ts_rs::TS;
 
 use crate::error::AppResult;
 
 /// A single work item: one (shader_version, scene, profile) triple to capture
-#[derive(Debug, sqlx::FromRow, serde::Serialize, TS)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, sqlx::FromRow, serde::Serialize, JsonSchema, TS)]
 #[ts(export)]
 pub struct WorkItem {
     pub shader_version_id: String,

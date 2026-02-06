@@ -1,10 +1,17 @@
 plugins {
     id 'org.jetbrains.kotlin.jvm'
     alias libs.plugins.kotlin.serialization
+    alias libs.plugins.test.logger
 }
 
 architectury {
     common('fabric', 'neoforge')
+}
+
+sourceSets {
+    test {
+        kotlin.srcDirs('src/test/kotlin')
+    }
 }
 
 dependencies {
@@ -28,4 +35,26 @@ dependencies {
     modCompileOnlyApi(libs.owo.fabric) {
         exclude group: 'net.fabricmc.fabric-api'
     }
+
+    // Test dependencies
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5'
+    testImplementation libs.kotlinx.serialization.json
+}
+
+test {
+    useJUnitPlatform()
+    outputs.upToDateWhen { false }
+}
+
+testlogger {
+    theme 'standard'
+    showExceptions true
+    showStackTraces true
+    showCauses true
+    showPassed true
+    showSkipped true
+    showFailed true
+    showSummary true
+    logLevel 'quiet'
 }

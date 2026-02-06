@@ -1,4 +1,5 @@
 use glint::models::agent::*;
+use glint::repo::work::WorkItem;
 use schemars::schema_for;
 use std::fs;
 use std::path::PathBuf;
@@ -35,4 +36,5 @@ fn export_all_schemas() {
     write_schema::<Resolution>("Resolution");
     write_schema::<Position>("Position");
     write_schema::<Camera>("Camera");
+    write_schema::<WorkItem>("WorkItem");
 }

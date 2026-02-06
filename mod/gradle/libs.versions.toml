@@ -29,6 +29,7 @@ slf4j = "2.0.17"
 spotless = "7.0.2"
 ktlint = "14.0.1"
 shadow = "9.0.0-beta4"
+test-logger = "4.0.0"
 
 [libraries]
 fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
@@ -68,3 +69,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+test-logger = { id = "com.adarshr.test-logger", version.ref = "test-logger" }

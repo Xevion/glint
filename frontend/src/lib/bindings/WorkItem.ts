@@ -3,4 +3,4 @@
 /**
  * A single work item: one (shader_version, scene, profile) triple to capture
  */
-export type WorkItem = { shaderVersionId: string, shaderId: string, shaderSlug: string, shaderName: string, version: string, downloadUrl: string | null, fileHash: string | null, sceneId: string, sceneSlug: string, sceneName: string, sceneDefinitionJson: string, worldId: string, worldSlug: string, worldName: string, worldFileUrl: string | null, worldFileHash: string | null, worldSizeBytes: number | null, profile: string | null, };
+export type WorkItem = { shader_version_id: string, shader_id: string, shader_slug: string, shader_name: string, version: string, download_url: string | null, file_hash: string | null, scene_id: string, scene_slug: string, scene_name: string, scene_definition_json: string, world_id: string, world_slug: string, world_name: string, world_file_url: string | null, world_file_hash: string | null, world_size_bytes: number | null, profile: string | null, };

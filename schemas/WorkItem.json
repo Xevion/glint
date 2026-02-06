@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkItem",
+  "description": "A single work item: one (shader_version, scene, profile) triple to capture",
+  "type": "object",
+  "properties": {
+    "download_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "file_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "profile": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scene_definition_json": {
+      "type": "string"
+    },
+    "scene_id": {
+      "type": "string"
+    },
+    "scene_name": {
+      "type": "string"
+    },
+    "scene_slug": {
+      "type": "string"
+    },
+    "shader_id": {
+      "type": "string"
+    },
+    "shader_name": {
+      "type": "string"
+    },
+    "shader_slug": {
+      "type": "string"
+    },
+    "shader_version_id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "world_file_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "world_file_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "world_id": {
+      "type": "string"
+    },
+    "world_name": {
+      "type": "string"
+    },
+    "world_size_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int64"
+    },
+    "world_slug": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "shader_version_id",
+    "shader_id",
+    "shader_slug",
+    "shader_name",
+    "version",
+    "scene_id",
+    "scene_slug",
+    "scene_name",
+    "scene_definition_json",
+    "world_id",
+    "world_slug",
+    "world_name"
+  ]
+}
