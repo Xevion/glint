@@ -267,6 +267,29 @@ impl Scene {
 
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
+pub struct ShaderListItem {
+    #[serde(flatten)]
+    pub shader: Shader,
+    pub authors: Vec<ShaderAuthor>,
+    pub categories: Vec<Category>,
+    pub features: Vec<Feature>,
+    pub latest_version: Option<String>,
+    pub game_versions: Option<String>,
+    pub thumbnail_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct SceneListItem {
+    #[serde(flatten)]
+    pub scene: Scene,
+    pub tags: Vec<Tag>,
+    pub thumbnail_url: Option<String>,
+    pub capture_count: i64,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
 pub struct ShaderWithVersions {
     #[serde(flatten)]
     pub shader: Shader,

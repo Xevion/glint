@@ -124,7 +124,7 @@ pub struct FailJobRequest {
 ///
 /// Selectors use a compact syntax:
 /// - `"+"` or `"1+"` — 1 random choice (default if omitted)
-/// - `"*"` — all available
+/// - `"!"` — all available
 /// - `"3+"` — 3 random choices
 /// - `"some-slug"` — specific item by slug
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

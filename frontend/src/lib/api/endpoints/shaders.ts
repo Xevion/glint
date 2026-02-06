@@ -1,14 +1,14 @@
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
-import type { Shader, ShaderWithCaptures } from '$lib/bindings';
+import type { ShaderListItem, ShaderWithCaptures } from '$lib/bindings';
 
 export class ShaderEndpoints extends ApiClient {
 	/**
-	 * List all shaders
+	 * List all shaders with enrichment data
 	 */
-	list(): Promise<Result<Shader[], ApiError>> {
-		return super.get<Shader[]>('/api/shaders');
+	list(): Promise<Result<ShaderListItem[], ApiError>> {
+		return super.get<ShaderListItem[]>('/api/shaders');
 	}
 
 	/**

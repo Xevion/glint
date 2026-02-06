@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
@@ -10,10 +12,10 @@ use crate::{
     auth::AdminUser,
     error::{AppError, AppResult},
     models::{
-        CreateSceneRequest, Scene, SceneWithCaptures, SceneWithWorld, UpdateSceneMetadataRequest,
-        UpdateSceneRequest,
+        CreateSceneRequest, Scene, SceneListItem, SceneWithCaptures, SceneWithWorld,
+        UpdateSceneMetadataRequest, UpdateSceneRequest,
     },
-    repo::{CaptureRepo, SceneRepo, WorldRepo},
+    repo::{CaptureRepo, SceneRepo, TagRepo, WorldRepo},
     state::AppState,
 };
 
@@ -37,17 +39,44 @@ pub fn router() -> Router<AppState> {
         )
 }
 
-/// GET /api/scenes - List active scenes (public), optionally filtered by world_id
+/// GET /api/scenes - List active scenes with enrichment (public), optionally filtered by world_id
 async fn list_scenes_public(
     State(state): State<AppState>,
     Query(params): Query<SceneQuery>,
-) -> AppResult<Json<Vec<Scene>>> {
+) -> AppResult<Json<Vec<SceneListItem>>> {
+    let db = state.db();
+
     let scenes = if let Some(ref world_id) = params.world_id {
-        SceneRepo::list_by_world(state.db(), world_id).await?
+        SceneRepo::list_by_world(db, world_id).await?
     } else {
-        SceneRepo::list_active(state.db()).await?
+        SceneRepo::list_active(db).await?
     };
-    Ok(Json(scenes))
+
+    let (tags, thumbnails, counts) = tokio::try_join!(
+        TagRepo::list_all_for_scenes(db),
+        CaptureRepo::batch_thumbnails_by_scene(db),
+        CaptureRepo::batch_count_by_scene(db),
+    )?;
+
+    let mut tags_map: HashMap<String, Vec<_>> = HashMap::new();
+    for (sid, tag) in tags {
+        tags_map.entry(sid).or_default().push(tag);
+    }
+
+    let items = scenes
+        .into_iter()
+        .map(|scene| {
+            let id = &scene.id;
+            SceneListItem {
+                tags: tags_map.remove(id).unwrap_or_default(),
+                thumbnail_url: thumbnails.get(id).cloned(),
+                capture_count: counts.get(id).copied().unwrap_or(0),
+                scene,
+            }
+        })
+        .collect();
+
+    Ok(Json(items))
 }
 
 /// GET /api/scenes/all - List all scenes including disabled (admin)

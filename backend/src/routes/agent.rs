@@ -147,33 +147,50 @@ async fn force_job(
     }
     let selected_scenes = apply_selector(&all_scenes, scene_selector, |s| &s.slug)?;
 
-    // Resolve shader — pick a shader, then its latest version
+    // Resolve shaders and their latest versions
     let all_shaders = ShaderRepo::list(db).await?;
     if all_shaders.is_empty() {
         return Err(AppError::BadRequest("No shaders in database".into()));
     }
     let selected_shaders = apply_selector(&all_shaders, shader_selector, |s| &s.slug)?;
 
-    // For now, use the first selected shader and its latest version
-    let shader = &selected_shaders[0];
-    let versions = ShaderVersionRepo::list_by_shader(db, &shader.id).await?;
-    let version = versions
-        .first()
-        .ok_or_else(|| AppError::BadRequest(format!("Shader '{}' has no versions", shader.slug)))?;
+    // Pair each shader with its latest version, skipping those without versions
+    let mut shader_versions = Vec::new();
+    for &shader in &selected_shaders {
+        match ShaderVersionRepo::list_by_shader(db, &shader.id)
+            .await?
+            .into_iter()
+            .next()
+        {
+            Some(version) => shader_versions.push((shader, version)),
+            None => warn!(shader = %shader.slug, "Shader has no versions, skipping"),
+        }
+    }
+    if shader_versions.is_empty() {
+        return Err(AppError::BadRequest(
+            "No selected shaders have versions".into(),
+        ));
+    }
 
-    // Create a real job in the DB
-    let job_id = nanoid!();
+    // Create a job for each shader (all share the same scenes)
     let scene_ids: Vec<String> = selected_scenes.iter().map(|s| s.id.clone()).collect();
+    let mut job_ids = Vec::with_capacity(shader_versions.len());
 
-    let create_req = CreateJobRequest {
-        shader_version_id: version.id.clone(),
-        scene_ids: scene_ids.clone(),
-        profiles: None,
-        priority: Some(100), // High priority for forced jobs
-    };
-    JobRepo::create(db, &job_id, &create_req).await?;
+    for (_, version) in &shader_versions {
+        let job_id = nanoid!();
+        let create_req = CreateJobRequest {
+            shader_version_id: version.id.clone(),
+            scene_ids: scene_ids.clone(),
+            profiles: None,
+            priority: Some(100),
+        };
+        JobRepo::create(db, &job_id, &create_req).await?;
+        job_ids.push(job_id);
+    }
 
-    // Immediately claim the job
+    // Claim the first job
+    let first_job_id = &job_ids[0];
+    let (first_shader, first_version) = &shader_versions[0];
     let agent_id = "force-orchestrate";
     let claimed = sqlx::query!(
         r#"
@@ -182,7 +199,7 @@ async fn force_job(
         WHERE id = $2
         "#,
         agent_id,
-        job_id
+        first_job_id
     )
     .execute(db)
     .await
@@ -194,15 +211,15 @@ async fn force_job(
         )));
     }
 
-    // Build the full payload (same as claim_next_job)
+    // Build payload for the first job
     let shader_info = ShaderInfo {
-        id: shader.id.clone(),
-        slug: shader.slug.clone(),
-        name: shader.name.clone(),
-        version_id: version.id.clone(),
-        version: version.version.clone(),
-        download_url: version.download_url.clone(),
-        file_hash: version.file_hash.clone(),
+        id: first_shader.id.clone(),
+        slug: first_shader.slug.clone(),
+        name: first_shader.name.clone(),
+        version_id: first_version.id.clone(),
+        version: first_version.version.clone(),
+        download_url: first_version.download_url.clone(),
+        file_hash: first_version.file_hash.clone(),
     };
 
     let mut scenes = Vec::new();
@@ -238,7 +255,7 @@ async fn force_job(
     }
 
     let payload = JobPayload {
-        id: job_id.clone(),
+        id: first_job_id.clone(),
         shader: shader_info,
         scenes,
         worlds: worlds_map.into_values().collect(),
@@ -247,10 +264,11 @@ async fn force_job(
     };
 
     info!(
-        job_id = %job_id,
-        shader = %shader.slug,
+        first_job = %first_job_id,
+        job_count = job_ids.len(),
+        shader_count = shader_versions.len(),
         scene_count = selected_scenes.len(),
-        "Force-created job"
+        "Force-created jobs"
     );
 
     Ok(Json(payload))
@@ -258,7 +276,7 @@ async fn force_job(
 
 /// Parses a selector string and applies it to a list of items.
 ///
-/// Syntax: `"+"` (1 random), `"*"` (all), `"3+"` (3 random), `"slug"` (by slug)
+/// Syntax: `"+"` (1 random), `"!"` (all), `"3+"` (3 random), `"slug"` (by slug)
 fn apply_selector<'a, T>(
     items: &'a [T],
     selector: &str,

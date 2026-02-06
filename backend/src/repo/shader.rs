@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Context;
 use tracing::{debug, instrument};
 use uuid::Uuid;
@@ -301,6 +303,28 @@ impl ShaderVersionRepo {
             version_id
         ))
         .map_err(Into::into)
+    }
+
+    /// Get the latest version per shader in a single query
+    #[instrument(skip(db), level = "debug")]
+    pub async fn batch_latest_versions(db: &DbPool) -> AppResult<HashMap<String, ShaderVersion>> {
+        let versions = sqlx::query_as!(
+            ShaderVersion,
+            r#"
+            SELECT DISTINCT ON (shader_id) *
+            FROM shader_versions
+            ORDER BY shader_id, created_at DESC
+            "#
+        )
+        .fetch_all(db)
+        .await
+        .context("failed to batch fetch latest shader versions")?;
+
+        debug!(count = versions.len(), "Batch fetched latest versions");
+        Ok(versions
+            .into_iter()
+            .map(|v| (v.shader_id.clone(), v))
+            .collect())
     }
 
     #[instrument(skip(db), level = "debug")]

@@ -23,6 +23,19 @@ impl ShaderAuthorRepo {
     }
 
     #[instrument(skip(db), level = "debug")]
+    pub async fn list_all(db: &DbPool) -> AppResult<Vec<ShaderAuthor>> {
+        let authors = sqlx::query_as!(
+            ShaderAuthor,
+            "SELECT * FROM shader_authors ORDER BY shader_id, name"
+        )
+        .fetch_all(db)
+        .await
+        .context("failed to list all shader authors")?;
+        debug!(count = authors.len(), "Listed all shader authors");
+        Ok(authors)
+    }
+
+    #[instrument(skip(db), level = "debug")]
     pub async fn upsert(
         db: &DbPool,
         id: &str,

@@ -1,5 +1,5 @@
 <script lang="ts">
-import type { Scene } from '$lib/bindings';
+import type { SceneListItem } from '$lib/bindings';
 import {
 	getBiomeDisplayName,
 	getDimensionDisplayName,
@@ -12,7 +12,7 @@ import { cn } from '$lib/utils';
 import { Sun, ArrowRight } from '@lucide/svelte';
 
 interface Props {
-	scene: Scene;
+	scene: SceneListItem;
 	class?: string;
 }
 
@@ -59,7 +59,7 @@ function handleKeyDown(e: KeyboardEvent) {
 	<!-- Thumbnail Image -->
 	<div class="relative aspect-video w-full overflow-hidden">
 		<img
-			src="/wallpapers/{wallpaperIndex}.jpg"
+			src={scene.thumbnail_url ?? `/wallpapers/${wallpaperIndex}.jpg`}
 			alt="{scene.name} scene preview"
 			class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
 			style="will-change: transform; backface-visibility: hidden;"
@@ -126,7 +126,7 @@ function handleKeyDown(e: KeyboardEvent) {
 			<div class="flex items-center gap-2 text-xs text-muted-foreground">
 				<span>{getWeatherDisplayName(scene.weather)}</span>
 				<span>•</span>
-				<span class="capitalize">Medium scene</span>
+				<span>{scene.capture_count} capture{scene.capture_count !== 1 ? 's' : ''}</span>
 			</div>
 			<span
 				class="inline-flex items-center gap-1 text-xs font-medium text-primary transition-transform group-hover:translate-x-1"

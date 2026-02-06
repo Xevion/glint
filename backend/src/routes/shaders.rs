@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -11,10 +13,12 @@ use crate::{
     auth::AdminUser,
     error::{AppError, AppResult},
     models::{
-        CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderVersion, ShaderWithCaptures,
-        UpdateShaderRequest,
+        CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderListItem, ShaderVersion,
+        ShaderWithCaptures, UpdateShaderRequest,
     },
-    repo::{ShaderRepo, ShaderVersionRepo},
+    repo::{
+        CaptureRepo, CategoryRepo, FeatureRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo,
+    },
     state::AppState,
 };
 
@@ -28,10 +32,53 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/versions", post(create_shader_version))
 }
 
-/// GET /api/shaders - List all shaders (public)
-async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shader>>> {
-    let shaders = ShaderRepo::list(state.db()).await?;
-    Ok(Json(shaders))
+/// GET /api/shaders - List all shaders with enrichment (public)
+async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<ShaderListItem>>> {
+    let db = state.db();
+
+    let (shaders, authors, categories, features, versions, thumbnails) = tokio::try_join!(
+        ShaderRepo::list(db),
+        ShaderAuthorRepo::list_all(db),
+        CategoryRepo::list_all_for_shaders(db),
+        FeatureRepo::list_all_for_shaders(db),
+        ShaderVersionRepo::batch_latest_versions(db),
+        CaptureRepo::batch_thumbnails_by_shader(db),
+    )?;
+
+    // Group by shader_id
+    let mut authors_map: HashMap<String, Vec<_>> = HashMap::new();
+    for a in authors {
+        authors_map.entry(a.shader_id.clone()).or_default().push(a);
+    }
+
+    let mut categories_map: HashMap<String, Vec<_>> = HashMap::new();
+    for (sid, cat) in categories {
+        categories_map.entry(sid).or_default().push(cat);
+    }
+
+    let mut features_map: HashMap<String, Vec<_>> = HashMap::new();
+    for (sid, feat) in features {
+        features_map.entry(sid).or_default().push(feat);
+    }
+
+    let items = shaders
+        .into_iter()
+        .map(|shader| {
+            let id = &shader.id;
+            let version = versions.get(id);
+            ShaderListItem {
+                authors: authors_map.remove(id).unwrap_or_default(),
+                categories: categories_map.remove(id).unwrap_or_default(),
+                features: features_map.remove(id).unwrap_or_default(),
+                latest_version: version.map(|v| v.version.clone()),
+                game_versions: version.and_then(|v| v.game_versions.clone()),
+                thumbnail_url: thumbnails.get(id).cloned(),
+                shader,
+            }
+        })
+        .collect();
+
+    Ok(Json(items))
 }
 
 /// GET /api/shaders/{id} - Get shader by ID or slug with versions and captures (public)

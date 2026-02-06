@@ -16,8 +16,9 @@
  *   -t, --token       Override GLINT_API_TOKEN
  *   -u, --url         Override GLINT_API_URL
  *   -v, --verbose     Show full Minecraft output
+ *   -h, --help        Show this help message and exit
  *   --force           Force-create a job from available DB resources
- *   --scenes SEL      Scene selector: + (1 random), * (all), 3+ (N random), or slug
+ *   --scenes SEL      Scene selector: + (1 random), ! (all), 3+ (N random), or slug
  *   --shaders SEL     Shader selector: same syntax as --scenes
  */
 
@@ -34,6 +35,7 @@ const { flags } = parseFlags(
 		token: "string",
 		verbose: "bool",
 		force: "bool",
+		help: "bool",
 		scenes: "string",
 		shaders: "string",
 	} as const,
@@ -43,6 +45,7 @@ const { flags } = parseFlags(
 		t: "token",
 		v: "verbose",
 		F: "force",
+		h: "help",
 	},
 	{
 		platform: "fabric",
@@ -50,10 +53,40 @@ const { flags } = parseFlags(
 		token: "",
 		verbose: false,
 		force: false,
+		help: false,
 		scenes: "",
 		shaders: "",
 	},
 );
+
+if (flags.help) {
+	console.log(`Usage: bun scripts/orchestrate.ts [flags]
+
+Launches Minecraft in autonomous mode for shader capture orchestration.
+
+Flags:
+  -p, --platform <name>   Mod platform: fabric (default) or neoforge
+  -t, --token <token>     Override GLINT_API_TOKEN
+  -u, --url <url>         Override GLINT_API_URL (default: http://localhost:8080)
+  -v, --verbose           Show full Minecraft output
+  -h, --help              Show this help message and exit
+  -F, --force             Force-create a job from available DB resources
+      --scenes <SEL>      Scene selector (requires --force or implies it)
+      --shaders <SEL>     Shader selector (requires --force or implies it)
+
+Selector syntax:
+  +          1 random (default)
+  !          All available
+  3+         N random (e.g. 3 random)
+  <slug>     Specific item by slug
+
+Examples:
+  bun scripts/orchestrate.ts                        # Run pending jobs
+  bun scripts/orchestrate.ts --force                # Force job, 1 random scene + shader
+  bun scripts/orchestrate.ts --scenes !             # Force job, all scenes, 1 random shader
+  bun scripts/orchestrate.ts --shaders bsl --scenes 3+  # BSL shader, 3 random scenes`);
+	process.exit(0);
+}
 
 const platform = flags.platform as string;
 const verbose = flags.verbose;

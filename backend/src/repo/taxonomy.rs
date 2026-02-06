@@ -87,6 +87,45 @@ impl CategoryRepo {
         Ok(result.rows_affected() > 0)
     }
 
+    /// List all shader→category mappings for batch enrichment
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_all_for_shaders(db: &DbPool) -> AppResult<Vec<(String, Category)>> {
+        struct Row {
+            shader_id: String,
+            id: i32,
+            slug: String,
+            name: String,
+            description: Option<String>,
+        }
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT sc.shader_id, c.id, c.slug, c.name, c.description
+            FROM categories c
+            JOIN shader_categories sc ON sc.category_id = c.id
+            ORDER BY c.name
+            "#
+        )
+        .fetch_all(db)
+        .await
+        .context("failed to list all shader categories")?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    r.shader_id,
+                    Category {
+                        id: r.id,
+                        slug: r.slug,
+                        name: r.name,
+                        description: r.description,
+                    },
+                )
+            })
+            .collect())
+    }
+
     /// List categories for a shader
     #[instrument(skip(db), level = "debug")]
     pub async fn list_for_shader(db: &DbPool, shader_id: &str) -> AppResult<Vec<Category>> {
@@ -233,6 +272,45 @@ impl FeatureRepo {
         Ok(result.rows_affected() > 0)
     }
 
+    /// List all shader→feature mappings for batch enrichment
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_all_for_shaders(db: &DbPool) -> AppResult<Vec<(String, Feature)>> {
+        struct Row {
+            shader_id: String,
+            id: i32,
+            slug: String,
+            name: String,
+            description: Option<String>,
+        }
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT sf.shader_id, f.id, f.slug, f.name, f.description
+            FROM features f
+            JOIN shader_features sf ON sf.feature_id = f.id
+            ORDER BY f.name
+            "#
+        )
+        .fetch_all(db)
+        .await
+        .context("failed to list all shader features")?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    r.shader_id,
+                    Feature {
+                        id: r.id,
+                        slug: r.slug,
+                        name: r.name,
+                        description: r.description,
+                    },
+                )
+            })
+            .collect())
+    }
+
     /// List features for a shader
     #[instrument(skip(db), level = "debug")]
     pub async fn list_for_shader(db: &DbPool, shader_id: &str) -> AppResult<Vec<Feature>> {
@@ -377,6 +455,45 @@ impl TagRepo {
             .context(format!("failed to delete tag '{}'", id))?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    /// List all scene→tag mappings for batch enrichment
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_all_for_scenes(db: &DbPool) -> AppResult<Vec<(String, Tag)>> {
+        struct Row {
+            scene_id: String,
+            id: i32,
+            slug: String,
+            name: String,
+            description: Option<String>,
+        }
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT st.scene_id, t.id, t.slug, t.name, t.description
+            FROM tags t
+            JOIN scene_tags st ON st.tag_id = t.id
+            ORDER BY t.name
+            "#
+        )
+        .fetch_all(db)
+        .await
+        .context("failed to list all scene tags")?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    r.scene_id,
+                    Tag {
+                        id: r.id,
+                        slug: r.slug,
+                        name: r.name,
+                        description: r.description,
+                    },
+                )
+            })
+            .collect())
     }
 
     /// List tags for a scene

@@ -1,14 +1,14 @@
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
-import type { Scene, SceneWithCaptures } from '$lib/bindings';
+import type { SceneListItem, SceneWithCaptures } from '$lib/bindings';
 
 export class SceneEndpoints extends ApiClient {
 	/**
-	 * List all scenes
+	 * List all scenes with enrichment data
 	 */
-	list(): Promise<Result<Scene[], ApiError>> {
-		return super.get<Scene[]>('/api/scenes');
+	list(): Promise<Result<SceneListItem[], ApiError>> {
+		return super.get<SceneListItem[]>('/api/scenes');
 	}
 
 	/**

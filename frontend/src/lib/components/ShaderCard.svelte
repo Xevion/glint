@@ -1,5 +1,5 @@
 <script lang="ts">
-import type { Shader } from '$lib/bindings';
+import type { ShaderListItem } from '$lib/bindings';
 import {
 	formatDate,
 	getModrinthUrl,
@@ -14,7 +14,7 @@ import BrandIcon from './icons/BrandIcon.svelte';
 import { Check, Layers, ExternalLink } from '@lucide/svelte';
 
 interface Props {
-	shader: Shader;
+	shader: ShaderListItem;
 	class?: string;
 }
 
@@ -86,7 +86,7 @@ function handleCheckboxClick(e: MouseEvent) {
 	<!-- Thumbnail Image -->
 	<div class="relative aspect-video w-full overflow-hidden">
 		<img
-			src="/wallpapers/{wallpaperIndex}.jpg"
+			src={shader.thumbnail_url ?? shader.icon_url ?? `/wallpapers/${wallpaperIndex}.jpg`}
 			alt="{shader.name} preview"
 			class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
 			style="will-change: transform; backface-visibility: hidden;"
@@ -137,7 +137,7 @@ function handleCheckboxClick(e: MouseEvent) {
 			</a>
 			<div class="flex items-center gap-2 text-sm text-muted-foreground">
 				<span>by</span>
-				<span class="font-medium text-card-foreground">Unknown Author</span>
+				<span class="font-medium text-card-foreground">{shader.authors[0]?.name ?? 'Unknown Author'}</span>
 				<span class="text-muted-foreground/50">·</span>
 				<span>{formatDate(shader.updated_at)}</span>
 			</div>
@@ -153,23 +153,24 @@ function handleCheckboxClick(e: MouseEvent) {
 		{/if}
 
 		<!-- Tags: Style & Features -->
-		<div class="flex flex-wrap gap-1.5">
-			<span
-				class="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary capitalize ring-1 ring-primary/20"
-			>
-				Realistic
-			</span>
-			<span
-				class="inline-flex items-center rounded-md bg-muted/50 px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/50"
-			>
-				Ray Tracing
-			</span>
-			<span
-				class="inline-flex items-center rounded-md bg-muted/50 px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/50"
-			>
-				Shadows
-			</span>
-		</div>
+		{#if shader.categories.length > 0 || shader.features.length > 0}
+			<div class="flex flex-wrap gap-1.5">
+				{#each shader.categories as category (category.id)}
+					<span
+						class="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary capitalize ring-1 ring-primary/20"
+					>
+						{category.name}
+					</span>
+				{/each}
+				{#each shader.features as feature (feature.id)}
+					<span
+						class="inline-flex items-center rounded-md bg-muted/50 px-1.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/50"
+					>
+						{feature.name}
+					</span>
+				{/each}
+			</div>
+		{/if}
 
 		<!-- Footer: Version & Links -->
 		<div class="mt-auto flex items-center justify-between border-t border-border pt-3">
@@ -177,7 +178,7 @@ function handleCheckboxClick(e: MouseEvent) {
 				<!-- Version -->
 				<span class="inline-flex items-center gap-1 text-xs">
 					<span class="text-muted-foreground/70">v</span>
-					<span class="font-medium text-card-foreground">1.0.0</span>
+					<span class="font-medium text-card-foreground">{shader.latest_version ?? '\u2014'}</span>
 				</span>
 
 				<!-- Separator -->
@@ -186,7 +187,7 @@ function handleCheckboxClick(e: MouseEvent) {
 				<!-- MC Version -->
 				<span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
 					<Layers class="h-3.5 w-3.5" />
-					1.21.4
+					{shader.game_versions ?? '\u2014'}
 				</span>
 			</div>
 

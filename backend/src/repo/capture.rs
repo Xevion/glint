@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use tracing::{debug, instrument};
@@ -300,5 +302,85 @@ impl CaptureRepo {
             .context(format!("failed to delete capture '{}'", id))?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    /// Get the most recent completed non-outdated thumbnail per shader
+    #[instrument(skip(db), level = "debug")]
+    pub async fn batch_thumbnails_by_shader(db: &DbPool) -> AppResult<HashMap<String, String>> {
+        struct Row {
+            shader_id: String,
+            screenshot_url: String,
+        }
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT DISTINCT ON (sv.shader_id)
+                sv.shader_id,
+                c.screenshot_url as "screenshot_url!"
+            FROM captures c
+            JOIN shader_versions sv ON c.shader_version_id = sv.id
+            WHERE c.status = 'completed' AND c.outdated = FALSE AND c.screenshot_url IS NOT NULL
+            ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST
+            "#
+        )
+        .fetch_all(db)
+        .await
+        .context("failed to batch fetch shader thumbnails")?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.shader_id, r.screenshot_url))
+            .collect())
+    }
+
+    /// Get the most recent completed non-outdated thumbnail per scene
+    #[instrument(skip(db), level = "debug")]
+    pub async fn batch_thumbnails_by_scene(db: &DbPool) -> AppResult<HashMap<String, String>> {
+        struct Row {
+            scene_id: String,
+            screenshot_url: String,
+        }
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT DISTINCT ON (c.scene_id)
+                c.scene_id,
+                c.screenshot_url as "screenshot_url!"
+            FROM captures c
+            WHERE c.status = 'completed' AND c.outdated = FALSE AND c.screenshot_url IS NOT NULL
+            ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
+            "#
+        )
+        .fetch_all(db)
+        .await
+        .context("failed to batch fetch scene thumbnails")?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.scene_id, r.screenshot_url))
+            .collect())
+    }
+
+    /// Count completed captures per scene
+    #[instrument(skip(db), level = "debug")]
+    pub async fn batch_count_by_scene(db: &DbPool) -> AppResult<HashMap<String, i64>> {
+        struct Row {
+            scene_id: String,
+            count: i64,
+        }
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT scene_id, COUNT(*) as "count!"
+            FROM captures
+            WHERE status = 'completed'
+            GROUP BY scene_id
+            "#
+        )
+        .fetch_all(db)
+        .await
+        .context("failed to batch count captures by scene")?;
+
+        Ok(rows.into_iter().map(|r| (r.scene_id, r.count)).collect())
     }
 }

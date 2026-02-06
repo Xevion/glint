@@ -7,8 +7,7 @@ export const load: PageLoad = async ({ fetch }) => {
 
 	return result.match({
 		Ok: (shaders) => ({
-			// Filter out vanilla shader - it's a baseline, not a shader pack
-			shaders: shaders.filter((s) => s.slug !== 'vanilla')
+			shaders
 		}),
 		Err: (error) => ({
 			shaders: [],

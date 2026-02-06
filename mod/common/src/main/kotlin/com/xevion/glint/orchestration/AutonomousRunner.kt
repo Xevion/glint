@@ -39,6 +39,7 @@ class AutonomousRunner(
     private var currentJob: JobPayload? = null
     private var pendingFuture: CompletableFuture<*>? = null
     private var lastHeartbeat: Long = 0
+    private var forceJobCreated: Boolean = false
 
     private enum class State {
         ClaimingJob,
@@ -84,7 +85,8 @@ class AutonomousRunner(
     private fun claimNextJob() {
         state = State.ClaimingJob
         pendingFuture =
-            if (isForceMode) {
+            if (isForceMode && !forceJobCreated) {
+                forceJobCreated = true
                 CompletableFuture.supplyAsync {
                     AgentApi
                         .forceJob(apiUrl, apiToken, forceScenes, forceShaders)
@@ -227,13 +229,7 @@ class AutonomousRunner(
             }
 
         currentJob = null
-
-        if (isForceMode) {
-            log.info("Force mode: single job complete, shutting down")
-            shutdown()
-        } else {
-            claimNextJob()
-        }
+        claimNextJob()
     }
 
     private fun uploadAndComplete(job: JobPayload): Result<Unit> {
