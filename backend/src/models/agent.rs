@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// Scene information for a job
+/// Scene information for a capture run
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SceneInfo {
     pub id: String,
@@ -18,7 +18,7 @@ pub struct SceneInfo {
     pub definition_json: String,
 }
 
-/// World information for a job
+/// World information for a capture run
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WorldInfo {
     pub id: String,
@@ -59,29 +59,16 @@ pub struct PrepareUploadResponse {
     pub uploads: HashMap<String, UploadTarget>,
 }
 
-/// Request to complete a job
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct CompleteJobRequest {
-    pub captures: Vec<CaptureRecord>,
-    pub discovered_profiles: Option<Vec<String>>,
-}
-
 /// A single capture result
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CaptureRecord {
     pub capture_id: String,
     pub scene_id: String,
     pub profile: Option<String>,
-    pub screenshot_path: String,
+    pub image_path: String,
     pub resolution_width: i32,
     pub resolution_height: i32,
     pub captured_at: DateTime<Utc>,
-}
-
-/// Request to fail a job
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct FailJobRequest {
-    pub error_message: String,
 }
 
 // Orchestration Manifest Types (matches mod output)
@@ -96,9 +83,9 @@ pub struct OrchestrationManifest {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct OrchestrationInfo {
     pub id: String,
-    /// Job ID from the job definition (None for interactive captures)
-    #[serde(rename = "jobId", skip_serializing_if = "Option::is_none")]
-    pub job_id: Option<String>,
+    /// Run ID from the run definition (None for interactive captures)
+    #[serde(rename = "runId", skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
     #[serde(rename = "startedAt")]
     pub started_at: String,
     #[serde(rename = "completedAt")]
@@ -128,12 +115,11 @@ pub struct CaptureSessionData {
     pub started_at: String,
     #[serde(rename = "completedAt")]
     pub completed_at: String,
-    #[serde(rename = "totalScreenshots")]
-    pub total_screenshots: i32,
-    #[serde(rename = "shaderPacks")]
-    pub shader_packs: Vec<String>,
+    #[serde(rename = "totalCaptures")]
+    pub total_captures: i32,
+    pub shaders: Vec<String>,
     pub minecraft: MinecraftInfo,
-    pub screenshots: Vec<ScreenshotEntry>,
+    pub captures: Vec<CaptureEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -147,7 +133,7 @@ pub struct MinecraftInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct ScreenshotEntry {
+pub struct CaptureEntry {
     pub file: String,
     pub timestamp: String,
     pub shader: Option<ShaderMetadata>,
@@ -156,8 +142,7 @@ pub struct ScreenshotEntry {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ShaderMetadata {
-    #[serde(rename = "packFile")]
-    pub pack_file: String,
+    pub filename: String,
     pub id: String,
     pub version: String,
     pub profile: Option<String>,

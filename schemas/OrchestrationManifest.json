@@ -36,9 +36,44 @@
         "pitch"
       ]
     },
+    "CaptureEntry": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        },
+        "shader": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShaderMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "timestamp",
+        "resolution"
+      ]
+    },
     "CaptureSessionData": {
       "type": "object",
       "properties": {
+        "captures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CaptureEntry"
+          }
+        },
         "completedAt": {
           "type": "string"
         },
@@ -48,16 +83,10 @@
         "sceneId": {
           "type": "string"
         },
-        "screenshots": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ScreenshotEntry"
-          }
-        },
         "sessionDir": {
           "type": "string"
         },
-        "shaderPacks": {
+        "shaders": {
           "type": "array",
           "items": {
             "type": "string"
@@ -66,7 +95,7 @@
         "startedAt": {
           "type": "string"
         },
-        "totalScreenshots": {
+        "totalCaptures": {
           "type": "integer",
           "format": "int32"
         },
@@ -80,10 +109,10 @@
         "sessionDir",
         "startedAt",
         "completedAt",
-        "totalScreenshots",
-        "shaderPacks",
+        "totalCaptures",
+        "shaders",
         "minecraft",
-        "screenshots"
+        "captures"
       ]
     },
     "MinecraftInfo": {
@@ -138,8 +167,8 @@
         "id": {
           "type": "string"
         },
-        "jobId": {
-          "description": "Job ID from the job definition (None for interactive captures)",
+        "runId": {
+          "description": "Run ID from the run definition (None for interactive captures)",
           "type": [
             "string",
             "null"
@@ -211,42 +240,13 @@
         "height"
       ]
     },
-    "ScreenshotEntry": {
-      "type": "object",
-      "properties": {
-        "file": {
-          "type": "string"
-        },
-        "resolution": {
-          "$ref": "#/$defs/Resolution"
-        },
-        "shader": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ShaderMetadata"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "timestamp": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "file",
-        "timestamp",
-        "resolution"
-      ]
-    },
     "ShaderMetadata": {
       "type": "object",
       "properties": {
-        "id": {
+        "filename": {
           "type": "string"
         },
-        "packFile": {
+        "id": {
           "type": "string"
         },
         "profile": {
@@ -260,7 +260,7 @@
         }
       },
       "required": [
-        "packFile",
+        "filename",
         "id",
         "version"
       ]

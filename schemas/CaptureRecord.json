@@ -11,6 +11,9 @@
       "type": "string",
       "format": "date-time"
     },
+    "image_path": {
+      "type": "string"
+    },
     "profile": {
       "type": [
         "string",
@@ -27,15 +30,12 @@
     },
     "scene_id": {
       "type": "string"
-    },
-    "screenshot_path": {
-      "type": "string"
     }
   },
   "required": [
     "capture_id",
     "scene_id",
-    "screenshot_path",
+    "image_path",
     "resolution_width",
     "resolution_height",
     "captured_at"

@@ -23,7 +23,7 @@ const images: CompareImageOption[] = $derived(
 	data.captures.map((c: CaptureWithContext) => {
 		const suffix = [c.shader_version, c.profile].filter(Boolean).join(' · ');
 		return {
-			url: c.screenshot_url!,
+			url: c.image_url!,
 			label: suffix ? `${c.shader_name} (${suffix})` : c.shader_name,
 			shader: {
 				name: c.shader_name,

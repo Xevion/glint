@@ -9,8 +9,8 @@
     "id": {
       "type": "string"
     },
-    "jobId": {
-      "description": "Job ID from the job definition (None for interactive captures)",
+    "runId": {
+      "description": "Run ID from the run definition (None for interactive captures)",
       "type": [
         "string",
         "null"

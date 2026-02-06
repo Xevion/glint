@@ -77,12 +77,12 @@ pub struct ClaimItemRequest {
 pub struct ClaimItemResponse {
     pub capture_id: String,
     pub presigned_url: String,
-    pub screenshot_url: String,
+    pub image_url: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ConfirmUploadRequest {
-    pub screenshot_path: Option<String>,
+    pub image_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,7 +96,7 @@ pub struct UploadUrlResponse {
     pub capture_id: String,
     pub r2_key: String,
     pub presigned_url: String,
-    pub screenshot_url: String,
+    pub image_url: String,
 }
 
 pub fn router() -> Router<AppState> {
@@ -228,7 +228,7 @@ async fn claim_item(
     );
 
     let r2_config = &state.config().r2;
-    let screenshot_url = r2_config.public_url_for_key(&r2_key);
+    let image_url = r2_config.public_url_for_key(&r2_key);
 
     let presigned_url = if let Some(s3) = state.s3() {
         let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
@@ -245,7 +245,7 @@ async fn claim_item(
         &item.shader_version_id,
         &item.scene_id,
         item.profile.as_deref(),
-        Some(&screenshot_url),
+        Some(&image_url),
         Some(request.resolution_width),
         Some(request.resolution_height),
         Some(request.captured_at),
@@ -260,7 +260,7 @@ async fn claim_item(
     Ok(Json(ClaimItemResponse {
         capture_id,
         presigned_url,
-        screenshot_url,
+        image_url,
     }))
 }
 
@@ -283,7 +283,7 @@ async fn confirm_upload(
         .ok_or_else(|| AppError::BadRequest("Run item has no capture_id".to_string()))?;
 
     let mut tx = state.begin_tx().await?;
-    CaptureRepo::confirm_upload(&mut *tx, capture_id, request.screenshot_path.as_deref()).await?;
+    CaptureRepo::confirm_upload(&mut *tx, capture_id, request.image_path.as_deref()).await?;
     CaptureRunRepo::complete_item(&mut *tx, &item_id, capture_id, None).await?;
     tx.commit().await?;
 
@@ -348,7 +348,7 @@ async fn get_upload_url(
     );
 
     let r2_config = &state.config().r2;
-    let screenshot_url = r2_config.public_url_for_key(&r2_key);
+    let image_url = r2_config.public_url_for_key(&r2_key);
 
     let presigned_url = if let Some(s3) = state.s3() {
         let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
@@ -361,6 +361,6 @@ async fn get_upload_url(
         capture_id,
         r2_key,
         presigned_url,
-        screenshot_url,
+        image_url,
     }))
 }

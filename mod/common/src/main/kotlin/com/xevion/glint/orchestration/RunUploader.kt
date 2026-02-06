@@ -18,9 +18,9 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * Manages the screenshot-to-upload pipeline for a single capture run.
+ * Manages the capture-to-upload pipeline for a single capture run.
  *
- * Thread-safe for cross-thread access from both IO pool (screenshot events) and game thread (failure reporting).
+ * Thread-safe for cross-thread access from both IO pool (capture events) and game thread (failure reporting).
  */
 class RunUploader(
     private val apiUrl: String,
@@ -42,18 +42,18 @@ class RunUploader(
     val failed: Int get() = failedCount.get()
 
     /**
-     * Handles a screenshot capture event by looking up the item ID and submitting an upload task.
+     * Handles a capture event by looking up the item ID and submitting an upload task.
      *
      * Called from IO pool threads.
      */
-    fun handleScreenshot(
+    fun handleCapture(
         shaderVersionId: String,
-        event: ScreenshotCapturedEvent,
+        event: CaptureTakenEvent,
     ) {
         val key = Triple(shaderVersionId, event.sceneId, event.entry.shader?.profile)
         val itemId = itemLookup[key]
         if (itemId == null) {
-            log.warn("No run item found for captured screenshot") {
+            log.warn("No run item found for capture") {
                 "scene_id" to event.sceneId
                 "profile" to (event.entry.shader?.profile ?: "null")
             }
@@ -132,7 +132,7 @@ class RunUploader(
                             apiToken,
                             runId,
                             itemId,
-                            FailItemRequest(errorMessage = "Screenshot not captured"),
+                            FailItemRequest(errorMessage = "Capture not taken"),
                         )
                         log.debug("Failed unsubmitted item") {
                             "item_id" to itemId
@@ -220,7 +220,7 @@ class RunUploader(
      */
     private fun executeUpload(
         itemId: String,
-        event: ScreenshotCapturedEvent,
+        event: CaptureTakenEvent,
     ) {
         log.debug("Claiming item") { "item_id" to itemId }
         val claimResponse =

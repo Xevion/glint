@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "WorldInfo",
-  "description": "World information for a job",
+  "description": "World information for a capture run",
   "type": "object",
   "properties": {
     "file_hash": {

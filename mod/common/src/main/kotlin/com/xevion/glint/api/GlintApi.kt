@@ -1,8 +1,8 @@
 package com.xevion.glint.api
 
+import com.xevion.glint.capture.Camera
+import com.xevion.glint.capture.Position
 import com.xevion.glint.scene.Scene
-import com.xevion.glint.screenshot.Camera
-import com.xevion.glint.screenshot.Position
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

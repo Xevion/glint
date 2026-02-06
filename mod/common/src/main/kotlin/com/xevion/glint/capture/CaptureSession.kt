@@ -4,13 +4,12 @@ import com.xevion.glint.Loggers
 import com.xevion.glint.orchestration.ShaderSpec
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneManager
-import com.xevion.glint.screenshot.*
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.time.Instant
 
 /**
- * Manages a multi-shader screenshot capture session for a single scene.
+ * Manages a multi-shader capture session for a single scene.
  *
  * Workflow:
  * 1. Start session - load and apply scene
@@ -35,7 +34,7 @@ class CaptureSession(
     private var shadersToCapture: List<ShaderSpec> = emptyList()
     private var currentIndex: Int = 0
     private var startedAt: Instant? = null
-    private val screenshotEntries: MutableList<ScreenshotEntry> = mutableListOf()
+    private val captureEntries: MutableList<CaptureEntry> = mutableListOf()
 
     private val stabilizationDetector = StabilizationDetector()
     private var resolvedScene: com.xevion.glint.scene.ResolvedScene? = null
@@ -44,8 +43,8 @@ class CaptureSession(
 
     private var sessionData: CaptureSessionData? = null
 
-    /** Called on Util.ioPool() thread after the screenshot file is written to disk. */
-    var onScreenshotTaken: ((ScreenshotEntry, File) -> Unit)? = null
+    /** Called on Util.ioPool() thread after the capture file is written to disk. */
+    var onCaptureTaken: ((CaptureEntry, File) -> Unit)? = null
 
     /**
      * Starts a new capture session.
@@ -73,7 +72,7 @@ class CaptureSession(
         }
 
         startedAt = Instant.now()
-        screenshotEntries.clear()
+        captureEntries.clear()
 
         if (!IrisIntegration.isAvailable) {
             log.warn("Iris is not available, capturing vanilla only")
@@ -281,10 +280,10 @@ class CaptureSession(
             return
         }
 
-        val screenshotName = buildScreenshotFilename(config)
-        log.info("Capturing screenshot") {
+        val captureFilename = buildCaptureFilename(config)
+        log.info("Taking capture") {
             "shader" to config.displayName
-            "file" to screenshotName
+            "file" to captureFilename
         }
 
         val timestamp = Instant.now().toString()
@@ -292,7 +291,7 @@ class CaptureSession(
         val shaderMeta =
             if (config.filename != null && shaderInfo != null) {
                 ShaderMetadata(
-                    packFile = config.filename,
+                    filename = config.filename,
                     id = shaderInfo.id,
                     version = shaderInfo.version,
                     profile = config.profile,
@@ -301,9 +300,9 @@ class CaptureSession(
                 null
             }
 
-        screenshotEntries.add(
-            ScreenshotEntry(
-                file = screenshotName,
+        captureEntries.add(
+            CaptureEntry(
+                file = captureFilename,
                 timestamp = timestamp,
                 shader = shaderMeta,
                 resolution =
@@ -317,25 +316,25 @@ class CaptureSession(
         // Capture values before the async write — Screenshot.grab() writes the file
         // asynchronously on Util.ioPool(), so we invoke the callback from inside the
         // consumer where the file is guaranteed to exist.
-        val capturedEntry = screenshotEntries.last()
-        val screenshotFile = File(outputDir, "screenshots/$screenshotName")
-        val callback = onScreenshotTaken
+        val capturedEntry = captureEntries.last()
+        val captureFile = File(outputDir, "screenshots/$captureFilename")
+        val callback = onCaptureTaken
 
         net.minecraft.client.Screenshot.grab(
             outputDir,
-            screenshotName,
+            captureFilename,
             renderTarget,
         ) { message ->
-            log.debug("Screenshot saved") {
+            log.debug("Capture saved") {
                 "message" to message.string
             }
-            callback?.invoke(capturedEntry, screenshotFile)
+            callback?.invoke(capturedEntry, captureFile)
         }
 
         transitionTo(State.PostCaptureCooldown)
     }
 
-    private fun buildScreenshotFilename(config: ShaderSpec): String {
+    private fun buildCaptureFilename(config: ShaderSpec): String {
         if (config.filename == null) {
             return "vanilla.png"
         }
@@ -421,7 +420,7 @@ class CaptureSession(
         currentIndex = 0
         shadersToCapture = emptyList()
         originalShaderPack = null
-        screenshotEntries.clear()
+        captureEntries.clear()
         startedAt = null
         originalState = null
 
@@ -450,8 +449,8 @@ class CaptureSession(
             sessionDir = sessionDirPath,
             startedAt = startedAt.toString(),
             completedAt = completedAt.toString(),
-            totalScreenshots = screenshotEntries.size,
-            shaderPacks = shadersToCapture.mapNotNull { it.filename }.distinct(),
+            totalCaptures = captureEntries.size,
+            shaders = shadersToCapture.mapNotNull { it.filename }.distinct(),
             minecraft =
                 MinecraftInfo(
                     version = mc.launchedVersion,
@@ -459,7 +458,7 @@ class CaptureSession(
                     position = position,
                     camera = camera,
                 ),
-            screenshots = screenshotEntries.toList(),
+            captures = captureEntries.toList(),
         )
     }
 

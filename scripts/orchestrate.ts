@@ -238,10 +238,10 @@ let terminated = false;
 let terminateReason = "";
 let terminateCode = 0;
 let gameStarted = false;
-let jobFailed = false;
+let runFailed = false;
 
 // Patterns that indicate work failed (not fatal to the process, but the work wasn't done)
-const JOB_ERROR_MARKERS = [
+const RUN_ERROR_MARKERS = [
 	/Failed to upload\/complete item/,
 	/Failed to fetch work/,
 	/Failed to create capture run/,
@@ -317,10 +317,10 @@ async function monitorStream(stream: ReadableStream, isStderr: boolean): Promise
 				}
 			}
 
-			// Check for job-level errors
-			for (const pattern of JOB_ERROR_MARKERS) {
+			// Check for run-level errors
+			for (const pattern of RUN_ERROR_MARKERS) {
 				if (pattern.test(data)) {
-					jobFailed = true;
+					runFailed = true;
 					if (!verbose) {
 						for (const line of data.split("\n")) {
 							if (pattern.test(line)) {
@@ -422,8 +422,8 @@ try {
 
 		// Orchestration completed normally
 		if (terminated && terminateCode === 0) {
-			if (jobFailed) {
-				console.error(c("31", `[orchestrate] Job failed (${elapsed}s)`));
+			if (runFailed) {
+				console.error(c("31", `[orchestrate] Run failed (${elapsed}s)`));
 				if (!verbose) {
 					const allOutput = outputBuffer + stderrBuffer;
 					console.error("");

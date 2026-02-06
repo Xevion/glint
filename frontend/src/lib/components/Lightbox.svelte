@@ -6,7 +6,7 @@ import { fade, scale } from 'svelte/transition';
 
 interface CaptureItem {
 	id: string;
-	screenshot_url: string | null;
+	image_url: string | null;
 	profile?: string | null;
 	shader_version?: string | null;
 	scene_id?: string;
@@ -92,14 +92,14 @@ function handleBackdropClick(e: MouseEvent) {
 	{/if}
 
 	<!-- Main image -->
-	{#if currentCapture?.screenshot_url}
+	{#if currentCapture?.image_url}
 		{#key currentCapture.id}
 			<div
 				transition:scale={{ duration: 200, start: 0.95 }}
 				class="relative max-h-[90vh] max-w-[90vw]"
 			>
 				<img
-					src={cfImageUrl(currentCapture.screenshot_url, 'full')}
+					src={cfImageUrl(currentCapture.image_url, 'full')}
 					alt="Capture fullscreen view"
 					class="max-h-[90vh] max-w-[90vw] object-contain"
 				/>

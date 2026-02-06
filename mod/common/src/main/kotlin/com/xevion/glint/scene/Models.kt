@@ -1,7 +1,7 @@
 package com.xevion.glint.scene
 
-import com.xevion.glint.screenshot.Camera
-import com.xevion.glint.screenshot.Position
+import com.xevion.glint.capture.Camera
+import com.xevion.glint.capture.Position
 import kotlinx.serialization.Serializable
 
 /**

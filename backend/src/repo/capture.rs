@@ -18,8 +18,8 @@ const CAPTURE_WITH_CONTEXT_BASE: &str = r#"
         s.name as shader_name,
         sv.version as shader_version,
         c.profile,
-        c.screenshot_path,
-        c.screenshot_url,
+        c.image_path,
+        c.image_url,
         c.captured_at,
         c.resolution_width,
         c.resolution_height,
@@ -141,8 +141,8 @@ impl CaptureRepo {
         shader_version_id: &str,
         scene_id: &str,
         profile: Option<&str>,
-        screenshot_path: Option<&str>,
-        screenshot_url: Option<&str>,
+        image_path: Option<&str>,
+        image_url: Option<&str>,
         resolution_width: Option<i32>,
         resolution_height: Option<i32>,
         captured_at: Option<DateTime<Utc>>,
@@ -150,7 +150,7 @@ impl CaptureRepo {
         sqlx::query!(
             r#"
             INSERT INTO captures (
-                id, shader_version_id, scene_id, profile, screenshot_path, screenshot_url,
+                id, shader_version_id, scene_id, profile, image_path, image_url,
                 resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, 'completed', $9, $9, $9)
             "#,
@@ -158,8 +158,8 @@ impl CaptureRepo {
             shader_version_id,
             scene_id,
             profile,
-            screenshot_path,
-            screenshot_url,
+            image_path,
+            image_url,
             resolution_width,
             resolution_height,
             captured_at
@@ -184,7 +184,7 @@ impl CaptureRepo {
         shader_version_id: &str,
         scene_id: &str,
         profile: Option<&str>,
-        screenshot_url: Option<&str>,
+        image_url: Option<&str>,
         resolution_width: Option<i32>,
         resolution_height: Option<i32>,
         captured_at: Option<DateTime<Utc>>,
@@ -192,7 +192,7 @@ impl CaptureRepo {
         sqlx::query!(
             r#"
             INSERT INTO captures (
-                id, shader_version_id, scene_id, profile, screenshot_url,
+                id, shader_version_id, scene_id, profile, image_url,
                 resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, 'uploading', $8, $8, $8)
             "#,
@@ -200,7 +200,7 @@ impl CaptureRepo {
             shader_version_id,
             scene_id,
             profile,
-            screenshot_url,
+            image_url,
             resolution_width,
             resolution_height,
             captured_at
@@ -221,16 +221,16 @@ impl CaptureRepo {
     pub async fn confirm_upload(
         executor: impl sqlx::PgExecutor<'_>,
         id: &str,
-        screenshot_path: Option<&str>,
+        image_path: Option<&str>,
     ) -> AppResult<bool> {
         let result = sqlx::query!(
             r#"
             UPDATE captures
-            SET status = 'completed', screenshot_path = $2, updated_at = now()
+            SET status = 'completed', image_path = $2, updated_at = now()
             WHERE id = $1 AND status = 'uploading'
             "#,
             id,
-            screenshot_path
+            image_path
         )
         .execute(executor)
         .await
@@ -407,17 +407,17 @@ impl CaptureRepo {
     ) -> AppResult<HashMap<String, String>> {
         struct Row {
             shader_id: String,
-            screenshot_url: String,
+            image_url: String,
         }
         let rows = sqlx::query_as!(
             Row,
             r#"
             SELECT DISTINCT ON (sv.shader_id)
                 sv.shader_id,
-                c.screenshot_url as "screenshot_url!"
+                c.image_url as "image_url!"
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
-            WHERE c.status = 'completed' AND c.outdated = FALSE AND c.screenshot_url IS NOT NULL
+            WHERE c.status = 'completed' AND c.outdated = FALSE AND c.image_url IS NOT NULL
             ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST
             "#
         )
@@ -427,7 +427,7 @@ impl CaptureRepo {
 
         Ok(rows
             .into_iter()
-            .map(|r| (r.shader_id, r.screenshot_url))
+            .map(|r| (r.shader_id, r.image_url))
             .collect())
     }
 
@@ -438,16 +438,16 @@ impl CaptureRepo {
     ) -> AppResult<HashMap<String, String>> {
         struct Row {
             scene_id: String,
-            screenshot_url: String,
+            image_url: String,
         }
         let rows = sqlx::query_as!(
             Row,
             r#"
             SELECT DISTINCT ON (c.scene_id)
                 c.scene_id,
-                c.screenshot_url as "screenshot_url!"
+                c.image_url as "image_url!"
             FROM captures c
-            WHERE c.status = 'completed' AND c.outdated = FALSE AND c.screenshot_url IS NOT NULL
+            WHERE c.status = 'completed' AND c.outdated = FALSE AND c.image_url IS NOT NULL
             ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
             "#
         )
@@ -457,7 +457,7 @@ impl CaptureRepo {
 
         Ok(rows
             .into_iter()
-            .map(|r| (r.scene_id, r.screenshot_url))
+            .map(|r| (r.scene_id, r.image_url))
             .collect())
     }
 

@@ -73,7 +73,7 @@ const timeLabel = $derived.by(() => {
 					>
 						{#if selectedCapture}
 							<img
-								src={cfImageUrl(selectedCapture.screenshot_url, 'hero')}
+								src={cfImageUrl(selectedCapture.image_url, 'hero')}
 								alt="{scene.name} with {selectedCapture.shader_name}"
 								class="h-full w-full object-cover"
 							/>
@@ -128,9 +128,9 @@ const timeLabel = $derived.by(() => {
 										? 'border-primary'
 										: 'border-transparent'}"
 								>
-									{#if capture.screenshot_url}
+									{#if capture.image_url}
 										<img
-											src={cfImageUrl(capture.screenshot_url, 'thumbnail')}
+											src={cfImageUrl(capture.image_url, 'thumbnail')}
 											alt="{capture.shader_name} thumbnail"
 											class="h-full w-full object-cover"
 										/>
@@ -185,9 +185,9 @@ const timeLabel = $derived.by(() => {
 								in:scale|local={{ duration: 350, delay: Math.min(i * 50, 400) + 250, start: 0.95 }}
 								class="group relative aspect-video overflow-hidden rounded-xl bg-card transition-transform hover:scale-[1.02]"
 							>
-								{#if capture.screenshot_url}
+								{#if capture.image_url}
 									<img
-										src={cfImageUrl(capture.screenshot_url, 'card')}
+										src={cfImageUrl(capture.image_url, 'card')}
 										alt="{capture.shader_name} render"
 										class="h-full w-full object-cover"
 									/>

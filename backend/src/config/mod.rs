@@ -17,7 +17,7 @@ pub struct Config {
     #[serde(default = "default_cors_origins")]
     pub cors_origins: Vec<String>,
 
-    /// R2/S3 configuration for screenshot storage
+    /// R2/S3 configuration for capture image storage
     #[serde(default)]
     pub r2: R2Config,
 

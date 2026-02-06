@@ -3,10 +3,10 @@
   "title": "ShaderMetadata",
   "type": "object",
   "properties": {
-    "id": {
+    "filename": {
       "type": "string"
     },
-    "packFile": {
+    "id": {
       "type": "string"
     },
     "profile": {
@@ -20,7 +20,7 @@
     }
   },
   "required": [
-    "packFile",
+    "filename",
     "id",
     "version"
   ]

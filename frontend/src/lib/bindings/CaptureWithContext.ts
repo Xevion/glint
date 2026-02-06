@@ -3,4 +3,4 @@
 /**
  * Capture with denormalized shader/version info for API responses
  */
-export type CaptureWithContext = { id: string, scene_id: string, shader_slug: string, shader_name: string, shader_version: string, profile: string | null, screenshot_path: string | null, screenshot_url: string | null, captured_at: string | null, resolution_width: number | null, resolution_height: number | null, run_id: string | null, run_status: string | null, shader_author: string | null, };
+export type CaptureWithContext = { id: string, scene_id: string, shader_slug: string, shader_name: string, shader_version: string, profile: string | null, image_path: string | null, image_url: string | null, captured_at: string | null, resolution_width: number | null, resolution_height: number | null, run_id: string | null, run_status: string | null, shader_author: string | null, };

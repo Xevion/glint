@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "SceneInfo",
-  "description": "Scene information for a job",
+  "description": "Scene information for a capture run",
   "type": "object",
   "properties": {
     "definition_json": {

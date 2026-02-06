@@ -1,11 +1,11 @@
 package com.xevion.glint.api
 
 import com.xevion.glint.Loggers
+import com.xevion.glint.capture.Camera
+import com.xevion.glint.capture.Position
 import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.scene.Weather
-import com.xevion.glint.screenshot.Camera
-import com.xevion.glint.screenshot.Position
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import kotlin.math.abs

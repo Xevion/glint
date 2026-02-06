@@ -1,4 +1,4 @@
-package com.xevion.glint.screenshot
+package com.xevion.glint.capture
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -14,10 +14,10 @@ data class CaptureSessionData(
     val sessionDir: String,
     val startedAt: String,
     val completedAt: String,
-    val totalScreenshots: Int,
-    val shaderPacks: List<String>,
+    val totalCaptures: Int,
+    val shaders: List<String>,
     val minecraft: MinecraftInfo,
-    val screenshots: List<ScreenshotEntry>,
+    val captures: List<CaptureEntry>,
 )
 
 @Serializable
@@ -43,10 +43,10 @@ data class Camera(
 )
 
 /**
- * Metadata for a single screenshot within a session.
+ * Metadata for a single capture within a session.
  */
 @Serializable
-data class ScreenshotEntry(
+data class CaptureEntry(
     val file: String,
     val timestamp: String,
     val shader: ShaderMetadata?,
@@ -55,7 +55,7 @@ data class ScreenshotEntry(
 
 @Serializable
 data class ShaderMetadata(
-    val packFile: String,
+    val filename: String,
     val id: String,
     val version: String,
     val profile: String? = null,

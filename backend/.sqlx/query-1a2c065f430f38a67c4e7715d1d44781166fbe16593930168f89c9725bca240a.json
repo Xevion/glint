@@ -25,12 +25,12 @@
       },
       {
         "ordinal": 4,
-        "name": "screenshot_url",
+        "name": "image_url",
         "type_info": "Text"
       },
       {
         "ordinal": 5,
-        "name": "screenshot_path",
+        "name": "image_path",
         "type_info": "Text"
       },
       {

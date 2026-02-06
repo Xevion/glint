@@ -58,7 +58,7 @@ function setFilter(key: string, value: string) {
 }
 
 const columns = [
-	{ id: 'preview', key: 'screenshot_url', name: 'Preview' },
+	{ id: 'preview', key: 'image_url', name: 'Preview' },
 	{ id: 'shader', key: 'shader_name', name: 'Shader' },
 	{ id: 'scene_id', key: 'scene_id', name: 'Scene' },
 	{ id: 'profile', key: 'profile', name: 'Profile' },
@@ -166,7 +166,7 @@ async function confirmDelete() {
 				{#if columnId === 'preview'}
 					{#if value}
 						<img src={cfImageUrl(value as string, 'thumbnail')} alt="Capture preview" class="h-12 w-20 rounded object-cover" />
-					{:else if row.screenshot_path}
+					{:else if row.image_path}
 						<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">No URL</div>
 					{:else}
 						<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">N/A</div>
@@ -238,10 +238,10 @@ async function confirmDelete() {
 >
 	{#if selected}
 		<dl class="space-y-4">
-			{#if selected.screenshot_url}
+			{#if selected.image_url}
 				<div>
 					<img
-						src={cfImageUrl(selected.screenshot_url, 'hero')}
+						src={cfImageUrl(selected.image_url, 'hero')}
 						alt="Capture"
 						class="w-full rounded-lg border"
 					/>

@@ -29,7 +29,7 @@ export const load: PageLoad = async ({ fetch, url }) => {
 
 	return sceneResult.match({
 		Ok: (data) => {
-			const captures = (data[0]?.captures ?? []).filter((c) => c.screenshot_url);
+			const captures = (data[0]?.captures ?? []).filter((c) => c.image_url);
 			return {
 				scenes,
 				captures,

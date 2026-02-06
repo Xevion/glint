@@ -163,9 +163,9 @@ onDestroy(() => {
 				<div class="space-y-2">
 					{#each recentCaptures as capture (capture.id)}
 						<div class="flex items-center gap-3 rounded border p-2 text-sm">
-							{#if capture.screenshot_url}
+							{#if capture.image_url}
 								<img
-									src={capture.screenshot_url}
+									src={capture.image_url}
 									alt="Capture"
 									class="h-10 w-16 rounded object-cover"
 								/>

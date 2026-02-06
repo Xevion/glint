@@ -14,7 +14,7 @@ import kotlin.time.Duration.Companion.seconds
  * Drives the autonomous capture loop: fetch work → create run → capture → upload → repeat.
  *
  * Asset preparation is delegated to [AssetPreparer] (runs off the tick thread).
- * Screenshot uploads are managed by [RunUploader] (thread-safe, per-run lifecycle).
+ * Capture uploads are managed by [RunUploader] (thread-safe, per-run lifecycle).
  */
 class AutonomousRunner(
     private val apiUrl: String,
@@ -229,8 +229,8 @@ class AutonomousRunner(
                 val shaderVersionId = group.shaderVersionId
                 val started =
                     SessionRegistry.startOrchestration(result.spec) { orchestrator ->
-                        orchestrator.onScreenshotCaptured = { event ->
-                            uploader.handleScreenshot(shaderVersionId, event)
+                        orchestrator.onCaptureTaken = { event ->
+                            uploader.handleCapture(shaderVersionId, event)
                         }
                     }
                 if (started) {

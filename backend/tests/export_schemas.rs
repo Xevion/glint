@@ -23,15 +23,13 @@ fn export_all_schemas() {
     write_schema::<WorldInfo>("WorldInfo");
     write_schema::<PrepareUploadRequest>("PrepareUploadRequest");
     write_schema::<PrepareUploadResponse>("PrepareUploadResponse");
-    write_schema::<CompleteJobRequest>("CompleteJobRequest");
     write_schema::<CaptureRecord>("CaptureRecord");
-    write_schema::<FailJobRequest>("FailJobRequest");
     write_schema::<OrchestrationManifest>("OrchestrationManifest");
     write_schema::<OrchestrationInfo>("OrchestrationInfo");
     write_schema::<OrchestrationStatus>("OrchestrationStatus");
     write_schema::<CaptureSessionData>("CaptureSessionData");
     write_schema::<MinecraftInfo>("MinecraftInfo");
-    write_schema::<ScreenshotEntry>("ScreenshotEntry");
+    write_schema::<CaptureEntry>("CaptureEntry");
     write_schema::<ShaderMetadata>("ShaderMetadata");
     write_schema::<Resolution>("Resolution");
     write_schema::<Position>("Position");

@@ -1,20 +1,21 @@
 package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
+import com.xevion.glint.capture.CaptureEntry
 import com.xevion.glint.capture.CaptureSession
+import com.xevion.glint.capture.CaptureSessionData
 import com.xevion.glint.capture.CaptureStateManager
 import com.xevion.glint.io.SessionDirectoryManager
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.SceneManager
-import com.xevion.glint.screenshot.CaptureSessionData
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.time.Instant
 
-/** Event fired when a single screenshot is captured during orchestration. */
-data class ScreenshotCapturedEvent(
-    val entry: com.xevion.glint.screenshot.ScreenshotEntry,
+/** Event fired when a single capture is taken during orchestration. */
+data class CaptureTakenEvent(
+    val entry: CaptureEntry,
     val fileBytes: ByteArray,
     val sceneId: String,
 )
@@ -30,8 +31,8 @@ class Orchestrator {
     private val log = Loggers.Orchestration.get()
     private val worldLoader = WorldLoader()
 
-    /** Called on main thread after each screenshot is captured, with file bytes read eagerly. */
-    var onScreenshotCaptured: ((ScreenshotCapturedEvent) -> Unit)? = null
+    /** Called on main thread after each capture is taken, with file bytes read eagerly. */
+    var onCaptureTaken: ((CaptureTakenEvent) -> Unit)? = null
 
     private var state: State = State.Idle
     private var ticksInState: Int = 0
@@ -204,14 +205,14 @@ class Orchestrator {
                     outputDir = worldDir,
                     worldName = pair.worldFolder,
                 ).also { session ->
-                    session.onScreenshotTaken = { entry, file ->
+                    session.onCaptureTaken = { entry, file ->
                         if (file.exists()) {
                             val bytes = file.readBytes()
-                            onScreenshotCaptured?.invoke(
-                                ScreenshotCapturedEvent(entry, bytes, pair.sceneId),
+                            onCaptureTaken?.invoke(
+                                CaptureTakenEvent(entry, bytes, pair.sceneId),
                             )
                         } else {
-                            log.warn("Screenshot file not found, skipping upload") {
+                            log.warn("Capture file not found, skipping upload") {
                                 "path" to file.absolutePath
                                 "scene_id" to pair.sceneId
                             }
@@ -246,29 +247,29 @@ class Orchestrator {
         val session = captureSession ?: return
         val sessionData = session.getSessionData()
         if (sessionData != null) {
-            if (sessionData.screenshots.isNotEmpty()) {
+            if (sessionData.captures.isNotEmpty()) {
                 sessionDataList.add(sessionData)
             } else {
-                log.warn("Session produced no screenshots") { "scene_id" to pair.sceneId }
+                log.warn("Session produced no captures") { "scene_id" to pair.sceneId }
             }
         } else {
             log.warn("No session data returned") { "scene_id" to pair.sceneId }
         }
 
-        renameScreenshotsDirectory(pair, currentSessionDir)
+        renameCapturesDirectory(pair, currentSessionDir)
         captureSession = null
     }
 
-    private fun renameScreenshotsDirectory(
+    private fun renameCapturesDirectory(
         pair: WorldSceneEntry,
         currentSessionDir: File,
     ) {
         val worldDir = File(currentSessionDir, pair.worldFolder)
-        val screenshotsDir = File(worldDir, "screenshots")
+        val capturesDir = File(worldDir, "screenshots")
         val sceneDir = File(worldDir, pair.sceneId)
 
-        if (!screenshotsDir.exists()) {
-            log.warn("Screenshots directory not found") { "path" to screenshotsDir.absolutePath }
+        if (!capturesDir.exists()) {
+            log.warn("Captures directory not found") { "path" to capturesDir.absolutePath }
             return
         }
 
@@ -277,9 +278,9 @@ class Orchestrator {
             sceneDir.deleteRecursively()
         }
 
-        if (!screenshotsDir.renameTo(sceneDir)) {
-            log.error("Failed to rename screenshots folder") {
-                "from" to screenshotsDir.absolutePath
+        if (!capturesDir.renameTo(sceneDir)) {
+            log.error("Failed to rename captures directory") {
+                "from" to capturesDir.absolutePath
                 "to" to sceneDir.absolutePath
             }
         }

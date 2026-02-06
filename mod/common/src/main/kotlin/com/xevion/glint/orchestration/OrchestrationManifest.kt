@@ -1,6 +1,6 @@
 package com.xevion.glint.orchestration
 
-import com.xevion.glint.screenshot.CaptureSessionData
+import com.xevion.glint.capture.CaptureSessionData
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
