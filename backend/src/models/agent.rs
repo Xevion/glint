@@ -103,6 +103,21 @@ pub struct FailJobRequest {
     pub error_message: String,
 }
 
+/// Request to force-create a job for testing.
+///
+/// Selectors use a compact syntax:
+/// - `"+"` or `"1+"` — 1 random choice (default if omitted)
+/// - `"*"` — all available
+/// - `"3+"` — 3 random choices
+/// - `"some-slug"` — specific item by slug
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ForceJobRequest {
+    /// Scene selector (default: "+" = 1 random)
+    pub scenes: Option<String>,
+    /// Shader selector (default: "+" = 1 random)
+    pub shaders: Option<String>,
+}
+
 // Orchestration Manifest Types (matches mod output)
 
 /// The manifest.json output by the Minecraft mod

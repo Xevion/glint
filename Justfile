@@ -79,8 +79,8 @@ smoke platform="fabric":
     bun ./scripts/smoke.ts {{platform}}
 
 # Run autonomous shader capture orchestration
-orchestrate platform="fabric":
-    cd mod && GLINT_AUTONOMOUS=true ./gradlew :{{platform}}:runClient
+orchestrate *flags:
+    bun scripts/orchestrate.ts {{flags}}
 
 # Run any command in mod directory (e.g., `just mod ./gradlew clean`)
 mod *args:

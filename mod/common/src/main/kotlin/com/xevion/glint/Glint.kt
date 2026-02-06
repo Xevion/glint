@@ -24,6 +24,13 @@ object Glint {
     var apiToken: String = ""
         private set
 
+    /** Force mode selectors from GLINT_FORCE_SCENES / GLINT_FORCE_SHADERS env vars. */
+    var forceScenes: String? = null
+        private set
+    var forceShaders: String? = null
+        private set
+    val isForceMode: Boolean get() = forceScenes != null || forceShaders != null
+
     var autonomousRunner: AutonomousRunner? = null
 
     fun init() {
@@ -36,8 +43,26 @@ object Glint {
             LOGGER.info("Autonomous mode enabled - will auto-start orchestration on title screen")
             apiUrl = System.getenv("GLINT_API_URL") ?: "http://localhost:8080"
             apiToken = System.getenv("GLINT_API_TOKEN") ?: ""
+
+            // Read force mode selectors
+            forceScenes = System.getenv("GLINT_FORCE_SCENES")
+            forceShaders = System.getenv("GLINT_FORCE_SHADERS")
+            if (isForceMode) {
+                LOGGER.info("Force mode: scenes={}, shaders={}", forceScenes ?: "+", forceShaders ?: "+")
+            }
+
+            // Fall back to saved config token if env var is empty
             if (apiToken.isBlank()) {
-                LOGGER.error("GLINT_API_TOKEN is required in autonomous mode")
+                val config = ApiConfig.load()
+                if (config.hasValidToken()) {
+                    LOGGER.info("Using saved access token from config")
+                    apiToken = config.accessToken
+                    if (config.apiUrl.isNotBlank()) {
+                        apiUrl = config.apiUrl
+                    }
+                } else {
+                    LOGGER.error("GLINT_API_TOKEN is required in autonomous mode (env or config)")
+                }
             }
         }
 

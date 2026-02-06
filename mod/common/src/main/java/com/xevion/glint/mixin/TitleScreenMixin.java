@@ -42,10 +42,14 @@ public abstract class TitleScreenMixin extends Screen {
                 Glint.INSTANCE
                         .getLOGGER()
                         .error("Cannot start autonomous mode: GLINT_API_TOKEN not set");
+                mc.stop();
                 return;
             }
 
-            AutonomousRunner runner = new AutonomousRunner(apiUrl, apiToken);
+            String forceScenes = Glint.INSTANCE.getForceScenes();
+            String forceShaders = Glint.INSTANCE.getForceShaders();
+            AutonomousRunner runner =
+                    new AutonomousRunner(apiUrl, apiToken, forceScenes, forceShaders);
             Glint.INSTANCE.setAutonomousRunner(runner);
             runner.start();
             return;

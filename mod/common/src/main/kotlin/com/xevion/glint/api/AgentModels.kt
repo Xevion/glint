@@ -82,3 +82,10 @@ data class CaptureRecord(
 data class FailJobRequest(
     @SerialName("error_message") val errorMessage: String,
 )
+
+/** Request to force-create a job for testing. */
+@Serializable
+data class ForceJobRequest(
+    val scenes: String? = null,
+    val shaders: String? = null,
+)

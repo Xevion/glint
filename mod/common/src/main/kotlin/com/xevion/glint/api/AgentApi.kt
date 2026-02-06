@@ -63,6 +63,47 @@ object AgentApi {
     }
 
     /**
+     * Force-creates a job using selector syntax.
+     * Returns a fully claimed JobPayload ready for execution.
+     */
+    fun forceJob(
+        apiUrl: String,
+        token: String,
+        scenes: String?,
+        shaders: String?,
+    ): Result<JobPayload> {
+        val url = "$apiUrl/api/agent/jobs/force"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setBearerAuth(token)
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 10000
+            connection.readTimeout = 30000
+
+            val requestBody = JSON.encodeToString(ForceJobRequest.serializer(), ForceJobRequest(scenes, shaders))
+            connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                200 -> {
+                    val body = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    val payload = JSON.decodeFromString<JobPayload>(body)
+                    Result.success(payload)
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /**
      * Sends a heartbeat for an active job.
      */
     fun heartbeat(

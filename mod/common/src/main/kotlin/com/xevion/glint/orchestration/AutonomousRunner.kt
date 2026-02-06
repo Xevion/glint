@@ -11,6 +11,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import net.minecraft.client.Minecraft
 import java.io.File
@@ -25,9 +26,13 @@ import java.util.concurrent.CompletableFuture
 class AutonomousRunner(
     private val apiUrl: String,
     private val apiToken: String,
+    private val forceScenes: String? = null,
+    private val forceShaders: String? = null,
 ) {
     private val log = Loggers.Orchestration.get()
     private val json = Json { ignoreUnknownKeys = true }
+
+    private val isForceMode: Boolean = forceScenes != null || forceShaders != null
 
     private var state: State = State.ClaimingJob
     private var currentJob: JobPayload? = null
@@ -78,8 +83,16 @@ class AutonomousRunner(
     private fun claimNextJob() {
         state = State.ClaimingJob
         pendingFuture =
-            CompletableFuture.supplyAsync {
-                AgentApi.claimJob(apiUrl, apiToken)
+            if (isForceMode) {
+                CompletableFuture.supplyAsync {
+                    AgentApi
+                        .forceJob(apiUrl, apiToken, forceScenes, forceShaders)
+                        .map { it as JobPayload? }
+                }
+            } else {
+                CompletableFuture.supplyAsync {
+                    AgentApi.claimJob(apiUrl, apiToken)
+                }
             }
     }
 
@@ -213,7 +226,13 @@ class AutonomousRunner(
             }
 
         currentJob = null
-        claimNextJob()
+
+        if (isForceMode) {
+            log.info("Force mode: single job complete, shutting down")
+            shutdown()
+        } else {
+            claimNextJob()
+        }
     }
 
     private fun uploadAndComplete(job: JobPayload): Result<Unit> {
@@ -222,20 +241,25 @@ class AutonomousRunner(
         val manifestFile = File(outputDir, "manifest.json")
 
         if (!manifestFile.exists()) {
-            // Try partial manifest
             val partialFile = File(outputDir, "manifest_partial.json")
-            if (partialFile.exists()) {
-                log.warn("Only partial manifest found") { "job_id" to job.id }
-                return AgentApi.failJob(apiUrl, apiToken, job.id, "Capture only partially completed")
-            }
-            return AgentApi.failJob(apiUrl, apiToken, job.id, "No manifest produced")
+            val message =
+                if (partialFile.exists()) {
+                    log.warn("Only partial manifest found") { "job_id" to job.id }
+                    "Capture only partially completed"
+                } else {
+                    "No manifest produced"
+                }
+            AgentApi.failJob(apiUrl, apiToken, job.id, message)
+            return Result.failure(RuntimeException(message))
         }
 
         val manifest =
             try {
                 json.decodeFromString<OrchestrationManifest>(manifestFile.readText())
             } catch (e: Exception) {
-                return AgentApi.failJob(apiUrl, apiToken, job.id, "Failed to parse manifest: ${e.message}")
+                val message = "Failed to parse manifest: ${e.message}"
+                AgentApi.failJob(apiUrl, apiToken, job.id, message)
+                return Result.failure(RuntimeException(message))
             }
 
         // Collect screenshot files and build capture records
@@ -266,7 +290,8 @@ class AutonomousRunner(
         }
 
         if (screenshotFiles.isEmpty()) {
-            return AgentApi.failJob(apiUrl, apiToken, job.id, "No screenshot files found")
+            AgentApi.failJob(apiUrl, apiToken, job.id, "No screenshot files found")
+            return Result.failure(RuntimeException("No screenshot files found"))
         }
 
         // Request pre-signed URLs
@@ -311,7 +336,17 @@ class AutonomousRunner(
             val sceneElements =
                 scenes.mapNotNull { scene ->
                     try {
-                        json.parseToJsonElement(scene.definitionJson)
+                        val parsed = json.parseToJsonElement(scene.definitionJson)
+                        // Override id with backend UUID to avoid collisions with pre-existing collections
+                        buildJsonObject {
+                            for ((key, value) in parsed.jsonObject) {
+                                if (key == "id") {
+                                    put("id", scene.id)
+                                } else {
+                                    put(key, value)
+                                }
+                            }
+                        }
                     } catch (e: Exception) {
                         log.warn("Failed to parse scene definition") {
                             "scene_id" to scene.id
@@ -322,10 +357,11 @@ class AutonomousRunner(
                 }
 
             val collection =
-                kotlinx.serialization.json.buildJsonObject {
+                buildJsonObject {
                     put("world", world.slug)
+                    put("folder", world.slug)
                     put("version", "1.21.4")
-                    put("scenes", kotlinx.serialization.json.JsonArray(sceneElements))
+                    put("scenes", JsonArray(sceneElements))
                 }
 
             collectionFile.writeText(
@@ -348,21 +384,8 @@ class AutonomousRunner(
         job: JobPayload,
         shaderFilename: String?,
     ): CaptureSpec? {
-        // Discover all scene IDs from the scene collections we just wrote
-        val allSceneIds = mutableListOf<String>()
-        for (world in job.worlds) {
-            val collections = SceneManager.discoverAllCollections()
-            for ((_, collection) in collections) {
-                if (collection.world != world.slug) continue
-                for (scene in collection.scenes) {
-                    allSceneIds.add(scene.id)
-                    for (variant in scene.variants) {
-                        allSceneIds.add(variant.id)
-                    }
-                }
-            }
-        }
-
+        // Use scene UUIDs from the job payload directly (written to collections in writeSceneDefinitions)
+        val allSceneIds = job.scenes.map { it.id }
         if (allSceneIds.isEmpty()) return null
 
         // Build shader list

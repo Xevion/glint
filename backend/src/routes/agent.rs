@@ -5,22 +5,25 @@ use axum::{
     http::StatusCode,
     routing::{get, post},
 };
-use tracing::warn;
+use rand::seq::SliceRandom;
+use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::models::CreateJobRequest;
 use crate::models::agent::{
-    CompleteJobRequest, FailJobRequest, JobPayload, PrepareUploadRequest, PrepareUploadResponse,
-    SceneInfo, ShaderInfo, WorldInfo,
+    CompleteJobRequest, FailJobRequest, ForceJobRequest, JobPayload, PrepareUploadRequest,
+    PrepareUploadResponse, SceneInfo, ShaderInfo, WorldInfo,
 };
 
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
-use crate::repo::{CaptureRepo, JobRepo, ShaderVersionRepo};
+use crate::repo::{CaptureRepo, JobRepo, SceneRepo, ShaderRepo, ShaderVersionRepo, WorldRepo};
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/jobs/next", get(claim_next_job))
+        .route("/jobs/force", post(force_job))
         .route("/jobs/{id}/heartbeat", post(heartbeat))
         .route("/jobs/{id}/prepare", post(prepare_upload))
         .route("/jobs/{id}/complete", post(complete_job))
@@ -126,6 +129,176 @@ async fn claim_next_job(State(state): State<AppState>) -> AppResult<Json<Option<
     Ok(Json(Some(payload)))
 }
 
+/// POST /api/agent/jobs/force
+/// Force-creates a job from available resources using selector syntax.
+/// Used by `just orchestrate --force` for testing the capture pipeline.
+async fn force_job(
+    State(state): State<AppState>,
+    Json(request): Json<ForceJobRequest>,
+) -> AppResult<Json<JobPayload>> {
+    let db = state.db();
+    let scene_selector = request.scenes.as_deref().unwrap_or("+");
+    let shader_selector = request.shaders.as_deref().unwrap_or("+");
+
+    // Resolve scenes
+    let all_scenes = SceneRepo::list_active(db).await?;
+    if all_scenes.is_empty() {
+        return Err(AppError::BadRequest("No active scenes in database".into()));
+    }
+    let selected_scenes = apply_selector(&all_scenes, scene_selector, |s| &s.slug)?;
+
+    // Resolve shader — pick a shader, then its latest version
+    let all_shaders = ShaderRepo::list(db).await?;
+    if all_shaders.is_empty() {
+        return Err(AppError::BadRequest("No shaders in database".into()));
+    }
+    let selected_shaders = apply_selector(&all_shaders, shader_selector, |s| &s.slug)?;
+
+    // For now, use the first selected shader and its latest version
+    let shader = &selected_shaders[0];
+    let versions = ShaderVersionRepo::list_by_shader(db, &shader.id).await?;
+    let version = versions
+        .first()
+        .ok_or_else(|| AppError::BadRequest(format!("Shader '{}' has no versions", shader.slug)))?;
+
+    // Create a real job in the DB
+    let job_id = Uuid::new_v4().to_string();
+    let scene_ids: Vec<String> = selected_scenes.iter().map(|s| s.id.clone()).collect();
+
+    let create_req = CreateJobRequest {
+        shader_version_id: version.id.clone(),
+        scene_ids: scene_ids.clone(),
+        profiles: None,
+        priority: Some(100), // High priority for forced jobs
+    };
+    JobRepo::create(db, &job_id, &create_req).await?;
+
+    // Immediately claim the job
+    let agent_id = "force-orchestrate";
+    let claimed = sqlx::query!(
+        r#"
+        UPDATE jobs
+        SET status = 'claimed', agent_id = $1, claimed_at = now(), last_heartbeat = now(), attempts = attempts + 1
+        WHERE id = $2
+        "#,
+        agent_id,
+        job_id
+    )
+    .execute(db)
+    .await
+    .context("failed to claim forced job")?;
+
+    if claimed.rows_affected() == 0 {
+        return Err(AppError::Internal(anyhow::anyhow!(
+            "Failed to claim just-created job"
+        )));
+    }
+
+    // Build the full payload (same as claim_next_job)
+    let shader_info = ShaderInfo {
+        id: shader.id.clone(),
+        slug: shader.slug.clone(),
+        name: shader.name.clone(),
+        version_id: version.id.clone(),
+        version: version.version.clone(),
+        download_url: version.download_url.clone(),
+        file_hash: version.file_hash.clone(),
+    };
+
+    let mut scenes = Vec::new();
+    let mut worlds_map = std::collections::HashMap::new();
+
+    for scene in &selected_scenes {
+        let world = WorldRepo::find_by_id(db, &scene.world_id)
+            .await?
+            .ok_or_else(|| {
+                AppError::Internal(anyhow::anyhow!(
+                    "World '{}' not found for scene '{}'",
+                    scene.world_id,
+                    scene.slug
+                ))
+            })?;
+
+        worlds_map.entry(world.id.clone()).or_insert(WorldInfo {
+            id: world.id.clone(),
+            slug: world.slug.clone(),
+            name: world.name.clone(),
+            file_url: world.file_url.clone(),
+            file_hash: world.file_hash.clone(),
+            size_bytes: world.size_bytes,
+        });
+
+        scenes.push(SceneInfo {
+            id: scene.id.clone(),
+            slug: scene.slug.clone(),
+            name: scene.name.clone(),
+            world_id: scene.world_id.clone(),
+            definition_json: scene.build_definition_json(),
+        });
+    }
+
+    let payload = JobPayload {
+        id: job_id.clone(),
+        shader: shader_info,
+        scenes,
+        worlds: worlds_map.into_values().collect(),
+        profiles: Vec::new(),
+        priority: 100,
+    };
+
+    info!(
+        job_id = %job_id,
+        shader = %shader.slug,
+        scene_count = selected_scenes.len(),
+        "Force-created job"
+    );
+
+    Ok(Json(payload))
+}
+
+/// Parses a selector string and applies it to a list of items.
+///
+/// Syntax: `"+"` (1 random), `"*"` (all), `"3+"` (3 random), `"slug"` (by slug)
+fn apply_selector<'a, T>(
+    items: &'a [T],
+    selector: &str,
+    get_slug: impl Fn(&T) -> &str,
+) -> AppResult<Vec<&'a T>> {
+    let selector = selector.trim();
+
+    // All
+    if selector == "*" || selector == "!" {
+        return Ok(items.iter().collect());
+    }
+
+    // Random N: "+" or "N+"
+    if selector == "+" || selector.ends_with('+') {
+        let count = if selector == "+" {
+            1
+        } else {
+            selector
+                .trim_end_matches('+')
+                .parse::<usize>()
+                .map_err(|_| AppError::BadRequest(format!("Invalid selector: '{selector}'")))?
+        };
+
+        let count = count.min(items.len());
+        let mut indices: Vec<usize> = (0..items.len()).collect();
+        indices.shuffle(&mut rand::rng());
+        indices.truncate(count);
+        return Ok(indices.into_iter().map(|i| &items[i]).collect());
+    }
+
+    // Specific slug
+    let found = items.iter().find(|item| get_slug(item) == selector);
+    match found {
+        Some(item) => Ok(vec![item]),
+        None => Err(AppError::NotFound(format!(
+            "No item with slug '{selector}'"
+        ))),
+    }
+}
+
 /// POST /api/agent/jobs/{id}/heartbeat
 /// Updates last_heartbeat timestamp to keep job alive
 async fn heartbeat(
@@ -148,9 +321,9 @@ async fn prepare_upload(
     Path(job_id): Path<String>,
     Json(request): Json<PrepareUploadRequest>,
 ) -> AppResult<Json<PrepareUploadResponse>> {
-    // Verify job exists and is running
-    if !JobRepo::is_running(state.db(), &job_id).await? {
-        return Err(AppError::NotFound("Job not found or not running".into()));
+    // Verify job exists and is active (claimed or running)
+    if !JobRepo::is_active(state.db(), &job_id).await? {
+        return Err(AppError::NotFound("Job not found or not active".into()));
     }
 
     let mut urls = std::collections::HashMap::new();
@@ -202,14 +375,17 @@ async fn complete_job(
     Path(job_id): Path<String>,
     Json(request): Json<CompleteJobRequest>,
 ) -> AppResult<StatusCode> {
-    // Get shader_version_id for running job
-    let shader_version_id = JobRepo::get_running_shader_version_id(state.db(), &job_id)
+    // Get shader_version_id for active job (claimed or running)
+    let shader_version_id = JobRepo::get_active_shader_version_id(state.db(), &job_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Job not found or not running".into()))?;
+        .ok_or_else(|| AppError::NotFound("Job not found or not active".into()))?;
 
-    // Insert captures
+    // Insert captures with R2 public URLs
+    let r2_config = &state.config().r2;
     for capture in &request.captures {
         let capture_id = Uuid::new_v4().to_string();
+        let r2_key = format!("captures/{}/{}", job_id, capture.screenshot_path);
+        let screenshot_url = r2_config.public_url_for_key(&r2_key);
         CaptureRepo::upsert(
             state.db(),
             &capture_id,
@@ -217,6 +393,7 @@ async fn complete_job(
             &capture.scene_id,
             capture.profile.as_deref(),
             Some(&capture.screenshot_path),
+            Some(&screenshot_url),
             Some(capture.resolution_width),
             Some(capture.resolution_height),
             Some(capture.captured_at),

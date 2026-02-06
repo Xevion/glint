@@ -92,6 +92,16 @@ impl R2Config {
             .as_ref()
             .map(|id| format!("https://{}.r2.cloudflarestorage.com", id))
     }
+
+    /// Build a public URL for a given R2 object key
+    pub fn public_url_for_key(&self, key: &str) -> String {
+        if let Some(ref public_url_prefix) = self.public_url {
+            format!("{}/{}", public_url_prefix, key)
+        } else {
+            let bucket = self.bucket.as_deref().unwrap_or("glint");
+            format!("https://{}.r2.cloudflarestorage.com/{}", bucket, key)
+        }
+    }
 }
 
 fn default_host() -> String {

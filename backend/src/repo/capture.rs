@@ -128,6 +128,7 @@ impl CaptureRepo {
         scene_id: &str,
         profile: Option<&str>,
         screenshot_path: Option<&str>,
+        screenshot_url: Option<&str>,
         resolution_width: Option<i32>,
         resolution_height: Option<i32>,
         captured_at: Option<DateTime<Utc>>,
@@ -135,12 +136,13 @@ impl CaptureRepo {
         sqlx::query!(
             r#"
             INSERT INTO captures (
-                id, shader_version_id, scene_id, profile, screenshot_path,
+                id, shader_version_id, scene_id, profile, screenshot_path, screenshot_url,
                 resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, 'completed', $8, $8, $8)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, 'completed', $9, $9, $9)
             ON CONFLICT (shader_version_id, scene_id, profile)
             DO UPDATE SET
                 screenshot_path = excluded.screenshot_path,
+                screenshot_url = excluded.screenshot_url,
                 resolution_width = excluded.resolution_width,
                 resolution_height = excluded.resolution_height,
                 outdated = FALSE,
@@ -153,6 +155,7 @@ impl CaptureRepo {
             scene_id,
             profile,
             screenshot_path,
+            screenshot_url,
             resolution_width,
             resolution_height,
             captured_at

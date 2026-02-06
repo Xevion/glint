@@ -179,20 +179,20 @@ impl JobRepo {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Get shader_version_id for a running job
+    /// Get shader_version_id for an active (claimed or running) job
     #[instrument(skip(db), level = "debug")]
-    pub async fn get_running_shader_version_id(
+    pub async fn get_active_shader_version_id(
         db: &DbPool,
         job_id: &str,
     ) -> AppResult<Option<String>> {
         sqlx::query_scalar!(
-            "SELECT shader_version_id FROM jobs WHERE id = $1 AND status = 'running'",
+            "SELECT shader_version_id FROM jobs WHERE id = $1 AND status IN ('claimed', 'running')",
             job_id
         )
         .fetch_optional(db)
         .await
         .context(format!(
-            "failed to get shader version id for running job '{}'",
+            "failed to get shader version id for active job '{}'",
             job_id
         ))
         .map_err(Into::into)
@@ -377,16 +377,16 @@ impl JobRepo {
         })
     }
 
-    /// Check if job exists and is in running state
+    /// Check if job exists and is active (claimed or running)
     #[instrument(skip(db), level = "debug")]
-    pub async fn is_running(db: &DbPool, job_id: &str) -> AppResult<bool> {
+    pub async fn is_active(db: &DbPool, job_id: &str) -> AppResult<bool> {
         let result = sqlx::query_scalar!(
-            "SELECT id FROM jobs WHERE id = $1 AND status = 'running'",
+            "SELECT id FROM jobs WHERE id = $1 AND status IN ('claimed', 'running')",
             job_id
         )
         .fetch_optional(db)
         .await
-        .context(format!("failed to check if job '{}' is running", job_id))?;
+        .context(format!("failed to check if job '{}' is active", job_id))?;
 
         Ok(result.is_some())
     }
