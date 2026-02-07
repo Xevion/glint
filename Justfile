@@ -14,6 +14,7 @@ alias f := format
 alias cm := check-mod
 alias dm := dev-mod
 alias sm := smoke
+alias lf := loom-fix
 
 # === Default ===
 
@@ -81,6 +82,13 @@ smoke platform="fabric":
 # Run autonomous shader capture orchestration
 orchestrate *flags:
     bun scripts/orchestrate.ts {{flags}}
+
+# Fix Loom remapping cache corruption (stale intermediary names in mixin annotations)
+loom-fix:
+    rm -rf mod/.gradle/loom-cache/remapped_mods
+    cd mod && ./gradlew --stop
+    cd mod && ./gradlew :fabric:configureClientLaunch --refresh-dependencies
+    @echo "✓ Loom remapped_mods cache rebuilt"
 
 # Run any command in mod directory (e.g., `just mod ./gradlew clean`)
 mod *args:
