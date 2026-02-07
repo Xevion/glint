@@ -1,11 +1,9 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
 import type { CaptureWithContext, SceneWithCaptures } from '$lib/bindings';
-import { cn } from '$lib/utils';
-import { cfImageUrl } from '$lib/utils/image';
-import { decodeThumbhash } from '$lib/utils/thumbhash';
+import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import { SvelteMap } from 'svelte/reactivity';
 import { fade, fly, scale } from 'svelte/transition';
 
 interface Props {
@@ -54,23 +52,6 @@ const timeLabel = $derived.by(() => {
 	if (hours < 18) return 'Day';
 	return 'Evening';
 });
-
-// Hero image thumbhash placeholder
-const heroPlaceholderUrl = $derived(
-	selectedCapture ? decodeThumbhash(selectedCapture.thumbhash) : null
-);
-let heroLoaded = $state(false);
-
-// Reset hero loaded state when selected capture changes
-$effect(() => {
-	if (selectedCapture) {
-		heroLoaded = false;
-	}
-});
-
-// Grid images loaded state
-// eslint-disable-next-line svelte/no-unnecessary-state-wrap -- SvelteSet needs $state to avoid svelte-check non_reactive_update warning
-let gridLoadedIds = $state(new SvelteSet<string>());
 </script>
 
 {#if scene}
@@ -94,27 +75,17 @@ let gridLoadedIds = $state(new SvelteSet<string>());
 				<!-- Main Preview Area -->
 				<div class="space-y-4 lg:col-span-2">
 					<!-- Main Image -->
-					<div
-						class="shadow-theme-lg relative aspect-video w-full overflow-hidden rounded-xl"
-						class:bg-muted={!heroPlaceholderUrl && !selectedCapture}
-						style:background-image={heroPlaceholderUrl ? `url(${heroPlaceholderUrl})` : undefined}
-						style:background-size="cover"
-						style:background-position="center"
-					>
+					<div class="shadow-theme-lg relative aspect-video w-full overflow-hidden rounded-xl">
 						{#if selectedCapture}
-							{@const imageSrc = cfImageUrl(selectedCapture.image_url, 'hero')}
-							{#if imageSrc}
-								<img
-									src={imageSrc}
-									alt="{scene.name} with {selectedCapture.shader_name}"
-									class={cn(
-										'h-full w-full object-cover transition-opacity duration-300',
-										heroLoaded ? 'opacity-100' : 'opacity-0'
-									)}
-									loading="lazy"
-									onload={() => (heroLoaded = true)}
-								/>
-							{/if}
+							<CaptureImage
+								src={selectedCapture.image_url}
+								thumbhash={selectedCapture.thumbhash}
+								preset="hero"
+								priority
+								alt="{scene.name} with {selectedCapture.shader_name}"
+								class="h-full w-full object-cover"
+								containerClass="h-full w-full"
+							/>
 
 							<!-- Overlay with shader info -->
 							<div
@@ -145,7 +116,7 @@ let gridLoadedIds = $state(new SvelteSet<string>());
 								</div>
 							</div>
 						{:else}
-							<div class="flex h-full items-center justify-center text-muted-foreground">
+							<div class="flex h-full items-center justify-center bg-muted text-muted-foreground">
 								<div class="text-center">
 									<ImageOff class="mx-auto mb-4 h-16 w-16" strokeWidth={1.5} />
 									<p class="text-sm">No captures available yet</p>
@@ -158,32 +129,22 @@ let gridLoadedIds = $state(new SvelteSet<string>());
 					{#if capturesByShader.length > 0}
 						<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
 							{#each capturesByShader as capture (capture.id)}
-								{@const thumbnailSrc = cfImageUrl(capture.image_url, 'thumbnail')}
-								{@const placeholderUrl = decodeThumbhash(capture.thumbhash)}
 								<button
 									type="button"
 									onclick={() => (selectedCapture = capture)}
-									class="relative aspect-video overflow-hidden rounded-lg border-2 transition-all hover:border-primary {selectedCapture?.id ===
+									class="relative overflow-hidden rounded-lg border-2 transition-all hover:border-primary {selectedCapture?.id ===
 									capture.id
 										? 'border-primary'
 										: 'border-transparent'}"
-									class:bg-muted={!placeholderUrl && !thumbnailSrc}
-									style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
-									style:background-size="cover"
-									style:background-position="center"
 								>
-									{#if thumbnailSrc}
-										<img
-											src={thumbnailSrc}
-											alt="{capture.shader_name} thumbnail"
-											class={cn(
-												'h-full w-full object-cover transition-opacity duration-300',
-												gridLoadedIds.has(capture.id) ? 'opacity-100' : 'opacity-0'
-											)}
-											loading="lazy"
-											onload={() => gridLoadedIds.add(capture.id)}
-										/>
-									{/if}
+									<CaptureImage
+										src={capture.image_url}
+										thumbhash={capture.thumbhash}
+										preset="thumbnail"
+										alt="{capture.shader_name} thumbnail"
+										class="h-full w-full object-cover"
+										containerClass="aspect-video"
+									/>
 								</button>
 							{/each}
 						</div>
@@ -228,54 +189,41 @@ let gridLoadedIds = $state(new SvelteSet<string>());
 					<h2 class="mb-4 text-2xl font-bold text-foreground">All Shader Renders</h2>
 					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						{#each captures as capture, i (capture.id)}
-							{@const cardSrc = cfImageUrl(capture.image_url, 'card')}
-							{@const placeholderUrl = decodeThumbhash(capture.thumbhash)}
 							<button
 								type="button"
 								onclick={() => (selectedCapture = capture)}
 								in:scale|local={{ duration: 350, delay: Math.min(i * 50, 400) + 250, start: 0.95 }}
-								class="group relative aspect-video overflow-hidden rounded-xl transition-transform hover:scale-[1.02]"
-								class:bg-muted={!placeholderUrl && !cardSrc}
-								style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
-								style:background-size="cover"
-								style:background-position="center"
+								class="group relative overflow-hidden rounded-xl transition-transform hover:scale-[1.02]"
 							>
-								{#if cardSrc}
-									<img
-										src={cardSrc}
-										alt="{capture.shader_name} render"
-										class={cn(
-											'h-full w-full object-cover transition-opacity duration-300',
-											gridLoadedIds.has(capture.id) ? 'opacity-100' : 'opacity-0'
-										)}
-										loading="lazy"
-										onload={() => {
-											gridLoadedIds.add(capture.id);
-											gridLoadedIds = gridLoadedIds;
-										}}
-									/>
-									<div
-										class="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
-									>
-										<div class="absolute right-0 bottom-0 left-0 p-3">
-											<div class="mb-1 font-bold text-white">{capture.shader_name}</div>
-											<div class="flex items-center gap-2">
-												{#if capture.profile}
-													<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">
-														{capture.profile}
-													</span>
-												{/if}
-												{#if capture.shader_version}
-													<span
-														class="rounded bg-white/20 px-2 py-0.5 text-xs font-bold text-white"
-													>
-														v{capture.shader_version}
-													</span>
-												{/if}
-											</div>
+								<CaptureImage
+									src={capture.image_url}
+									thumbhash={capture.thumbhash}
+									preset="card"
+									alt="{capture.shader_name} render"
+									class="h-full w-full object-cover"
+									containerClass="aspect-video"
+								/>
+								<div
+									class="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+								>
+									<div class="absolute right-0 bottom-0 left-0 p-3">
+										<div class="mb-1 font-bold text-white">{capture.shader_name}</div>
+										<div class="flex items-center gap-2">
+											{#if capture.profile}
+												<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">
+													{capture.profile}
+												</span>
+											{/if}
+											{#if capture.shader_version}
+												<span
+													class="rounded bg-white/20 px-2 py-0.5 text-xs font-bold text-white"
+												>
+													v{capture.shader_version}
+												</span>
+											{/if}
 										</div>
 									</div>
-								{/if}
+								</div>
 							</button>
 						{/each}
 					</div>
