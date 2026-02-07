@@ -23,8 +23,9 @@ interface Props {
 let { shader, class: className }: Props = $props();
 
 let isHovered = $state(false);
-const isSelected = $derived(comparisonStore.isSelected(shader.id));
-const hasAnySelection = $derived(comparisonStore.hasSelection());
+const selectionMode = $derived(comparisonStore.selectionMode);
+const isSelected = $derived(selectionMode && comparisonStore.isSelected(shader.id));
+const hasAnySelection = $derived(selectionMode && comparisonStore.hasSelection());
 
 const modrinthUrl = $derived(getModrinthUrl(shader.modrinth_id));
 const curseforgeUrl = $derived(getCurseforgeUrl(shader.curseforge_id));
@@ -100,24 +101,26 @@ function handleCheckboxClick(e: MouseEvent) {
 			class="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent"
 		></div>
 
-		<!-- Compare checkbox - top right -->
-		<button
-			type="button"
-			data-checkbox
-			onclick={handleCheckboxClick}
-			class={cn(
-				'absolute top-3 right-3 flex h-5 w-5 cursor-pointer items-center justify-center rounded border-2 transition-all duration-200',
-				isSelected
-					? 'border-primary bg-primary'
-					: 'border-gray-400 bg-gray-900/70 backdrop-blur-sm hover:border-gray-300',
-				isSelected || isHovered || hasAnySelection ? 'opacity-100' : 'opacity-0',
-				!isSelected && hasAnySelection && !isHovered && 'opacity-60'
-			)}
-		>
-			{#if isSelected}
-				<Check class="h-3 w-3 text-primary-foreground" strokeWidth={3} />
-			{/if}
-		</button>
+		<!-- Compare checkbox - only visible in selection mode -->
+		{#if selectionMode}
+			<button
+				type="button"
+				data-checkbox
+				onclick={handleCheckboxClick}
+				class={cn(
+					'absolute top-3 right-3 flex h-5 w-5 cursor-pointer items-center justify-center rounded border-2 transition-all duration-200',
+					isSelected
+						? 'border-primary bg-primary'
+						: 'border-gray-400 bg-gray-900/70 backdrop-blur-sm hover:border-gray-300',
+					isSelected || isHovered || hasAnySelection ? 'opacity-100' : 'opacity-0',
+					!isSelected && hasAnySelection && !isHovered && 'opacity-60'
+				)}
+			>
+				{#if isSelected}
+					<Check class="h-3 w-3 text-primary-foreground" strokeWidth={3} />
+				{/if}
+			</button>
+		{/if}
 	</div>
 
 	<!-- Card Body -->

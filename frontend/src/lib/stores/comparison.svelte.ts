@@ -3,6 +3,7 @@ import type { Shader } from '$lib/bindings';
 function createComparisonStore() {
 	let leftShader = $state<Shader | null>(null);
 	let rightShader = $state<Shader | null>(null);
+	let _selectionMode = $state(false);
 
 	return {
 		get left(): Shader | null {
@@ -13,6 +14,16 @@ function createComparisonStore() {
 		},
 		get canCompare(): boolean {
 			return leftShader !== null && rightShader !== null;
+		},
+		get selectionMode(): boolean {
+			return _selectionMode;
+		},
+		set selectionMode(value: boolean) {
+			_selectionMode = value;
+			if (!value) {
+				leftShader = null;
+				rightShader = null;
+			}
 		},
 
 		isSelected(id: string): boolean {
