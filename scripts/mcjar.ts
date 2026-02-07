@@ -2,11 +2,21 @@
 
 import { spawn } from "bun";
 import * as fs from "fs/promises";
+import os from "os";
 import path from "path";
 
 type JarKind = "sources" | "merged";
 
-const SEARCH_ROOT = "mod/.gradle/loom-cache/minecraftMaven/net/minecraft";
+// Loom stores decompiled sources in the global Gradle cache, while
+// per-project remapped/injected merged JARs live under mod/.gradle/.
+// Search global first (has sources), then fall back to project-local.
+const SEARCH_ROOTS = [
+  path.join(
+    os.homedir(),
+    ".gradle/caches/fabric-loom/minecraftMaven/net/minecraft"
+  ),
+  "mod/.gradle/loom-cache/minecraftMaven/net/minecraft",
+];
 
 type Config = {
   version?: string;
@@ -107,11 +117,19 @@ async function findJar(kind: JarKind): Promise<string> {
   const glob = new Bun.Glob(`**/${pattern}`);
   const candidates: string[] = [];
 
-  for await (const match of glob.scan(SEARCH_ROOT)) {
-    const resolved = path.isAbsolute(match)
-      ? match
-      : path.join(SEARCH_ROOT, match);
-    candidates.push(resolved);
+  for (const root of SEARCH_ROOTS) {
+    try {
+      await fs.access(root);
+    } catch {
+      continue;
+    }
+    for await (const match of glob.scan(root)) {
+      const resolved = path.isAbsolute(match) ? match : path.join(root, match);
+      candidates.push(resolved);
+    }
+    // Prefer the first root that has results (global cache has more
+    // complete JARs than project-local Architectury-injected variants)
+    if (candidates.length > 0) break;
   }
 
   const filtered = config.version
