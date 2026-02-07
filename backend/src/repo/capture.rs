@@ -128,14 +128,39 @@ impl CaptureRepo {
         Ok(captures)
     }
 
-    /// Fetch captures with shader/version context for a scene (for scene detail page)
+    /// Fetch the latest capture per shader for a scene (for scene detail page)
     #[instrument(skip(executor), level = "debug")]
     pub async fn list_with_context_for_scene(
         executor: impl sqlx::PgExecutor<'_>,
         scene_id: &str,
     ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = capture_ctx_query!(
-            " WHERE c.scene_id = $1 AND c.status = 'completed' ORDER BY s.name, sv.created_at DESC",
+        let captures = sqlx::query_as!(
+            CaptureWithContext,
+            r#"
+            SELECT DISTINCT ON (sv.shader_id)
+                c.id,
+                c.scene_id,
+                s.slug as shader_slug,
+                s.name as shader_name,
+                sv.version as shader_version,
+                c.profile,
+                c.image_path,
+                c.image_url,
+                c.thumbhash,
+                c.captured_at,
+                c.resolution_width,
+                c.resolution_height,
+                cri.run_id as "run_id?: String",
+                cr.status as "run_status?: String",
+                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author
+            FROM captures c
+            JOIN shader_versions sv ON c.shader_version_id = sv.id
+            JOIN shaders s ON sv.shader_id = s.id
+            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
+            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
+            WHERE c.scene_id = $1 AND c.status = 'completed'
+            ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST
+            "#,
             scene_id
         )
         .fetch_all(executor)

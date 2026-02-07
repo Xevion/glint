@@ -215,7 +215,7 @@ const uniqueSceneCaptures = $derived.by(() => {
 			<!-- Captures Grid -->
 			{#if captures.length > 0}
 				<div in:fade|local={{ duration: 300, delay: 200 }} class="mb-8">
-					<h2 class="mb-4 text-2xl font-bold text-foreground">All Captures</h2>
+					<h2 class="mb-4 text-2xl font-bold text-foreground">Captures</h2>
 					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						{#each captures as capture, i (capture.id)}
 							<button

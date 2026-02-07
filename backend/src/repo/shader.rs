@@ -316,7 +316,7 @@ impl ShaderRepo {
         let captures = sqlx::query_as!(
             CaptureWithContext,
             r#"
-            SELECT
+            SELECT DISTINCT ON (c.scene_id)
                 c.id,
                 c.scene_id,
                 s.slug as shader_slug,
@@ -338,7 +338,7 @@ impl ShaderRepo {
             LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
             LEFT JOIN capture_runs cr ON cri.run_id = cr.id
             WHERE s.id = $1 AND c.status = 'completed'
-            ORDER BY sv.created_at DESC
+            ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
             "#,
             shader_id
         )
