@@ -6,7 +6,9 @@ import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneManager
 import net.minecraft.client.Minecraft
 import java.io.File
+import java.nio.file.Path
 import java.time.Instant
+import java.util.concurrent.CompletableFuture
 
 /**
  * Manages a multi-shader capture session for a single scene.
@@ -42,6 +44,7 @@ class CaptureSession(
     private var originalState: CaptureStateSnapshot? = null
 
     private var sessionData: CaptureSessionData? = null
+    private var pendingCapture: CompletableFuture<Path>? = null
 
     /** Called on Util.ioPool() thread after the capture file is written to disk. */
     var onCaptureTaken: ((CaptureEntry, File) -> Unit)? = null
@@ -268,9 +271,17 @@ class CaptureSession(
     }
 
     private fun handleCapturing() {
-        val mc = Minecraft.getInstance()
-        val renderTarget = mc.mainRenderTarget
+        // If a high-res capture is already in flight, wait for it to finish.
+        // HighResCapture advances itself via GameRendererMixin each frame.
+        val pending = pendingCapture
+        if (pending != null) {
+            if (!pending.isDone) return
+            pendingCapture = null
+            transitionTo(State.PostCaptureCooldown)
+            return
+        }
 
+        // First tick in Capturing state — initiate the high-res capture
         val config = shadersToCapture.getOrNull(currentIndex)
         if (config == null) {
             log.error("Invalid shader config") {
@@ -281,9 +292,10 @@ class CaptureSession(
         }
 
         val captureFilename = buildCaptureFilename(config)
-        log.info("Taking capture") {
+        log.info("Taking high-res capture") {
             "shader" to config.displayName
             "file" to captureFilename
+            "resolution" to "${HighResCapture.CAPTURE_WIDTH}x${HighResCapture.CAPTURE_HEIGHT}"
         }
 
         val timestamp = Instant.now().toString()
@@ -307,31 +319,38 @@ class CaptureSession(
                 shader = shaderMeta,
                 resolution =
                     Resolution(
-                        width = renderTarget.width,
-                        height = renderTarget.height,
+                        width = HighResCapture.CAPTURE_WIDTH,
+                        height = HighResCapture.CAPTURE_HEIGHT,
                     ),
             ),
         )
 
-        // Capture values before the async write — Screenshot.grab() writes the file
-        // asynchronously on Util.ioPool(), so we invoke the callback from inside the
-        // consumer where the file is guaranteed to exist.
         val capturedEntry = captureEntries.last()
         val captureFile = File(outputDir, "screenshots/$captureFilename")
         val callback = onCaptureTaken
 
-        net.minecraft.client.Screenshot.grab(
-            outputDir,
-            captureFilename,
-            renderTarget,
-        ) { message ->
-            log.debug("Capture saved") {
-                "message" to message.string
+        val screenshotsDir = File(outputDir, "screenshots")
+        if (!screenshotsDir.exists()) {
+            screenshotsDir.mkdirs()
+        }
+
+        val outputPath = screenshotsDir.toPath().resolve(captureFilename)
+        val future =
+            HighResCapture.startCapture(outputPath) ?: run {
+                log.error("Failed to start high-res capture (already in progress)")
+                advanceToNextShader()
+                return
+            }
+
+        // When the file is written, invoke the session callback
+        future.thenAccept {
+            log.debug("High-res capture saved") {
+                "file" to captureFilename
             }
             callback?.invoke(capturedEntry, captureFile)
         }
 
-        transitionTo(State.PostCaptureCooldown)
+        pendingCapture = future
     }
 
     private fun buildCaptureFilename(config: ShaderSpec): String {

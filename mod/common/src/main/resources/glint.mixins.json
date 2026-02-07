@@ -4,9 +4,11 @@
   "compatibilityLevel": "JAVA_21",
   "minVersion": "0.8",
   "mixins": [
+    "NativeImageAccessor",
     "ShaderPackAccessor"
   ],
   "client": [
+    "GameRendererMixin",
     "KeyboardHandlerMixin",
     "MinecraftMixin",
     "MouseHandlerMixin",
