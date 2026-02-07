@@ -1,22 +1,16 @@
 import { browser } from '$app/environment';
 
 /**
- * Get the API base URL.
+ * Get the API base URL for the current context.
  *
- * In development: Uses Vite proxy (relative /api URLs)
- * In production: Uses PUBLIC_API_URL env var or falls back to same origin
+ * - Browser: relative URLs (same-origin, handled by Vite proxy in dev or reverse proxy in prod)
+ * - SSR: PUBLIC_BACKEND_URL env var for server-to-server calls (may be different host/port)
  */
 export function getApiUrl(): string {
-	// In browser, check for public env var
-	if (browser && typeof window !== 'undefined') {
-		const publicApiUrl = import.meta.env?.PUBLIC_API_URL;
-		if (publicApiUrl) {
-			return publicApiUrl;
-		}
+	if (browser) {
+		return '';
 	}
 
-	// Default to relative URLs (works with Vite proxy in dev, same-origin in prod)
-	return '';
+	// SSR: use public env var for backend origin (accessible in universal load functions)
+	return import.meta.env?.PUBLIC_BACKEND_URL ?? 'http://localhost:8080';
 }
-
-export const API_BASE_URL = getApiUrl();

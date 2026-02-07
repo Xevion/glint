@@ -1,5 +1,5 @@
 import { Result } from 'true-myth';
-import { API_BASE_URL } from './config';
+import { getApiUrl } from './config';
 import { ApiError, ApiErrorType } from './errors';
 
 /**
@@ -9,7 +9,7 @@ export class ApiClient {
 	private baseUrl: string;
 	private fetchFn: typeof fetch;
 
-	constructor(baseUrl: string = API_BASE_URL, fetchFn: typeof fetch = fetch) {
+	constructor(baseUrl: string = getApiUrl(), fetchFn: typeof fetch = fetch) {
 		this.baseUrl = baseUrl;
 		this.fetchFn = fetchFn;
 	}

@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './config';
+import { getApiUrl } from './config';
 import { AdminEndpoints } from './endpoints/admin';
 import { AdoptEndpoints } from './endpoints/adopt';
 import { CaptureEndpoints } from './endpoints/captures';
@@ -22,15 +22,16 @@ import { WorldsEndpoints } from './endpoints/worlds';
  * ```
  */
 export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
+	const url = baseUrl ?? getApiUrl();
 	return {
-		shaders: new ShaderEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		scenes: new SceneEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		captures: new CaptureEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		admin: new AdminEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		adopt: new AdoptEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		worlds: new WorldsEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		device: new DeviceEndpoints(baseUrl ?? API_BASE_URL, fetchFn),
-		runs: new RunEndpoints(baseUrl ?? API_BASE_URL, fetchFn)
+		shaders: new ShaderEndpoints(url, fetchFn),
+		scenes: new SceneEndpoints(url, fetchFn),
+		captures: new CaptureEndpoints(url, fetchFn),
+		admin: new AdminEndpoints(url, fetchFn),
+		adopt: new AdoptEndpoints(url, fetchFn),
+		worlds: new WorldsEndpoints(url, fetchFn),
+		device: new DeviceEndpoints(url, fetchFn),
+		runs: new RunEndpoints(url, fetchFn)
 	};
 }
 

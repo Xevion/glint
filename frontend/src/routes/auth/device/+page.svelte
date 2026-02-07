@@ -9,7 +9,7 @@ import { onMount } from 'svelte';
 import { fade, fly } from 'svelte/transition';
 
 interface Props {
-	data: { userCode: string | null };
+	data: { userCode: string | null; currentUrl: string };
 }
 
 let { data }: Props = $props();
@@ -82,11 +82,8 @@ async function confirmAuthorization() {
 	});
 }
 
-// Build login URL with redirect back to this page
-const loginUrl = $derived.by(() => {
-	const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
-	return resolve('/api/auth/discord', { redirect: currentUrl });
-});
+// Build login URL with redirect back to this page (SSR-safe via load function)
+const loginUrl = $derived(resolve('/api/auth/discord', { redirect: data.currentUrl }));
 
 onMount(() => {
 	void loadCodeStatus();
