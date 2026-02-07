@@ -63,6 +63,7 @@ async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shade
 
     let items = shaders
         .into_iter()
+        .filter(|shader| thumbnails.contains_key(&shader.id))
         .map(|shader| {
             let id = &shader.id;
             let version = versions.get(id);
