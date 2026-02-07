@@ -1,7 +1,8 @@
 <script lang="ts">
 import { api } from '$lib/api';
-import type { ShaderSearchResult, ShaderSearchSort } from '$lib/bindings';
+import type { Shader, ShaderSearchResult, ShaderSearchSort } from '$lib/bindings';
 import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
@@ -21,11 +22,14 @@ import {
 
 type BrowseTab = 'popular' | 'recent';
 
+const PAGE_SIZE = 20;
+
 let query = $state('');
 let results = $state<ShaderSearchResult[]>([]);
 let totalModrinth = $state(0);
 let totalCurseforge = $state<number | null>(null);
 let loading = $state(false);
+let loadingMore = $state(false);
 let error = $state<string | null>(null);
 
 let activeTab = $state<BrowseTab>('popular');
@@ -34,6 +38,12 @@ let searchQuery = $state('');
 
 let adoptDialogOpen = $state(false);
 let adoptUrl = $state<string | undefined>(undefined);
+
+// Track whether there are more results to load
+let hasMore = $derived.by(() => {
+	const totalPlatformResults = totalModrinth + (totalCurseforge ?? 0);
+	return results.length < totalPlatformResults;
+});
 
 // Load popular shaders on mount
 $effect(() => {
@@ -51,7 +61,7 @@ async function loadBrowse(sort: ShaderSearchSort) {
 	loading = true;
 	error = null;
 
-	const result = await api.adopt.search(undefined, 20, 0, sort);
+	const result = await api.adopt.search(undefined, PAGE_SIZE, 0, sort);
 	if (result.isOk) {
 		results = result.value.results;
 		totalModrinth = result.value.total_modrinth;
@@ -72,7 +82,7 @@ async function handleSearch() {
 	searchActive = true;
 	searchQuery = q;
 
-	const result = await api.adopt.search(q, 20, 0);
+	const result = await api.adopt.search(q, PAGE_SIZE, 0);
 	if (result.isOk) {
 		results = result.value.results;
 		totalModrinth = result.value.total_modrinth;
@@ -82,6 +92,25 @@ async function handleSearch() {
 		results = [];
 	}
 	loading = false;
+}
+
+async function loadMore() {
+	loadingMore = true;
+	error = null;
+
+	const offset = results.length;
+	const sort: ShaderSearchSort | undefined = searchActive ? undefined : activeTab;
+	const q = searchActive ? searchQuery : undefined;
+
+	const result = await api.adopt.search(q, PAGE_SIZE, offset, sort);
+	if (result.isOk) {
+		results = [...results, ...result.value.results];
+		totalModrinth = result.value.total_modrinth;
+		totalCurseforge = result.value.total_curseforge;
+	} else {
+		error = result.error.message;
+	}
+	loadingMore = false;
 }
 
 function clearSearch() {
@@ -102,13 +131,22 @@ function adoptFromResult(result: ShaderSearchResult) {
 	adoptDialogOpen = true;
 }
 
-function handleShaderAdopted() {
+function handleShaderAdopted(shader: Shader) {
 	adoptUrl = undefined;
-	if (searchActive) {
-		void handleSearch();
-	} else {
-		void loadBrowse(activeTab);
-	}
+	// Optimistically update the result in-place
+	results = results.map((r) => {
+		if (r.platform_url === shader.website_url || r.slug === shader.slug) {
+			return { ...r, adopted: { id: shader.id, slug: shader.slug } };
+		}
+		// Match by platform ID
+		if (
+			(r.platform === 'modrinth' && shader.modrinth_id && r.platform_id === shader.modrinth_id) ||
+			(r.platform === 'curseforge' && shader.curseforge_id && r.platform_id === shader.curseforge_id)
+		) {
+			return { ...r, adopted: { id: shader.id, slug: shader.slug } };
+		}
+		return r;
+	});
 }
 
 function formatNumber(n: number): string {
@@ -221,6 +259,7 @@ function formatNumber(n: number): string {
 						<th class="p-3 text-left font-medium">Platform</th>
 						<th class="p-3 text-left font-medium">Author</th>
 						<th class="p-3 text-right font-medium">Downloads</th>
+						<th class="p-3 text-right font-medium">Updated</th>
 						<th class="w-24 p-3 text-right font-medium"></th>
 					</tr>
 				</thead>
@@ -249,9 +288,23 @@ function formatNumber(n: number): string {
 							</td>
 							<td class="p-3">
 								<div class="flex items-center gap-2">
-									<span class="font-medium">{result.name}</span>
+									<a
+										href={result.platform_url}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="font-medium hover:underline"
+										onclick={(e: MouseEvent) => e.stopPropagation()}
+									>
+										{result.name}
+										<ExternalLink
+											class="ml-1 inline h-3 w-3 text-muted-foreground"
+										/>
+									</a>
 									{#if result.adopted}
-										<Badge variant="secondary" class="gap-1 text-emerald-700 dark:text-emerald-400">
+										<Badge
+											variant="secondary"
+											class="gap-1 text-emerald-700 dark:text-emerald-400"
+										>
 											<Check class="h-3 w-3" />
 											Adopted
 										</Badge>
@@ -274,6 +327,13 @@ function formatNumber(n: number): string {
 							<td class="p-3 text-muted-foreground">{result.author}</td>
 							<td class="p-3 text-right tabular-nums">
 								{formatNumber(result.downloads)}
+							</td>
+							<td class="p-3 text-right text-muted-foreground">
+								{#if result.updated_at}
+									<TimeAgo timestamp={result.updated_at} />
+								{:else}
+									<span>-</span>
+								{/if}
 							</td>
 							<td class="p-3 text-right">
 								{#if result.adopted}
@@ -321,9 +381,22 @@ function formatNumber(n: number): string {
 						{/if}
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2">
-								<span class="font-medium">{result.name}</span>
+								<a
+									href={result.platform_url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="font-medium hover:underline"
+								>
+									{result.name}
+									<ExternalLink
+										class="ml-1 inline h-3 w-3 text-muted-foreground"
+									/>
+								</a>
 								{#if result.adopted}
-									<Badge variant="secondary" class="gap-1 text-emerald-700 dark:text-emerald-400">
+									<Badge
+										variant="secondary"
+										class="gap-1 text-emerald-700 dark:text-emerald-400"
+									>
 										<Check class="h-3 w-3" />
 										Adopted
 									</Badge>
@@ -348,6 +421,11 @@ function formatNumber(n: number): string {
 							<span class="tabular-nums text-muted-foreground">
 								{formatNumber(result.downloads)}
 							</span>
+							{#if result.updated_at}
+								<span class="text-muted-foreground">
+									<TimeAgo timestamp={result.updated_at} />
+								</span>
+							{/if}
 						</div>
 						{#if result.adopted}
 							<Button
@@ -372,6 +450,18 @@ function formatNumber(n: number): string {
 				</div>
 			{/each}
 		</div>
+
+		<!-- Load more -->
+		{#if hasMore}
+			<div class="flex justify-center pt-2">
+				<Button variant="outline" onclick={loadMore} disabled={loadingMore}>
+					{#if loadingMore}
+						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+					{/if}
+					Load more
+				</Button>
+			</div>
+		{/if}
 	{/if}
 </div>
 

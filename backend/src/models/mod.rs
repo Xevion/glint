@@ -628,6 +628,9 @@ pub struct ShaderSearchResult {
     pub downloads: u64,
     pub categories: Vec<String>,
     pub platform_url: String,
+    /// When the shader was last updated on its platform
+    #[ts(type = "string | null")]
+    pub updated_at: Option<DateTime<Utc>>,
     /// Present when this shader has already been adopted into Glint
     pub adopted: Option<ShaderAdopted>,
 }

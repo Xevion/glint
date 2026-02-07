@@ -3,6 +3,10 @@ import type { ShaderAdopted } from "./ShaderAdopted";
 
 export type ShaderSearchResult = { platform: string, platform_id: string, slug: string, name: string, description: string, icon_url: string | null, author: string, downloads: number, categories: Array<string>, platform_url: string, 
 /**
+ * When the shader was last updated on its platform
+ */
+updated_at: string | null, 
+/**
  * Present when this shader has already been adopted into Glint
  */
 adopted: ShaderAdopted | null, };

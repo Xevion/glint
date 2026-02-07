@@ -1,6 +1,6 @@
 <script lang="ts">
 import { api } from '$lib/api';
-import type { AdoptPreviewResponse } from '$lib/bindings';
+import type { AdoptPreviewResponse, Shader } from '$lib/bindings';
 import { Button } from '$lib/components/ui/button';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
@@ -12,7 +12,7 @@ const PLATFORM_URL_PATTERN =
 	/^https?:\/\/(www\.)?(modrinth\.com\/shader\/|curseforge\.com\/minecraft\/shaders\/)/i;
 
 interface Props {
-	onShaderAdopted?: () => void;
+	onShaderAdopted?: (shader: Shader) => void;
 	/** If provided, skip URL input and go straight to preview when opened */
 	initialUrl?: string;
 	/** Optional trigger snippet; if omitted, renders default "Adopt Shader" button */
@@ -81,8 +81,9 @@ async function handleAdopt() {
 
 	const result = await api.adopt.adopt(url.trim());
 	if (result.isOk) {
+		const shader = result.value;
 		resetAndClose();
-		onShaderAdopted?.();
+		onShaderAdopted?.(shader);
 	} else {
 		const isAlreadyAdopted = result.error.statusCode === 409 || result.error.code === 'CONFLICT';
 		if (isAlreadyAdopted) {

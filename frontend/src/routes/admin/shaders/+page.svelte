@@ -33,7 +33,7 @@ async function refresh() {
 			<span class="text-lg text-muted-foreground">{shaders.length}</span>
 		</div>
 		<div class="flex items-center gap-2">
-			<AdoptShaderDialog onShaderAdopted={refresh} />
+			<AdoptShaderDialog onShaderAdopted={() => refresh()} />
 			<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
 				<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
 			</Button>

@@ -87,6 +87,7 @@ async fn search_platforms(
                     author: hit.author,
                     downloads: hit.downloads,
                     categories: hit.categories,
+                    updated_at: Some(hit.date_modified),
                     adopted: None, // Enriched below
                 });
             }
@@ -101,6 +102,10 @@ async fn search_platforms(
         Some(Ok(search)) => {
             let total = search.pagination.map(|p| p.total_count);
             for cf_mod in search.data {
+                let updated_at = cf_mod
+                    .date_modified
+                    .parse::<chrono::DateTime<chrono::Utc>>()
+                    .ok();
                 results.push(ShaderSearchResult {
                     platform: Platform::CurseForge.to_string(),
                     platform_id: cf_mod.id.to_string(),
@@ -119,6 +124,7 @@ async fn search_platforms(
                         "https://www.curseforge.com/minecraft/shaders/{}",
                         cf_mod.slug
                     ),
+                    updated_at,
                     adopted: None, // Enriched below
                 });
             }
