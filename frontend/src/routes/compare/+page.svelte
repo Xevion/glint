@@ -9,7 +9,6 @@ import {
 	type ShaderDisplayInfo
 } from '$lib/components/compare';
 import { Button } from '$lib/components/ui/button';
-import { cfImageUrl } from '$lib/utils/image';
 import { ArrowLeftRight, Columns3, SplitSquareHorizontal, ToggleLeft } from '@lucide/svelte';
 import { goto } from '$app/navigation';
 import { fade, fly } from 'svelte/transition';
@@ -124,7 +123,7 @@ const modes: { value: CompareMode; label: string; icon: typeof Columns3 }[] = [
 			<!-- Shader comparison -->
 			<div in:fade={{ duration: 300, delay: 100 }} class="mb-6 overflow-hidden rounded-xl border border-border bg-card">
 				<svelte:boundary onerror={(e) => console.error('[Compare]', e)}>
-					<ShaderCompare leftImage={cfImageUrl(leftImage, 'full') ?? leftImage} rightImage={cfImageUrl(rightImage, 'full') ?? rightImage} {mode} {leftShader} {rightShader} />
+					<ShaderCompare {leftImage} {rightImage} {mode} {leftShader} {rightShader} />
 
 					{#snippet failed(error, reset)}
 						<ErrorBoundaryFallback
