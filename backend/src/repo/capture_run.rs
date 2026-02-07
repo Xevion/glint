@@ -1,5 +1,5 @@
 use anyhow::Context;
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, warn};
 
 use crate::error::{AppError, AppResult};
 use crate::models::{CaptureRun, CaptureRunItem, CaptureRunItemWithContext};
@@ -311,5 +311,94 @@ impl CaptureRunRepo {
         ))?;
 
         Ok(items)
+    }
+
+    /// Find capture runs that are still 'running' but have had no item activity
+    /// within the given timeout period. "Activity" is the most recent item
+    /// `started_at` or `completed_at`, falling back to the run's `started_at`.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn find_stale_runs(
+        executor: impl sqlx::PgExecutor<'_>,
+        timeout_secs: i64,
+    ) -> AppResult<Vec<String>> {
+        let rows = sqlx::query_scalar!(
+            r#"
+            SELECT cr.id as "id!"
+            FROM capture_runs cr
+            LEFT JOIN LATERAL (
+                SELECT GREATEST(
+                    MAX(cri.started_at),
+                    MAX(cri.completed_at)
+                ) AS last_activity
+                FROM capture_run_items cri
+                WHERE cri.run_id = cr.id
+            ) activity ON TRUE
+            WHERE cr.status = 'running'
+              AND COALESCE(activity.last_activity, cr.started_at)
+                  < now() - make_interval(secs => $1::float8)
+            "#,
+            timeout_secs as f64
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to find stale capture runs")?;
+
+        Ok(rows)
+    }
+
+    /// Mark a run as timed out: set remaining pending/running items to 'skipped',
+    /// tally final counts, and set the run status to 'timed_out'.
+    #[instrument(skip(pool), level = "debug")]
+    pub async fn timeout_run(pool: &sqlx::PgPool, run_id: &str) -> AppResult<()> {
+        let mut tx = pool.begin().await.context("failed to begin transaction")?;
+
+        // Skip any items still pending or running
+        let skipped = sqlx::query!(
+            r#"
+            UPDATE capture_run_items
+            SET status = 'skipped', completed_at = now()
+            WHERE run_id = $1 AND status IN ('pending', 'running')
+            "#,
+            run_id
+        )
+        .execute(&mut *tx)
+        .await
+        .context("failed to skip remaining items")?;
+
+        // Finalize the run with accurate counts
+        sqlx::query!(
+            r#"
+            WITH counts AS (
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,
+                    COUNT(*) FILTER (WHERE status = 'skipped') AS skipped
+                FROM capture_run_items WHERE run_id = $1
+            )
+            UPDATE capture_runs SET
+                completed_at = now(),
+                completed_items = counts.completed::int4,
+                failed_items = counts.failed::int4,
+                skipped_items = counts.skipped::int4,
+                status = 'timed_out'
+            FROM counts
+            WHERE capture_runs.id = $1
+            "#,
+            run_id
+        )
+        .execute(&mut *tx)
+        .await
+        .context("failed to mark run as timed out")?;
+
+        tx.commit()
+            .await
+            .context("failed to commit timeout transaction")?;
+
+        warn!(
+            run_id,
+            items_skipped = skipped.rows_affected(),
+            "Capture run timed out"
+        );
+        Ok(())
     }
 }

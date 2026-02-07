@@ -147,7 +147,10 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Start thumbhash background worker
-    tokio::spawn(services::thumbhash::run(thumbhash_rx, pool));
+    tokio::spawn(services::thumbhash::run(thumbhash_rx, pool.clone()));
+
+    // Start capture run monitor (detects and times out stale runs)
+    tokio::spawn(services::capture_run_monitor::monitor_capture_runs(pool));
 
     // Configure CORS
     let cors = CorsLayer::new()

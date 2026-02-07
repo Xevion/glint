@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT cr.id as \"id!\"\n            FROM capture_runs cr\n            LEFT JOIN LATERAL (\n                SELECT GREATEST(\n                    MAX(cri.started_at),\n                    MAX(cri.completed_at)\n                ) AS last_activity\n                FROM capture_run_items cri\n                WHERE cri.run_id = cr.id\n            ) activity ON TRUE\n            WHERE cr.status = 'running'\n              AND COALESCE(activity.last_activity, cr.started_at)\n                  < now() - make_interval(secs => $1::float8)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "115071ab6f74252287ac2587f79a6ce16a68e870641b30f391bd2580edb22987"
+}

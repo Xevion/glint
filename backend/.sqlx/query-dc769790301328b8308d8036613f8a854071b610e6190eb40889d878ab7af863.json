@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE capture_run_items\n            SET status = 'skipped', completed_at = now()\n            WHERE run_id = $1 AND status IN ('pending', 'running')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dc769790301328b8308d8036613f8a854071b610e6190eb40889d878ab7af863"
+}
