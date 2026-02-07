@@ -138,6 +138,7 @@ pub struct Capture {
     pub captured_at: Option<DateTime<Utc>>,
     pub status: String,
     pub error_message: Option<String>,
+    pub thumbhash: Option<String>,
     pub outdated: bool,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
@@ -314,6 +315,7 @@ pub struct ShaderListItem {
     pub latest_version: Option<String>,
     pub game_versions: Option<String>,
     pub thumbnail_url: Option<String>,
+    pub thumbhash: Option<String>,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -323,6 +325,7 @@ pub struct SceneListItem {
     pub scene: Scene,
     pub tags: Vec<Tag>,
     pub thumbnail_url: Option<String>,
+    pub thumbhash: Option<String>,
     pub capture_count: i64,
 }
 
@@ -364,6 +367,7 @@ pub struct CaptureWithContext {
     pub profile: Option<String>,
     pub image_path: Option<String>,
     pub image_url: Option<String>,
+    pub thumbhash: Option<String>,
     #[ts(type = "string | null")]
     pub captured_at: Option<DateTime<Utc>>,
     pub resolution_width: Option<i32>,

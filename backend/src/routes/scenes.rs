@@ -67,9 +67,11 @@ async fn list_scenes_public(
         .into_iter()
         .map(|scene| {
             let id = &scene.id;
+            let thumb = thumbnails.get(id);
             SceneListItem {
                 tags: tags_map.remove(id).unwrap_or_default(),
-                thumbnail_url: thumbnails.get(id).cloned(),
+                thumbnail_url: thumb.map(|t| t.image_url.clone()),
+                thumbhash: thumb.and_then(|t| t.thumbhash.clone()),
                 capture_count: counts.get(id).copied().unwrap_or(0),
                 scene,
             }

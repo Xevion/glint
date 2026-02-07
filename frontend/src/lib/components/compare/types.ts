@@ -28,4 +28,5 @@ export interface ElementBounds {
 export interface ImageOption {
 	url: string;
 	label: string;
+	thumbhash?: string | null;
 }

@@ -122,6 +122,11 @@
         "ordinal": 23,
         "name": "updated_at",
         "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 24,
+        "name": "thumbhash",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -153,7 +158,8 @@
       true,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
   "hash": "d0bb5a5f8f1c19d68885588b4874c331c3bba2a67c1e594770e76876dd0d9576"

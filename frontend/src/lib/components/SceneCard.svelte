@@ -6,10 +6,10 @@ import { cn } from '$lib/utils';
 import {
 	getBiomeDisplayName,
 	getDimensionDisplayName,
-	getWeatherDisplayName,
-	hashStringToNumber
+	getWeatherDisplayName
 } from '$lib/utils/display';
 import { cfImageUrl } from '$lib/utils/image';
+import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { ArrowRight, Sun } from '@lucide/svelte';
 
 interface Props {
@@ -30,7 +30,9 @@ function getTimeOfDay(ticks: number): string {
 
 const timeOfDay = $derived(getTimeOfDay(scene.time_of_day_ticks));
 
-const wallpaperIndex = $derived(hashStringToNumber(scene.id) % 50);
+const imageSrc = $derived(cfImageUrl(scene.thumbnail_url, 'card'));
+const placeholderUrl = $derived(decodeThumbhash(scene.thumbhash));
+let loaded = $state(false);
 
 function handleCardClick() {
 	void goto(resolve('/scenes/[id]', { id: scene.slug }), { invalidateAll: true });
@@ -58,14 +60,26 @@ function handleKeyDown(e: KeyboardEvent) {
 	)}
 >
 	<!-- Thumbnail Image -->
-	<div class="relative aspect-video w-full overflow-hidden">
-		<img
-			src={cfImageUrl(scene.thumbnail_url, 'card') ?? `/wallpapers/${wallpaperIndex}.jpg`}
-			alt="{scene.name} scene preview"
-			class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-			style="will-change: transform; backface-visibility: hidden;"
-			loading="lazy"
-		/>
+	<div
+		class="relative aspect-video w-full overflow-hidden"
+		class:bg-muted={!placeholderUrl && !imageSrc}
+		style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
+		style:background-size="cover"
+		style:background-position="center"
+	>
+		{#if imageSrc}
+			<img
+				src={imageSrc}
+				alt="{scene.name} scene preview"
+				class={cn(
+					'h-full w-full object-cover transition-all duration-500 ease-out group-hover:scale-105',
+					loaded ? 'opacity-100' : 'opacity-0'
+				)}
+				style="will-change: transform; backface-visibility: hidden;"
+				loading="lazy"
+				onload={() => (loaded = true)}
+			/>
+		{/if}
 
 		<!-- Gradient overlay -->
 		<div

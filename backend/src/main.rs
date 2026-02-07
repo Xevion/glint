@@ -120,6 +120,9 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Create thumbhash channel
+    let (thumbhash_tx, thumbhash_rx) = tokio::sync::mpsc::unbounded_channel();
+
     // Build application state
     let state = AppState::new(
         pool.clone(),
@@ -128,6 +131,7 @@ async fn main() -> anyhow::Result<()> {
         oauth_client,
         modrinth_client,
         curseforge_client,
+        thumbhash_tx,
     );
 
     // Start upload cleanup background task
@@ -137,10 +141,13 @@ async fn main() -> anyhow::Result<()> {
         .clone()
         .unwrap_or_else(|| "glint".to_string());
     tokio::spawn(services::upload_cleanup::cleanup_expired_uploads(
-        pool,
+        pool.clone(),
         s3_client.clone(),
         cleanup_bucket,
     ));
+
+    // Start thumbhash background worker
+    tokio::spawn(services::thumbhash::run(thumbhash_rx, pool));
 
     // Configure CORS
     let cors = CorsLayer::new()

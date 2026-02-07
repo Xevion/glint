@@ -25,6 +25,7 @@ const images: CompareImageOption[] = $derived(
 		return {
 			url: c.image_url!,
 			label: suffix ? `${c.shader_name} (${suffix})` : c.shader_name,
+			thumbhash: c.thumbhash,
 			shader: {
 				name: c.shader_name,
 				version: c.shader_version,

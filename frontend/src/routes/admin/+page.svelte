@@ -3,6 +3,7 @@ import { invalidateAll } from '$app/navigation';
 import type { CaptureWithContext } from '$lib/bindings';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Button } from '$lib/components/ui/button';
+import { decodeThumbhash } from '$lib/utils/thumbhash';
 import {
 	Activity,
 	ArrowRight,
@@ -162,13 +163,23 @@ onDestroy(() => {
 			{:else}
 				<div class="space-y-2">
 					{#each recentCaptures as capture (capture.id)}
+						{@const placeholderUrl = decodeThumbhash(capture.thumbhash)}
 						<div class="flex items-center gap-3 rounded border p-2 text-sm">
 							{#if capture.image_url}
-								<img
-									src={capture.image_url}
-									alt="Capture"
-									class="h-10 w-16 rounded object-cover"
-								/>
+								<div
+									class="relative h-10 w-16 overflow-hidden rounded"
+									class:bg-muted={!placeholderUrl}
+									style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
+									style:background-size="cover"
+									style:background-position="center"
+								>
+									<img
+										src={capture.image_url}
+										alt="Capture"
+										class="h-full w-full object-cover"
+										loading="lazy"
+									/>
+								</div>
 							{:else}
 								<div class="flex h-10 w-16 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
 									N/A

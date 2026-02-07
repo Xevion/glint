@@ -9,6 +9,7 @@ import { AdminDetailField, AdminSlideOver } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { cfImageUrl } from '$lib/utils/image';
+import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { RefreshCw, Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
@@ -165,7 +166,24 @@ async function confirmDelete() {
 			{#snippet cell({ columnId, value, row }: { columnId: string; value: unknown; row: CaptureWithContext })}
 				{#if columnId === 'preview'}
 					{#if value}
-						<img src={cfImageUrl(value as string, 'thumbnail')} alt="Capture preview" class="h-12 w-20 rounded object-cover" />
+						{@const thumbnailSrc = cfImageUrl(value as string, 'thumbnail')}
+						{@const placeholderUrl = decodeThumbhash(row.thumbhash)}
+						<div
+							class="relative h-12 w-20 overflow-hidden rounded"
+							class:bg-muted={!placeholderUrl && !thumbnailSrc}
+							style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
+							style:background-size="cover"
+							style:background-position="center"
+						>
+							{#if thumbnailSrc}
+								<img
+									src={thumbnailSrc}
+									alt="Capture preview"
+									class="h-full w-full object-cover"
+									loading="lazy"
+								/>
+							{/if}
+						</div>
 					{:else if row.image_path}
 						<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">No URL</div>
 					{:else}
@@ -239,12 +257,23 @@ async function confirmDelete() {
 	{#if selected}
 		<dl class="space-y-4">
 			{#if selected.image_url}
-				<div>
-					<img
-						src={cfImageUrl(selected.image_url, 'hero')}
-						alt="Capture"
-						class="w-full rounded-lg border"
-					/>
+				{@const heroSrc = cfImageUrl(selected.image_url, 'hero')}
+				{@const placeholderUrl = decodeThumbhash(selected.thumbhash)}
+				<div
+					class="relative w-full overflow-hidden rounded-lg border"
+					class:bg-muted={!placeholderUrl && !heroSrc}
+					style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
+					style:background-size="cover"
+					style:background-position="center"
+				>
+					{#if heroSrc}
+						<img
+							src={heroSrc}
+							alt="Capture"
+							class="w-full"
+							loading="lazy"
+						/>
+					{/if}
 				</div>
 			{/if}
 

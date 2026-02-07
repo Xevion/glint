@@ -33,3 +33,6 @@ time = { version = "0.3.47", features = ["formatting", "macros"] }
 serde_repr = "0.1.20"
 url = "2.5.8"
 nanoid = "0.4.0"
+thumbhash = "0.1.0"
+image = { version = "0.25.9", default-features = false, features = ["png"] }
+base64 = "0.22.1"

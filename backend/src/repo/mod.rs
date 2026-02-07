@@ -11,7 +11,7 @@ pub mod user;
 pub mod work;
 pub mod world;
 
-pub use capture::CaptureRepo;
+pub use capture::{CaptureRepo, ThumbnailInfo};
 pub use capture_run::CaptureRunRepo;
 pub use device_code::DeviceCodeRepo;
 pub use pending_upload::PendingUploadRepo;

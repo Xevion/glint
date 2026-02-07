@@ -66,13 +66,15 @@ async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shade
         .map(|shader| {
             let id = &shader.id;
             let version = versions.get(id);
+            let thumb = thumbnails.get(id);
             ShaderListItem {
                 authors: authors_map.remove(id).unwrap_or_default(),
                 categories: categories_map.remove(id).unwrap_or_default(),
                 features: features_map.remove(id).unwrap_or_default(),
                 latest_version: version.map(|v| v.version.clone()),
                 game_versions: version.and_then(|v| v.game_versions.clone()),
-                thumbnail_url: thumbnails.get(id).cloned(),
+                thumbnail_url: thumb.map(|t| t.image_url.clone()),
+                thumbhash: thumb.and_then(|t| t.thumbhash.clone()),
                 shader,
             }
         })

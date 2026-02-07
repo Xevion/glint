@@ -325,6 +325,7 @@ impl ShaderRepo {
                 c.profile,
                 c.image_path,
                 c.image_url,
+                c.thumbhash,
                 c.captured_at,
                 c.resolution_width,
                 c.resolution_height,

@@ -295,6 +295,9 @@ async fn confirm_upload(
     CaptureRunRepo::complete_item(&mut *tx, &item_id, capture_id, None).await?;
     tx.commit().await?;
 
+    // Queue thumbhash generation (fire-and-forget)
+    let _ = state.thumbhash_tx().send(capture_id.to_string());
+
     debug!(item_id, capture_id, "Upload confirmed");
     Ok(StatusCode::OK)
 }

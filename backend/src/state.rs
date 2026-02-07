@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use aws_sdk_s3::Client as S3Client;
 use oauth2::{EndpointNotSet, EndpointSet};
+use tokio::sync::mpsc;
 
 use crate::{
     config::Config,
@@ -32,6 +33,7 @@ pub struct AppStateInner {
     pub oauth: Option<OAuthClient>,
     pub modrinth: ModrinthClient,
     pub curseforge: Option<CurseForgeClient>,
+    pub thumbhash_tx: mpsc::UnboundedSender<String>,
 }
 
 impl AppState {
@@ -42,6 +44,7 @@ impl AppState {
         oauth: Option<OAuthClient>,
         modrinth: ModrinthClient,
         curseforge: Option<CurseForgeClient>,
+        thumbhash_tx: mpsc::UnboundedSender<String>,
     ) -> Self {
         Self {
             inner: Arc::new(AppStateInner {
@@ -51,6 +54,7 @@ impl AppState {
                 oauth,
                 modrinth,
                 curseforge,
+                thumbhash_tx,
             }),
         }
     }
@@ -77,6 +81,10 @@ impl AppState {
 
     pub fn curseforge(&self) -> Option<&CurseForgeClient> {
         self.inner.curseforge.as_ref()
+    }
+
+    pub fn thumbhash_tx(&self) -> &mpsc::UnboundedSender<String> {
+        &self.inner.thumbhash_tx
     }
 
     pub async fn begin_tx(&self) -> AppResult<DbTransaction<'_>> {

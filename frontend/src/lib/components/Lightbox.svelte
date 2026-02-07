@@ -1,12 +1,15 @@
 <script lang="ts">
 import { Button } from '$lib/components/ui/button';
+import { cn } from '$lib/utils';
 import { cfImageUrl } from '$lib/utils/image';
+import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { ChevronLeft, ChevronRight, X } from '@lucide/svelte';
 import { fade, scale } from 'svelte/transition';
 
 interface CaptureItem {
 	id: string;
 	image_url: string | null;
+	thumbhash?: string | null;
 	profile?: string | null;
 	shader_version?: string | null;
 	scene_id?: string;
@@ -24,6 +27,16 @@ let { captures, currentIndex, onClose, onNavigate }: Props = $props();
 const currentCapture = $derived(captures[currentIndex]);
 const hasPrev = $derived(currentIndex > 0);
 const hasNext = $derived(currentIndex < captures.length - 1);
+
+const placeholderUrl = $derived(currentCapture ? decodeThumbhash(currentCapture.thumbhash) : null);
+let loaded = $state(false);
+
+// Reset loaded state when current capture changes
+$effect(() => {
+	if (currentCapture) {
+		loaded = false;
+	}
+});
 
 function handleKeydown(e: KeyboardEvent) {
 	switch (e.key) {
@@ -97,11 +110,19 @@ function handleBackdropClick(e: MouseEvent) {
 			<div
 				transition:scale={{ duration: 200, start: 0.95 }}
 				class="relative max-h-[90vh] max-w-[90vw]"
+				class:bg-muted={!placeholderUrl}
+				style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
+				style:background-size="cover"
+				style:background-position="center"
 			>
 				<img
 					src={cfImageUrl(currentCapture.image_url, 'full')}
 					alt="Capture fullscreen view"
-					class="max-h-[90vh] max-w-[90vw] object-contain"
+					class={cn(
+						'max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-300',
+						loaded ? 'opacity-100' : 'opacity-0'
+					)}
+					onload={() => (loaded = true)}
 				/>
 
 				<!-- Capture info overlay -->

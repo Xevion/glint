@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                c.id,\n                c.scene_id,\n                s.slug as shader_slug,\n                s.name as shader_name,\n                sv.version as shader_version,\n                c.profile,\n                c.image_path,\n                c.image_url,\n                c.captured_at,\n                c.resolution_width,\n                c.resolution_height,\n                cri.run_id as \"run_id?: String\",\n                cr.status as \"run_status?: String\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id\n            LEFT JOIN capture_runs cr ON cri.run_id = cr.id\n            WHERE s.id = $1 AND c.status = 'completed'\n            ORDER BY sv.created_at DESC\n            ",
+  "query": "\n            SELECT\n                c.id,\n                c.scene_id,\n                s.slug as shader_slug,\n                s.name as shader_name,\n                sv.version as shader_version,\n                c.profile,\n                c.image_path,\n                c.image_url,\n                c.thumbhash,\n                c.captured_at,\n                c.resolution_width,\n                c.resolution_height,\n                cri.run_id as \"run_id?: String\",\n                cr.status as \"run_status?: String\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id\n            LEFT JOIN capture_runs cr ON cri.run_id = cr.id\n             WHERE c.id = $1",
   "describe": {
     "columns": [
       {
@@ -45,31 +45,36 @@
       },
       {
         "ordinal": 8,
+        "name": "thumbhash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
         "name": "captured_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "resolution_width",
         "type_info": "Int4"
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "resolution_height",
         "type_info": "Int4"
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "run_id?: String",
         "type_info": "Text"
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "run_status?: String",
         "type_info": "Text"
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "shader_author",
         "type_info": "Text"
       }
@@ -91,10 +96,11 @@
       true,
       true,
       true,
+      true,
       false,
       false,
       null
     ]
   },
-  "hash": "2abedb958a380ab0aa86193e3437779d7c23338b8f69555a947e2b43435d9325"
+  "hash": "a748f669206bb97767ba3ed8c9bc2346b01935cde494698f733e9bd73a0ac829"
 }

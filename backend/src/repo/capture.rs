@@ -8,6 +8,11 @@ use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
 use crate::models::{Capture, CaptureWithContext};
 
+pub struct ThumbnailInfo {
+    pub image_url: String,
+    pub thumbhash: Option<String>,
+}
+
 pub struct CaptureRepo;
 
 /// Compile-time checked query returning `CaptureWithContext`.
@@ -29,6 +34,7 @@ macro_rules! capture_ctx_query {
                 c.profile,
                 c.image_path,
                 c.image_url,
+                c.thumbhash,
                 c.captured_at,
                 c.resolution_width,
                 c.resolution_height,
@@ -410,17 +416,19 @@ impl CaptureRepo {
     #[instrument(skip(executor), level = "debug")]
     pub async fn batch_thumbnails_by_shader(
         executor: impl sqlx::PgExecutor<'_>,
-    ) -> AppResult<HashMap<String, String>> {
+    ) -> AppResult<HashMap<String, ThumbnailInfo>> {
         struct Row {
             shader_id: String,
             image_url: String,
+            thumbhash: Option<String>,
         }
         let rows = sqlx::query_as!(
             Row,
             r#"
             SELECT DISTINCT ON (sv.shader_id)
                 sv.shader_id,
-                c.image_url as "image_url!"
+                c.image_url as "image_url!",
+                c.thumbhash
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             WHERE c.status = 'completed' AND c.outdated = FALSE AND c.image_url IS NOT NULL
@@ -433,7 +441,15 @@ impl CaptureRepo {
 
         Ok(rows
             .into_iter()
-            .map(|r| (r.shader_id, r.image_url))
+            .map(|r| {
+                (
+                    r.shader_id,
+                    ThumbnailInfo {
+                        image_url: r.image_url,
+                        thumbhash: r.thumbhash,
+                    },
+                )
+            })
             .collect())
     }
 
@@ -441,17 +457,19 @@ impl CaptureRepo {
     #[instrument(skip(executor), level = "debug")]
     pub async fn batch_thumbnails_by_scene(
         executor: impl sqlx::PgExecutor<'_>,
-    ) -> AppResult<HashMap<String, String>> {
+    ) -> AppResult<HashMap<String, ThumbnailInfo>> {
         struct Row {
             scene_id: String,
             image_url: String,
+            thumbhash: Option<String>,
         }
         let rows = sqlx::query_as!(
             Row,
             r#"
             SELECT DISTINCT ON (c.scene_id)
                 c.scene_id,
-                c.image_url as "image_url!"
+                c.image_url as "image_url!",
+                c.thumbhash
             FROM captures c
             WHERE c.status = 'completed' AND c.outdated = FALSE AND c.image_url IS NOT NULL
             ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
@@ -463,8 +481,53 @@ impl CaptureRepo {
 
         Ok(rows
             .into_iter()
-            .map(|r| (r.scene_id, r.image_url))
+            .map(|r| {
+                (
+                    r.scene_id,
+                    ThumbnailInfo {
+                        image_url: r.image_url,
+                        thumbhash: r.thumbhash,
+                    },
+                )
+            })
             .collect())
+    }
+
+    /// List IDs of completed captures that have an image but no thumbhash yet
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_unhashed_ids(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<String>> {
+        let ids = sqlx::query_scalar!(
+            r#"
+            SELECT id
+            FROM captures
+            WHERE status = 'completed' AND image_url IS NOT NULL AND thumbhash IS NULL
+            ORDER BY created_at ASC
+            "#
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to list unhashed capture ids")?;
+
+        Ok(ids)
+    }
+
+    /// Set the thumbhash for a capture
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn set_thumbhash(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+        thumbhash: &str,
+    ) -> AppResult<()> {
+        sqlx::query!(
+            "UPDATE captures SET thumbhash = $2 WHERE id = $1",
+            id,
+            thumbhash
+        )
+        .execute(executor)
+        .await
+        .context(format!("failed to set thumbhash for capture '{}'", id))?;
+
+        Ok(())
     }
 
     /// Count completed captures per scene
