@@ -1,6 +1,6 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
-import type { CaptureWithContext } from '$lib/bindings';
+import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Button } from '$lib/components/ui/button';
@@ -9,6 +9,7 @@ import {
 	ArrowRight,
 	Camera,
 	Globe,
+	HeartPulse,
 	Mountain,
 	Pause,
 	Play,
@@ -29,6 +30,7 @@ let userCount: number = $derived(data.userCount);
 let runCount: number = $derived(data.runCount);
 let recentCaptures: CaptureWithContext[] = $derived(data.recentCaptures);
 let healthStatus: 'ok' | 'error' = $derived(data.healthStatus);
+let captureHealth: CaptureHealthSummary | null = $derived(data.captureHealth);
 let errors: Record<string, string> = $derived(data.errors);
 
 let refreshing = $state(false);
@@ -146,6 +148,30 @@ onDestroy(() => {
 				</a>
 			{/each}
 		</div>
+
+		<!-- Capture Health -->
+		{#if captureHealth}
+			<a
+				href="/admin/health"
+				class="flex items-center gap-4 rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+			>
+				<HeartPulse class="h-5 w-5 text-muted-foreground" />
+				<div class="flex flex-1 items-center gap-3 text-sm">
+					<span class="font-medium">Capture Health</span>
+					<span class="text-green-600 dark:text-green-400">{captureHealth.completed} completed</span>
+					{#if captureHealth.missing > 0}
+						<span class="text-red-600 dark:text-red-400">{captureHealth.missing} missing</span>
+					{/if}
+					{#if captureHealth.stale > 0}
+						<span class="text-yellow-600 dark:text-yellow-400">{captureHealth.stale} stale</span>
+					{/if}
+					{#if captureHealth.failed > 0}
+						<span class="text-muted-foreground">{captureHealth.failed} failed</span>
+					{/if}
+				</div>
+				<ArrowRight class="h-4 w-4 text-muted-foreground" />
+			</a>
+		{/if}
 
 		<!-- Recent Captures -->
 		<div class="rounded-lg border bg-card p-4">

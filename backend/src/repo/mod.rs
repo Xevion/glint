@@ -1,4 +1,5 @@
 pub mod capture;
+pub mod capture_health;
 pub mod capture_run;
 pub mod device_code;
 pub mod pending_upload;
@@ -12,6 +13,7 @@ pub mod work;
 pub mod world;
 
 pub use capture::{CaptureRepo, ThumbnailInfo};
+pub use capture_health::CaptureHealthRepo;
 pub use capture_run::CaptureRunRepo;
 pub use device_code::DeviceCodeRepo;
 pub use pending_upload::PendingUploadRepo;

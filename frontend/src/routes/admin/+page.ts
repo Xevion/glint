@@ -1,20 +1,29 @@
 import { createApiClient } from '$lib/api';
-import type { CaptureWithContext } from '$lib/bindings';
+import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => {
 	const api = createApiClient(fetch);
 
-	const [shadersRes, worldsRes, scenesRes, capturesRes, usersRes, healthRes, runsRes] =
-		await Promise.all([
-			api.shaders.list(),
-			api.worlds.list(),
-			api.scenes.list(),
-			api.admin.listCaptures(),
-			api.admin.listUsers(),
-			api.admin.health(),
-			api.runs.list()
-		]);
+	const [
+		shadersRes,
+		worldsRes,
+		scenesRes,
+		capturesRes,
+		usersRes,
+		healthRes,
+		runsRes,
+		captureHealthRes
+	] = await Promise.all([
+		api.shaders.list(),
+		api.worlds.list(),
+		api.scenes.list(),
+		api.admin.listCaptures(),
+		api.admin.listUsers(),
+		api.admin.health(),
+		api.runs.list(),
+		api.admin.captureHealth()
+	]);
 
 	const errors: Record<string, string> = {};
 
@@ -74,6 +83,11 @@ export const load: PageLoad = async ({ fetch }) => {
 		}
 	});
 
+	const captureHealth = captureHealthRes.match({
+		Ok: (v) => v.summary,
+		Err: () => null as CaptureHealthSummary | null
+	});
+
 	return {
 		shaderCount,
 		worldCount,
@@ -83,6 +97,7 @@ export const load: PageLoad = async ({ fetch }) => {
 		runCount,
 		recentCaptures,
 		healthStatus,
+		captureHealth,
 		errors
 	};
 };

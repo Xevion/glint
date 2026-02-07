@@ -1,4 +1,5 @@
 import type {
+	CaptureHealthResponse,
 	CaptureWithContext,
 	PaginatedCaptures,
 	Scene,
@@ -7,6 +8,7 @@ import type {
 	ShaderWithCaptures,
 	User,
 	UserWithSessions,
+	WorkItem,
 	WorldWithScenes
 } from '$lib/bindings';
 import type { Result } from 'true-myth';
@@ -141,6 +143,16 @@ export class AdminEndpoints extends ApiClient {
 
 	deleteSession(token: string): Promise<Result<null, ApiError>> {
 		return super.delete<null>(`/api/sessions/${token}`);
+	}
+
+	// ============== Capture Health ==============
+
+	captureHealth(): Promise<Result<CaptureHealthResponse, ApiError>> {
+		return super.get<CaptureHealthResponse>('/api/admin/capture-health');
+	}
+
+	workQueue(limit = 50): Promise<Result<WorkItem[], ApiError>> {
+		return super.get<WorkItem[]>(`/api/work?dry_run=true&limit=${limit}`);
 	}
 
 	// ============== Health ==============
