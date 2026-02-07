@@ -9,7 +9,7 @@ interface Props {
 	confirmLabel?: string;
 	cancelLabel?: string;
 	variant?: 'default' | 'destructive';
-	onConfirm: () => void;
+	onConfirm: () => void | Promise<void>;
 	onCancel?: () => void;
 }
 
@@ -24,9 +24,16 @@ let {
 	onCancel
 }: Props = $props();
 
-function handleConfirm() {
-	open = false;
-	onConfirm();
+let confirming = $state(false);
+
+async function handleConfirm() {
+	confirming = true;
+	try {
+		await onConfirm();
+		open = false;
+	} finally {
+		confirming = false;
+	}
 }
 
 function handleCancel() {
@@ -44,8 +51,10 @@ function handleCancel() {
 			{/if}
 		</Dialog.Header>
 		<Dialog.Footer class="mt-4">
-			<Button variant="outline" onclick={handleCancel}>{cancelLabel}</Button>
-			<Button {variant} onclick={handleConfirm}>{confirmLabel}</Button>
+			<Button variant="outline" onclick={handleCancel} disabled={confirming}>{cancelLabel}</Button>
+			<Button {variant} onclick={handleConfirm} disabled={confirming}>
+				{confirming ? 'Processing...' : confirmLabel}
+			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

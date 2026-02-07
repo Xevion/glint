@@ -34,3 +34,4 @@ export type { User } from "./User";
 export type { UserWithSessions } from "./UserWithSessions";
 export type { WorkItem } from "./WorkItem";
 export type { World } from "./World";
+export type { WorldWithScenes } from "./WorldWithScenes";

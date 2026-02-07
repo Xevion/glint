@@ -13,9 +13,9 @@ use crate::{
     error::{AppError, AppResult},
     models::{
         CompleteWorldUploadRequest, CreateWorldRequest, CreateWorldUploadResponse,
-        UpdateWorldRequest, World,
+        UpdateWorldRequest, World, WorldWithScenes,
     },
-    repo::{PendingUploadRepo, WorldRepo},
+    repo::{PendingUploadRepo, SceneRepo, WorldRepo},
     state::AppState,
 };
 
@@ -295,14 +295,15 @@ async fn complete_world_upload(
     Ok((StatusCode::CREATED, Json(world)))
 }
 
-/// GET /api/worlds/{id} - Get world by ID (admin)
+/// GET /api/worlds/{id} - Get world with scenes (admin)
 async fn get_world(
     _admin: AdminUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> AppResult<Json<World>> {
+) -> AppResult<Json<WorldWithScenes>> {
     let world = WorldRepo::get_by_id(state.db(), &id).await?;
-    Ok(Json(world))
+    let scenes = SceneRepo::list_by_world(state.db(), &id).await?;
+    Ok(Json(WorldWithScenes { world, scenes }))
 }
 
 /// PUT /api/worlds/{id} - Update world metadata (admin)
@@ -311,9 +312,10 @@ async fn update_world(
     State(state): State<AppState>,
     Path(id): Path<String>,
     Json(request): Json<UpdateWorldRequest>,
-) -> AppResult<Json<World>> {
+) -> AppResult<Json<WorldWithScenes>> {
     let world = WorldRepo::update(state.db(), &id, &request).await?;
-    Ok(Json(world))
+    let scenes = SceneRepo::list_by_world(state.db(), &id).await?;
+    Ok(Json(WorldWithScenes { world, scenes }))
 }
 
 /// DELETE /api/worlds/{id} - Delete a world (admin)

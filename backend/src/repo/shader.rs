@@ -331,12 +331,15 @@ impl ShaderRepo {
                 c.resolution_height,
                 cri.run_id as "run_id?: String",
                 cr.status as "run_status?: String",
-                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author
+                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
+                sc.name as "scene_name?: String",
+                sc.slug as "scene_slug?: String"
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             JOIN shaders s ON sv.shader_id = s.id
             LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
             LEFT JOIN capture_runs cr ON cri.run_id = cr.id
+            LEFT JOIN scenes sc ON c.scene_id = sc.id
             WHERE s.id = $1 AND c.status = 'completed'
             ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
             "#,

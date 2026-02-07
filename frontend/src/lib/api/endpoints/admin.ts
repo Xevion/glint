@@ -4,9 +4,10 @@ import type {
 	Scene,
 	SceneWithWorld,
 	Shader,
+	ShaderWithCaptures,
 	User,
 	UserWithSessions,
-	World
+	WorldWithScenes
 } from '$lib/bindings';
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
@@ -41,8 +42,8 @@ export class AdminEndpoints extends ApiClient {
 		return super.get<Shader[]>('/api/shaders');
 	}
 
-	getShader(id: string): Promise<Result<Shader, ApiError>> {
-		return super.get<Shader>(`/api/shaders/${id}`);
+	getShader(id: string): Promise<Result<ShaderWithCaptures, ApiError>> {
+		return super.get<ShaderWithCaptures>(`/api/shaders/${id}`);
 	}
 
 	updateShader(id: string, request: UpdateShaderRequest): Promise<Result<Shader, ApiError>> {
@@ -55,12 +56,12 @@ export class AdminEndpoints extends ApiClient {
 
 	// ============== Worlds ==============
 
-	getWorld(id: string): Promise<Result<World, ApiError>> {
-		return super.get<World>(`/api/worlds/${id}`);
+	getWorld(id: string): Promise<Result<WorldWithScenes, ApiError>> {
+		return super.get<WorldWithScenes>(`/api/worlds/${id}`);
 	}
 
-	updateWorld(id: string, request: UpdateWorldRequest): Promise<Result<World, ApiError>> {
-		return super.put<World>(`/api/worlds/${id}`, request);
+	updateWorld(id: string, request: UpdateWorldRequest): Promise<Result<WorldWithScenes, ApiError>> {
+		return super.put<WorldWithScenes>(`/api/worlds/${id}`, request);
 	}
 
 	deleteWorld(id: string): Promise<Result<null, ApiError>> {

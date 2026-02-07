@@ -377,6 +377,18 @@ pub struct CaptureWithContext {
     pub run_status: Option<String>,
     // Shader author
     pub shader_author: Option<String>,
+    // Scene context
+    pub scene_name: Option<String>,
+    pub scene_slug: Option<String>,
+}
+
+/// World with its associated scenes
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct WorldWithScenes {
+    #[serde(flatten)]
+    pub world: World,
+    pub scenes: Vec<Scene>,
 }
 
 /// Paginated captures response envelope

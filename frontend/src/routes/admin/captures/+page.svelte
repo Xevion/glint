@@ -1,15 +1,11 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import { page as pageStore } from '$app/state';
-import { api } from '$lib/api';
 import type { CaptureWithContext } from '$lib/bindings';
 import AdminTable from '$lib/components/AdminTable.svelte';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminDetailField, AdminSlideOver } from '$lib/components/admin';
-import { Button } from '$lib/components/ui/button';
-import { ConfirmDialog } from '$lib/components/ui/dialog';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
-import { RefreshCw, Trash2 } from '@lucide/svelte';
+import { Button } from '$lib/components/ui/button';
+import { RefreshCw } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -20,11 +16,8 @@ let pageSize = $derived(data.pageSize);
 let totalPages = $derived(Math.ceil(totalCount / pageSize));
 let shaders = $derived(data.shaders);
 let scenes = $derived(data.scenes);
-let selected = $state<CaptureWithContext | null>(null);
 let refreshing = $state(false);
-let error = $state<string | null>(null);
-let showDeleteConfirm = $state(false);
-let captureToDelete = $state<CaptureWithContext | null>(null);
+let error = $derived(data.error);
 
 const statusColors: Record<string, string> = {
 	running: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
@@ -60,7 +53,7 @@ function setFilter(key: string, value: string) {
 const columns = [
 	{ id: 'preview', key: 'image_url', name: 'Preview' },
 	{ id: 'shader', key: 'shader_name', name: 'Shader' },
-	{ id: 'scene_id', key: 'scene_id', name: 'Scene' },
+	{ id: 'scene', key: 'scene_name', name: 'Scene' },
 	{ id: 'profile', key: 'profile', name: 'Profile' },
 	{ id: 'resolution', key: 'resolution_width', name: 'Resolution' },
 	{ id: 'captured_at', key: 'captured_at', name: 'Captured', component: 'time' as const },
@@ -69,29 +62,8 @@ const columns = [
 
 async function refresh() {
 	refreshing = true;
-	error = null;
 	await invalidateAll();
 	refreshing = false;
-}
-
-function handleDelete(capture: CaptureWithContext) {
-	captureToDelete = capture;
-	showDeleteConfirm = true;
-}
-
-async function confirmDelete() {
-	if (!captureToDelete) return;
-	const result = await api.admin.deleteCapture(captureToDelete.id);
-	result.match({
-		Ok: () => {
-			selected = null;
-			captureToDelete = null;
-			void refresh();
-		},
-		Err: (err) => {
-			error = err.message;
-		}
-	});
 }
 </script>
 
@@ -143,7 +115,8 @@ async function confirmDelete() {
 		{#if data.filters.runId}
 			<span class="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs">
 				Run: {data.filters.runId.slice(0, 8)}...
-				<button class="hover:text-foreground" onclick={() => setFilter('run_id', '')}>x</button>
+				<button class="hover:text-foreground" onclick={() => setFilter('run_id', '')}>x</button
+				>
 			</span>
 		{/if}
 	</div>
@@ -158,8 +131,7 @@ async function confirmDelete() {
 		<AdminTable
 			data={captures}
 			{columns}
-			selectedId={selected?.id}
-			onRowClick={(capture: CaptureWithContext) => (selected = capture)}
+			onRowClick={(capture: CaptureWithContext) => goto(`/admin/captures/${capture.id}`)}
 			getRowId={(c: CaptureWithContext) => c.id}
 		>
 			{#snippet cell({ columnId, value, row }: { columnId: string; value: unknown; row: CaptureWithContext })}
@@ -174,38 +146,56 @@ async function confirmDelete() {
 							containerClass="h-12 w-20 rounded"
 						/>
 					{:else if row.image_path}
-						<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">No URL</div>
+						<div
+							class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground"
+						>
+							No URL
+						</div>
 					{:else}
-						<div class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground">N/A</div>
+						<div
+							class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground"
+						>
+							N/A
+						</div>
 					{/if}
 				{:else if columnId === 'shader'}
 					<div>
-						<a href="/shaders/{row.shader_slug}" class="font-medium text-primary hover:underline">{row.shader_name}</a>
+						<a
+							href="/shaders/{row.shader_slug}"
+							class="font-medium text-primary hover:underline"
+							onclick={(e) => e.stopPropagation()}>{row.shader_name}</a
+						>
 						<div class="text-xs text-muted-foreground">{row.shader_version}</div>
 					</div>
+				{:else if columnId === 'scene'}
+					{value ?? row.scene_id}
 				{:else if columnId === 'profile'}
 					{value ?? '-'}
-			{:else if columnId === 'resolution'}
-				{row.resolution_width && row.resolution_height
-					? `${row.resolution_width}x${row.resolution_height}`
-					: '-'}
-			{:else if columnId === 'run'}
-				{#if row.run_id}
-					<a
-						href="/admin/runs/{row.run_id}"
-						class="inline-flex items-center gap-1"
-						onclick={(e) => e.stopPropagation()}
-					>
-						<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[row.run_status ?? ''] ?? 'bg-gray-100 text-gray-800'}">
-							{row.run_status ?? '?'}
-						</span>
-					</a>
+				{:else if columnId === 'resolution'}
+					{row.resolution_width && row.resolution_height
+						? `${row.resolution_width}x${row.resolution_height}`
+						: '-'}
+				{:else if columnId === 'run'}
+					{#if row.run_id}
+						<a
+							href="/admin/runs/{row.run_id}"
+							class="inline-flex items-center gap-1"
+							onclick={(e) => e.stopPropagation()}
+						>
+							<span
+								class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
+									row.run_status ?? ''
+								] ?? 'bg-gray-100 text-gray-800'}"
+							>
+								{row.run_status ?? '?'}
+							</span>
+						</a>
+					{:else}
+						<span class="text-muted-foreground">&mdash;</span>
+					{/if}
 				{:else}
-					<span class="text-muted-foreground">—</span>
+					{value ?? '-'}
 				{/if}
-			{:else}
-				{value ?? '-'}
-			{/if}
 			{/snippet}
 		</AdminTable>
 	{/if}
@@ -213,14 +203,27 @@ async function confirmDelete() {
 	{#if totalPages > 1}
 		<div class="flex items-center justify-between border-t pt-4">
 			<div class="text-sm text-muted-foreground">
-				Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+				Showing {(currentPage - 1) * pageSize + 1}&ndash;{Math.min(
+					currentPage * pageSize,
+					totalCount
+				)} of {totalCount}
 			</div>
 			<div class="flex items-center gap-2">
-				<Button variant="outline" size="sm" disabled={currentPage <= 1} onclick={() => navigateToPage(currentPage - 1)}>
+				<Button
+					variant="outline"
+					size="sm"
+					disabled={currentPage <= 1}
+					onclick={() => navigateToPage(currentPage - 1)}
+				>
 					Previous
 				</Button>
 				<span class="text-sm">Page {currentPage} of {totalPages}</span>
-				<Button variant="outline" size="sm" disabled={currentPage >= totalPages} onclick={() => navigateToPage(currentPage + 1)}>
+				<Button
+					variant="outline"
+					size="sm"
+					disabled={currentPage >= totalPages}
+					onclick={() => navigateToPage(currentPage + 1)}
+				>
 					Next
 				</Button>
 			</div>
@@ -236,90 +239,3 @@ async function confirmDelete() {
 		</div>
 	{/if}
 </div>
-
-<AdminSlideOver
-	open={selected !== null}
-	title={selected ? `${selected.shader_name} - ${selected.shader_version}` : ''}
-	description={selected?.profile ? `Profile: ${selected.profile}` : undefined}
-	onClose={() => (selected = null)}
->
-	{#if selected}
-		<dl class="space-y-4">
-			{#if selected.image_url}
-				<CaptureImage
-					src={selected.image_url}
-					thumbhash={selected.thumbhash}
-					preset="hero"
-					alt="Capture"
-					class="w-full"
-					containerClass="w-full overflow-hidden rounded-lg border"
-				/>
-			{/if}
-
-			<AdminDetailField label="Capture ID">
-				<code class="text-xs">{selected.id}</code>
-			</AdminDetailField>
-
-			<AdminDetailField label="Shader">
-				<a href="/shaders/{selected.shader_slug}" class="text-primary hover:underline">
-					{selected.shader_name}
-				</a>
-				<span class="text-muted-foreground"> ({selected.shader_version})</span>
-			</AdminDetailField>
-
-			<AdminDetailField label="Scene ID">
-				{selected.scene_id}
-			</AdminDetailField>
-
-			{#if selected.profile}
-				<AdminDetailField label="Profile">
-					{selected.profile}
-				</AdminDetailField>
-			{/if}
-
-			<AdminDetailField label="Resolution">
-				{selected.resolution_width && selected.resolution_height
-					? `${selected.resolution_width}x${selected.resolution_height}`
-					: '-'}
-			</AdminDetailField>
-
-			<AdminDetailField label="Captured">
-				{#if selected.captured_at}
-					<TimeAgo timestamp={selected.captured_at} />
-				{:else}
-					-
-				{/if}
-			</AdminDetailField>
-
-			{#if selected?.run_id}
-				<AdminDetailField label="Run">
-					<a href="/admin/runs/{selected.run_id}" class="text-primary hover:underline">
-						{selected.run_id.slice(0, 12)}...
-					</a>
-					{#if selected.run_status}
-						<span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[selected.run_status] ?? ''}">
-							{selected.run_status}
-						</span>
-					{/if}
-				</AdminDetailField>
-			{/if}
-		</dl>
-	{/if}
-
-	{#snippet footer()}
-		<div class="flex justify-end gap-2">
-			<Button variant="destructive" onclick={() => selected && handleDelete(selected)}>
-				<Trash2 class="mr-2 h-4 w-4" />
-				Delete
-			</Button>
-		</div>
-	{/snippet}
-</AdminSlideOver>
-
-<ConfirmDialog
-	bind:open={showDeleteConfirm}
-	title="Delete Capture"
-	description={`Delete capture for ${captureToDelete?.shader_name}?`}
-	confirmLabel="Delete"
-	onConfirm={confirmDelete}
-/>

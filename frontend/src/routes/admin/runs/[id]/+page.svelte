@@ -64,9 +64,9 @@ const statCards = $derived([
 	<!-- Header -->
 	<header class="space-y-2">
 		<div class="flex items-center gap-2">
-			<a href="/admin/runs" class="text-muted-foreground hover:text-foreground">
-				<ArrowLeft class="h-4 w-4" />
-			</a>
+		<a href="/admin/runs" class="text-muted-foreground hover:text-foreground" aria-label="Back to runs">
+			<ArrowLeft class="h-4 w-4" />
+		</a>
 			<h1 class="text-2xl font-semibold">Capture Run</h1>
 			<span
 				class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[

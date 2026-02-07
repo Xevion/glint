@@ -1,0 +1,203 @@
+<script lang="ts">
+import { goto, invalidateAll } from '$app/navigation';
+import { untrack } from 'svelte';
+import { api } from '$lib/api';
+import type { UpdateWorldRequest } from '$lib/api/endpoints/admin';
+import type { Scene, WorldWithScenes } from '$lib/bindings';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
+import { AdminDetailField } from '$lib/components/admin';
+import { Button } from '$lib/components/ui/button';
+import { ConfirmDialog } from '$lib/components/ui/dialog';
+import { Input } from '$lib/components/ui/input';
+import { Label } from '$lib/components/ui/label';
+import { Textarea } from '$lib/components/ui/textarea';
+import { formatBytes } from '$lib/utils/display';
+import { ArrowLeft, Trash2 } from '@lucide/svelte';
+import type { PageData } from './$types';
+
+let { data } = $props<{ data: PageData }>();
+let world: WorldWithScenes = $derived(data.world);
+let scenes: Scene[] = $derived(data.world.scenes);
+
+let saving = $state(false);
+let actionLoading = $state(false);
+let error = $state<string | null>(null);
+let showDeleteConfirm = $state(false);
+
+let editName = $state('');
+let editDescription = $state('');
+
+$effect(() => {
+	void world.id;
+	untrack(() => {
+		editName = world.name;
+		editDescription = world.description ?? '';
+	});
+});
+
+async function handleSave() {
+	saving = true;
+	error = null;
+
+	try {
+		const request: UpdateWorldRequest = {};
+		if (editName !== world.name) request.name = editName;
+		if (editDescription !== (world.description ?? ''))
+			request.description = editDescription || undefined;
+
+		if (Object.keys(request).length === 0) return;
+
+		const result = await api.admin.updateWorld(world.id, request);
+		result.match({
+			Ok: () => {
+				void invalidateAll();
+			},
+			Err: (err) => {
+				error = err.message;
+			}
+		});
+	} finally {
+		saving = false;
+	}
+}
+
+async function confirmDelete() {
+	actionLoading = true;
+	try {
+		const result = await api.admin.deleteWorld(world.id);
+		result.match({
+			Ok: () => {
+				void goto('/admin/worlds');
+			},
+			Err: (err) => {
+				error = err.message;
+			}
+		});
+	} finally {
+		actionLoading = false;
+	}
+}
+</script>
+
+<div class="space-y-6">
+	<!-- Header -->
+	<header class="space-y-2">
+		<div class="flex items-center gap-2">
+		<a href="/admin/worlds" class="text-muted-foreground hover:text-foreground" aria-label="Back to worlds">
+			<ArrowLeft class="h-4 w-4" />
+		</a>
+			<h1 class="text-2xl font-semibold">{world.name}</h1>
+			<code class="rounded bg-muted px-1.5 py-0.5 text-xs">{world.minecraft_version}</code>
+		</div>
+	</header>
+
+	{#if error}
+		<div
+			class="rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+		>
+			{error}
+		</div>
+	{/if}
+
+	<!-- Edit Section -->
+	<div class="space-y-4 rounded-lg border p-4">
+		<div class="grid gap-2">
+			<Label for="name">Name</Label>
+			<Input id="name" bind:value={editName} />
+		</div>
+
+		<div class="grid gap-2">
+			<Label for="description">Description</Label>
+			<Textarea id="description" bind:value={editDescription} rows={3} />
+		</div>
+
+		<div class="flex justify-end">
+			<Button onclick={handleSave} disabled={saving}>
+				{saving ? 'Saving...' : 'Save Changes'}
+			</Button>
+		</div>
+	</div>
+
+	<!-- Metadata -->
+	<div class="rounded-lg border p-4">
+		<dl class="space-y-2 text-sm">
+			<AdminDetailField label="ID">
+				<code class="text-xs">{world.id}</code>
+			</AdminDetailField>
+			<AdminDetailField label="Slug">
+				{world.slug}
+			</AdminDetailField>
+			<AdminDetailField label="Minecraft Version">
+				<code class="rounded bg-muted px-1.5 py-0.5 text-xs">{world.minecraft_version}</code>
+			</AdminDetailField>
+			<AdminDetailField label="Size">
+				{world.size_bytes ? formatBytes(world.size_bytes) : '-'}
+			</AdminDetailField>
+			{#if world.file_hash}
+				<AdminDetailField label="File Hash">
+					<code class="text-xs">{world.file_hash}</code>
+				</AdminDetailField>
+			{/if}
+			<AdminDetailField label="Created">
+				<TimeAgo timestamp={world.created_at} />
+			</AdminDetailField>
+			<AdminDetailField label="Updated">
+				<TimeAgo timestamp={world.updated_at} />
+			</AdminDetailField>
+		</dl>
+	</div>
+
+	<!-- Scenes Section -->
+	<div class="space-y-3">
+		<h2 class="text-lg font-medium">Scenes ({scenes.length})</h2>
+		{#if scenes.length === 0}
+			<p class="text-sm text-muted-foreground">No scenes for this world.</p>
+		{:else}
+			<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+				{#each scenes as scene (scene.id)}
+					<a
+						href="/admin/scenes/{scene.id}"
+						class="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+					>
+						<div>
+							<div class="font-medium">{scene.name}</div>
+							<div class="text-xs text-muted-foreground">
+								{scene.dimension.split(':').pop()} &middot;
+								<span class="capitalize">{scene.weather}</span>
+							</div>
+						</div>
+						{#if scene.active}
+							<span
+								class="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800 dark:bg-green-900 dark:text-green-300"
+							>
+								Active
+							</span>
+						{:else}
+							<span
+								class="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+							>
+								Inactive
+							</span>
+						{/if}
+					</a>
+				{/each}
+			</div>
+		{/if}
+	</div>
+
+	<!-- Actions -->
+	<div class="border-t pt-4">
+		<Button variant="destructive" onclick={() => (showDeleteConfirm = true)} disabled={actionLoading}>
+			<Trash2 class="mr-2 h-4 w-4" />
+			Delete World
+		</Button>
+	</div>
+</div>
+
+<ConfirmDialog
+	bind:open={showDeleteConfirm}
+	title="Delete World"
+	description={`Delete world "${world.name}"? This will also delete the file from storage.`}
+	confirmLabel="Delete"
+	onConfirm={confirmDelete}
+/>
