@@ -7,8 +7,8 @@ use uuid::Uuid;
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
 use crate::models::{
-    CaptureWithContext, CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderVersion,
-    UpdateShaderRequest,
+    CaptureWithContext, CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderAdopted,
+    ShaderVersion, UpdateShaderRequest,
 };
 use crate::platform::{Platform, PlatformMetadata, PlatformVersion};
 
@@ -305,6 +305,55 @@ impl ShaderRepo {
             shader_id
         ))?;
         Ok(())
+    }
+
+    /// Find adopted shaders matching any of the given platform IDs.
+    /// Returns a map from platform_id → ShaderAdopted for quick lookup.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn find_adopted_by_platform_ids(
+        executor: impl sqlx::PgExecutor<'_>,
+        modrinth_ids: &[String],
+        curseforge_ids: &[String],
+    ) -> AppResult<HashMap<String, ShaderAdopted>> {
+        struct Row {
+            id: String,
+            slug: String,
+            modrinth_id: Option<String>,
+            curseforge_id: Option<String>,
+        }
+
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT id, slug, modrinth_id, curseforge_id FROM shaders
+            WHERE modrinth_id = ANY($1) OR curseforge_id = ANY($2)
+            "#,
+            modrinth_ids,
+            curseforge_ids,
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to find adopted shaders by platform IDs")?;
+
+        let mut result = HashMap::new();
+        for row in rows {
+            let adopted = ShaderAdopted {
+                id: row.id,
+                slug: row.slug,
+            };
+            if let Some(mid) = row.modrinth_id {
+                result.insert(mid, adopted.clone());
+            }
+            if let Some(cid) = row.curseforge_id {
+                result.insert(cid, adopted);
+            }
+        }
+
+        debug!(
+            count = result.len(),
+            "Found adopted shaders by platform IDs"
+        );
+        Ok(result)
     }
 
     /// Fetch captures with shader/version context for a given shader

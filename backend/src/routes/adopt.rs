@@ -10,7 +10,7 @@ use crate::{
     error::{AppError, AppResult},
     models::{
         AdoptPreviewResponse, AdoptShaderRequest, LinkShaderRequest, Shader, ShaderSearchRequest,
-        ShaderSearchResponse, ShaderSearchResult,
+        ShaderSearchResponse, ShaderSearchResult, ShaderSearchSort,
     },
     platform::{self, Platform},
     repo::ShaderRepo,
@@ -27,24 +27,40 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/sync", post(sync_shader))
 }
 
-/// POST /api/shaders/search - Search both platforms for shaders (admin)
+/// POST /api/shaders/search - Search or browse both platforms for shaders (admin)
+///
+/// When `query` is provided: searches platforms by text query.
+/// When `query` is absent/empty: browses platforms using `sort` order (popular or recent).
 async fn search_platforms(
     _admin: AdminUser,
     State(state): State<AppState>,
     Json(request): Json<ShaderSearchRequest>,
 ) -> AppResult<Json<ShaderSearchResponse>> {
-    let query = request.query.trim();
-    if query.is_empty() {
-        return Err(AppError::BadRequest("Search query cannot be empty".into()));
-    }
-
+    let query = request.query.as_deref().map(str::trim).unwrap_or_default();
     let limit = request.limit.unwrap_or(20).min(100);
     let offset = request.offset.unwrap_or(0);
+    let sort = request.sort.unwrap_or_default();
 
-    let modrinth_fut = state.modrinth().search_shaders(query, offset, limit);
+    // Determine platform-specific sort parameters based on mode
+    let (modrinth_index, cf_sort_field) = if query.is_empty() {
+        match sort {
+            ShaderSearchSort::Popular => (Some("downloads"), Some(6u32)), // TotalDownloads
+            ShaderSearchSort::Recent => (Some("newest"), Some(3u32)),     // LastUpdated
+        }
+    } else {
+        // For search queries, let platforms use their default relevance ranking
+        (None, None)
+    };
+
+    let modrinth_fut = state
+        .modrinth()
+        .search_shaders(query, offset, limit, modrinth_index);
     let cf_fut = async {
         if let Some(cf) = state.curseforge() {
-            Some(cf.search_shaders(query, limit, offset).await)
+            Some(
+                cf.search_shaders(query, limit, offset, cf_sort_field, Some("desc"))
+                    .await,
+            )
         } else {
             None
         }
@@ -71,6 +87,7 @@ async fn search_platforms(
                     author: hit.author,
                     downloads: hit.downloads,
                     categories: hit.categories,
+                    adopted: None, // Enriched below
                 });
             }
         }
@@ -102,6 +119,7 @@ async fn search_platforms(
                         "https://www.curseforge.com/minecraft/shaders/{}",
                         cf_mod.slug
                     ),
+                    adopted: None, // Enriched below
                 });
             }
             total
@@ -113,7 +131,37 @@ async fn search_platforms(
         None => None,
     };
 
+    // Sort combined results by downloads (for browse mode this maintains cross-platform ordering)
     results.sort_by(|a, b| b.downloads.cmp(&a.downloads));
+
+    // Enrich results with adopted shader info
+    if !results.is_empty() {
+        let modrinth_ids: Vec<String> = results
+            .iter()
+            .filter(|r| r.platform == "modrinth")
+            .map(|r| r.platform_id.clone())
+            .collect();
+        let curseforge_ids: Vec<String> = results
+            .iter()
+            .filter(|r| r.platform == "curseforge")
+            .map(|r| r.platform_id.clone())
+            .collect();
+
+        match ShaderRepo::find_adopted_by_platform_ids(state.db(), &modrinth_ids, &curseforge_ids)
+            .await
+        {
+            Ok(adopted_map) => {
+                for result in &mut results {
+                    if let Some(adopted) = adopted_map.get(&result.platform_id) {
+                        result.adopted = Some(adopted.clone());
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = ?e, "Failed to check adopted shaders, continuing without");
+            }
+        }
+    }
 
     Ok(Json(ShaderSearchResponse {
         results,

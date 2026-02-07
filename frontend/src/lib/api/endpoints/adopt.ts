@@ -1,15 +1,26 @@
-import type { AdoptPreviewResponse, Shader, ShaderSearchResponse } from '$lib/bindings';
+import type {
+	AdoptPreviewResponse,
+	Shader,
+	ShaderSearchResponse,
+	ShaderSearchSort
+} from '$lib/bindings';
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
 
 export class AdoptEndpoints extends ApiClient {
 	search(
-		query: string,
+		query?: string,
 		limit?: number,
-		offset?: number
+		offset?: number,
+		sort?: ShaderSearchSort
 	): Promise<Result<ShaderSearchResponse, ApiError>> {
-		return super.post<ShaderSearchResponse>('/api/shaders/search', { query, limit, offset });
+		return super.post<ShaderSearchResponse>('/api/shaders/search', {
+			query: query ?? undefined,
+			limit,
+			offset,
+			sort
+		});
 	}
 
 	preview(url: string): Promise<Result<AdoptPreviewResponse, ApiError>> {

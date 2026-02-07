@@ -26,26 +26,33 @@ impl ModrinthClient {
         }
     }
 
-    /// Search for shader projects
+    /// Search for shader projects.
+    /// `index` controls sort order: "relevance" (default for search), "downloads", "newest"
     pub async fn search_shaders(
         &self,
         query: &str,
         offset: u32,
         limit: u32,
+        index: Option<&str>,
     ) -> PlatformResult<SearchResponse> {
         let facets = serde_json::to_string(&vec![vec![Facet::ProjectType(ProjectType::Shader)]])
             .expect("facet serialization cannot fail");
 
-        self.client
+        let mut req = self
+            .client
             .get(format!("{}/search", Self::BASE_URL))
             .query(&[
                 ("query", query),
                 ("facets", &facets),
                 ("offset", &offset.to_string()),
                 ("limit", &limit.to_string()),
-            ])
-            .send_and_parse()
-            .await
+            ]);
+
+        if let Some(idx) = index {
+            req = req.query(&[("index", idx)]);
+        }
+
+        req.send_and_parse().await
     }
 
     /// Get a single project by ID or slug

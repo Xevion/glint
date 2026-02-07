@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, slug, modrinth_id, curseforge_id FROM shaders\n            WHERE modrinth_id = ANY($1) OR curseforge_id = ANY($2)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "modrinth_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "curseforge_id",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "95ca9a219d8388187e2402e9d8b3909ae4ef702e7b535b9f83243b5a60c9688c"
+}

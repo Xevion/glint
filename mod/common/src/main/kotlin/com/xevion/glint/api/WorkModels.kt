@@ -83,15 +83,15 @@ data class UploadUrlResponse(
     @SerialName("capture_id") val captureId: String,
     @SerialName("r2_key") val r2Key: String,
     @SerialName("presigned_url") val presignedUrl: String,
-    @SerialName("screenshot_url") val screenshotUrl: String,
+    @SerialName("image_url") val imageUrl: String,
 )
 
 /** Request to mark a run item as completed. */
 @Serializable
 data class CompleteItemRequest(
     @SerialName("capture_id") val captureId: String,
-    @SerialName("screenshot_path") val screenshotPath: String,
-    @SerialName("screenshot_url") val screenshotUrl: String,
+    @SerialName("image_path") val imagePath: String,
+    @SerialName("image_url") val imageUrl: String,
     @SerialName("resolution_width") val resolutionWidth: Int,
     @SerialName("resolution_height") val resolutionHeight: Int,
     @SerialName("captured_at") val capturedAt: String,
@@ -119,7 +119,7 @@ data class ClaimItemRequest(
 data class ClaimItemResponse(
     @SerialName("capture_id") val captureId: String,
     @SerialName("presigned_url") val presignedUrl: String,
-    @SerialName("screenshot_url") val screenshotUrl: String,
+    @SerialName("image_url") val imageUrl: String,
 )
 
 /** Request to confirm an upload has completed. */

@@ -628,6 +628,16 @@ pub struct ShaderSearchResult {
     pub downloads: u64,
     pub categories: Vec<String>,
     pub platform_url: String,
+    /// Present when this shader has already been adopted into Glint
+    pub adopted: Option<ShaderAdopted>,
+}
+
+/// Reference to an already-adopted shader in Glint
+#[derive(Debug, Clone, Serialize, FromRow, TS)]
+#[ts(export)]
+pub struct ShaderAdopted {
+    pub id: String,
+    pub slug: String,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -638,9 +648,21 @@ pub struct ShaderSearchResponse {
     pub total_curseforge: Option<u32>,
 }
 
+/// Sort order for shader browsing (when no search query is provided)
+#[derive(Debug, Default, Deserialize, Serialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum ShaderSearchSort {
+    #[default]
+    Popular,
+    Recent,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ShaderSearchRequest {
-    pub query: String,
+    pub query: Option<String>,
     pub limit: Option<u32>,
     pub offset: Option<u32>,
+    /// Sort order for browse mode (ignored when query is provided)
+    pub sort: Option<ShaderSearchSort>,
 }

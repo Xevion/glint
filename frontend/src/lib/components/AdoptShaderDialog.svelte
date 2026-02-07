@@ -5,8 +5,11 @@ import { Button } from '$lib/components/ui/button';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
-import { ArrowLeft, Check, CircleAlert, Download, LoaderCircle } from '@lucide/svelte';
+import { ArrowLeft, Check, CircleAlert, Download, Info, LoaderCircle } from '@lucide/svelte';
 import type { Snippet } from 'svelte';
+
+const PLATFORM_URL_PATTERN =
+	/^https?:\/\/(www\.)?(modrinth\.com\/shader\/|curseforge\.com\/minecraft\/shaders\/)/i;
 
 interface Props {
 	onShaderAdopted?: () => void;
@@ -24,6 +27,7 @@ let step = $state<'url' | 'preview'>('url');
 let loading = $state(false);
 let adopting = $state(false);
 let error = $state<string | null>(null);
+let errorIsConflict = $state(false);
 let url = $state('');
 let preview = $state<AdoptPreviewResponse | null>(null);
 let initialized = $state(false);
@@ -39,18 +43,31 @@ $effect(() => {
 	}
 });
 
+function isValidPlatformUrl(input: string): boolean {
+	return PLATFORM_URL_PATTERN.test(input.trim());
+}
+
 async function handlePreview() {
-	if (!url.trim()) return;
+	const trimmed = url.trim();
+	if (!trimmed) return;
+
+	if (!isValidPlatformUrl(trimmed)) {
+		error = 'Please enter a valid Modrinth or CurseForge shader URL.';
+		errorIsConflict = false;
+		return;
+	}
 
 	loading = true;
 	error = null;
+	errorIsConflict = false;
 
-	const result = await api.adopt.preview(url.trim());
+	const result = await api.adopt.preview(trimmed);
 	if (result.isOk) {
 		preview = result.value;
 		step = 'preview';
 	} else {
 		error = result.error.message;
+		errorIsConflict = false;
 	}
 	loading = false;
 }
@@ -60,13 +77,21 @@ async function handleAdopt() {
 
 	adopting = true;
 	error = null;
+	errorIsConflict = false;
 
 	const result = await api.adopt.adopt(url.trim());
 	if (result.isOk) {
 		resetAndClose();
 		onShaderAdopted?.();
 	} else {
-		error = result.error.message;
+		const isAlreadyAdopted = result.error.statusCode === 409 || result.error.code === 'CONFLICT';
+		if (isAlreadyAdopted) {
+			error = 'This shader is already in Glint.';
+			errorIsConflict = true;
+		} else {
+			error = result.error.message;
+			errorIsConflict = false;
+		}
 		adopting = false;
 	}
 }
@@ -75,6 +100,7 @@ function goBack() {
 	step = 'url';
 	preview = null;
 	error = null;
+	errorIsConflict = false;
 }
 
 function resetAndClose() {
@@ -83,6 +109,7 @@ function resetAndClose() {
 	url = '';
 	preview = null;
 	error = null;
+	errorIsConflict = false;
 	loading = false;
 	adopting = false;
 }
@@ -142,12 +169,26 @@ function formatNumber(n: number): string {
 		</Dialog.Header>
 
 		{#if error}
-			<div
-				class="flex items-start gap-2 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
-			>
-				<CircleAlert class="h-4 w-4 shrink-0 mt-0.5" />
-				<div>{error}</div>
-			</div>
+			{#if errorIsConflict}
+				<div
+					class="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-blue-300"
+				>
+					<Info class="mt-0.5 h-4 w-4 shrink-0" />
+					<div>
+						{error}
+						<a href="/admin/shaders" class="ml-1 underline hover:no-underline">
+							View adopted shaders
+						</a>
+					</div>
+				</div>
+			{:else}
+				<div
+					class="flex items-start gap-2 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+				>
+					<CircleAlert class="mt-0.5 h-4 w-4 shrink-0" />
+					<div>{error}</div>
+				</div>
+			{/if}
 		{/if}
 
 		{#if step === 'url'}

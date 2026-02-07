@@ -145,7 +145,7 @@ impl CaptureHealthRepo {
                 tm.profile,
                 sv.capture_failure_count AS "capture_failure_count!",
                 bc.captured_at AS last_capture_at,
-                bc.outdated AS capture_outdated,
+                bc.outdated AS "capture_outdated?: bool",
                 (bc.captured_at IS NOT NULL) AS "has_capture!"
             FROM target_matrix tm
             JOIN latest_versions sv ON sv.id = tm.shader_version_id

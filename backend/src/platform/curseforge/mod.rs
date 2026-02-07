@@ -39,14 +39,19 @@ impl CurseForgeClient<Authenticated> {
         }
     }
 
-    /// Search for shader packs
+    /// Search for shader packs.
+    /// `sort_field` and `sort_order` control ordering. CurseForge sort fields:
+    /// 1=Featured, 2=Popularity, 3=LastUpdated, 4=Name, 5=Author, 6=TotalDownloads
     pub async fn search_shaders(
         &self,
         query: &str,
         page_size: u32,
         index: u32,
+        sort_field: Option<u32>,
+        sort_order: Option<&str>,
     ) -> PlatformResult<CfSearchResponse> {
-        self.client
+        let mut req = self
+            .client
             .get(format!("{}/mods/search", Self::BASE_URL))
             .query(&[
                 ("gameId", &Self::MINECRAFT_GAME_ID.to_string()),
@@ -54,9 +59,16 @@ impl CurseForgeClient<Authenticated> {
                 ("searchFilter", &query.to_string()),
                 ("pageSize", &page_size.to_string()),
                 ("index", &index.to_string()),
-            ])
-            .send_and_parse()
-            .await
+            ]);
+
+        if let Some(sf) = sort_field {
+            req = req.query(&[("sortField", &sf.to_string())]);
+        }
+        if let Some(so) = sort_order {
+            req = req.query(&[("sortOrder", so)]);
+        }
+
+        req.send_and_parse().await
     }
 
     /// Get a single mod by ID
@@ -141,7 +153,7 @@ impl CurseForgeClient<Authenticated> {
 
     /// Search by slug (convenience: searches and finds exact match)
     pub async fn get_mod_by_slug(&self, slug: &str) -> PlatformResult<Option<CfMod>> {
-        let results = self.search_shaders(slug, 50, 0).await?;
+        let results = self.search_shaders(slug, 50, 0, None, None).await?;
         Ok(results.data.into_iter().find(|m| m.slug == slug))
     }
 
