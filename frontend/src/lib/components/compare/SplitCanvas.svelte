@@ -460,7 +460,7 @@ $effect(() => {
 
 onMount(() => {
 	if (!canvas) return;
-	ctx = canvas.getContext('2d');
+	ctx = canvas.getContext('2d', { willReadFrequently: true });
 	const cleanup = setupResizeObserver();
 
 	canvas.style.cursor = 'grab';

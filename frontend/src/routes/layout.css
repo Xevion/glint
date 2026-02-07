@@ -149,6 +149,12 @@
 	background: var(--scrollbar-thumb-hover);
 }
 
+::-webkit-scrollbar-button {
+	opacity: 0;
+	height: 0;
+	width: 0;
+}
+
 /* Glass effect utilities */
 .glass {
 	background: oklch(from var(--background) l c h / 70%);
