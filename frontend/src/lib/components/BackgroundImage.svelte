@@ -1,6 +1,8 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import type { Snippet } from 'svelte';
+import { wallpaperManifest } from '$lib/data/wallpaper-manifest';
+import { decodeThumbhash } from '$lib/utils/thumbhash';
 
 interface Props {
 	lightWallpapers: number[];
@@ -55,9 +57,14 @@ const sectionsNeeded = $derived(() => {
 	return Math.max(3, Math.ceil(containerHeight / height) + 1);
 });
 
-// Generate wallpaper URLs for a given theme
 function getWallpaperUrl(index: number): string {
-	return `/wallpapers/${index}.jpg`;
+	return wallpaperManifest[index]?.optimized ?? `/wallpapers/${index}.jpg`;
+}
+
+function getThumbhashBackground(index: number): string | null {
+	const entry = wallpaperManifest[index];
+	if (!entry) return null;
+	return decodeThumbhash(entry.thumbhash);
 }
 
 // Shuffle array using Fisher-Yates algorithm
@@ -194,6 +201,48 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 </script>
 
 <div class="background-container" bind:this={containerEl}>
+	<!-- Light theme thumbhash placeholders (shown immediately while images load) -->
+	{#if mounted && !imagesLoaded}
+		{#each lightIndices as wallpaperIndex, i (i)}
+			{@const top = i * sectionHeight()}
+			{@const isFirst = i === 0}
+			{@const isLast = i === lightIndices.length - 1}
+			{@const thumbhashUrl = getThumbhashBackground(wallpaperIndex)}
+			{#if thumbhashUrl}
+				<div
+					class="wallpaper-section wallpaper-light"
+					style:top="{top}px"
+					style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
+					style:background-image="url({thumbhashUrl})"
+					style:background-size="cover"
+					style:filter={lightFilterStyle() ?? undefined}
+					style:--blend-height="{blendHeight}px"
+					class:has-fade-top={!isFirst}
+					class:has-fade-bottom={!isLast}
+				></div>
+			{/if}
+		{/each}
+		{#each darkIndices as wallpaperIndex, i (i)}
+			{@const top = i * sectionHeight()}
+			{@const isFirst = i === 0}
+			{@const isLast = i === darkIndices.length - 1}
+			{@const thumbhashUrl = getThumbhashBackground(wallpaperIndex)}
+			{#if thumbhashUrl}
+				<div
+					class="wallpaper-section wallpaper-dark"
+					style:top="{top}px"
+					style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
+					style:background-image="url({thumbhashUrl})"
+					style:background-size="cover"
+					style:filter={darkFilterStyle ?? undefined}
+					style:--blend-height="{blendHeight}px"
+					class:has-fade-top={!isFirst}
+					class:has-fade-bottom={!isLast}
+				></div>
+			{/if}
+		{/each}
+	{/if}
+
 	<!-- Light theme wallpapers -->
 	{#if mounted && imagesLoaded}
 		{#each lightIndices as wallpaperIndex, i (i)}

@@ -116,6 +116,10 @@ bindings:
     cd backend && cargo test export_bindings --quiet
     bun scripts/bindings-barrel.ts
 
+# Generate optimized wallpapers and thumbhash manifest
+wallpapers:
+    bun scripts/optimize-wallpapers.ts
+
 # Query Minecraft source JAR
 # Usage:
 #   just mcjar list net/minecraft/client/renderer/        # List classes in package

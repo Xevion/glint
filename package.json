@@ -16,7 +16,9 @@
   "devDependencies": {
     "@types/bun": "latest",
     "concurrently": "^9.2.1",
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "sharp": "^0.34.5",
+    "thumbhash": "^0.1.1"
   },
   "engines": {
     "bun": ">=1.0.0"

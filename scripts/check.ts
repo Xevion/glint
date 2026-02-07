@@ -104,6 +104,50 @@ if (fix) {
 	}
 }
 
+// Regenerate optimized wallpapers if source JPEGs are newer than outputs.
+{
+	const OPTIMIZED_DIR = 'frontend/static/wallpapers/optimized';
+	const MANIFEST_PATH = 'frontend/src/lib/data/wallpaper-manifest.ts';
+	const CURATED_INDICES = [13, 53, 31, 71, 18, 65, 32, 97, 102, 69, 23, 94];
+
+	let newestSrcMtime = 0;
+	for (const idx of CURATED_INDICES) {
+		const src = `frontend/static/wallpapers/${idx}.jpg`;
+		if (existsSync(src)) {
+			const mt = statSync(src).mtimeMs;
+			if (mt > newestSrcMtime) newestSrcMtime = mt;
+		}
+	}
+
+	let newestOptMtime = 0;
+	if (existsSync(OPTIMIZED_DIR)) {
+		for (const file of new Bun.Glob('*.webp').scanSync(OPTIMIZED_DIR)) {
+			const mt = statSync(`${OPTIMIZED_DIR}/${file}`).mtimeMs;
+			if (mt > newestOptMtime) newestOptMtime = mt;
+		}
+	}
+	if (existsSync(MANIFEST_PATH)) {
+		const mt = statSync(MANIFEST_PATH).mtimeMs;
+		if (mt > newestOptMtime) newestOptMtime = mt;
+	}
+
+	const hasSources = newestSrcMtime > 0;
+	const stale = hasSources && (newestOptMtime === 0 || newestSrcMtime > newestOptMtime);
+	if (stale) {
+		const t = Date.now();
+		process.stdout.write(c('1;36', '→ Regenerating optimized wallpapers (sources changed)...') + '\n');
+		run(['bun', 'scripts/optimize-wallpapers.ts']);
+		const count = existsSync(OPTIMIZED_DIR)
+			? readdirSync(OPTIMIZED_DIR).filter((f) => f.endsWith('.webp')).length
+			: 0;
+		process.stdout.write(c('32', '✓ wallpapers') + ` (${elapsed(t)}s, ${count} images)\n`);
+	} else if (hasSources) {
+		process.stdout.write(c('2', '· wallpapers up-to-date, skipped') + '\n');
+	} else {
+		process.stdout.write(c('2', '· wallpapers skipped (no source images)') + '\n');
+	}
+}
+
 interface Check {
 	name: string;
 	cmd: string[];
