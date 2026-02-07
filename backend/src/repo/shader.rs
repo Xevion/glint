@@ -658,6 +658,15 @@ impl ShaderVersionRepo {
             return Ok(());
         }
 
+        // Deduplicate by version_number — platforms can return multiple entries for the
+        // same version (e.g. different loaders), and PostgreSQL's ON CONFLICT DO UPDATE
+        // cannot affect the same row twice in one statement.
+        let mut seen = std::collections::HashSet::new();
+        let versions: Vec<&PlatformVersion> = versions
+            .iter()
+            .filter(|v| seen.insert(&v.version_number))
+            .collect();
+
         let ids: Vec<String> = versions
             .iter()
             .map(|_| Uuid::new_v4().to_string())
