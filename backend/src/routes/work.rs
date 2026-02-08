@@ -2,6 +2,7 @@ use axum::{Json, Router, extract::State, routing::get};
 use serde::Deserialize;
 use tracing::debug;
 
+use crate::auth::AuthUser;
 use crate::error::AppResult;
 use crate::repo::WorkRepo;
 use crate::repo::work::WorkItem;
@@ -24,6 +25,7 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn get_work(
+    _user: AuthUser,
     State(state): State<AppState>,
     axum::extract::Query(query): axum::extract::Query<WorkQuery>,
 ) -> AppResult<Json<Vec<WorkItem>>> {

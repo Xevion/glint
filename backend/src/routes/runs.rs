@@ -119,6 +119,7 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn create_run(
+    _user: AuthUser,
     State(state): State<AppState>,
     Json(request): Json<CreateRunRequest>,
 ) -> AppResult<(StatusCode, Json<CaptureRun>)> {
@@ -166,12 +167,16 @@ async fn create_run(
     Ok((StatusCode::CREATED, Json(run)))
 }
 
-async fn list_runs(State(state): State<AppState>) -> AppResult<Json<Vec<CaptureRun>>> {
+async fn list_runs(
+    _user: AuthUser,
+    State(state): State<AppState>,
+) -> AppResult<Json<Vec<CaptureRun>>> {
     let runs = CaptureRunRepo::list(state.db()).await?;
     Ok(Json(runs))
 }
 
 async fn get_run(
+    _user: AuthUser,
     State(state): State<AppState>,
     Path(run_id): Path<String>,
 ) -> AppResult<Json<CaptureRun>> {
@@ -180,6 +185,7 @@ async fn get_run(
 }
 
 async fn list_run_items(
+    _user: AuthUser,
     State(state): State<AppState>,
     Path(run_id): Path<String>,
 ) -> AppResult<Json<Vec<CaptureRunItemWithContext>>> {
@@ -188,6 +194,7 @@ async fn list_run_items(
 }
 
 async fn fail_item(
+    _user: AuthUser,
     State(state): State<AppState>,
     Path((run_id, item_id)): Path<(String, String)>,
     Json(request): Json<FailItemRequest>,
@@ -213,6 +220,7 @@ async fn fail_item(
 }
 
 async fn claim_item(
+    _user: AuthUser,
     State(state): State<AppState>,
     Path((run_id, item_id)): Path<(String, String)>,
     Json(request): Json<ClaimItemRequest>,
@@ -273,6 +281,7 @@ async fn claim_item(
 }
 
 async fn confirm_upload(
+    _user: AuthUser,
     State(state): State<AppState>,
     Path((run_id, item_id)): Path<(String, String)>,
     Json(request): Json<ConfirmUploadRequest>,
@@ -303,6 +312,7 @@ async fn confirm_upload(
 }
 
 async fn complete_run(
+    _user: AuthUser,
     State(state): State<AppState>,
     Path(run_id): Path<String>,
 ) -> AppResult<Json<CaptureRun>> {
