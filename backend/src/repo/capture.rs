@@ -21,12 +21,50 @@ pub struct CaptureRepo;
 /// SQLx macros require string-literal concatenation (`"a" + "b"`), so this
 /// macro injects the shared SELECT/FROM/JOIN fragment and appends a caller-
 /// supplied suffix (WHERE, ORDER BY, LIMIT, etc.).
+///
+/// # Variants
+///
+/// - `capture_ctx_query!($suffix, $args...)` — plain SELECT
+/// - `capture_ctx_query!(distinct: $expr, $suffix, $args...)` — SELECT DISTINCT ON ($expr)
+#[macro_export]
 macro_rules! capture_ctx_query {
     ($suffix:literal $(, $arg:expr)* $(,)?) => {
         sqlx::query_as!(
             CaptureWithContext,
             r#"
             SELECT
+                c.id,
+                c.scene_id,
+                s.slug as shader_slug,
+                s.name as shader_name,
+                sv.version as shader_version,
+                c.profile,
+                c.image_path,
+                c.image_url,
+                c.thumbhash,
+                c.captured_at,
+                c.resolution_width,
+                c.resolution_height,
+                c.file_size_bytes,
+                cri.run_id as "run_id?: String",
+                cr.status as "run_status?: String",
+                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
+                sc.name as "scene_name?: String",
+                sc.slug as "scene_slug?: String"
+            FROM captures c
+            JOIN shader_versions sv ON c.shader_version_id = sv.id
+            JOIN shaders s ON sv.shader_id = s.id
+            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
+            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
+            LEFT JOIN scenes sc ON c.scene_id = sc.id
+            "# + $suffix
+            $(, $arg)*
+        )
+    };
+    (distinct: $distinct:literal, $suffix:literal $(, $arg:expr)* $(,)?) => {
+        sqlx::query_as!(
+            CaptureWithContext,
+            r#"SELECT DISTINCT ON ("# + $distinct + r#")
                 c.id,
                 c.scene_id,
                 s.slug as shader_slug,
@@ -139,34 +177,9 @@ impl CaptureRepo {
         executor: impl sqlx::PgExecutor<'_>,
         scene_id: &str,
     ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = sqlx::query_as!(
-            CaptureWithContext,
+        let captures = capture_ctx_query!(
+            distinct: "sv.shader_id",
             r#"
-            SELECT DISTINCT ON (sv.shader_id)
-                c.id,
-                c.scene_id,
-                s.slug as shader_slug,
-                s.name as shader_name,
-                sv.version as shader_version,
-                c.profile,
-                c.image_path,
-                c.image_url,
-                c.thumbhash,
-                c.captured_at,
-                c.resolution_width,
-                c.resolution_height,
-                c.file_size_bytes,
-                cri.run_id as "run_id?: String",
-                cr.status as "run_status?: String",
-                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
-                sc.name as "scene_name?: String",
-                sc.slug as "scene_slug?: String"
-            FROM captures c
-            JOIN shader_versions sv ON c.shader_version_id = sv.id
-            JOIN shaders s ON sv.shader_id = s.id
-            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
-            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
-            LEFT JOIN scenes sc ON c.scene_id = sc.id
             WHERE c.scene_id = $1 AND c.status = 'completed'
             ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST
             "#,

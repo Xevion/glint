@@ -4,7 +4,7 @@ import { untrack } from 'svelte';
 import { api } from '$lib/api';
 import type { UpdateShaderRequest } from '$lib/api/endpoints/admin';
 import type { CaptureWithContext, ShaderVersion, ShaderWithCaptures } from '$lib/bindings';
-import CaptureImage from '$lib/components/CaptureImage.svelte';
+import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminDetailField } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
@@ -30,6 +30,14 @@ let editDescription = $state('');
 let editModrinthId = $state('');
 let editCurseforgeId = $state('');
 let editWebsiteUrl = $state('');
+
+let isDirty = $derived(
+	editName !== shader.name ||
+		editDescription !== (shader.description ?? '') ||
+		editModrinthId !== (shader.modrinth_id ?? '') ||
+		editCurseforgeId !== (shader.curseforge_id ?? '') ||
+		editWebsiteUrl !== (shader.website_url ?? '')
+);
 
 $effect(() => {
 	void shader.id;
@@ -150,7 +158,7 @@ async function confirmDelete() {
 		</div>
 
 		<div class="flex justify-end">
-			<Button onclick={handleSave} disabled={saving}>
+			<Button onclick={handleSave} disabled={saving || !isDirty}>
 				{saving ? 'Saving...' : 'Save Changes'}
 			</Button>
 		</div>
@@ -239,42 +247,23 @@ async function confirmDelete() {
 				</a>
 			{/if}
 		</div>
-		{#if captures.length === 0}
-			<p class="text-sm text-muted-foreground">No captures yet.</p>
-		{:else}
-			<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-				{#each captures as capture (capture.id)}
-					<a
-						href="/admin/captures/{capture.id}"
-						class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50"
-					>
-						{#if capture.image_url}
-							<CaptureImage
-								src={capture.image_url}
-								thumbhash={capture.thumbhash}
-								preset="card"
-								alt={capture.scene_name ?? capture.scene_id}
-								class="w-full"
-								containerClass="aspect-video w-full"
-							/>
-						{:else}
-							<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
-								No image
-							</div>
+	{#if captures.length === 0}
+		<p class="text-sm text-muted-foreground">No captures yet.</p>
+	{:else}
+		<CaptureGridAdmin {captures} alt={(c: CaptureWithContext) => c.scene_name ?? c.scene_id}>
+			{#snippet footer(capture: CaptureWithContext)}
+				<div class="p-2">
+					<div class="text-sm font-medium">{capture.scene_name ?? capture.scene_id}</div>
+					<div class="text-xs text-muted-foreground">
+						{capture.shader_version}
+						{#if capture.profile}
+							&middot; {capture.profile}
 						{/if}
-						<div class="p-2">
-							<div class="text-sm font-medium">{capture.scene_name ?? capture.scene_id}</div>
-							<div class="text-xs text-muted-foreground">
-								{capture.shader_version}
-								{#if capture.profile}
-									&middot; {capture.profile}
-								{/if}
-							</div>
-						</div>
-					</a>
-				{/each}
-			</div>
-		{/if}
+					</div>
+				</div>
+			{/snippet}
+		</CaptureGridAdmin>
+	{/if}
 	</div>
 
 	<!-- Actions -->

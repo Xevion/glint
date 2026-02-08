@@ -59,29 +59,29 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	getShader(id: string): Promise<Result<ShaderWithCaptures, ApiError>> {
-		return super.get<ShaderWithCaptures>(`/api/shaders/${id}`);
+		return super.get<ShaderWithCaptures>(`/api/shaders/${encodeURIComponent(id)}`);
 	}
 
 	updateShader(id: string, request: UpdateShaderRequest): Promise<Result<Shader, ApiError>> {
-		return super.put<Shader>(`/api/shaders/${id}`, request);
+		return super.put<Shader>(`/api/shaders/${encodeURIComponent(id)}`, request);
 	}
 
 	deleteShader(id: string): Promise<Result<null, ApiError>> {
-		return super.delete<null>(`/api/shaders/${id}`);
+		return super.delete<null>(`/api/shaders/${encodeURIComponent(id)}`);
 	}
 
 	// ============== Worlds ==============
 
 	getWorld(id: string): Promise<Result<WorldWithScenes, ApiError>> {
-		return super.get<WorldWithScenes>(`/api/worlds/${id}`);
+		return super.get<WorldWithScenes>(`/api/worlds/${encodeURIComponent(id)}`);
 	}
 
 	updateWorld(id: string, request: UpdateWorldRequest): Promise<Result<WorldWithScenes, ApiError>> {
-		return super.put<WorldWithScenes>(`/api/worlds/${id}`, request);
+		return super.put<WorldWithScenes>(`/api/worlds/${encodeURIComponent(id)}`, request);
 	}
 
 	deleteWorld(id: string): Promise<Result<null, ApiError>> {
-		return super.delete<null>(`/api/worlds/${id}`);
+		return super.delete<null>(`/api/worlds/${encodeURIComponent(id)}`);
 	}
 
 	// ============== Scenes ==============
@@ -91,19 +91,19 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	getScene(id: string): Promise<Result<Scene, ApiError>> {
-		return super.get<Scene>(`/api/scenes/${id}`);
+		return super.get<Scene>(`/api/scenes/${encodeURIComponent(id)}`);
 	}
 
 	updateScene(id: string, request: UpdateSceneMetadataRequest): Promise<Result<Scene, ApiError>> {
-		return super.put<Scene>(`/api/scenes/${id}`, request);
+		return super.put<Scene>(`/api/scenes/${encodeURIComponent(id)}`, request);
 	}
 
 	disableScene(id: string): Promise<Result<null, ApiError>> {
-		return super.delete<null>(`/api/scenes/${id}`);
+		return super.delete<null>(`/api/scenes/${encodeURIComponent(id)}`);
 	}
 
 	reactivateScene(id: string): Promise<Result<Scene, ApiError>> {
-		return super.put<Scene>(`/api/scenes/${id}/reactivate`, {});
+		return super.put<Scene>(`/api/scenes/${encodeURIComponent(id)}/reactivate`, {});
 	}
 
 	// ============== Captures ==============
@@ -128,11 +128,11 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	getCapture(id: string): Promise<Result<CaptureWithContext, ApiError>> {
-		return super.get<CaptureWithContext>(`/api/captures/${id}/details`);
+		return super.get<CaptureWithContext>(`/api/captures/${encodeURIComponent(id)}/details`);
 	}
 
 	deleteCapture(id: string): Promise<Result<null, ApiError>> {
-		return super.delete<null>(`/api/captures/${id}`);
+		return super.delete<null>(`/api/captures/${encodeURIComponent(id)}`);
 	}
 
 	// ============== Users ==============
@@ -142,21 +142,21 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	getUser(id: number): Promise<Result<UserWithSessions, ApiError>> {
-		return super.get<UserWithSessions>(`/api/users/${id}`);
+		return super.get<UserWithSessions>(`/api/users/${encodeURIComponent(id)}`);
 	}
 
 	updateUserRole(id: number, role: string): Promise<Result<User, ApiError>> {
-		return super.put<User>(`/api/users/${id}/role`, { role });
+		return super.put<User>(`/api/users/${encodeURIComponent(id)}/role`, { role });
 	}
 
 	deleteUserSessions(id: number): Promise<Result<null, ApiError>> {
-		return super.delete<null>(`/api/users/${id}/sessions`);
+		return super.delete<null>(`/api/users/${encodeURIComponent(id)}/sessions`);
 	}
 
 	// ============== Sessions ==============
 
 	deleteSession(token: string): Promise<Result<null, ApiError>> {
-		return super.delete<null>(`/api/sessions/${token}`);
+		return super.delete<null>(`/api/sessions/${encodeURIComponent(token)}`);
 	}
 
 	// ============== Capture Health ==============

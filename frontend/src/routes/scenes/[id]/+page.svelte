@@ -2,9 +2,10 @@
 import { resolve } from '$app/paths';
 import type { CaptureWithContext, SceneWithCaptures } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
+import CaptureGallery from '$lib/components/CaptureGallery.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
 import { SvelteMap } from 'svelte/reactivity';
-import { fade, fly, scale } from 'svelte/transition';
+import { fly } from 'svelte/transition';
 
 interface Props {
 	data: { scene: SceneWithCaptures };
@@ -183,61 +184,32 @@ const timeLabel = $derived.by(() => {
 				</div>
 			</div>
 
-			<!-- Captures Grid -->
-			{#if captures.length > 0}
-				<div in:fade|local={{ duration: 300, delay: 200 }} class="mb-8">
-					<h2 class="mb-4 text-2xl font-bold text-foreground">Shader Renders</h2>
-					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-						{#each captures as capture, i (capture.id)}
-							<button
-								type="button"
-								onclick={() => (selectedCapture = capture)}
-								in:scale|local={{ duration: 350, delay: Math.min(i * 50, 400) + 250, start: 0.95 }}
-								class="group relative overflow-hidden rounded-xl transition-transform hover:scale-[1.02]"
-							>
-								<CaptureImage
-									src={capture.image_url}
-									thumbhash={capture.thumbhash}
-									preset="card"
-									alt="{capture.shader_name} render"
-									class="h-full w-full object-cover"
-									containerClass="aspect-video"
-								/>
-								<div
-									class="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
-								>
-									<div class="absolute right-0 bottom-0 left-0 p-3">
-										<div class="mb-1 font-bold text-white">{capture.shader_name}</div>
-										<div class="flex items-center gap-2">
-											{#if capture.profile}
-												<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">
-													{capture.profile}
-												</span>
-											{/if}
-											{#if capture.shader_version}
-												<span
-													class="rounded bg-white/20 px-2 py-0.5 text-xs font-bold text-white"
-												>
-													v{capture.shader_version}
-												</span>
-											{/if}
-										</div>
-									</div>
-								</div>
-							</button>
-						{/each}
-					</div>
+		<!-- Captures Grid -->
+		<CaptureGallery
+			{captures}
+			title="Shader Renders"
+			emptyMessage="Captures for this scene are being generated."
+			onclick={(capture: CaptureWithContext) => (selectedCapture = capture)}
+			alt={(capture: CaptureWithContext) => `${capture.shader_name} render`}
+		>
+			{#snippet overlay(capture: CaptureWithContext)}
+				<div class="mb-1 font-bold text-white">{capture.shader_name}</div>
+				<div class="flex items-center gap-2">
+					{#if capture.profile}
+						<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">
+							{capture.profile}
+						</span>
+					{/if}
+					{#if capture.shader_version}
+						<span
+							class="rounded bg-white/20 px-2 py-0.5 text-xs font-bold text-white"
+						>
+							v{capture.shader_version}
+						</span>
+					{/if}
 				</div>
-			{:else}
-				<div
-					in:fade|local={{ duration: 300, delay: 200 }}
-					class="mb-8 rounded-xl border border-border bg-card p-12 text-center"
-				>
-					<ImageOff class="mx-auto mb-4 h-16 w-16 text-muted-foreground opacity-30" strokeWidth={1.5} />
-					<h3 class="mb-2 text-lg font-semibold text-card-foreground">No Captures Yet</h3>
-					<p class="text-sm text-muted-foreground">Captures for this scene are being generated.</p>
-				</div>
-			{/if}
+			{/snippet}
+		</CaptureGallery>
 		</div>
 	{/key}
 {/if}

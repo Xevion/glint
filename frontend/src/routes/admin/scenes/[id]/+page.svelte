@@ -3,8 +3,8 @@ import { goto, invalidateAll } from '$app/navigation';
 import { untrack } from 'svelte';
 import { api } from '$lib/api';
 import type { UpdateSceneMetadataRequest } from '$lib/api/endpoints/admin';
-import type { CaptureWithContext, Scene } from '$lib/bindings';
-import CaptureImage from '$lib/components/CaptureImage.svelte';
+import type { CaptureWithContext, Scene, WorldWithScenes } from '$lib/bindings';
+import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminDetailField } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
@@ -17,6 +17,7 @@ import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
 let scene: Scene = $derived(data.scene);
+let world: WorldWithScenes | null = $derived(data.world);
 let captures: CaptureWithContext[] = $derived(data.captures);
 let captureCount: number = $derived(data.captureCount);
 
@@ -27,6 +28,8 @@ let showDisableConfirm = $state(false);
 
 let editName = $state('');
 let editDescription = $state('');
+
+let isDirty = $derived(editName !== scene.name || editDescription !== (scene.description ?? ''));
 
 $effect(() => {
 	void scene.id;
@@ -154,7 +157,7 @@ async function handleReactivate() {
 		</div>
 
 		<div class="flex justify-end">
-			<Button onclick={handleSave} disabled={saving}>
+			<Button onclick={handleSave} disabled={saving || !isDirty}>
 				{saving ? 'Saving...' : 'Save Changes'}
 			</Button>
 		</div>
@@ -169,14 +172,14 @@ async function handleReactivate() {
 			<AdminDetailField label="Slug">
 				{scene.slug}
 			</AdminDetailField>
-			<AdminDetailField label="World">
-				<a
-					href="/admin/worlds/{scene.world_id}"
-					class="text-primary hover:underline"
-				>
-					{scene.world_id}
-				</a>
-			</AdminDetailField>
+		<AdminDetailField label="World">
+			<a
+				href="/admin/worlds/{scene.world_id}"
+				class="text-primary hover:underline"
+			>
+				{world?.name ?? scene.world_id}
+			</a>
+		</AdminDetailField>
 			<AdminDetailField label="Position">
 				<code class="text-xs">
 					{scene.x.toFixed(1)}, {scene.y.toFixed(1)}, {scene.z.toFixed(1)}
@@ -230,44 +233,23 @@ async function handleReactivate() {
 				</a>
 			{/if}
 		</div>
-		{#if captures.length === 0}
-			<p class="text-sm text-muted-foreground">No captures yet.</p>
-		{:else}
-			<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-				{#each captures as capture (capture.id)}
-					<a
-						href="/admin/captures/{capture.id}"
-						class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50"
-					>
-						{#if capture.image_url}
-							<CaptureImage
-								src={capture.image_url}
-								thumbhash={capture.thumbhash}
-								preset="card"
-								alt={capture.shader_name}
-								class="w-full"
-								containerClass="aspect-video w-full"
-							/>
-						{:else}
-							<div
-								class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground"
-							>
-								No image
-							</div>
+	{#if captures.length === 0}
+		<p class="text-sm text-muted-foreground">No captures yet.</p>
+	{:else}
+		<CaptureGridAdmin {captures}>
+			{#snippet footer(capture: CaptureWithContext)}
+				<div class="p-2">
+					<div class="text-sm font-medium">{capture.shader_name}</div>
+					<div class="text-xs text-muted-foreground">
+						{capture.shader_version}
+						{#if capture.profile}
+							&middot; {capture.profile}
 						{/if}
-						<div class="p-2">
-							<div class="text-sm font-medium">{capture.shader_name}</div>
-							<div class="text-xs text-muted-foreground">
-								{capture.shader_version}
-								{#if capture.profile}
-									&middot; {capture.profile}
-								{/if}
-							</div>
-						</div>
-					</a>
-				{/each}
-			</div>
-		{/if}
+					</div>
+				</div>
+			{/snippet}
+		</CaptureGridAdmin>
+	{/if}
 	</div>
 
 	<!-- Actions -->

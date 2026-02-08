@@ -19,8 +19,20 @@ export const load: PageLoad = async ({ params, fetch }) => {
 
 	const capturesData = capturesRes.match({
 		Ok: (c) => c,
-		Err: () => ({ items: [], total: 0, page: 1, pageSize: 8 })
+		Err: (e) => {
+			error(e.statusCode ?? 500, e.message);
+		}
 	});
 
-	return { scene, captures: capturesData.items, captureCount: capturesData.total };
+	// Fetch world data for display name (non-critical — fall back to world_id)
+	const world = scene.world_id
+		? await api.admin.getWorld(scene.world_id).then((res) =>
+				res.match({
+					Ok: (w) => w,
+					Err: () => null
+				})
+			)
+		: null;
+
+	return { scene, world, captures: capturesData.items, captureCount: capturesData.total };
 };

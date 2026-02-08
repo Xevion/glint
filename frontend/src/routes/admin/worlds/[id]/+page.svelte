@@ -27,6 +27,8 @@ let showDeleteConfirm = $state(false);
 let editName = $state('');
 let editDescription = $state('');
 
+let isDirty = $derived(editName !== world.name || editDescription !== (world.description ?? ''));
+
 $effect(() => {
 	void world.id;
 	untrack(() => {
@@ -112,7 +114,7 @@ async function confirmDelete() {
 		</div>
 
 		<div class="flex justify-end">
-			<Button onclick={handleSave} disabled={saving}>
+			<Button onclick={handleSave} disabled={saving || !isDirty}>
 				{saving ? 'Saving...' : 'Save Changes'}
 			</Button>
 		</div>
