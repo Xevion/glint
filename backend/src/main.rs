@@ -120,8 +120,8 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
-    // Create thumbhash channel
-    let (thumbhash_tx, thumbhash_rx) = tokio::sync::mpsc::unbounded_channel();
+    // Create capture metadata channel
+    let (metadata_tx, metadata_rx) = tokio::sync::mpsc::unbounded_channel();
 
     // Build application state
     let state = AppState::new(
@@ -131,7 +131,7 @@ async fn main() -> anyhow::Result<()> {
         oauth_client,
         modrinth_client,
         curseforge_client,
-        thumbhash_tx,
+        metadata_tx,
     );
 
     // Start upload cleanup background task
@@ -146,8 +146,8 @@ async fn main() -> anyhow::Result<()> {
         cleanup_bucket,
     ));
 
-    // Start thumbhash background worker
-    tokio::spawn(services::thumbhash::run(thumbhash_rx, pool.clone()));
+    // Start capture metadata background worker
+    tokio::spawn(services::capture_metadata::run(metadata_rx, pool.clone()));
 
     // Start capture run monitor (detects and times out stale runs)
     tokio::spawn(services::capture_run_monitor::monitor_capture_runs(pool));

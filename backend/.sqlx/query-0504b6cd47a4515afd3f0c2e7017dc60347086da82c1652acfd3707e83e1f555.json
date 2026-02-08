@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                c.id,\n                c.scene_id,\n                s.slug as shader_slug,\n                s.name as shader_name,\n                sv.version as shader_version,\n                c.profile,\n                c.image_path,\n                c.image_url,\n                c.thumbhash,\n                c.captured_at,\n                c.resolution_width,\n                c.resolution_height,\n                cri.run_id as \"run_id?: String\",\n                cr.status as \"run_status?: String\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,\n                sc.name as \"scene_name?: String\",\n                sc.slug as \"scene_slug?: String\"\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id\n            LEFT JOIN capture_runs cr ON cri.run_id = cr.id\n            LEFT JOIN scenes sc ON c.scene_id = sc.id\n            \n            WHERE ($1::text IS NULL OR s.slug = $1)\n              AND ($2::text IS NULL OR c.scene_id = $2)\n              AND ($3::text IS NULL OR c.status = $3)\n              AND ($4::text IS NULL OR cri.run_id = $4)\n            ORDER BY c.created_at DESC\n            LIMIT $5 OFFSET $6\n            ",
+  "query": "\n            SELECT DISTINCT ON (sv.shader_id)\n                c.id,\n                c.scene_id,\n                s.slug as shader_slug,\n                s.name as shader_name,\n                sv.version as shader_version,\n                c.profile,\n                c.image_path,\n                c.image_url,\n                c.thumbhash,\n                c.captured_at,\n                c.resolution_width,\n                c.resolution_height,\n                c.file_size_bytes,\n                cri.run_id as \"run_id?: String\",\n                cr.status as \"run_status?: String\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,\n                sc.name as \"scene_name?: String\",\n                sc.slug as \"scene_slug?: String\"\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id\n            LEFT JOIN capture_runs cr ON cri.run_id = cr.id\n            LEFT JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.scene_id = $1 AND c.status = 'completed'\n            ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST\n            ",
   "describe": {
     "columns": [
       {
@@ -65,38 +65,38 @@
       },
       {
         "ordinal": 12,
+        "name": "file_size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 13,
         "name": "run_id?: String",
         "type_info": "Text"
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "run_status?: String",
         "type_info": "Text"
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "shader_author",
         "type_info": "Text"
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "scene_name?: String",
         "type_info": "Text"
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "scene_slug?: String",
         "type_info": "Text"
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Int8",
-        "Int8"
+        "Text"
       ]
     },
     "nullable": [
@@ -112,6 +112,7 @@
       true,
       true,
       true,
+      true,
       false,
       false,
       null,
@@ -119,5 +120,5 @@
       false
     ]
   },
-  "hash": "a4bbea2876225dcd1bf1101781f7b728efbb02ef36ff684a4b32f3f8d4232c6b"
+  "hash": "0504b6cd47a4515afd3f0c2e7017dc60347086da82c1652acfd3707e83e1f555"
 }

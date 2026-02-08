@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Context;
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use tracing::{debug, instrument};
 
 use crate::db::DbPool;
@@ -38,6 +39,7 @@ macro_rules! capture_ctx_query {
                 c.captured_at,
                 c.resolution_width,
                 c.resolution_height,
+                c.file_size_bytes,
                 cri.run_id as "run_id?: String",
                 cr.status as "run_status?: String",
                 (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
@@ -153,6 +155,7 @@ impl CaptureRepo {
                 c.captured_at,
                 c.resolution_width,
                 c.resolution_height,
+                c.file_size_bytes,
                 cri.run_id as "run_id?: String",
                 cr.status as "run_status?: String",
                 (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
@@ -349,6 +352,23 @@ pub struct CaptureStatusCounts {
     pub outdated: i32,
 }
 
+#[derive(Debug, Serialize)]
+pub struct StorageStats {
+    pub total_bytes: i64,
+    pub capture_count: i64,
+    pub avg_bytes: i64,
+    pub missing_count: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StorageBucket {
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub date: DateTime<Utc>,
+    pub cumulative_bytes: i64,
+    pub cumulative_count: i64,
+    pub bucket_bytes: i64,
+}
+
 impl CaptureRepo {
     /// List all captures with context (for admin dashboard)
     #[instrument(skip(executor), level = "debug")]
@@ -524,20 +544,24 @@ impl CaptureRepo {
             .collect())
     }
 
-    /// List IDs of completed captures that have an image but no thumbhash yet
+    /// List IDs of completed captures that are missing thumbhash OR file size metadata
     #[instrument(skip(executor), level = "debug")]
-    pub async fn list_unhashed_ids(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<String>> {
+    pub async fn list_unprocessed_ids(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<Vec<String>> {
         let ids = sqlx::query_scalar!(
             r#"
             SELECT id
             FROM captures
-            WHERE status = 'completed' AND image_url IS NOT NULL AND thumbhash IS NULL
+            WHERE status = 'completed'
+              AND image_url IS NOT NULL
+              AND (thumbhash IS NULL OR file_size_bytes IS NULL)
             ORDER BY created_at ASC
             "#
         )
         .fetch_all(executor)
         .await
-        .context("failed to list unhashed capture ids")?;
+        .context("failed to list unprocessed capture ids")?;
 
         Ok(ids)
     }
@@ -557,6 +581,27 @@ impl CaptureRepo {
         .execute(executor)
         .await
         .context(format!("failed to set thumbhash for capture '{}'", id))?;
+
+        Ok(())
+    }
+
+    /// Set file metadata (size and content type) for a capture
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn set_file_metadata(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+        file_size_bytes: i64,
+        content_type: &str,
+    ) -> AppResult<()> {
+        sqlx::query!(
+            "UPDATE captures SET file_size_bytes = $2, content_type = $3 WHERE id = $1",
+            id,
+            file_size_bytes,
+            content_type
+        )
+        .execute(executor)
+        .await
+        .context(format!("failed to set file metadata for capture '{}'", id))?;
 
         Ok(())
     }
@@ -584,5 +629,106 @@ impl CaptureRepo {
         .context("failed to batch count captures by scene")?;
 
         Ok(rows.into_iter().map(|r| (r.scene_id, r.count)).collect())
+    }
+
+    /// Get aggregate storage statistics for completed captures
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn storage_stats(executor: impl sqlx::PgExecutor<'_>) -> AppResult<StorageStats> {
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                COALESCE(SUM(file_size_bytes), 0)::int8 as "total_bytes!",
+                COUNT(*) FILTER (WHERE file_size_bytes IS NOT NULL)::int8 as "capture_count!",
+                COALESCE(AVG(file_size_bytes), 0)::int8 as "avg_bytes!",
+                COUNT(*) FILTER (WHERE status = 'completed' AND image_url IS NOT NULL AND file_size_bytes IS NULL)::int8 as "missing_count!"
+            FROM captures
+            WHERE status = 'completed'
+            "#
+        )
+        .fetch_one(executor)
+        .await
+        .context("failed to get storage stats")?;
+
+        Ok(StorageStats {
+            total_bytes: row.total_bytes,
+            capture_count: row.capture_count,
+            avg_bytes: row.avg_bytes,
+            missing_count: row.missing_count,
+        })
+    }
+
+    /// Get cumulative storage growth with gap-filled time series.
+    ///
+    /// Generates a continuous series at the given interval (in hours), starting
+    /// from the earliest completed capture within the date range. Buckets with
+    /// no captures are filled with zeros; cumulative values carry forward.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn storage_growth(
+        executor: impl sqlx::PgExecutor<'_>,
+        days: i32,
+        interval_hours: i32,
+    ) -> AppResult<Vec<StorageBucket>> {
+        struct Row {
+            date: DateTime<Utc>,
+            cumulative_bytes: i64,
+            cumulative_count: i64,
+            bucket_bytes: i64,
+        }
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            WITH
+              bounds AS (
+                SELECT
+                  date_trunc('hour', MIN(created_at)) AS first_ts
+                FROM captures
+                WHERE status = 'completed'
+                  AND created_at >= now() - make_interval(days => $1)
+              ),
+              buckets AS (
+                SELECT generate_series(
+                  (SELECT first_ts FROM bounds),
+                  now(),
+                  make_interval(hours => $2)
+                ) AS bucket
+              ),
+              capture_agg AS (
+                SELECT
+                  -- Align each capture to its bucket start
+                  (SELECT MAX(b.bucket) FROM buckets b WHERE b.bucket <= c.created_at) AS bucket,
+                  COALESCE(SUM(file_size_bytes), 0)::int8 AS bytes,
+                  COUNT(*)::int8 AS cnt
+                FROM captures c
+                WHERE c.status = 'completed'
+                  AND c.created_at >= (SELECT first_ts FROM bounds)
+                GROUP BY 1
+              )
+            SELECT
+              b.bucket AS "date!",
+              (SUM(COALESCE(ca.bytes, 0)) OVER w)::int8 AS "cumulative_bytes!",
+              (SUM(COALESCE(ca.cnt, 0)) OVER w)::int8 AS "cumulative_count!",
+              COALESCE(ca.bytes, 0)::int8 AS "bucket_bytes!"
+            FROM buckets b
+            LEFT JOIN capture_agg ca ON ca.bucket = b.bucket
+            WHERE (SELECT first_ts FROM bounds) IS NOT NULL
+            WINDOW w AS (ORDER BY b.bucket)
+            ORDER BY b.bucket
+            "#,
+            days,
+            interval_hours
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to get storage growth")?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| StorageBucket {
+                date: r.date,
+                cumulative_bytes: r.cumulative_bytes,
+                cumulative_count: r.cumulative_count,
+                bucket_bytes: r.bucket_bytes,
+            })
+            .collect())
     }
 }

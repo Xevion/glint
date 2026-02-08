@@ -33,7 +33,7 @@ pub struct AppStateInner {
     pub oauth: Option<OAuthClient>,
     pub modrinth: ModrinthClient,
     pub curseforge: Option<CurseForgeClient>,
-    pub thumbhash_tx: mpsc::UnboundedSender<String>,
+    pub metadata_tx: mpsc::UnboundedSender<String>,
 }
 
 impl AppState {
@@ -44,7 +44,7 @@ impl AppState {
         oauth: Option<OAuthClient>,
         modrinth: ModrinthClient,
         curseforge: Option<CurseForgeClient>,
-        thumbhash_tx: mpsc::UnboundedSender<String>,
+        metadata_tx: mpsc::UnboundedSender<String>,
     ) -> Self {
         Self {
             inner: Arc::new(AppStateInner {
@@ -54,7 +54,7 @@ impl AppState {
                 oauth,
                 modrinth,
                 curseforge,
-                thumbhash_tx,
+                metadata_tx,
             }),
         }
     }
@@ -83,8 +83,8 @@ impl AppState {
         self.inner.curseforge.as_ref()
     }
 
-    pub fn thumbhash_tx(&self) -> &mpsc::UnboundedSender<String> {
-        &self.inner.thumbhash_tx
+    pub fn metadata_tx(&self) -> &mpsc::UnboundedSender<String> {
+        &self.inner.metadata_tx
     }
 
     pub async fn begin_tx(&self) -> AppResult<DbTransaction<'_>> {

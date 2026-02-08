@@ -24,3 +24,5 @@
 
 # Node.js dependencies
 /node_modules/
+.worktrees/
+.worktrees/

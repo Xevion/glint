@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH\n              bounds AS (\n                SELECT\n                  date_trunc('hour', MIN(created_at)) AS first_ts\n                FROM captures\n                WHERE status = 'completed'\n                  AND created_at >= now() - make_interval(days => $1)\n              ),\n              buckets AS (\n                SELECT generate_series(\n                  (SELECT first_ts FROM bounds),\n                  now(),\n                  make_interval(hours => $2)\n                ) AS bucket\n              ),\n              capture_agg AS (\n                SELECT\n                  -- Align each capture to its bucket start\n                  (SELECT MAX(b.bucket) FROM buckets b WHERE b.bucket <= c.created_at) AS bucket,\n                  COALESCE(SUM(file_size_bytes), 0)::int8 AS bytes,\n                  COUNT(*)::int8 AS cnt\n                FROM captures c\n                WHERE c.status = 'completed'\n                  AND c.created_at >= (SELECT first_ts FROM bounds)\n                GROUP BY 1\n              )\n            SELECT\n              b.bucket AS \"date!\",\n              (SUM(COALESCE(ca.bytes, 0)) OVER w)::int8 AS \"cumulative_bytes!\",\n              (SUM(COALESCE(ca.cnt, 0)) OVER w)::int8 AS \"cumulative_count!\",\n              COALESCE(ca.bytes, 0)::int8 AS \"bucket_bytes!\"\n            FROM buckets b\n            LEFT JOIN capture_agg ca ON ca.bucket = b.bucket\n            WHERE (SELECT first_ts FROM bounds) IS NOT NULL\n            WINDOW w AS (ORDER BY b.bucket)\n            ORDER BY b.bucket\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "date!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "cumulative_bytes!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "cumulative_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "bucket_bytes!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "6b9cf7a91a8ce87396367b640dc5c83edcfa7b5cb6f716e82407e5148d184fca"
+}

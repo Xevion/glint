@@ -139,6 +139,8 @@ pub struct Capture {
     pub status: String,
     pub error_message: Option<String>,
     pub thumbhash: Option<String>,
+    pub file_size_bytes: Option<i64>,
+    pub content_type: Option<String>,
     pub outdated: bool,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
@@ -372,6 +374,7 @@ pub struct CaptureWithContext {
     pub captured_at: Option<DateTime<Utc>>,
     pub resolution_width: Option<i32>,
     pub resolution_height: Option<i32>,
+    pub file_size_bytes: Option<i64>,
     // Run context
     pub run_id: Option<String>,
     pub run_status: Option<String>,

@@ -1,4 +1,5 @@
 import { createApiClient } from '$lib/api';
+import type { StorageBucket, StorageStats } from '$lib/api/endpoints/admin';
 import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
 import type { PageLoad } from './$types';
 
@@ -13,7 +14,9 @@ export const load: PageLoad = async ({ fetch }) => {
 		usersRes,
 		healthRes,
 		runsRes,
-		captureHealthRes
+		captureHealthRes,
+		storageStatsRes,
+		storageGrowthRes
 	] = await Promise.all([
 		api.shaders.list(),
 		api.worlds.list(),
@@ -22,7 +25,9 @@ export const load: PageLoad = async ({ fetch }) => {
 		api.admin.listUsers(),
 		api.admin.health(),
 		api.runs.list(),
-		api.admin.captureHealth()
+		api.admin.captureHealth(),
+		api.admin.storageStats(),
+		api.admin.storageGrowth()
 	]);
 
 	const errors: Record<string, string> = {};
@@ -88,6 +93,22 @@ export const load: PageLoad = async ({ fetch }) => {
 		Err: () => null as CaptureHealthSummary | null
 	});
 
+	const storageStats = storageStatsRes.match({
+		Ok: (v) => v,
+		Err: (e) => {
+			errors.storage = e.message;
+			return null as StorageStats | null;
+		}
+	});
+
+	const storageGrowth = storageGrowthRes.match({
+		Ok: (v) => v,
+		Err: (e) => {
+			errors.storageGrowth = e.message;
+			return [] as StorageBucket[];
+		}
+	});
+
 	return {
 		shaderCount,
 		worldCount,
@@ -98,6 +119,8 @@ export const load: PageLoad = async ({ fetch }) => {
 		recentCaptures,
 		healthStatus,
 		captureHealth,
+		storageStats,
+		storageGrowth,
 		errors
 	};
 };

@@ -4,11 +4,24 @@ import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Button } from '$lib/components/ui/button';
+import { formatBytes, formatDatetime } from '$lib/utils/format';
+import {
+	Chart,
+	Svg,
+	Area,
+	Axis,
+	Highlight,
+	LinearGradient,
+	RectClipPath,
+	Tooltip
+} from 'layerchart';
+import { scaleTime, scaleLinear } from 'd3-scale';
 import {
 	Activity,
 	ArrowRight,
 	Camera,
 	Globe,
+	HardDrive,
 	HeartPulse,
 	Mountain,
 	Pause,
@@ -31,6 +44,23 @@ let runCount: number = $derived(data.runCount);
 let recentCaptures: CaptureWithContext[] = $derived(data.recentCaptures);
 let healthStatus: 'ok' | 'error' = $derived(data.healthStatus);
 let captureHealth: CaptureHealthSummary | null = $derived(data.captureHealth);
+let storageStats = $derived(data.storageStats);
+let storageGrowth = $derived(data.storageGrowth);
+let chartData = $derived(
+	storageGrowth.map(
+		(b: {
+			date: number;
+			cumulative_bytes: number;
+			cumulative_count: number;
+			bucket_bytes: number;
+		}) => ({
+			date: new Date(b.date * 1000),
+			bytes: b.cumulative_bytes,
+			count: b.cumulative_count,
+			bucketBytes: b.bucket_bytes
+		})
+	)
+);
 let errors: Record<string, string> = $derived(data.errors);
 
 let refreshing = $state(false);
@@ -172,6 +202,125 @@ onDestroy(() => {
 				<ArrowRight class="h-4 w-4 text-muted-foreground" />
 			</a>
 		{/if}
+
+	<!-- Storage Stats -->
+	{#if storageStats}
+		<div class="rounded-lg border bg-card p-4">
+			<div class="mb-3 flex items-center gap-2">
+				<HardDrive class="h-5 w-5 text-muted-foreground" />
+				<span class="font-medium">Storage</span>
+			</div>
+			<div class="grid grid-cols-4 gap-4 text-sm">
+				<div>
+					<div class="text-2xl font-bold">{formatBytes(storageStats.total_bytes)}</div>
+					<div class="text-muted-foreground">Total</div>
+				</div>
+				<div>
+					<div class="text-2xl font-bold">{storageStats.capture_count}</div>
+					<div class="text-muted-foreground">Tracked</div>
+				</div>
+				<div>
+					<div class="text-2xl font-bold">{formatBytes(storageStats.avg_bytes)}</div>
+					<div class="text-muted-foreground">Average</div>
+				</div>
+				<div>
+					<div class="text-2xl font-bold">{storageStats.missing_count}</div>
+					<div class="text-muted-foreground">Missing</div>
+				</div>
+			</div>
+		{#if chartData.length > 1}
+			<div class="mt-2 text-xs text-muted-foreground">Storage Growth</div>
+			<div class="mt-1 h-75">
+				<Chart
+					data={chartData}
+					x="date"
+					xScale={scaleTime()}
+					y="bytes"
+					yScale={scaleLinear()}
+					yNice={true}
+					yDomain={[0, null]}
+					padding={{ top: 48, bottom: 24, left: 60 }}
+					tooltip={{ mode: 'bisect-x' }}
+					let:width
+					let:height
+					let:padding
+					let:tooltip
+				>
+					{@const tt = tooltip as { data: unknown; x: number }}
+					{@const pad = padding as { top: number }}
+					<Svg>
+						<LinearGradient
+							class="from-primary/50 to-primary/0"
+							vertical
+							let:gradient
+						>
+							<Area
+								line={{ class: 'stroke-2 stroke-primary opacity-20' }}
+								fill={gradient}
+							/>
+							<RectClipPath
+								x={0}
+								y={0}
+								width={tt.data ? tt.x : width}
+								{height}
+								spring
+							>
+								<Area line={{ class: 'stroke-2 stroke-primary' }} fill={gradient} />
+							</RectClipPath>
+						</LinearGradient>
+						<Highlight
+							points
+							lines={{ class: 'stroke-primary [stroke-dasharray:unset]' }}
+						/>
+						<Axis placement="bottom" />
+						<Axis
+							placement="left"
+							ticks={4}
+							format={(v: number) => formatBytes(v)}
+						/>
+					</Svg>
+
+					<!-- Floating label: total size near the data point -->
+					<Tooltip.Root
+						y={48}
+						xOffset={4}
+						variant="none"
+						class="text-sm font-semibold text-primary leading-3"
+						let:data
+					>
+						{@const d = data as { bytes: number; count: number }}
+						{formatBytes(d.bytes)} &middot; {d.count} captures
+					</Tooltip.Root>
+
+					<!-- Floating label: date at top-left corner -->
+					<Tooltip.Root
+						x={4}
+						y={4}
+						variant="none"
+						class="text-sm font-semibold leading-3"
+						let:data
+					>
+						{@const d = data as { date: Date }}
+						{formatDatetime(d.date)}
+					</Tooltip.Root>
+
+					<!-- Floating label: date pill on bottom axis -->
+					<Tooltip.Root
+						x="data"
+						y={height + pad.top + 2}
+						anchor="top"
+						variant="none"
+						class="text-sm font-semibold bg-primary text-primary-foreground leading-3 px-2 py-1 rounded whitespace-nowrap"
+						let:data
+					>
+						{@const d = data as { date: Date }}
+						{formatDatetime(d.date)}
+					</Tooltip.Root>
+				</Chart>
+			</div>
+		{/if}
+		</div>
+	{/if}
 
 		<!-- Recent Captures -->
 		<div class="rounded-lg border bg-card p-4">

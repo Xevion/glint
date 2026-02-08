@@ -12,7 +12,7 @@ pub mod user;
 pub mod work;
 pub mod world;
 
-pub use capture::{CaptureRepo, ThumbnailInfo};
+pub use capture::{CaptureRepo, StorageBucket, StorageStats, ThumbnailInfo};
 pub use capture_health::CaptureHealthRepo;
 pub use capture_run::CaptureRunRepo;
 pub use device_code::DeviceCodeRepo;

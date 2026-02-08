@@ -127,6 +127,16 @@
         "ordinal": 24,
         "name": "thumbhash",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 25,
+        "name": "file_size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 26,
+        "name": "content_type",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -159,6 +169,8 @@
       false,
       false,
       false,
+      true,
+      true,
       true
     ]
   },

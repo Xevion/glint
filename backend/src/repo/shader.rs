@@ -378,6 +378,7 @@ impl ShaderRepo {
                 c.captured_at,
                 c.resolution_width,
                 c.resolution_height,
+                c.file_size_bytes,
                 cri.run_id as "run_id?: String",
                 cr.status as "run_status?: String",
                 (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,

@@ -5,6 +5,7 @@ import type { CaptureWithContext } from '$lib/bindings';
 import AdminTable from '$lib/components/AdminTable.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { Button } from '$lib/components/ui/button';
+import { formatBytes } from '$lib/utils/format';
 import { RefreshCw } from '@lucide/svelte';
 import type { PageData } from './$types';
 
@@ -57,6 +58,7 @@ const columns = [
 	{ id: 'scene', key: 'scene_name', name: 'Scene' },
 	{ id: 'profile', key: 'profile', name: 'Profile' },
 	{ id: 'resolution', key: 'resolution_width', name: 'Resolution' },
+	{ id: 'file_size', key: 'file_size_bytes', name: 'Size' },
 	{ id: 'captured_at', key: 'captured_at', name: 'Captured', component: 'time' as const },
 	{ id: 'run', key: 'run_id', name: 'Run' }
 ];
@@ -176,7 +178,9 @@ async function refresh() {
 					{row.resolution_width && row.resolution_height
 						? `${row.resolution_width}x${row.resolution_height}`
 						: '-'}
-				{:else if columnId === 'run'}
+				{:else if columnId === 'file_size'}
+				{value ? formatBytes(value as number) : '-'}
+			{:else if columnId === 'run'}
 					{#if row.run_id}
 						<a
 							href="/admin/runs/{row.run_id}"

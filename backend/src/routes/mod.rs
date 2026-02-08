@@ -7,6 +7,7 @@ mod runs;
 mod scenes;
 mod sessions;
 mod shaders;
+mod storage;
 mod user;
 mod users;
 mod work;
@@ -37,6 +38,7 @@ fn api_router() -> Router<AppState> {
         .nest("/runs", runs::router())
         .nest("/work", work::router())
         .nest("/admin/capture-health", capture_health::router())
+        .nest("/admin/storage", storage::router())
         .merge(runs::failure_router())
         .merge(runs::upload_router())
 }

@@ -37,6 +37,20 @@ export interface UpdateUserRoleRequest {
 	role: string;
 }
 
+export interface StorageStats {
+	total_bytes: number;
+	capture_count: number;
+	avg_bytes: number;
+	missing_count: number;
+}
+
+export interface StorageBucket {
+	date: number; // unix timestamp in seconds
+	cumulative_bytes: number;
+	cumulative_count: number;
+	bucket_bytes: number;
+}
+
 export class AdminEndpoints extends ApiClient {
 	// ============== Shaders ==============
 
@@ -159,5 +173,17 @@ export class AdminEndpoints extends ApiClient {
 
 	health(): Promise<Result<string, ApiError>> {
 		return this.getText('/health');
+	}
+
+	// ============== Storage ==============
+
+	storageStats(): Promise<Result<StorageStats, ApiError>> {
+		return super.get<StorageStats>('/api/admin/storage/stats');
+	}
+
+	storageGrowth(days = 90, intervalHours = 1): Promise<Result<StorageBucket[], ApiError>> {
+		return super.get<StorageBucket[]>(
+			`/api/admin/storage/growth?days=${days}&interval_hours=${intervalHours}`
+		);
 	}
 }
