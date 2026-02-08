@@ -6,9 +6,10 @@ use oauth2::{EndpointNotSet, EndpointSet};
 use tokio::sync::mpsc;
 
 use crate::{
+    analytics::Analytics,
     config::Config,
     db::{DbPool, DbTransaction},
-    error::AppResult,
+    error::{AppError, AppResult},
     platform::{curseforge::CurseForgeClient, modrinth::ModrinthClient},
 };
 
@@ -34,9 +35,11 @@ pub struct AppStateInner {
     pub modrinth: ModrinthClient,
     pub curseforge: Option<CurseForgeClient>,
     pub metadata_tx: mpsc::UnboundedSender<String>,
+    pub analytics: Option<Analytics>,
 }
 
 impl AppState {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: DbPool,
         config: Config,
@@ -45,6 +48,7 @@ impl AppState {
         modrinth: ModrinthClient,
         curseforge: Option<CurseForgeClient>,
         metadata_tx: mpsc::UnboundedSender<String>,
+        analytics: Option<Analytics>,
     ) -> Self {
         Self {
             inner: Arc::new(AppStateInner {
@@ -55,6 +59,7 @@ impl AppState {
                 modrinth,
                 curseforge,
                 metadata_tx,
+                analytics,
             }),
         }
     }
@@ -85,6 +90,34 @@ impl AppState {
 
     pub fn metadata_tx(&self) -> &mpsc::UnboundedSender<String> {
         &self.inner.metadata_tx
+    }
+
+    pub fn analytics(&self) -> Option<&Analytics> {
+        self.inner.analytics.as_ref()
+    }
+
+    /// Fire-and-forget analytics event. No-op if analytics is not configured.
+    pub fn track(&self, event_name: &str, distinct_id: &str, properties: serde_json::Value) {
+        if let Some(analytics) = self.analytics() {
+            analytics.track(event_name, distinct_id, properties);
+        }
+    }
+
+    /// Report an error to PostHog analytics and return it for handler use.
+    /// Use in handlers: `return Err(state.track_err(error, "handler_name"))`
+    pub fn track_err(&self, error: AppError, handler: &str) -> AppError {
+        let (status, code) = error.status_and_code();
+        self.track(
+            "api_error",
+            "system",
+            serde_json::json!({
+                "handler": handler,
+                "status": status.as_u16(),
+                "code": code,
+                "message": error.to_string(),
+            }),
+        );
+        error
     }
 
     pub async fn begin_tx(&self) -> AppResult<DbTransaction<'_>> {

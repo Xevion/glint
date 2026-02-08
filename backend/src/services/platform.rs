@@ -76,6 +76,17 @@ impl PlatformService {
             .await?
             .is_some()
         {
+            if let Some(analytics) = state.analytics() {
+                analytics.track(
+                    "shader_adoption_failed",
+                    "system",
+                    serde_json::json!({
+                        "slug": data.metadata.slug,
+                        "platform": platform.to_string(),
+                        "reason": "already_exists",
+                    }),
+                );
+            }
             return Err(AppError::Conflict(format!(
                 "Shader with slug '{}' already exists",
                 data.metadata.slug
@@ -101,6 +112,20 @@ impl PlatformService {
             platform = %platform,
             "Adopted shader from platform"
         );
+
+        if let Some(analytics) = state.analytics() {
+            analytics.track(
+                "shader_adoption_succeeded",
+                "system",
+                serde_json::json!({
+                    "shader_id": shader_id,
+                    "slug": slug,
+                    "platform": platform.to_string(),
+                    "version_count": version_count,
+                    "author_count": author_count,
+                }),
+            );
+        }
 
         ShaderRepo::get_by_id(state.db(), &shader_id).await
     }

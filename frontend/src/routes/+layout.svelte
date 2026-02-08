@@ -8,6 +8,7 @@ import BackgroundImage from '$lib/components/BackgroundImage.svelte';
 import Navigation from '$lib/components/Navigation.svelte';
 import Sidebar from '$lib/components/Sidebar.svelte';
 import { initNavigation } from '$lib/stores/navigation.svelte';
+import { telemetry } from '$lib/telemetry';
 import { themeStore } from '$lib/stores/theme.svelte';
 import './layout.css';
 
@@ -30,6 +31,7 @@ $effect(() => {
 onMount(() => {
 	// Set up system preference listener (theme is already applied by blocking script)
 	themeStore.init();
+	telemetry.init();
 
 	// Initialize OverlayScrollbars on the body for full-page scrolling
 	osInstance = OverlayScrollbars(document.body, {

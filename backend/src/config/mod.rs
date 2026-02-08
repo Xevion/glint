@@ -28,6 +28,10 @@ pub struct Config {
     /// Platform integration configuration (Modrinth, CurseForge)
     #[serde(default)]
     pub platform: PlatformConfig,
+
+    /// PostHog analytics configuration
+    #[serde(default)]
+    pub posthog: PostHogConfig,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -127,6 +131,27 @@ fn default_modrinth_user_agent() -> String {
     "glint/0.1.0 (https://github.com/Xevion/glint)".to_string()
 }
 
+/// PostHog analytics configuration
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct PostHogConfig {
+    /// PostHog project API key
+    pub api_key: Option<String>,
+
+    /// PostHog API host (defaults to https://observe.xevion.dev)
+    #[serde(default = "default_posthog_host")]
+    pub host: String,
+}
+
+fn default_posthog_host() -> String {
+    "https://observe.xevion.dev".to_string()
+}
+
+impl PostHogConfig {
+    pub fn is_configured(&self) -> bool {
+        self.api_key.is_some()
+    }
+}
+
 impl Config {
     pub fn load() -> anyhow::Result<Self> {
         let mut config: Config = Figment::new()
@@ -163,6 +188,12 @@ impl Config {
         if let Ok(ua) = std::env::var("GLINT_MODRINTH_USER_AGENT") {
             config.platform.modrinth_user_agent = ua;
         }
+
+        // Load PostHog config from env vars directly (secrets - avoid logging)
+        config.posthog = PostHogConfig {
+            api_key: std::env::var("GLINT_POSTHOG_API_KEY").ok(),
+            host: std::env::var("GLINT_POSTHOG_HOST").unwrap_or_else(|_| default_posthog_host()),
+        };
 
         Ok(config)
     }

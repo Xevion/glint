@@ -164,6 +164,17 @@ async fn create_run(
     CaptureRunRepo::insert_items(state.db(), &items).await?;
 
     info!(run_id = %run_id, total_items, "Created capture run");
+
+    state.track(
+        "capture_run_started",
+        "system",
+        serde_json::json!({
+            "run_id": run_id,
+            "total_items": total_items,
+            "agent_id": request.agent_id,
+        }),
+    );
+
     Ok((StatusCode::CREATED, Json(run)))
 }
 
@@ -324,6 +335,17 @@ async fn complete_run(
         completed = run.completed_items,
         failed = run.failed_items,
         "Capture run finalized"
+    );
+
+    state.track(
+        "capture_run_completed",
+        "system",
+        serde_json::json!({
+            "run_id": run_id,
+            "status": run.status,
+            "completed_items": run.completed_items,
+            "failed_items": run.failed_items,
+        }),
     );
 
     Ok(Json(run))

@@ -120,6 +120,20 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Initialize PostHog analytics if configured
+    let analytics = if config.posthog.is_configured() {
+        let client = glint::analytics::Analytics::new(
+            config.posthog.api_key.as_deref().unwrap(),
+            &config.posthog.host,
+        )
+        .await;
+        info!(host = %config.posthog.host, "PostHog analytics initialized");
+        Some(client)
+    } else {
+        warn!("PostHog not configured, analytics disabled");
+        None
+    };
+
     // Create capture metadata channel
     let (metadata_tx, metadata_rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -132,6 +146,7 @@ async fn main() -> anyhow::Result<()> {
         modrinth_client,
         curseforge_client,
         metadata_tx,
+        analytics,
     );
 
     // Start upload cleanup background task
@@ -159,7 +174,10 @@ async fn main() -> anyhow::Result<()> {
         .allow_headers(Any);
 
     // Build router
+    let analytics_layer =
+        glint::middleware::analytics::AnalyticsLayer::new(state.analytics().cloned());
     let app = routes::router(state)
+        .layer(analytics_layer)
         .layer(cors)
         .layer(TraceLayer::new_for_http());
 
