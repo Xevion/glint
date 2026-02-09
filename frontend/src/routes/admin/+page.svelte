@@ -247,30 +247,33 @@ onDestroy(() => {
 					let:tooltip
 				>
 					{@const tt = tooltip as { data: unknown; x: number }}
-					{@const pad = padding as { top: number }}
+					{@const pad = padding as { top: number; left: number }}
 					<Svg>
 						<LinearGradient
-							class="from-primary/50 to-primary/0"
+							stops={[
+								'color-mix(in oklab, var(--chart-3) 50%, transparent)',
+								'transparent'
+							]}
 							vertical
 							let:gradient
 						>
 							<Area
-								line={{ class: 'stroke-2 stroke-primary opacity-20' }}
+								line={{ class: 'stroke-2 stroke-chart-3 opacity-20' }}
 								fill={gradient}
 							/>
 							<RectClipPath
 								x={0}
 								y={0}
-								width={tt.data ? tt.x : width}
+								width={tt.data ? tt.x - pad.left : width}
 								{height}
 								spring
 							>
-								<Area line={{ class: 'stroke-2 stroke-primary' }} fill={gradient} />
+								<Area line={{ class: 'stroke-2 stroke-chart-3' }} fill={gradient} />
 							</RectClipPath>
 						</LinearGradient>
 						<Highlight
 							points
-							lines={{ class: 'stroke-primary [stroke-dasharray:unset]' }}
+							lines={{ class: 'stroke-chart-3 [stroke-dasharray:unset]' }}
 						/>
 						<Axis placement="bottom" />
 						<Axis

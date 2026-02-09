@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../node_modules/layerchart";
 
 @import "tw-animate-css";
 
@@ -78,6 +79,10 @@
 }
 
 @theme inline {
+	/* Map layerchart's svelte-ux theme tokens to shadcn equivalents */
+	--color-surface: var(--background);
+	--color-surface-content: var(--foreground);
+
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
 	--radius-lg: var(--radius);
