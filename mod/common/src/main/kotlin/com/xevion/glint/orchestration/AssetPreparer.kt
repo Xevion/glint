@@ -108,6 +108,7 @@ class AssetPreparer(
                 "slug" to world.slug
             }
             try {
+                var lastProgressLog = 0L
                 val folderPath =
                     com.xevion.glint.download.WorldDownloader
                         .downloadWorld(
@@ -116,9 +117,14 @@ class AssetPreparer(
                             fileUrl = fileUrl,
                             expectedHash = world.fileHash,
                             progressCallback = { progress ->
-                                log.debug("World download progress") {
-                                    "slug" to world.slug
-                                    "progress" to progress
+                                val now = System.currentTimeMillis()
+                                val isTerminal = progress.state != com.xevion.glint.download.DownloadProgress.State.DOWNLOADING
+                                if (isTerminal || now - lastProgressLog >= 1000) {
+                                    lastProgressLog = now
+                                    log.debug("World download progress") {
+                                        "slug" to world.slug
+                                        "progress" to progress
+                                    }
                                 }
                             },
                         ).join()
