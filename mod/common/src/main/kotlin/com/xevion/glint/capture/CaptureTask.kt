@@ -1,7 +1,6 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.capture.WebpWriter
 import net.minecraft.Util
 import net.minecraft.client.Minecraft
 import net.minecraft.client.Screenshot
@@ -9,12 +8,15 @@ import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 
 /**
- * Manages a single high-resolution screenshot capture across multiple render frames.
+ * Manages a single high-resolution screenshot capture across two render frames.
  *
  * Frame sequence:
- * - Frame 0: Optionally hide HUD, framebuffer is already resized by HighResCapture
- * - Frames 1..SETTLE_FRAMES-1: Wait for GPU to produce fully-rendered frames at new resolution
- * - Frame SETTLE_FRAMES: Read back framebuffer pixels and write PNG asynchronously
+ * - Frame 0: Optionally hide HUD (framebuffer is already at capture resolution from session start)
+ * - Frame 1: Read back framebuffer pixels and write image asynchronously
+ *
+ * No settle frames are needed because the StabilizationDetector in CaptureSession
+ * already ensures chunks, lighting, and rendering are fully stable before capture begins,
+ * and the framebuffer has been at 4K since session start (no per-capture resize).
  */
 class CaptureTask(
     private val file: Path,
@@ -23,7 +25,7 @@ class CaptureTask(
 ) {
     private val log = Loggers.Capture.get()
     private var originalHudState = false
-    private var frame = 0
+    private var hudHidden = false
 
     /**
      * Advances the capture by one frame.
@@ -32,27 +34,18 @@ class CaptureTask(
     fun onRenderTick(): Boolean {
         val mc = Minecraft.getInstance()
 
-        when {
-            frame == 0 -> {
-                originalHudState = mc.options.hideGui
-                if (hideHud) {
-                    mc.options.hideGui = true
-                }
-                frame++
-                return false
+        if (!hudHidden) {
+            originalHudState = mc.options.hideGui
+            if (hideHud) {
+                mc.options.hideGui = true
             }
-
-            frame < SETTLE_FRAMES -> {
-                frame++
-                return false
-            }
-
-            else -> {
-                capture(mc)
-                mc.options.hideGui = originalHudState
-                return true
-            }
+            hudHidden = true
+            return false
         }
+
+        capture(mc)
+        mc.options.hideGui = originalHudState
+        return true
     }
 
     private fun capture(mc: Minecraft) {
@@ -77,13 +70,5 @@ class CaptureTask(
                 future.completeExceptionally(e)
             }
         }
-    }
-
-    companion object {
-        /**
-         * Number of frames to wait before capturing. The framebuffer needs a few frames
-         * after resize for the GPU to produce fully-rendered content at the new resolution.
-         */
-        private const val SETTLE_FRAMES = 10
     }
 }

@@ -9,14 +9,13 @@ import java.util.concurrent.CompletableFuture
 /**
  * Orchestrates high-resolution screenshot capture by faking a window resize.
  *
- * The approach mimics what Minecraft does in `resizeDisplay()`:
- * 1. Set Window.framebufferWidth/Height fields to the capture resolution
- * 2. Recalculate GUI scale from the new dimensions
- * 3. Resize the main render target (GPU framebuffer) to match
- * 4. Notify GameRenderer/LevelRenderer of the new size
- * 5. Wait for the GPU to produce fully-rendered frames at the new resolution
- * 6. Read back framebuffer pixels and write to disk
- * 7. Restore all state to the actual window dimensions
+ * Resolution management is session-scoped: dimensions are set to 4K once at session
+ * start and restored at session end. This avoids per-capture resize cascades in Iris
+ * (which would reset temporal accumulation buffers each time).
+ *
+ * The blit-to-screen step uses the real window dimensions (via [realFramebufferWidth]
+ * and [realFramebufferHeight]) so the display shows a properly downscaled image instead
+ * of a zoomed-in corner.
  *
  * Setting the actual Window fields (not just spoofing getter return values) is
  * critical because Sodium, Iris, and Minecraft's own calculateScale/setGuiScale
@@ -30,14 +29,80 @@ object HighResCapture {
 
     private var activeTask: CaptureTask? = null
     private var savedGraphicsMode: GraphicsStatus? = null
-    private var savedFramebufferWidth: Int = 0
-    private var savedFramebufferHeight: Int = 0
+
+    /** Real GLFW framebuffer dimensions, saved at session start. */
+    var realFramebufferWidth: Int = 0
+        private set
+    var realFramebufferHeight: Int = 0
+        private set
+
+    private var sessionActive: Boolean = false
+
+    // ── Session lifecycle ──────────────────────────────────────────────
 
     /**
-     * Starts a high-resolution capture. The capture completes asynchronously over several
-     * render frames. Returns a future that completes when the file is written to disk.
+     * Begins a capture session by resizing to 4K and forcing Fancy graphics mode.
      *
-     * @param file Output path for the PNG file
+     * Call once before the first capture. The resolution stays at 4K for the entire
+     * session so that Iris pipelines are always created at the capture resolution.
+     *
+     * @return true if session started, false if one is already active
+     */
+    fun beginSession(): Boolean {
+        if (sessionActive) {
+            log.warn("Capture session already active, ignoring beginSession")
+            return false
+        }
+
+        val mc = Minecraft.getInstance()
+
+        // Force Fancy graphics mode. In Fabulous mode Minecraft routes block entities
+        // to a separate entityTarget framebuffer that we don't resize.
+        val currentMode = mc.options.graphicsMode().get()
+        if (currentMode == GraphicsStatus.FABULOUS) {
+            savedGraphicsMode = currentMode
+            mc.options.graphicsMode().set(GraphicsStatus.FANCY)
+            log.debug("Switched from Fabulous to Fancy for capture session")
+        }
+
+        applyCaptureDimensions(mc)
+        sessionActive = true
+
+        log.info("Capture session begun") {
+            "resolution" to "${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}"
+        }
+        return true
+    }
+
+    /**
+     * Ends the capture session and restores the real window dimensions and graphics mode.
+     */
+    fun endSession() {
+        if (!sessionActive) {
+            log.warn("No capture session active, ignoring endSession")
+            return
+        }
+
+        activeTask = null
+        restoreDimensions()
+        restoreGraphicsMode()
+        sessionActive = false
+
+        log.info("Capture session ended")
+    }
+
+    /** Whether a capture session is active (dimensions are at 4K). */
+    fun isSessionActive(): Boolean = sessionActive
+
+    // ── Per-capture lifecycle ──────────────────────────────────────────
+
+    /**
+     * Starts a single high-resolution capture within an active session.
+     *
+     * The framebuffer is already at 4K from [beginSession], so no resize happens here.
+     * The capture completes asynchronously over a couple of render frames.
+     *
+     * @param file Output path for the image file
      * @param hideHud Whether to hide the HUD during capture
      * @return Future that completes when the capture is saved, or null if a capture is already active
      */
@@ -45,6 +110,11 @@ object HighResCapture {
         file: Path,
         hideHud: Boolean = true,
     ): CompletableFuture<Path>? {
+        if (!sessionActive) {
+            log.error("Cannot start capture outside of an active session")
+            return null
+        }
+
         if (activeTask != null) {
             log.warn("High-res capture already in progress, ignoring request")
             return null
@@ -57,23 +127,6 @@ object HighResCapture {
 
         val future = CompletableFuture<Path>()
         activeTask = CaptureTask(file, hideHud, future)
-
-        val mc = Minecraft.getInstance()
-
-        // Force Fancy graphics mode during capture. In Fabulous mode, Minecraft routes
-        // block entities (enchanting table books, chests, etc.) to a separate entityTarget
-        // framebuffer that we don't resize. Fancy mode renders everything to mainRenderTarget.
-        // Iris shaders override the graphics pipeline regardless, so this doesn't affect
-        // shader quality.
-        val currentMode = mc.options.graphicsMode().get()
-        if (currentMode == GraphicsStatus.FABULOUS) {
-            savedGraphicsMode = currentMode
-            mc.options.graphicsMode().set(GraphicsStatus.FANCY)
-            log.debug("Switched from Fabulous to Fancy for capture")
-        }
-
-        applyCaptureDimensions(mc)
-
         return future
     }
 
@@ -86,12 +139,13 @@ object HighResCapture {
 
         if (task.onRenderTick()) {
             activeTask = null
-            restoreAll()
         }
     }
 
-    /** Whether a high-resolution capture is currently active. */
+    /** Whether a single capture is currently in-flight. */
     fun isCapturing(): Boolean = activeTask != null
+
+    // ── Internal ───────────────────────────────────────────────────────
 
     /**
      * Fake a window resize to the capture resolution. Mirrors what Minecraft.resizeDisplay()
@@ -100,29 +154,19 @@ object HighResCapture {
     private fun applyCaptureDimensions(mc: Minecraft) {
         val window = mc.window
 
-        // Save the real framebuffer dimensions so we can restore them later.
-        // Use the actual field values (not getWidth/getHeight which we may be spoofing).
-        savedFramebufferWidth = window.width
-        savedFramebufferHeight = window.height
+        realFramebufferWidth = window.width
+        realFramebufferHeight = window.height
         log.debug("Saved real framebuffer dimensions") {
-            "saved" to "${savedFramebufferWidth}x$savedFramebufferHeight"
+            "saved" to "${realFramebufferWidth}x$realFramebufferHeight"
         }
 
-        // Set the Window's framebufferWidth/framebufferHeight fields to our capture resolution.
-        // This is the critical difference from our previous approach: anything that reads
-        // these fields directly (Sodium, Iris, calculateScale, setGuiScale) will now see
-        // the capture resolution instead of the real window size.
         window.setWidth(CAPTURE_WIDTH)
         window.setHeight(CAPTURE_HEIGHT)
 
-        // Recalculate GUI scale from the new dimensions, same as resizeDisplay()
         val guiScale = window.calculateScale(mc.options.guiScale().get(), mc.isEnforceUnicode)
         window.setGuiScale(guiScale.toDouble())
 
-        // Resize the GPU framebuffer to actually allocate 4K textures
         mc.mainRenderTarget?.resize(CAPTURE_WIDTH, CAPTURE_HEIGHT)
-
-        // Notify GameRenderer → LevelRenderer so viewport/frustum are updated
         mc.gameRenderer.resize(CAPTURE_WIDTH, CAPTURE_HEIGHT)
 
         log.info("Applied capture dimensions") {
@@ -131,33 +175,34 @@ object HighResCapture {
         }
     }
 
-    /** Restore all state to the real window dimensions. */
-    private fun restoreAll() {
+    /** Restore window dimensions to the real GLFW size. */
+    private fun restoreDimensions() {
         val mc = Minecraft.getInstance()
         val window = mc.window
 
-        // Restore the real framebuffer dimensions
-        window.setWidth(savedFramebufferWidth)
-        window.setHeight(savedFramebufferHeight)
+        window.setWidth(realFramebufferWidth)
+        window.setHeight(realFramebufferHeight)
 
-        // Recalculate GUI scale from real dimensions
         val guiScale = window.calculateScale(mc.options.guiScale().get(), mc.isEnforceUnicode)
         window.setGuiScale(guiScale.toDouble())
 
-        // Restore GPU framebuffer to window size
-        mc.mainRenderTarget?.resize(savedFramebufferWidth, savedFramebufferHeight)
-
-        // Notify GameRenderer/LevelRenderer
-        mc.gameRenderer.resize(savedFramebufferWidth, savedFramebufferHeight)
+        mc.mainRenderTarget?.resize(realFramebufferWidth, realFramebufferHeight)
+        mc.gameRenderer.resize(realFramebufferWidth, realFramebufferHeight)
 
         log.info("Restored real dimensions") {
-            "resolution" to "${savedFramebufferWidth}x$savedFramebufferHeight"
+            "resolution" to "${realFramebufferWidth}x$realFramebufferHeight"
             "guiScale" to guiScale.toString()
         }
+    }
 
-        // Restore graphics mode if we changed it
+    /** Restore graphics mode if we changed it at session start. */
+    private fun restoreGraphicsMode() {
         savedGraphicsMode?.let { mode ->
-            mc.options.graphicsMode().set(mode)
+            Minecraft
+                .getInstance()
+                .options
+                .graphicsMode()
+                .set(mode)
             log.debug("Restored graphics mode") { "mode" to mode }
             savedGraphicsMode = null
         }

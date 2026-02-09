@@ -101,6 +101,11 @@ class CaptureSession(
         originalState = CaptureStateSnapshot.capture()
         log.debug("Original client state saved")
 
+        if (!HighResCapture.beginSession()) {
+            log.error("Failed to begin high-res capture session")
+            return false
+        }
+
         transitionTo(State.ApplyingScene)
         return true
     }
@@ -422,6 +427,8 @@ class CaptureSession(
         ChunkForceLoader.releaseAll()
 
         sessionData = buildSessionData()
+
+        HighResCapture.endSession()
 
         if (IrisIntegration.isAvailable) {
             originalShaderPack?.let { shaderPack ->
