@@ -275,6 +275,7 @@ let terminateReason = "";
 let terminateCode = 0;
 let gameStarted = false;
 let runFailed = false;
+let lastActivity = Date.now();
 
 // Patterns that indicate work failed (not fatal to the process, but the work wasn't done)
 const RUN_ERROR_MARKERS = [
@@ -336,6 +337,7 @@ async function monitorStream(stream: ReadableStream, isStderr: boolean): Promise
 				for (const marker of GAME_STARTED_MARKERS) {
 					if (marker.test(data)) {
 						gameStarted = true;
+						lastActivity = Date.now();
 						if (!verbose) {
 							console.log(c("36", "[orchestrate] Game loaded"));
 						}
@@ -344,10 +346,11 @@ async function monitorStream(stream: ReadableStream, isStderr: boolean): Promise
 				}
 			}
 
-			// Check progress markers (informational, don't terminate)
-			if (!verbose) {
-				for (const { pattern, msg } of PROGRESS_MARKERS) {
-					if (pattern.test(data)) {
+			// Check progress markers (reset inactivity timer)
+			for (const { pattern, msg } of PROGRESS_MARKERS) {
+				if (pattern.test(data)) {
+					lastActivity = Date.now();
+					if (!verbose) {
 						console.log(c("36", `[orchestrate] ${msg}`));
 					}
 				}
@@ -450,7 +453,7 @@ if (proc.stderr) monitorStream(proc.stderr, true);
 // Wait loop
 const startTime = Date.now();
 const EARLY_TIMEOUT = 120; // 2 min for game to start
-const FULL_TIMEOUT = 600; // 10 min total for orchestration
+const INACTIVITY_TIMEOUT = 180; // 3 min without progress before assuming hang
 
 try {
 	while (true) {
@@ -510,15 +513,14 @@ try {
 			process.exit(exitCode);
 		}
 
-		// Timeout
-		const timeout = gameStarted ? FULL_TIMEOUT : EARLY_TIMEOUT;
-		if (elapsed > timeout) {
-			console.error(
-				c(
-					"31",
-					`[orchestrate] Timeout (${timeout}s, game ${gameStarted ? "started" : "not started"})`,
-				),
-			);
+		// Timeout: before game starts, use absolute timeout; after, use inactivity timeout
+		const idleSeconds = Math.floor((Date.now() - lastActivity) / 1000);
+		const timedOut = gameStarted ? idleSeconds > INACTIVITY_TIMEOUT : elapsed > EARLY_TIMEOUT;
+		if (timedOut) {
+			const reason = gameStarted
+				? `No activity for ${idleSeconds}s (limit: ${INACTIVITY_TIMEOUT}s)`
+				: `Game did not start within ${EARLY_TIMEOUT}s`;
+			console.error(c("31", `[orchestrate] Timeout: ${reason}`));
 			if (!verbose) {
 				const allOutput = outputBuffer + stderrBuffer;
 				console.error("Last 50 lines:");
