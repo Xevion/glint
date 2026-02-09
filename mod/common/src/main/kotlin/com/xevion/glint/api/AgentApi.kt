@@ -173,7 +173,7 @@ object AgentApi {
     fun uploadFile(
         presignedUrl: String,
         fileBytes: ByteArray,
-        contentType: String = "image/png",
+        contentType: String = "image/webp",
     ): Result<Unit> =
         try {
             val connection = URI(presignedUrl).toURL().openConnection() as HttpURLConnection
@@ -186,7 +186,10 @@ object AgentApi {
             connection.outputStream.use { it.write(fileBytes) }
 
             when (connection.responseCode) {
-                in 200..299 -> Result.success(Unit)
+                in 200..299 -> {
+                    Result.success(Unit)
+                }
+
                 else -> {
                     val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
                     Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
@@ -219,7 +222,10 @@ object AgentApi {
             connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
 
             when (connection.responseCode) {
-                in 200..299 -> Result.success(Unit)
+                in 200..299 -> {
+                    Result.success(Unit)
+                }
+
                 else -> {
                     val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
                     Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
@@ -253,7 +259,10 @@ object AgentApi {
             connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
 
             when (connection.responseCode) {
-                in 200..299 -> Result.success(Unit)
+                in 200..299 -> {
+                    Result.success(Unit)
+                }
+
                 else -> {
                     val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
                     Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
@@ -326,7 +335,10 @@ object AgentApi {
             connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
 
             when (connection.responseCode) {
-                in 200..299 -> Result.success(Unit)
+                in 200..299 -> {
+                    Result.success(Unit)
+                }
+
                 else -> {
                     val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
                     Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
@@ -393,7 +405,10 @@ object AgentApi {
             connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
 
             when (connection.responseCode) {
-                in 200..299 -> Result.success(Unit)
+                in 200..299 -> {
+                    Result.success(Unit)
+                }
+
                 else -> {
                     val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
                     Result.failure(ApiError.HttpError(connection.responseCode, errorBody))

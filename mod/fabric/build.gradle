@@ -36,6 +36,9 @@ dependencies {
     include libs.kotlinx.coroutines.core
     include libs.kotlinx.serialization.core
     include libs.kotlinx.serialization.json
+    include libs.webp.imageio
+
+    implementation libs.webp.imageio
 
     modCompileOnly libs.iris
     modCompileOnly libs.sodium

@@ -619,6 +619,58 @@ impl CaptureRepo {
         Ok(())
     }
 
+    /// Update image fields after transcoding a capture from PNG to WebP
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn update_image_after_transcode(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+        image_url: &str,
+        image_path: Option<&str>,
+        file_size_bytes: i64,
+        content_type: &str,
+    ) -> AppResult<()> {
+        sqlx::query!(
+            r#"
+            UPDATE captures
+            SET image_url = $2, image_path = $3, file_size_bytes = $4, content_type = $5, updated_at = now()
+            WHERE id = $1
+            "#,
+            id,
+            image_url,
+            image_path,
+            file_size_bytes,
+            content_type
+        )
+        .execute(executor)
+        .await
+        .context(format!("failed to update image after transcode for '{}'", id))?;
+
+        debug!(id, "Updated capture image after transcode");
+        Ok(())
+    }
+
+    /// List IDs of completed captures still stored as PNG (for WebP transcoding backfill)
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_png_capture_ids(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<Vec<String>> {
+        let ids = sqlx::query_scalar!(
+            r#"
+            SELECT id
+            FROM captures
+            WHERE status = 'completed'
+              AND image_url IS NOT NULL
+              AND (content_type = 'image/png' OR image_url LIKE '%.png')
+            ORDER BY created_at ASC
+            "#
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to list PNG capture ids for transcoding")?;
+
+        Ok(ids)
+    }
+
     /// Count completed captures per scene
     #[instrument(skip(executor), level = "debug")]
     pub async fn batch_count_by_scene(

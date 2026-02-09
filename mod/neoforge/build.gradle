@@ -30,12 +30,15 @@ dependencies {
     modImplementation libs.kotlinx.serialization.core
     modImplementation libs.kotlinx.serialization.json
     
+    implementation libs.webp.imageio
+
     developmentNeoForge libs.kotlin.stdlib
 
     include libs.kotlin.stdlib
     include libs.kotlinx.coroutines.core
     include libs.kotlinx.serialization.core
     include libs.kotlinx.serialization.json
+    include libs.webp.imageio
 
     // owo-lib UI framework
     api libs.owo.neoforge

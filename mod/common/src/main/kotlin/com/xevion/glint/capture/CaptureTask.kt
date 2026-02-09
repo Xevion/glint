@@ -1,6 +1,7 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Loggers
+import com.xevion.glint.capture.WebpWriter
 import net.minecraft.Util
 import net.minecraft.client.Minecraft
 import net.minecraft.client.Screenshot
@@ -64,12 +65,14 @@ class CaptureTask(
         Util.ioPool().execute {
             try {
                 image.use { nativeImage ->
-                    FramebufferWriter.write(nativeImage, file)
+                    WebpWriter.write(nativeImage, file)
                     future.complete(file)
                 }
             } catch (e: Exception) {
                 log.error("Failed to save high-res screenshot") {
-                    "error" to (e.message ?: "unknown")
+                    "exception" to e.javaClass.simpleName
+                    "error" to (e.message ?: "no message")
+                    "stackTrace" to e.stackTraceToString()
                 }
                 future.completeExceptionally(e)
             }

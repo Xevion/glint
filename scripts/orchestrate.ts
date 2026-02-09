@@ -92,6 +92,23 @@ if (platform !== "fabric" && platform !== "neoforge") {
 
 // ── Resolve API configuration ──
 
+interface ModConfig {
+	apiUrl?: string;
+	accessToken?: string;
+	tokenExpiresAt?: number;
+}
+
+/** Read the mod's saved config from .minecraft/glint/config.json */
+function readModConfig(): ModConfig | null {
+	const configPath = `mod/${platform}/run/glint/config.json`;
+	if (!existsSync(configPath)) return null;
+	try {
+		return JSON.parse(readFileSync(configPath, "utf-8")) as ModConfig;
+	} catch {
+		return null;
+	}
+}
+
 function resolveApiToken(): string {
 	// 1. CLI flag
 	if (flags.token) return flags.token as string;
@@ -99,14 +116,33 @@ function resolveApiToken(): string {
 	// 2. Environment variable
 	if (process.env.GLINT_API_TOKEN) return process.env.GLINT_API_TOKEN;
 
-	// Backend doesn't validate agent tokens yet (TODO in routes/agent.rs)
-	// Use a development placeholder so the mod doesn't reject the empty value
-	return "dev-orchestrate";
+	// 3. Saved mod config (from device auth flow)
+	const config = readModConfig();
+	if (config?.accessToken) {
+		if (config.tokenExpiresAt && config.tokenExpiresAt < Date.now()) {
+			console.error(c("31", "[preflight] Saved token has expired — re-authenticate via the mod's config wizard"));
+			process.exit(1);
+		}
+		console.log(c("36", "[preflight] Using saved token from mod config"));
+		return config.accessToken;
+	}
+
+	console.error(c("31", "[preflight] No API token found"));
+	console.error("   Provide a token via one of:");
+	console.error("     --token <token>           CLI flag");
+	console.error("     GLINT_API_TOKEN=<token>   environment variable");
+	console.error("     Device auth wizard        (run Minecraft and use the Glint config screen)");
+	process.exit(1);
 }
 
 function resolveApiUrl(): string {
 	if (flags.url) return flags.url as string;
 	if (process.env.GLINT_API_URL) return process.env.GLINT_API_URL;
+
+	// Fall back to mod config URL if available
+	const config = readModConfig();
+	if (config?.apiUrl) return config.apiUrl;
+
 	return "http://localhost:8080";
 }
 

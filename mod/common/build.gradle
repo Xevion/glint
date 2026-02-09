@@ -28,6 +28,8 @@ dependencies {
     modImplementation libs.kotlinx.serialization.core
     modImplementation libs.kotlinx.serialization.json
 
+    implementation libs.webp.imageio
+
     // Iris integration - compile-time only, not bundled
     modCompileOnly libs.iris
 

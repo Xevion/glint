@@ -355,12 +355,12 @@ class CaptureSession(
 
     private fun buildCaptureFilename(config: ShaderSpec): String {
         if (config.filename == null) {
-            return "vanilla.png"
+            return "vanilla.webp"
         }
 
         val shaderInfo = parseShaderPackName(config.filename)
         val profileSuffix = config.profile?.let { "_${sanitizeForFilename(it)}" } ?: ""
-        return "${shaderInfo.id}_${shaderInfo.version}$profileSuffix.png"
+        return "${shaderInfo.id}_${shaderInfo.version}$profileSuffix.webp"
     }
 
     private fun parseShaderPackName(filename: String): ShaderPackInfo {

@@ -25,6 +25,7 @@ kotlin = "2.2.21"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.8.0"
 
+webp-imageio = "0.1.6"
 slf4j = "2.0.17"
 spotless = "7.0.2"
 ktlint = "14.0.1"
@@ -50,6 +51,7 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 
+webp-imageio = { module = "org.sejda.imageio:webp-imageio", version.ref = "webp-imageio" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 
 iris = { module = "maven.modrinth:iris", version.ref = "iris" }

@@ -162,7 +162,12 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Start capture metadata background worker
-    tokio::spawn(services::capture_metadata::run(metadata_rx, pool.clone()));
+    tokio::spawn(services::capture_metadata::run(
+        metadata_rx,
+        pool.clone(),
+        s3_client.clone(),
+        config.r2.clone(),
+    ));
 
     // Start capture run monitor (detects and times out stale runs)
     tokio::spawn(services::capture_run_monitor::monitor_capture_runs(pool));

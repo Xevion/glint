@@ -34,7 +34,7 @@ serde_repr = "0.1.20"
 url = "2.5.8"
 nanoid = "0.4.0"
 thumbhash = "0.1.0"
-image = { version = "0.25.9", default-features = false, features = ["png"] }
+image = { version = "0.25.9", default-features = false, features = ["avif-native", "png", "webp"] }
 base64 = "0.22.1"
 posthog-rs = "0.4.0"
 tower = { version = "0.5.3", features = ["util"] }

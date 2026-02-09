@@ -1,16 +1,25 @@
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::primitives::ByteStream;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use image::imageops::FilterType;
 use sqlx::PgPool;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
+use crate::config::R2Config;
 use crate::repo::CaptureRepo;
 
 /// Run the capture metadata background worker.
 ///
-/// On startup, backfills any completed captures missing thumbhash or file metadata.
-/// Then loops on the channel, processing new capture IDs as they arrive.
-pub async fn run(mut rx: mpsc::UnboundedReceiver<String>, pool: PgPool) {
+/// On startup, backfills any completed captures missing thumbhash or file metadata,
+/// then transcodes any remaining PNG captures to AVIF. After backfill, loops on the
+/// channel processing new capture IDs as they arrive.
+pub async fn run(
+    mut rx: mpsc::UnboundedReceiver<String>,
+    pool: PgPool,
+    s3: Option<S3Client>,
+    r2_config: R2Config,
+) {
     // Backfill existing captures missing thumbhash or file metadata
     match CaptureRepo::list_unprocessed_ids(&pool).await {
         Ok(ids) => {
@@ -31,6 +40,27 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<String>, pool: PgPool) {
         Err(e) => {
             error!(error = %e, "Metadata worker failed to query unprocessed captures");
         }
+    }
+
+    // Backfill PNG → AVIF transcoding
+    if let Some(ref s3_client) = s3 {
+        match CaptureRepo::list_png_capture_ids(&pool).await {
+            Ok(ids) if !ids.is_empty() => {
+                info!(count = ids.len(), "Transcoding PNG captures to AVIF");
+                for id in &ids {
+                    transcode_capture(&pool, s3_client, &r2_config, id).await;
+                }
+                info!(count = ids.len(), "PNG→AVIF transcoding backfill complete");
+            }
+            Ok(_) => {
+                info!("No PNG captures to transcode");
+            }
+            Err(e) => {
+                error!(error = %e, "Failed to query PNG captures for transcoding");
+            }
+        }
+    } else {
+        debug!("S3 not configured, skipping PNG→AVIF transcoding");
     }
 
     // Process new captures as they arrive
@@ -113,6 +143,150 @@ async fn process_capture(pool: &PgPool, capture_id: &str) {
             }
         }
     }
+}
+
+/// Transcode a single PNG capture to AVIF and update R2 + DB.
+async fn transcode_capture(pool: &PgPool, s3: &S3Client, r2_config: &R2Config, capture_id: &str) {
+    let capture = match CaptureRepo::find_by_id(pool, capture_id).await {
+        Ok(Some(c)) => c,
+        Ok(None) => {
+            warn!(capture_id, "Transcode: capture not found");
+            return;
+        }
+        Err(e) => {
+            error!(capture_id, error = %e, "Transcode: failed to fetch capture");
+            return;
+        }
+    };
+
+    let image_url = match capture.image_url {
+        Some(ref url) if !url.is_empty() => url.clone(),
+        _ => {
+            debug!(capture_id, "Transcode: no image_url, skipping");
+            return;
+        }
+    };
+
+    // Download the PNG
+    let png_bytes = match reqwest::get(&image_url).await {
+        Ok(resp) => match resp.bytes().await {
+            Ok(b) => b,
+            Err(e) => {
+                warn!(capture_id, error = %e, "Transcode: failed to download image body");
+                return;
+            }
+        },
+        Err(e) => {
+            warn!(capture_id, error = %e, "Transcode: failed to download image");
+            return;
+        }
+    };
+
+    // Encode to WebP in a blocking task (CPU-intensive)
+    let png_bytes_clone = png_bytes.clone();
+    let webp_bytes =
+        match tokio::task::spawn_blocking(move || encode_to_webp(&png_bytes_clone)).await {
+            Ok(Ok(bytes)) => bytes,
+            Ok(Err(e)) => {
+                warn!(capture_id, error = %e, "Transcode: WebP encoding failed");
+                return;
+            }
+            Err(e) => {
+                error!(capture_id, error = %e, "Transcode: blocking task panicked");
+                return;
+            }
+        };
+
+    let webp_size = webp_bytes.len() as i64;
+    let png_size = png_bytes.len() as i64;
+
+    // Derive the new R2 key by replacing .png with .webp in the old URL
+    let old_r2_key = extract_r2_key_from_url(&image_url, r2_config);
+    let new_r2_key = old_r2_key.replace(".png", ".webp");
+    let new_image_url = r2_config.public_url_for_key(&new_r2_key);
+    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+
+    // Upload WebP to R2
+    if let Err(e) = s3
+        .put_object()
+        .bucket(bucket)
+        .key(&new_r2_key)
+        .content_type("image/webp")
+        .body(ByteStream::from(webp_bytes))
+        .send()
+        .await
+    {
+        error!(capture_id, error = %e, "Transcode: failed to upload WebP to R2");
+        return;
+    }
+
+    // Update DB with new image URL, content type, and file size
+    let new_image_path = capture
+        .image_path
+        .as_deref()
+        .map(|p| p.replace(".png", ".webp"));
+    if let Err(e) = CaptureRepo::update_image_after_transcode(
+        pool,
+        capture_id,
+        &new_image_url,
+        new_image_path.as_deref(),
+        webp_size,
+        "image/webp",
+    )
+    .await
+    {
+        error!(capture_id, error = %e, "Transcode: failed to update DB");
+        return;
+    }
+
+    // Delete old PNG from R2 (best-effort)
+    if old_r2_key != new_r2_key
+        && let Err(e) = s3
+            .delete_object()
+            .bucket(bucket)
+            .key(&old_r2_key)
+            .send()
+            .await
+    {
+        warn!(capture_id, error = %e, "Transcode: failed to delete old PNG from R2");
+    }
+
+    info!(
+        capture_id,
+        png_size,
+        webp_size,
+        ratio = format_args!("{:.1}x", png_size as f64 / webp_size as f64),
+        "Transcoded PNG→WebP"
+    );
+}
+
+/// Encode raw image bytes (any supported format) to WebP.
+fn encode_to_webp(input: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let img = image::load_from_memory(input)?;
+    let mut buf = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::WebP)?;
+    Ok(buf.into_inner())
+}
+
+/// Extract the R2 object key from a public URL.
+///
+/// Given `https://pub-xxx.r2.dev/captures/shader/scene/id.png`, returns `captures/shader/scene/id.png`.
+fn extract_r2_key_from_url(image_url: &str, r2_config: &R2Config) -> String {
+    if let Some(ref prefix) = r2_config.public_url {
+        let trimmed = prefix.trim_end_matches('/');
+        if let Some(key) = image_url.strip_prefix(trimmed) {
+            return key.trim_start_matches('/').to_string();
+        }
+    }
+    // Fallback: take everything after the third slash (https://host/key...)
+    image_url
+        .find("://")
+        .and_then(|i| image_url[i + 3..].find('/'))
+        .map(|i| {
+            let start = image_url.find("://").unwrap() + 3 + i + 1;
+            image_url[start..].to_string()
+        })
+        .unwrap_or_else(|| image_url.to_string())
 }
 
 /// Full GET: download image, generate thumbhash, extract file size and content type.

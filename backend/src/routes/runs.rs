@@ -250,7 +250,7 @@ async fn claim_item(
 
     let capture_id = nanoid!(ID_LENGTH, &ID_ALPHABET);
     let r2_key = format!(
-        "captures/{}/{}/{}.png",
+        "captures/{}/{}/{}.webp",
         shader_id, item.scene_id, capture_id
     );
 
@@ -259,7 +259,7 @@ async fn claim_item(
 
     let presigned_url = if let Some(s3) = state.s3() {
         let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
-        generate_presigned_put_url(s3, bucket, &r2_key, "image/png", 3600).await?
+        generate_presigned_put_url(s3, bucket, &r2_key, "image/webp", 3600).await?
     } else {
         format!("https://r2.example.com/{}", r2_key)
     };
@@ -386,7 +386,7 @@ async fn get_upload_url(
 ) -> AppResult<Json<UploadUrlResponse>> {
     let capture_id = nanoid!(ID_LENGTH, &ID_ALPHABET);
     let r2_key = format!(
-        "captures/{}/{}/{}.png",
+        "captures/{}/{}/{}.webp",
         request.shader_id, request.scene_id, capture_id
     );
 
@@ -395,7 +395,7 @@ async fn get_upload_url(
 
     let presigned_url = if let Some(s3) = state.s3() {
         let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
-        generate_presigned_put_url(s3, bucket, &r2_key, "image/png", 3600).await?
+        generate_presigned_put_url(s3, bucket, &r2_key, "image/webp", 3600).await?
     } else {
         format!("https://r2.example.com/{}", r2_key)
     };
