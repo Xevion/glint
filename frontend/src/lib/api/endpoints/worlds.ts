@@ -1,7 +1,9 @@
 import type {
 	CreateWorldUploadResponse,
 	CreateWorldVersionUploadResponse,
-	World
+	World,
+	WorldListItem,
+	WorldVersion
 } from '$lib/bindings';
 import { Result } from 'true-myth';
 import { ApiClient } from '../client';
@@ -38,8 +40,8 @@ export interface UploadProgress {
 }
 
 export class WorldsEndpoints extends ApiClient {
-	async list(): Promise<Result<World[], ApiError>> {
-		return this.get<World[]>('/api/worlds');
+	async list(): Promise<Result<WorldListItem[], ApiError>> {
+		return this.get<WorldListItem[]>('/api/worlds');
 	}
 
 	async createWorldUpload(
@@ -122,7 +124,10 @@ export class WorldsEndpoints extends ApiClient {
 	async completeWorldVersionUpload(
 		worldId: string,
 		request: CompleteWorldVersionUploadRequest
-	): Promise<Result<unknown, ApiError>> {
-		return this.post(`/api/worlds/${encodeURIComponent(worldId)}/versions/complete`, request);
+	): Promise<Result<WorldVersion, ApiError>> {
+		return this.post<WorldVersion>(
+			`/api/worlds/${encodeURIComponent(worldId)}/versions/complete`,
+			request
+		);
 	}
 }

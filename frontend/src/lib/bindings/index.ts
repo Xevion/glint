@@ -41,5 +41,6 @@ export type { User } from "./User";
 export type { UserWithSessions } from "./UserWithSessions";
 export type { WorkItem } from "./WorkItem";
 export type { World } from "./World";
+export type { WorldListItem } from "./WorldListItem";
 export type { WorldVersion } from "./WorldVersion";
 export type { WorldWithDetails } from "./WorldWithDetails";

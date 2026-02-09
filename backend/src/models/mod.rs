@@ -398,6 +398,15 @@ pub struct CaptureWithContext {
     pub scene_slug: Option<String>,
 }
 
+/// World summary for list endpoints (no scenes loaded)
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct WorldListItem {
+    #[serde(flatten)]
+    pub world: World,
+    pub latest_version: Option<WorldVersion>,
+}
+
 /// World with its associated scenes and latest version
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
@@ -527,6 +536,14 @@ pub struct CompleteWorldUploadRequest {
 #[derive(Debug, Deserialize)]
 pub struct CompleteWorldVersionUploadRequest {
     pub upload_id: String,
+}
+
+/// Request to initiate a new version upload for an existing world
+#[derive(Debug, Deserialize)]
+pub struct CreateWorldVersionUploadRequest {
+    /// SHA256 hash with algorithm prefix (e.g., "sha256:abc123...")
+    pub file_hash: String,
+    pub file_size_bytes: i64,
 }
 
 /// Internal request for creating a world record in the database

@@ -1,3 +1,4 @@
+use aws_sdk_s3::Client as S3Client;
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -10,10 +11,12 @@ use uuid::Uuid;
 
 use crate::{
     auth::AdminUser,
+    config::R2Config,
     error::{AppError, AppResult},
     models::{
         CompleteWorldUploadRequest, CompleteWorldVersionUploadRequest, CreateWorldRequest,
-        CreateWorldUploadResponse, CreateWorldVersionUploadResponse, UpdateWorldRequest, World,
+        CreateWorldUploadResponse, CreateWorldVersionUploadRequest,
+        CreateWorldVersionUploadResponse, PendingUpload, UpdateWorldRequest, World, WorldListItem,
         WorldVersion, WorldWithDetails,
     },
     repo::{PendingUploadRepo, SceneRepo, WorldRepo, WorldVersionRepo},
@@ -22,6 +25,120 @@ use crate::{
 
 /// Presigned URL expiry time (5 minutes)
 const PRESIGN_EXPIRY_SECS: u64 = 300;
+
+/// Maximum upload size (512 MiB)
+const MAX_UPLOAD_SIZE: i64 = 512 * 1024 * 1024;
+
+/// Validate common upload fields (hash format, file size).
+fn validate_upload_request(file_hash: &str, file_size_bytes: i64) -> AppResult<()> {
+    if !file_hash.starts_with("sha256:") {
+        return Err(AppError::BadRequest(
+            "file_hash must have algorithm prefix (e.g., 'sha256:abc123...')".into(),
+        ));
+    }
+    if file_size_bytes <= 0 {
+        return Err(AppError::BadRequest(
+            "file_size_bytes must be greater than zero".into(),
+        ));
+    }
+    if file_size_bytes > MAX_UPLOAD_SIZE {
+        return Err(AppError::BadRequest(format!(
+            "File too large: {} bytes (max {} MiB)",
+            file_size_bytes,
+            MAX_UPLOAD_SIZE / 1024 / 1024
+        )));
+    }
+    Ok(())
+}
+
+/// Result of successfully verifying and moving a staged upload in S3.
+struct FinalizedUpload {
+    version_id: String,
+    file_url: String,
+}
+
+/// Verify a staged upload exists in S3 with the correct hash, then move it
+/// from the staging path to the final versioned path and return the public URL.
+async fn finalize_staged_upload(
+    s3: &S3Client,
+    r2_config: &R2Config,
+    pending: &PendingUpload,
+    world_slug: &str,
+) -> AppResult<FinalizedUpload> {
+    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+
+    // Verify file exists in R2
+    let head = s3
+        .head_object()
+        .bucket(bucket)
+        .key(&pending.upload_key)
+        .send()
+        .await
+        .map_err(|e| {
+            warn!(upload_key = %pending.upload_key, error = %e, "Upload file not found in R2");
+            AppError::NotFound(
+                "Uploaded file not found in storage. Please retry the upload.".into(),
+            )
+        })?;
+
+    // Verify hash from metadata
+    let stored_hash = head.metadata().and_then(|m| m.get("sha256").cloned());
+    let expected_hash = pending
+        .file_hash
+        .strip_prefix("sha256:")
+        .unwrap_or(&pending.file_hash);
+
+    if stored_hash.as_deref() != Some(expected_hash) {
+        warn!(
+            expected = %expected_hash,
+            actual = ?stored_hash,
+            "Upload hash mismatch"
+        );
+        return Err(AppError::BadRequest(
+            "File hash mismatch. The uploaded file may be corrupted.".into(),
+        ));
+    }
+
+    // Move file to versioned location
+    let version_id = Uuid::new_v4().to_string();
+    let final_key = format!("worlds/{}/{}.zip", world_slug, version_id);
+
+    let copy_source = format!("{}/{}", bucket, pending.upload_key);
+    s3.copy_object()
+        .bucket(bucket)
+        .copy_source(&copy_source)
+        .key(&final_key)
+        .metadata_directive(aws_sdk_s3::types::MetadataDirective::Copy)
+        .send()
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to copy upload to final location");
+            AppError::Internal(anyhow::anyhow!("Failed to finalize upload: {}", e))
+        })?;
+
+    // Delete staging file (best-effort)
+    if let Err(e) = s3
+        .delete_object()
+        .bucket(bucket)
+        .key(&pending.upload_key)
+        .send()
+        .await
+    {
+        warn!(key = %pending.upload_key, error = %e, "Failed to delete temp upload file");
+    }
+
+    // Generate public URL
+    let file_url = if let Some(ref public_url_prefix) = r2_config.public_url {
+        format!("{}/{}", public_url_prefix, final_key)
+    } else {
+        format!("https://{}.r2.cloudflarestorage.com/{}", bucket, final_key)
+    };
+
+    Ok(FinalizedUpload {
+        version_id,
+        file_url,
+    })
+}
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -45,7 +162,7 @@ pub fn router() -> Router<AppState> {
 async fn list_worlds(
     _admin: AdminUser,
     State(state): State<AppState>,
-) -> AppResult<Json<Vec<WorldWithDetails>>> {
+) -> AppResult<Json<Vec<WorldListItem>>> {
     let (worlds, latest_versions) = tokio::try_join!(
         WorldRepo::list(state.db()),
         WorldVersionRepo::batch_latest(state.db()),
@@ -58,9 +175,8 @@ async fn list_worlds(
                 .iter()
                 .find(|v| v.world_id == world.id)
                 .cloned();
-            WorldWithDetails {
+            WorldListItem {
                 world,
-                scenes: vec![],
                 latest_version,
             }
         })
@@ -77,22 +193,7 @@ async fn create_world_upload(
 ) -> AppResult<(StatusCode, Json<CreateWorldUploadResponse>)> {
     debug!(slug = %request.slug, "Preparing world upload");
 
-    // Validate hash format (must have algorithm prefix)
-    if !request.file_hash.starts_with("sha256:") {
-        return Err(AppError::BadRequest(
-            "file_hash must have algorithm prefix (e.g., 'sha256:abc123...')".into(),
-        ));
-    }
-
-    // Validate file size (max 512 MiB)
-    const MAX_UPLOAD_SIZE: i64 = 512 * 1024 * 1024;
-    if request.file_size_bytes > MAX_UPLOAD_SIZE {
-        return Err(AppError::BadRequest(format!(
-            "File too large: {} bytes (max {} MiB)",
-            request.file_size_bytes,
-            MAX_UPLOAD_SIZE / 1024 / 1024
-        )));
-    }
+    validate_upload_request(&request.file_hash, request.file_size_bytes)?;
 
     // Check if world with this slug already exists
     if WorldRepo::exists_by_slug(state.db(), &request.slug).await? {
@@ -213,50 +314,16 @@ async fn complete_world_upload(
         .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))?;
 
     let r2_config = &state.config().r2;
-    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
 
-    // Verify file exists in R2 via head_object
-    let head_result = s3
-        .head_object()
-        .bucket(bucket)
-        .key(&pending.upload_key)
-        .send()
-        .await;
+    // Verify and move staged file in S3
+    let finalized = finalize_staged_upload(s3, r2_config, &pending, pending_slug).await?;
 
-    let head = match head_result {
-        Ok(h) => h,
-        Err(e) => {
-            warn!(upload_id = %request.upload_id, error = %e, "Upload file not found in R2");
-            return Err(AppError::NotFound(
-                "Uploaded file not found in storage. Please retry the upload.".into(),
-            ));
-        }
-    };
+    // Create world + version + cleanup pending record in a single transaction
+    let mut tx = state.begin_tx().await?;
 
-    // Verify hash from metadata
-    let stored_hash = head.metadata().and_then(|m| m.get("sha256").cloned());
-    let expected_hash = pending
-        .file_hash
-        .strip_prefix("sha256:")
-        .unwrap_or(&pending.file_hash);
-
-    if stored_hash.as_deref() != Some(expected_hash) {
-        warn!(
-            upload_id = %request.upload_id,
-            expected = %expected_hash,
-            actual = ?stored_hash,
-            "Upload hash mismatch"
-        );
-        return Err(AppError::BadRequest(
-            "File hash mismatch. The uploaded file may be corrupted.".into(),
-        ));
-    }
-
-    // Create world record first (to detect conflicts before moving files)
     let world_id = Uuid::new_v4().to_string();
-    let version_id = Uuid::new_v4().to_string();
     let world_result = WorldRepo::create(
-        state.db(),
+        &mut *tx,
         &world_id,
         &CreateWorldRequest {
             name: &pending_name,
@@ -269,9 +336,8 @@ async fn complete_world_upload(
 
     // Handle conflict (another upload completed first)
     if let Err(AppError::Conflict(_)) = &world_result {
-        // Delete pending record; cleanup service will remove the staging file
+        tx.rollback().await.ok();
         PendingUploadRepo::delete(state.db(), &request.upload_id).await?;
-
         return Err(AppError::Conflict(format!(
             "World with slug '{}' was created by another upload",
             slug
@@ -280,55 +346,18 @@ async fn complete_world_upload(
 
     let world = world_result?;
 
-    // Move file to versioned location: _uploads/{uuid}.zip -> worlds/{slug}/{version_id}.zip
-    let final_key = format!("worlds/{}/{}.zip", pending_slug, version_id);
-
-    // Copy to final location
-    let copy_source = format!("{}/{}", bucket, pending.upload_key);
-    s3.copy_object()
-        .bucket(bucket)
-        .copy_source(&copy_source)
-        .key(&final_key)
-        .metadata_directive(aws_sdk_s3::types::MetadataDirective::Copy)
-        .send()
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to copy upload to final location");
-            AppError::Internal(anyhow::anyhow!("Failed to finalize upload: {}", e))
-        })?;
-
-    // Delete original upload file
-    if let Err(e) = s3
-        .delete_object()
-        .bucket(bucket)
-        .key(&pending.upload_key)
-        .send()
-        .await
-    {
-        // Log but don't fail - cleanup will handle it
-        warn!(key = %pending.upload_key, error = %e, "Failed to delete temp upload file");
-    }
-
-    // Generate public URL
-    let file_url = if let Some(ref public_url_prefix) = r2_config.public_url {
-        format!("{}/{}", public_url_prefix, final_key)
-    } else {
-        format!("https://{}.r2.cloudflarestorage.com/{}", bucket, final_key)
-    };
-
-    // Create initial world version with artifact data
     WorldVersionRepo::create(
-        state.db(),
-        &version_id,
+        &mut *tx,
+        &finalized.version_id,
         &world.id,
-        &file_url,
+        &finalized.file_url,
         &pending.file_hash,
         pending.size_bytes,
     )
     .await?;
 
-    // Delete pending upload record
-    PendingUploadRepo::delete(state.db(), &request.upload_id).await?;
+    PendingUploadRepo::delete(&mut *tx, &request.upload_id).await?;
+    tx.commit().await?;
 
     info!(world_id = %world.id, slug = %world.slug, "World created with initial version");
     Ok((StatusCode::CREATED, Json(world)))
@@ -432,14 +461,6 @@ async fn list_world_versions(
     Ok(Json(versions))
 }
 
-/// Request to initiate a new version upload for an existing world
-#[derive(Debug, serde::Deserialize)]
-struct CreateWorldVersionUploadRequest {
-    /// SHA256 hash with algorithm prefix (e.g., "sha256:abc123...")
-    file_hash: String,
-    file_size_bytes: i64,
-}
-
 /// POST /api/worlds/{id}/versions - Initiate world version upload (admin)
 ///
 /// Phase 1 of two-phase upload: creates a pending upload record and returns
@@ -453,22 +474,7 @@ async fn create_world_version(
 ) -> AppResult<(StatusCode, Json<CreateWorldVersionUploadResponse>)> {
     let world = WorldRepo::get_by_id(state.db(), &id).await?;
 
-    // Validate hash format
-    if !request.file_hash.starts_with("sha256:") {
-        return Err(AppError::BadRequest(
-            "file_hash must have algorithm prefix (e.g., 'sha256:abc123...')".into(),
-        ));
-    }
-
-    // Validate file size (max 512 MiB)
-    const MAX_UPLOAD_SIZE: i64 = 512 * 1024 * 1024;
-    if request.file_size_bytes > MAX_UPLOAD_SIZE {
-        return Err(AppError::BadRequest(format!(
-            "File too large: {} bytes (max {} MiB)",
-            request.file_size_bytes,
-            MAX_UPLOAD_SIZE / 1024 / 1024
-        )));
-    }
+    validate_upload_request(&request.file_hash, request.file_size_bytes)?;
 
     // Require R2/S3
     let s3 = state
@@ -574,89 +580,25 @@ async fn complete_world_version_upload(
         .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))?;
 
     let r2_config = &state.config().r2;
-    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
 
-    // Verify file exists in R2 via head_object
-    let head = s3
-        .head_object()
-        .bucket(bucket)
-        .key(&pending.upload_key)
-        .send()
-        .await
-        .map_err(|e| {
-            warn!(upload_id = %request.upload_id, error = %e, "Upload file not found in R2");
-            AppError::NotFound(
-                "Uploaded file not found in storage. Please retry the upload.".into(),
-            )
-        })?;
+    // Verify and move staged file in S3
+    let finalized = finalize_staged_upload(s3, r2_config, &pending, &world.slug).await?;
 
-    // Verify hash from metadata
-    let stored_hash = head.metadata().and_then(|m| m.get("sha256").cloned());
-    let expected_hash = pending
-        .file_hash
-        .strip_prefix("sha256:")
-        .unwrap_or(&pending.file_hash);
+    // Create version + cleanup pending record in a single transaction
+    let mut tx = state.begin_tx().await?;
 
-    if stored_hash.as_deref() != Some(expected_hash) {
-        warn!(
-            upload_id = %request.upload_id,
-            expected = %expected_hash,
-            actual = ?stored_hash,
-            "Upload hash mismatch"
-        );
-        return Err(AppError::BadRequest(
-            "File hash mismatch. The uploaded file may be corrupted.".into(),
-        ));
-    }
-
-    // Move file to versioned location: _uploads/{uuid}.zip -> worlds/{slug}/{version_id}.zip
-    let version_id = Uuid::new_v4().to_string();
-    let final_key = format!("worlds/{}/{}.zip", world.slug, version_id);
-
-    let copy_source = format!("{}/{}", bucket, pending.upload_key);
-    s3.copy_object()
-        .bucket(bucket)
-        .copy_source(&copy_source)
-        .key(&final_key)
-        .metadata_directive(aws_sdk_s3::types::MetadataDirective::Copy)
-        .send()
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to copy version upload to final location");
-            AppError::Internal(anyhow::anyhow!("Failed to finalize upload: {}", e))
-        })?;
-
-    // Delete staging file
-    if let Err(e) = s3
-        .delete_object()
-        .bucket(bucket)
-        .key(&pending.upload_key)
-        .send()
-        .await
-    {
-        warn!(key = %pending.upload_key, error = %e, "Failed to delete temp upload file");
-    }
-
-    // Generate public URL
-    let file_url = if let Some(ref public_url_prefix) = r2_config.public_url {
-        format!("{}/{}", public_url_prefix, final_key)
-    } else {
-        format!("https://{}.r2.cloudflarestorage.com/{}", bucket, final_key)
-    };
-
-    // Create world version record
     let version = WorldVersionRepo::create(
-        state.db(),
-        &version_id,
+        &mut *tx,
+        &finalized.version_id,
         &world.id,
-        &file_url,
+        &finalized.file_url,
         &pending.file_hash,
         pending.size_bytes,
     )
     .await?;
 
-    // Delete pending upload record
-    PendingUploadRepo::delete(state.db(), &request.upload_id).await?;
+    PendingUploadRepo::delete(&mut *tx, &request.upload_id).await?;
+    tx.commit().await?;
 
     info!(
         world_id = %world.id,

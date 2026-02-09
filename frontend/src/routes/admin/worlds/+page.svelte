@@ -1,6 +1,6 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
-import type { World } from '$lib/bindings';
+import type { WorldListItem } from '$lib/bindings';
 import AdminTable from '$lib/components/AdminTable.svelte';
 import WorldUploadDialog from '$lib/components/WorldUploadDialog.svelte';
 import { Button } from '$lib/components/ui/button';
@@ -52,8 +52,8 @@ async function refresh() {
 		<AdminTable
 			data={worlds}
 			{columns}
-			onRowClick={(world: World) => goto(`/admin/worlds/${world.id}`)}
-			getRowId={(w: World) => w.id}
+			onRowClick={(world: WorldListItem) => goto(`/admin/worlds/${world.id}`)}
+			getRowId={(w: WorldListItem) => w.id}
 		>
 			{#snippet cell({ columnId, value })}
 				{#if columnId === 'name'}
