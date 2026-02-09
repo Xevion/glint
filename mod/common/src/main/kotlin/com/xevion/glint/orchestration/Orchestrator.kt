@@ -5,6 +5,8 @@ import com.xevion.glint.capture.CaptureEntry
 import com.xevion.glint.capture.CaptureSession
 import com.xevion.glint.capture.CaptureSessionData
 import com.xevion.glint.capture.CaptureStateManager
+import com.xevion.glint.capture.HighResCapture
+import com.xevion.glint.capture.IrisIntegration
 import com.xevion.glint.io.SessionDirectoryManager
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.SceneManager
@@ -21,11 +23,15 @@ data class CaptureTakenEvent(
 )
 
 /**
- * Orchestrates multi-world, multi-scene capture sessions.
+ * Orchestrates multi-world, multi-shader, multi-scene capture sessions.
  *
- * Resolves scene IDs from a [CaptureSpec], loads each world sequentially,
- * captures all scenes in that world, then moves to the next world.
- * Generates a master manifest on completion.
+ * Executes captures in world → shader → scene order to minimize expensive operations:
+ * - World loads happen once per unique world
+ * - Shader loads happen once per shader per world (not per scene)
+ * - Scene transitions are cheap teleports within an already-loaded shader
+ *
+ * The 4K framebuffer is kept active for the entire orchestration to avoid
+ * per-session Iris pipeline recreation from resolution changes.
  */
 class Orchestrator {
     private val log = Loggers.Orchestration.get()
@@ -38,8 +44,11 @@ class Orchestrator {
     private var ticksInState: Int = 0
 
     private var spec: CaptureSpec? = null
-    private var worldScenePairs: List<WorldSceneEntry> = emptyList()
-    private var currentPairIndex: Int = 0
+
+    // Capture plan: world → shader → scenes
+    private var capturePlan: List<WorldCaptures> = emptyList()
+    private var currentWorldIndex: Int = 0
+    private var currentShaderIndex: Int = 0
 
     private var captureSession: CaptureSession? = null
     private var sessionDir: File? = null
@@ -47,10 +56,24 @@ class Orchestrator {
     private var startedAt: Instant? = null
     private val sessionDataList = mutableListOf<CaptureSessionData>()
 
-    private data class WorldSceneEntry(
+    private var originalShaderPack: String? = null
+    private var highResSessionActive: Boolean = false
+
+    /** A group of scenes in a single world, organized by shader. */
+    private data class WorldCaptures(
         val worldFolder: String,
-        val scene: ResolvedScene,
+        val shaderRuns: List<ShaderRun>,
+    )
+
+    /** All scenes to capture with a specific shader. */
+    private data class ShaderRun(
+        val shader: ShaderSpec,
+        val scenes: List<SceneEntry>,
+    )
+
+    private data class SceneEntry(
         val sceneId: String,
+        val scene: ResolvedScene,
     )
 
     fun start(spec: CaptureSpec): Boolean {
@@ -70,7 +93,7 @@ class Orchestrator {
         }
 
         CaptureStateManager.startCapture()
-        transitionTo(State.DiscoveringScenes)
+        transitionTo(State.Planning)
         return true
     }
 
@@ -88,16 +111,20 @@ class Orchestrator {
         when (state) {
             State.Idle -> {}
 
-            State.DiscoveringScenes -> {
-                handleDiscoveringScenes()
+            State.Planning -> {
+                handlePlanning()
             }
 
             State.LoadingWorld -> {
                 handleLoadingWorld()
             }
 
-            State.RunningScene -> {
-                handleRunningScene()
+            State.LoadingShader -> {
+                handleLoadingShader()
+            }
+
+            State.CapturingScenes -> {
+                handleCapturingScenes()
             }
 
             State.GeneratingManifest -> {
@@ -125,33 +152,62 @@ class Orchestrator {
         }
     }
 
-    private fun handleDiscoveringScenes() {
-        val pairs = buildWorldScenePairs()
-        if (pairs.isEmpty()) {
+    // ── State handlers ──────────────────────────────────────────────────
+
+    private fun handlePlanning() {
+        val plan = buildCapturePlan()
+        if (plan.isEmpty()) {
             finishWithError("No valid scenes found")
             return
         }
 
-        worldScenePairs = pairs
-        currentPairIndex = 0
+        capturePlan = plan
+        currentWorldIndex = 0
+        currentShaderIndex = 0
+
+        val totalScenes = plan.sumOf { w -> w.shaderRuns.sumOf { it.scenes.size } }
+        val totalShaderLoads = plan.sumOf { it.shaderRuns.size }
+        log.info("Capture plan ready") {
+            "worlds" to plan.size
+            "shader_loads" to totalShaderLoads
+            "total_captures" to totalScenes
+        }
+
+        // Save original shader state and begin 4K session for entire orchestration
+        if (IrisIntegration.isAvailable) {
+            originalShaderPack =
+                if (IrisIntegration.isShaderPackInUse().getOrDefault(false)) {
+                    IrisIntegration.getShaderPackName().getOrNull()
+                } else {
+                    null
+                }
+        }
+
+        if (!HighResCapture.beginSession()) {
+            finishWithError("Failed to begin high-res capture session")
+            return
+        }
+        highResSessionActive = true
+
         transitionTo(State.LoadingWorld)
     }
 
     private fun handleLoadingWorld() {
-        val pair =
-            getCurrentPair() ?: run {
-                log.error("No current world-scene pair")
+        val world =
+            getCurrentWorld() ?: run {
                 transitionTo(State.GeneratingManifest)
                 return
             }
 
-        when (val result = worldLoader.loadWorld(pair.worldFolder, ticksInState)) {
+        when (val result = worldLoader.loadWorld(world.worldFolder, ticksInState)) {
             is WorldLoader.LoadResult.Complete -> {
                 log.info("World ready") {
-                    "progress" to "${currentPairIndex + 1}/${worldScenePairs.size}"
-                    "world" to pair.worldFolder
+                    "world" to world.worldFolder
+                    "world_progress" to "${currentWorldIndex + 1}/${capturePlan.size}"
+                    "shaders_in_world" to world.shaderRuns.size
                 }
-                transitionTo(State.RunningScene)
+                currentShaderIndex = 0
+                transitionTo(State.LoadingShader)
             }
 
             is WorldLoader.LoadResult.LoadingWorld,
@@ -168,138 +224,99 @@ class Orchestrator {
         }
     }
 
-    private fun handleRunningScene() {
-        val pair =
-            getCurrentPair() ?: run {
-                finishWithError("No current pair in RunningScene")
+    private fun handleLoadingShader() {
+        val world =
+            getCurrentWorld() ?: run {
+                advanceToNextWorld()
                 return
             }
+        val shaderRun =
+            world.shaderRuns.getOrNull(currentShaderIndex) ?: run {
+                advanceToNextWorld()
+                return
+            }
+
+        // Shader loading is synchronous — set config and reload in a single tick
+        val shader = shaderRun.shader
+        log.info("Loading shader") {
+            "shader" to shader.displayName
+            "shader_progress" to "${currentShaderIndex + 1}/${world.shaderRuns.size}"
+            "scenes" to shaderRun.scenes.size
+        }
+
+        if (IrisIntegration.isAvailable) {
+            val result =
+                if (shader.filename == null) {
+                    IrisIntegration.disableShaders()
+                } else {
+                    IrisIntegration.enableShaders(shader.filename, shader.profile)
+                }
+
+            if (result.isFailure) {
+                log.error("Failed to load shader, skipping") {
+                    "shader" to shader.displayName
+                }
+                advanceToNextShader()
+                return
+            }
+        }
+
+        // Start capture session for this shader's scenes
         val currentSessionDir =
             sessionDir ?: run {
-                finishWithError("No session directory in RunningScene")
+                finishWithError("No session directory")
                 return
             }
-        val currentSpec =
-            spec ?: run {
-                finishWithError("No capture spec in RunningScene")
-                return
-            }
+        val worldDir = File(currentSessionDir, world.worldFolder)
+        if (!worldDir.exists() && !worldDir.mkdirs()) {
+            finishWithError("Failed to create world directory")
+            return
+        }
 
-        if (captureSession == null) {
-            log.info("Running scene") {
-                "progress" to "${currentPairIndex + 1}/${worldScenePairs.size}"
-                "scene_id" to pair.sceneId
-            }
-
-            val worldDir = File(currentSessionDir, pair.worldFolder)
-            if (!worldDir.exists() && !worldDir.mkdirs()) {
-                log.error("Failed to create world directory") { "path" to worldDir.absolutePath }
-                finishWithError("Failed to create world directory")
-                return
-            }
-
-            val newSession =
-                CaptureSession(
-                    sceneId = pair.sceneId,
-                    shaders = currentSpec.shaders,
-                    outputDir = worldDir,
-                    worldName = pair.worldFolder,
-                ).also { session ->
-                    session.onCaptureTaken = { entry, file ->
-                        if (file.exists()) {
-                            val bytes = file.readBytes()
-                            onCaptureTaken?.invoke(
-                                CaptureTakenEvent(entry, bytes, pair.sceneId),
-                            )
-                        } else {
-                            log.warn("Capture file not found, skipping upload") {
-                                "path" to file.absolutePath
-                                "scene_id" to pair.sceneId
-                            }
+        val newSession =
+            CaptureSession(
+                shader = shader,
+                scenes = shaderRun.scenes.map { CaptureSession.SceneInput(it.sceneId, it.scene) },
+                outputDir = worldDir,
+                worldName = world.worldFolder,
+            ).also { session ->
+                session.onCaptureTaken = { entry, file, sceneId ->
+                    if (file.exists()) {
+                        val bytes = file.readBytes()
+                        onCaptureTaken?.invoke(CaptureTakenEvent(entry, bytes, sceneId))
+                    } else {
+                        log.warn("Capture file not found, skipping upload") {
+                            "path" to file.absolutePath
+                            "scene_id" to sceneId
                         }
                     }
                 }
+            }
 
-            if (!newSession.start()) {
-                log.error("Failed to start capture session") { "scene_id" to pair.sceneId }
-                finishWithError("Failed to start capture session")
+        if (!newSession.start()) {
+            log.error("Failed to start capture session") {
+                "shader" to shader.displayName
+            }
+            advanceToNextShader()
+            return
+        }
+        captureSession = newSession
+
+        transitionTo(State.CapturingScenes)
+    }
+
+    private fun handleCapturingScenes() {
+        val session =
+            captureSession ?: run {
+                advanceToNextShader()
                 return
             }
-            captureSession = newSession
-        }
-
-        val session = captureSession ?: return
 
         session.tick()
 
         if (!session.isRunning) {
-            finalizeCaptureSession(pair, currentSessionDir)
-            advanceToNextPair()
-        }
-    }
-
-    private fun finalizeCaptureSession(
-        pair: WorldSceneEntry,
-        currentSessionDir: File,
-    ) {
-        log.info("Scene capture complete") { "scene_id" to pair.sceneId }
-
-        val session = captureSession ?: return
-        val sessionData = session.getSessionData()
-        if (sessionData != null) {
-            if (sessionData.captures.isNotEmpty()) {
-                sessionDataList.add(sessionData)
-            } else {
-                log.warn("Session produced no captures") { "scene_id" to pair.sceneId }
-            }
-        } else {
-            log.warn("No session data returned") { "scene_id" to pair.sceneId }
-        }
-
-        renameCapturesDirectory(pair, currentSessionDir)
-        captureSession = null
-    }
-
-    private fun renameCapturesDirectory(
-        pair: WorldSceneEntry,
-        currentSessionDir: File,
-    ) {
-        val worldDir = File(currentSessionDir, pair.worldFolder)
-        val capturesDir = File(worldDir, "screenshots")
-        val sceneDir = File(worldDir, pair.sceneId)
-
-        if (!capturesDir.exists()) {
-            log.warn("Captures directory not found") { "path" to capturesDir.absolutePath }
-            return
-        }
-
-        if (sceneDir.exists()) {
-            log.warn("Scene directory already exists, deleting") { "path" to sceneDir.absolutePath }
-            sceneDir.deleteRecursively()
-        }
-
-        if (!capturesDir.renameTo(sceneDir)) {
-            log.error("Failed to rename captures directory") {
-                "from" to capturesDir.absolutePath
-                "to" to sceneDir.absolutePath
-            }
-        }
-    }
-
-    private fun advanceToNextPair() {
-        currentPairIndex++
-
-        if (currentPairIndex >= worldScenePairs.size) {
-            transitionTo(State.GeneratingManifest)
-        } else {
-            val currentWorld = worldScenePairs[currentPairIndex - 1].worldFolder
-            val nextWorld = worldScenePairs[currentPairIndex].worldFolder
-
-            if (currentWorld != nextWorld) {
-                transitionTo(State.LoadingWorld)
-            } else {
-                transitionTo(State.RunningScene)
-            }
+            finalizeShaderRun()
+            advanceToNextShader()
         }
     }
 
@@ -310,7 +327,7 @@ class Orchestrator {
         sessionDir?.let { dir ->
             log.info("Orchestration complete") {
                 "results_dir" to dir.absolutePath
-                "scenes_captured" to sessionDataList.size
+                "sessions" to sessionDataList.size
             }
         }
 
@@ -326,6 +343,78 @@ class Orchestrator {
             Minecraft.getInstance().stop()
         }
     }
+
+    // ── Navigation ──────────────────────────────────────────────────────
+
+    private fun advanceToNextShader() {
+        captureSession = null
+        val world = getCurrentWorld()
+        if (world != null && currentShaderIndex + 1 < world.shaderRuns.size) {
+            currentShaderIndex++
+            transitionTo(State.LoadingShader)
+        } else {
+            advanceToNextWorld()
+        }
+    }
+
+    private fun advanceToNextWorld() {
+        captureSession = null
+        currentWorldIndex++
+        currentShaderIndex = 0
+
+        if (currentWorldIndex >= capturePlan.size) {
+            transitionTo(State.GeneratingManifest)
+        } else {
+            transitionTo(State.LoadingWorld)
+        }
+    }
+
+    // ── Session finalization ────────────────────────────────────────────
+
+    private fun finalizeShaderRun() {
+        val session = captureSession ?: return
+        val allData = session.getAllSessionData()
+
+        for (data in allData) {
+            if (data.captures.isNotEmpty()) {
+                sessionDataList.add(data)
+            } else {
+                log.warn("Session produced no captures") { "scene_id" to data.sceneId }
+            }
+        }
+
+        // Rename screenshots directories to scene IDs
+        val world = getCurrentWorld() ?: return
+        val currentSessionDir = sessionDir ?: return
+        val worldDir = File(currentSessionDir, world.worldFolder)
+
+        for (sceneInput in session.scenes) {
+            renameCapturesDirectory(sceneInput.sceneId, worldDir)
+        }
+    }
+
+    private fun renameCapturesDirectory(
+        sceneId: String,
+        worldDir: File,
+    ) {
+        val capturesDir = File(worldDir, "screenshots")
+        val sceneDir = File(worldDir, sceneId)
+
+        if (!capturesDir.exists()) return
+
+        if (sceneDir.exists()) {
+            sceneDir.deleteRecursively()
+        }
+
+        if (!capturesDir.renameTo(sceneDir)) {
+            log.error("Failed to rename captures directory") {
+                "from" to capturesDir.absolutePath
+                "to" to sceneDir.absolutePath
+            }
+        }
+    }
+
+    // ── Cleanup ─────────────────────────────────────────────────────────
 
     private fun finishWithError(reason: String) {
         log.error("Orchestration failed") { "reason" to reason }
@@ -344,28 +433,50 @@ class Orchestrator {
 
     private fun cleanup() {
         captureSession = null
+
+        // End 4K session if active
+        if (highResSessionActive) {
+            HighResCapture.endSession()
+            highResSessionActive = false
+        }
+
+        // Restore original shader
+        if (IrisIntegration.isAvailable) {
+            originalShaderPack?.let { IrisIntegration.enableShaders(it) }
+                ?: IrisIntegration.disableShaders()
+        }
+
         CaptureStateManager.endCapture()
 
         state = State.Idle
         ticksInState = 0
-        worldScenePairs = emptyList()
-        currentPairIndex = 0
+        capturePlan = emptyList()
+        currentWorldIndex = 0
+        currentShaderIndex = 0
         sessionDir = null
         sessionId = ""
         startedAt = null
         sessionDataList.clear()
         worldLoader.reset()
+        originalShaderPack = null
         spec = null
     }
 
+    // ── Plan building ───────────────────────────────────────────────────
+
     /**
-     * Resolves scene IDs from the spec into (world, scene) pairs, grouped by world
-     * and preserving scene order.
+     * Builds the capture plan: world → shader → scenes.
+     *
+     * Groups scenes by world, then for each world creates a [ShaderRun] per
+     * shader in the spec. This ensures each shader is loaded only once per world.
      */
-    private fun buildWorldScenePairs(): List<WorldSceneEntry> {
+    private fun buildCapturePlan(): List<WorldCaptures> {
         val currentSpec = spec ?: return emptyList()
 
-        val pairs = mutableListOf<WorldSceneEntry>()
+        // Resolve all scenes, grouped by world
+        val scenesByWorld = mutableMapOf<String, MutableList<SceneEntry>>()
+        val worldOrder = mutableListOf<String>()
+
         for (sceneId in currentSpec.sceneIds) {
             val resolvedScene = SceneManager.loadScene(sceneId)
             if (resolvedScene == null) {
@@ -373,32 +484,54 @@ class Orchestrator {
                 continue
             }
 
-            if (!worldLoader.worldExists(resolvedScene.worldFolderName)) {
+            val worldFolder = resolvedScene.worldFolderName
+            if (!worldLoader.worldExists(worldFolder)) {
                 log.warn("World directory not found, skipping scene") {
                     "scene_id" to sceneId
-                    "world" to resolvedScene.worldFolderName
+                    "world" to worldFolder
                 }
                 continue
             }
 
-            pairs.add(WorldSceneEntry(resolvedScene.worldFolderName, resolvedScene, sceneId))
+            if (worldFolder !in scenesByWorld) {
+                worldOrder.add(worldFolder)
+            }
+            scenesByWorld
+                .getOrPut(worldFolder) { mutableListOf() }
+                .add(SceneEntry(sceneId, resolvedScene))
         }
 
-        // Group by world to minimize world loads, preserving first-seen order
-        val worldOrder = pairs.map { it.worldFolder }.distinct()
-        val grouped = pairs.groupBy { it.worldFolder }
-        val sorted = worldOrder.flatMap { world -> grouped[world] ?: emptyList() }
+        // For each world, create a ShaderRun per shader
+        val plan =
+            worldOrder.mapNotNull { worldFolder ->
+                val scenes = scenesByWorld[worldFolder] ?: return@mapNotNull null
+                val shaderRuns =
+                    currentSpec.shaders.map { shader ->
+                        ShaderRun(shader, scenes)
+                    }
+                WorldCaptures(worldFolder, shaderRuns)
+            }
 
-        if (sorted.isNotEmpty()) {
-            val uniqueWorlds = sorted.map { it.worldFolder }.distinct().size
-            log.info("Resolved scenes") {
-                "scene_count" to sorted.size
-                "world_count" to uniqueWorlds
+        if (plan.isNotEmpty()) {
+            log.info("Resolved capture plan") {
+                "worlds" to plan.size
+                "scenes" to
+                    plan.sumOf { w ->
+                        w.shaderRuns
+                            .firstOrNull()
+                            ?.scenes
+                            ?.size ?: 0
+                    }
+                "shaders" to currentSpec.shaders.size
             }
         }
 
-        return sorted
+        return plan
     }
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    private fun getCurrentWorld(): WorldCaptures? = capturePlan.getOrNull(currentWorldIndex)
 
     private fun createSessionDirectory(): Boolean {
         val mc = Minecraft.getInstance()
@@ -453,13 +586,12 @@ class Orchestrator {
         }
     }
 
-    private fun getCurrentPair(): WorldSceneEntry? = worldScenePairs.getOrNull(currentPairIndex)
-
     private enum class State {
         Idle,
-        DiscoveringScenes,
+        Planning,
         LoadingWorld,
-        RunningScene,
+        LoadingShader,
+        CapturingScenes,
         GeneratingManifest,
         Finishing,
     }

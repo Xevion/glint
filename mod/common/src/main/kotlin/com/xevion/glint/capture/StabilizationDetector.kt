@@ -6,79 +6,75 @@ import net.minecraft.world.level.chunk.EmptyLevelChunk
 import net.minecraft.world.level.chunk.status.ChunkStatus
 
 /**
- * Detects when the world has stabilized after shader changes.
+ * Detects when the world has stabilized after shader or scene changes.
  *
- * Checks multiple conditions:
- * 1. All chunks in render distance are loaded
- * 2. Lighting calculations are complete
- * 3. Chunk rendering is complete (vanilla or Sodium)
- * 4. GPU shader compilation has settled
+ * Simple approach: is the renderer busy? Wait. Is everything idle? Settle, then approve.
+ * No modes, no flags — just polls the actual state of the engine each tick.
  */
-class StabilizationDetector(
-    private val settlingTicks: Int = DEFAULT_SETTLING_TICKS,
-) {
+class StabilizationDetector {
     private val log = Loggers.Capture.get()
 
-    private var ticksSinceStable: Int = 0
-    private var graphUpdateTicks: Int = 0
-
-    // Force loading and section count tracking
+    private var ticksSinceIdle: Int = 0
     private var forceLoadingInitiated: Boolean = false
-    private var lastSectionCount: Int = 0
-    private var sectionStableTicks: Int = 0
 
-    /**
-     * Reset state for a new stabilization cycle.
-     */
     fun reset() {
-        ticksSinceStable = 0
-        graphUpdateTicks = 0
+        ticksSinceIdle = 0
         forceLoadingInitiated = false
-        lastSectionCount = 0
-        sectionStableTicks = 0
-        SodiumIntegration.resetStabilizationState()
     }
 
     /**
-     * Check if the world has stabilized.
+     * Check if the world has stabilized. Call once per tick.
      *
      * @param ticksInState Total ticks spent in current stabilization phase (for logging)
      * @return true if stable, false if still waiting
      */
     fun isStable(ticksInState: Int): Boolean {
         val mc = Minecraft.getInstance()
-        val level = mc.level
-        val player = mc.player
-
-        if (level == null || player == null) {
-            log.warn("Level or player not available during stabilization")
-            return false
-        }
+        val level = mc.level ?: return false
+        val player = mc.player ?: return false
 
         val logInterval = ticksInState % LOG_INTERVAL_TICKS == 0
 
-        if (!areChunksLoaded(mc, logInterval)) {
-            ticksSinceStable = 0
+        // Enforce a minimum wait so the engine has time to react to teleports/changes.
+        if (ticksInState < MIN_WAIT_TICKS) {
+            if (logInterval) {
+                log.debug("Stabilize: minimum wait") {
+                    "ticks" to ticksInState
+                    "required" to MIN_WAIT_TICKS
+                }
+            }
             return false
         }
 
-        if (!isLightingComplete(level, logInterval)) {
-            ticksSinceStable = 0
+        // Force-load chunks once per cycle (singleplayer only)
+        if (!forceLoadingInitiated && mc.singleplayerServer != null) {
+            ChunkForceLoader.forceLoadRenderDistance()
+            forceLoadingInitiated = true
+        }
+
+        // Check if anything is still working
+        val chunksReady = areChunksReady(mc, logInterval)
+        val lightingDone = !level.chunkSource.lightEngine.hasLightWork()
+        val renderingDone = isRenderingIdle(mc, logInterval)
+
+        if (!chunksReady || !lightingDone || !renderingDone) {
+            ticksSinceIdle = 0
+
+            if (logInterval) {
+                if (!lightingDone) log.debug("Stabilize: lighting in progress")
+            }
+
             return false
         }
 
-        if (!isRenderingComplete(mc, logInterval)) {
-            ticksSinceStable = 0
-            return false
-        }
+        // Everything is idle — accumulate settling ticks
+        ticksSinceIdle++
 
-        ticksSinceStable++
-        if (ticksSinceStable >= settlingTicks) {
-            val loadedChunks = countLoadedChunks(mc)
+        if (ticksSinceIdle >= SETTLING_TICKS) {
             log.info("Stabilization complete") {
                 "total_ticks" to ticksInState
-                "stable_ticks" to ticksSinceStable
-                "chunks_loaded" to loadedChunks
+                "idle_ticks" to ticksSinceIdle
+                "chunks_loaded" to countLoadedChunks(mc)
             }
             return true
         }
@@ -86,56 +82,8 @@ class StabilizationDetector(
         return false
     }
 
-    private fun areChunksLoaded(
-        mc: Minecraft,
-        logInterval: Boolean,
-    ): Boolean {
-        // Initiate force loading once per stabilization cycle (singleplayer only)
-        if (!forceLoadingInitiated && mc.singleplayerServer != null) {
-            ChunkForceLoader.forceLoadRenderDistance()
-            forceLoadingInitiated = true
-        }
-
-        // Use Sodium's section count as ground truth when available
-        val currentSections = SodiumIntegration.getTotalSections()
-        if (currentSections != null) {
-            return areSectionCountStable(currentSections, logInterval)
-        }
-
-        // Fall back to vanilla chunk counting if Sodium unavailable
-        return vanillaChunksLoaded(mc, logInterval)
-    }
-
-    /**
-     * Check if Sodium's section count has stabilized.
-     * Section count is stable when it hasn't changed for SECTION_STABLE_TICKS.
-     */
-    private fun areSectionCountStable(
-        currentSections: Int,
-        logInterval: Boolean,
-    ): Boolean {
-        if (currentSections == lastSectionCount) {
-            sectionStableTicks++
-        } else {
-            sectionStableTicks = 0
-            lastSectionCount = currentSections
-        }
-
-        if (logInterval) {
-            log.debug("Stabilize: sections loaded") {
-                "sections" to currentSections
-                "stable_ticks" to sectionStableTicks
-            }
-        }
-
-        // Consider stable when section count hasn't changed for threshold
-        return sectionStableTicks >= SECTION_STABLE_TICKS
-    }
-
-    /**
-     * Vanilla chunk loading check - used when Sodium is not available.
-     */
-    private fun vanillaChunksLoaded(
+    /** Are all chunks around the player's position loaded? */
+    private fun areChunksReady(
         mc: Minecraft,
         logInterval: Boolean,
     ): Boolean {
@@ -153,32 +101,57 @@ class StabilizationDetector(
 
         for (dx in -renderDistance..renderDistance) {
             for (dz in -renderDistance..renderDistance) {
-                val distSquared = dx * dx + dz * dz
-                if (distSquared > radiusSquared) {
-                    continue
-                }
-
+                if (dx * dx + dz * dz > radiusSquared) continue
                 totalChunks++
                 val chunk = chunkSource.getChunk(chunkX + dx, chunkZ + dz, ChunkStatus.FULL, false)
-
                 if (chunk != null && chunk !is EmptyLevelChunk) {
                     loadedChunks++
                 }
             }
         }
 
-        if (loadedChunks < totalChunks) {
-            if (logInterval) {
-                log.debug("Stabilize: chunks loaded") {
-                    "loaded" to loadedChunks
-                    "total" to totalChunks
-                    "render_distance" to renderDistance
-                }
+        if (loadedChunks < totalChunks && logInterval) {
+            log.debug("Stabilize: chunks loading") {
+                "loaded" to loadedChunks
+                "total" to totalChunks
             }
-            return false
         }
 
-        return true
+        return loadedChunks >= totalChunks
+    }
+
+    /**
+     * Is Sodium's rendering pipeline idle?
+     *
+     * Checks the build queue, scheduled jobs, busy threads, and graph update flag.
+     * Falls back to vanilla's [net.minecraft.client.renderer.LevelRenderer.hasRenderedAllSections]
+     * if Sodium is not available.
+     */
+    private fun isRenderingIdle(
+        mc: Minecraft,
+        logInterval: Boolean,
+    ): Boolean {
+        if (!SodiumIntegration.isAvailable()) {
+            return mc.levelRenderer.hasRenderedAllSections()
+        }
+
+        val needsUpdate = SodiumIntegration.needsGraphUpdate() ?: return true
+        val scheduledJobs = SodiumIntegration.getScheduledJobCount() ?: 0
+        val busyThreads = SodiumIntegration.getBusyThreadCount() ?: 0
+        val queueEmpty = SodiumIntegration.isBuildQueueEmpty() ?: true
+
+        val busy = needsUpdate || scheduledJobs > 0 || busyThreads > 0 || !queueEmpty
+
+        if (busy && logInterval) {
+            log.debug("Stabilize: renderer busy") {
+                "needs_update" to needsUpdate
+                "queued" to scheduledJobs
+                "busy_threads" to busyThreads
+                "queue_empty" to queueEmpty
+            }
+        }
+
+        return !busy
     }
 
     private fun countLoadedChunks(mc: Minecraft): Int {
@@ -191,96 +164,20 @@ class StabilizationDetector(
         val renderDistance = mc.options.effectiveRenderDistance
         val radiusSquared = renderDistance * renderDistance
 
-        var loadedChunks = 0
-
+        var count = 0
         for (dx in -renderDistance..renderDistance) {
             for (dz in -renderDistance..renderDistance) {
-                val distSquared = dx * dx + dz * dz
-                if (distSquared > radiusSquared) {
-                    continue
-                }
-
+                if (dx * dx + dz * dz > radiusSquared) continue
                 val chunk = chunkSource.getChunk(chunkX + dx, chunkZ + dz, ChunkStatus.FULL, false)
-                if (chunk != null && chunk !is EmptyLevelChunk) {
-                    loadedChunks++
-                }
+                if (chunk != null && chunk !is EmptyLevelChunk) count++
             }
         }
-
-        return loadedChunks
-    }
-
-    private fun isLightingComplete(
-        level: net.minecraft.world.level.Level,
-        logInterval: Boolean,
-    ): Boolean {
-        val lightEngine = level.chunkSource.lightEngine
-        val hasLightWork = lightEngine.hasLightWork()
-
-        if (hasLightWork) {
-            if (logInterval) {
-                log.debug("Stabilize: lighting still running")
-            }
-            return false
-        }
-
-        return true
-    }
-
-    private fun isRenderingComplete(
-        mc: Minecraft,
-        logInterval: Boolean,
-    ): Boolean {
-        val levelRenderer = mc.levelRenderer
-        val sodiumComplete = SodiumIntegration.isRenderingComplete()
-
-        if (sodiumComplete != null) {
-            if (!sodiumComplete) {
-                val scheduledJobs = SodiumIntegration.getScheduledJobCount() ?: 0
-                val busyThreads = SodiumIntegration.getBusyThreadCount() ?: 0
-                val totalThreads = SodiumIntegration.getTotalThreadCount() ?: 0
-                val needsUpdate = SodiumIntegration.needsGraphUpdate() ?: false
-
-                if (needsUpdate) {
-                    graphUpdateTicks++
-                } else {
-                    graphUpdateTicks = 0
-                }
-
-                if (logInterval) {
-                    when {
-                        scheduledJobs > 0 -> {
-                            log.debug("Stabilize: building chunks") {
-                                "queued" to scheduledJobs
-                                "busy_threads" to busyThreads
-                                "total_threads" to totalThreads
-                            }
-                        }
-
-                        needsUpdate -> {
-                            log.debug("Stabilize: graph update in progress") {
-                                "tick" to graphUpdateTicks
-                            }
-                        }
-
-                        busyThreads > 0 -> {
-                            log.debug("Stabilize: finishing builds") {
-                                "busy_threads" to busyThreads
-                                "total_threads" to totalThreads
-                            }
-                        }
-                    }
-                }
-            }
-            return sodiumComplete
-        } else {
-            return levelRenderer.hasRenderedAllSections()
-        }
+        return count
     }
 
     companion object {
-        private const val DEFAULT_SETTLING_TICKS = 10
         private const val LOG_INTERVAL_TICKS = 10
-        private const val SECTION_STABLE_TICKS = 10 // 0.5 seconds at 20 TPS
+        private const val MIN_WAIT_TICKS = 20 // 1 second floor
+        private const val SETTLING_TICKS = 10 // 0.5 seconds of idle before approving
     }
 }

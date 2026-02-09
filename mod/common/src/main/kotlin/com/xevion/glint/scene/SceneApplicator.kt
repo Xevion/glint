@@ -5,6 +5,18 @@ import net.minecraft.client.Minecraft
 import net.minecraft.world.level.GameRules
 import net.minecraft.client.CameraType as MinecraftCameraType
 
+/** Result of applying a scene. */
+enum class SceneApplyResult {
+    /** Scene application failed. */
+    FAILED,
+
+    /** Scene applied, no chunk rebuild was triggered. */
+    APPLIED,
+
+    /** Scene applied, a full chunk rebuild was triggered (allChanged). */
+    APPLIED_WITH_REBUILD,
+}
+
 /**
  * Applies scene settings to the Minecraft client.
  * Handles world state, player positioning, camera, and render settings.
@@ -14,9 +26,12 @@ object SceneApplicator {
 
     /**
      * Applies a resolved scene to the game.
-     * Returns true if successful, false if failed.
+     *
+     * Returns [SceneApplyResult.APPLIED_WITH_REBUILD] when render settings triggered
+     * [net.minecraft.client.renderer.LevelRenderer.allChanged], meaning the caller
+     * should use full stabilization (including rendering pipeline checks).
      */
-    fun apply(resolvedScene: ResolvedScene): Boolean {
+    fun apply(resolvedScene: ResolvedScene): SceneApplyResult {
         val mc = Minecraft.getInstance()
         val scene = resolvedScene.scene
         val config = resolvedScene.config
@@ -24,7 +39,7 @@ object SceneApplicator {
         // Scene system only works in single-player
         if (mc.singleplayerServer == null) {
             log.error("Scene system is not available in multiplayer")
-            return false
+            return SceneApplyResult.FAILED
         }
 
         log.info("Applying scene") {
@@ -35,7 +50,7 @@ object SceneApplicator {
         // 1. Validate world is loaded
         if (!validateWorld(resolvedScene.worldFolderName)) {
             log.error("World not loaded") { "world" to resolvedScene.worldFolderName }
-            return false
+            return SceneApplyResult.FAILED
         }
 
         // 2. Set position and camera
@@ -44,17 +59,25 @@ object SceneApplicator {
         // 3. Set time and weather
         applyTimeAndWeather(scene)
 
-        // 4. Apply render settings
-        applyRenderSettings(config)
+        // 4. Apply render settings (only changes what differs from current state)
+        val rebuildTriggered = applyRenderSettings(config)
 
         // 5. Freeze world state
         freezeWorldState(config)
 
-        // 6. Force chunk reload
-        mc.levelRenderer.allChanged()
+        // 6. Only force a full chunk reload if a rebuild-triggering setting changed.
+        //    Individual option setters for graphicsMode, ambientOcclusion, and biomeBlend
+        //    already call allChanged() via Minecraft's internal listeners, but an explicit
+        //    call ensures consistency. When settings are unchanged, skip entirely to avoid
+        //    destroying and recreating Sodium's RenderSectionManager unnecessarily.
+        if (rebuildTriggered) {
+            mc.levelRenderer.allChanged()
+            log.debug("Scene applied with chunk rebuild")
+        } else {
+            log.debug("Scene applied successfully")
+        }
 
-        log.debug("Scene applied successfully")
-        return true
+        return if (rebuildTriggered) SceneApplyResult.APPLIED_WITH_REBUILD else SceneApplyResult.APPLIED
     }
 
     private fun validateWorld(worldName: String): Boolean {
@@ -154,61 +177,97 @@ object SceneApplicator {
         }
     }
 
-    private fun applyRenderSettings(config: SceneConfig) {
+    /**
+     * Applies render settings, skipping values that already match.
+     *
+     * @return true if any setting that triggers [net.minecraft.client.renderer.LevelRenderer.allChanged]
+     *   was changed (graphicsMode, ambientOcclusion, biomeBlend), meaning a full chunk rebuild
+     *   will occur via Minecraft's internal option listeners.
+     */
+    private fun applyRenderSettings(config: SceneConfig): Boolean {
         val mc = Minecraft.getInstance()
         val options = mc.options
+        var rebuildTriggered = false
+        var settingsChanged = 0
+
+        // Helper: only set an option if the value differs from current
+        fun <T> setIfChanged(
+            option: net.minecraft.client.OptionInstance<T>,
+            desired: T?,
+            triggersRebuild: Boolean = false,
+        ) {
+            if (desired == null) return
+            if (option.get() == desired) return
+            option.set(desired)
+            settingsChanged++
+            if (triggersRebuild) rebuildTriggered = true
+        }
 
         // Camera & View
-        config.fov?.let { options.fov().set(it) }
-        config.viewBobbing?.let { options.bobView().set(it) }
+        setIfChanged(options.fov(), config.fov)
+        setIfChanged(options.bobView(), config.viewBobbing)
 
         // Render Settings
-        config.renderDistance?.let { options.renderDistance().set(it) }
-        config.simulationDistance?.let { options.simulationDistance().set(it) }
-        config.entityDistanceScaling?.let { options.entityDistanceScaling().set(it) }
+        setIfChanged(options.renderDistance(), config.renderDistance)
+        setIfChanged(options.simulationDistance(), config.simulationDistance)
+        setIfChanged(options.entityDistanceScaling(), config.entityDistanceScaling)
 
         config.graphicsMode?.let {
-            options.graphicsMode().set(
+            val desired =
                 when (it) {
                     GraphicsMode.FAST -> net.minecraft.client.GraphicsStatus.FAST
                     GraphicsMode.FANCY -> net.minecraft.client.GraphicsStatus.FANCY
                     GraphicsMode.FABULOUS -> net.minecraft.client.GraphicsStatus.FABULOUS
-                },
-            )
+                }
+            setIfChanged(options.graphicsMode(), desired, triggersRebuild = true)
         }
 
         config.particles?.let {
-            options.particles().set(
+            val desired =
                 when (it) {
                     ParticleMode.ALL -> net.minecraft.server.level.ParticleStatus.ALL
                     ParticleMode.DECREASED -> net.minecraft.server.level.ParticleStatus.DECREASED
                     ParticleMode.MINIMAL -> net.minecraft.server.level.ParticleStatus.MINIMAL
-                    ParticleMode.OFF -> net.minecraft.server.level.ParticleStatus.MINIMAL // MC doesn't have OFF
-                },
-            )
+                    ParticleMode.OFF -> net.minecraft.server.level.ParticleStatus.MINIMAL
+                }
+            setIfChanged(options.particles(), desired)
         }
 
         config.clouds?.let {
-            options.cloudStatus().set(
+            val desired =
                 when (it) {
                     CloudMode.OFF -> net.minecraft.client.CloudStatus.OFF
                     CloudMode.FAST -> net.minecraft.client.CloudStatus.FAST
                     CloudMode.FANCY -> net.minecraft.client.CloudStatus.FANCY
-                },
-            )
+                }
+            setIfChanged(options.cloudStatus(), desired)
         }
 
-        config.ambientOcclusion?.let { options.ambientOcclusion().set(it) }
-        config.entityShadows?.let { options.entityShadows().set(it) }
-        config.biomeBlend?.let { options.biomeBlendRadius().set(it) }
-        config.brightness?.let { options.gamma().set(it) }
-        config.guiScale?.let { options.guiScale().set(it) }
-        config.hideHud?.let { options.hideGui = it }
-        config.screenEffects?.let { options.screenEffectScale().set(it) }
-        config.fovEffects?.let { options.fovEffectScale().set(it) }
-        config.mipmapLevels?.let { options.mipmapLevels().set(it) }
+        setIfChanged(options.ambientOcclusion(), config.ambientOcclusion, triggersRebuild = true)
+        setIfChanged(options.entityShadows(), config.entityShadows)
+        setIfChanged(options.biomeBlendRadius(), config.biomeBlend, triggersRebuild = true)
+        setIfChanged(options.gamma(), config.brightness)
+        setIfChanged(options.guiScale(), config.guiScale)
+        config.hideHud?.let {
+            if (options.hideGui != it) {
+                options.hideGui = it
+                settingsChanged++
+            }
+        }
+        setIfChanged(options.screenEffectScale(), config.screenEffects)
+        setIfChanged(options.fovEffectScale(), config.fovEffects)
+        setIfChanged(options.mipmapLevels(), config.mipmapLevels)
 
-        log.debug("Render settings applied")
+        if (settingsChanged > 0) {
+            log.debug("Render settings applied") {
+                "changed" to settingsChanged
+                "rebuild_triggered" to rebuildTriggered
+            }
+        } else {
+            log.debug("Render settings unchanged, skipped")
+        }
+
+        return rebuildTriggered
     }
 
     private fun freezeWorldState(config: SceneConfig) {

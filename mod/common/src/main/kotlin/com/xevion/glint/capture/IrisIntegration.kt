@@ -73,24 +73,107 @@ object IrisIntegration {
         }
     }
 
-    private fun setShaderPack(packName: String?): Result<Unit> {
+    /**
+     * Configures and reloads Iris with the given shader pack and optional profile.
+     *
+     * Batches config changes and profile options into a single [Iris.reload] call
+     * when possible. If the pack is changing AND a profile is requested, two reloads
+     * are needed (first to load the pack so its profile definitions are available,
+     * then to apply the profile options).
+     */
+    fun enableShaders(
+        packName: String,
+        profile: String? = null,
+    ): Result<Unit> {
+        if (!available) return Result.failure(IllegalStateException("Iris not available"))
+
+        return runCatching {
+            val currentPack = Iris.getCurrentPackName()
+            val samePack = currentPack == packName
+
+            if (profile != null && samePack && Iris.getCurrentPack().isPresent) {
+                // Same pack, just changing profile — queue options then single reload
+                queueProfile(profile)
+                Iris.reload()
+                log.info("Shader profile changed") {
+                    "pack" to packName
+                    "profile" to profile
+                }
+            } else if (profile != null) {
+                // Different pack with profile — need two reloads:
+                // first to load pack, second to apply profile from that pack
+                setShaderPackConfig(packName)
+                Iris.getShaderPackOptionQueue().clear()
+                Iris.reload()
+
+                queueProfile(profile)
+                Iris.reload()
+                log.info("Shader pack changed with profile") {
+                    "pack" to packName
+                    "profile" to profile
+                }
+            } else {
+                // No profile — single reload with cleared options
+                setShaderPackConfig(packName)
+                Iris.getShaderPackOptionQueue().clear()
+                Iris.reload()
+                log.info("Shader pack changed") { "pack" to packName }
+            }
+        }.onFailure { e ->
+            log.error(e, "Failed to enable shaders") {
+                "pack" to packName
+                "profile" to profile
+            }
+        }
+    }
+
+    fun disableShaders(): Result<Unit> {
         if (!available) return Result.failure(IllegalStateException("Iris not available"))
 
         return runCatching {
             val config = Iris.getIrisConfig()
-            config.setShaderPackName(packName ?: "")
-            config.setShadersEnabled(packName != null)
+            config.setShaderPackName("")
+            config.setShadersEnabled(false)
             config.save()
             Iris.reload()
-            log.info("Shader pack changed") { "pack" to (packName ?: "(disabled)") }
+            log.info("Shaders disabled")
         }.onFailure { e ->
-            log.error(e, "Failed to set shader pack") { "pack" to packName }
+            log.error(e, "Failed to disable shaders")
         }
     }
 
-    fun disableShaders(): Result<Unit> = setShaderPack(null)
+    private fun setShaderPackConfig(packName: String) {
+        val config = Iris.getIrisConfig()
+        config.setShaderPackName(packName)
+        config.setShadersEnabled(true)
+        config.save()
+    }
 
-    fun enableShaders(packName: String): Result<Unit> = setShaderPack(packName)
+    private fun queueProfile(profileName: String) {
+        val pack =
+            Iris.getCurrentPack().orElse(null)
+                ?: throw IllegalStateException("No shader pack loaded, cannot apply profile")
+
+        val menuContainer = (pack as ShaderPackAccessor).getMenuContainer()
+        val profileSet = menuContainer.profiles
+
+        var foundProfile: Any? = null
+        profileSet.forEach { name, p ->
+            if (name == profileName) {
+                foundProfile = p
+            }
+        }
+
+        val profile =
+            foundProfile ?: throw IllegalArgumentException("Profile not found: $profileName")
+
+        Iris.queueShaderPackOptionsFromProfile(profile as net.irisshaders.iris.shaderpack.option.Profile)
+
+        val queue = Iris.getShaderPackOptionQueue()
+        if (queue.isEmpty()) {
+            log.warn("Profile queued but option queue is empty") { "profile" to profileName }
+        }
+    }
 
     fun getShaderProfiles(): Result<List<String>> {
         if (!available || !isShaderPackInUse().getOrDefault(false)) {
@@ -107,60 +190,6 @@ object IrisIntegration {
             profileNames.toList()
         }.onFailure { e ->
             log.error(e, "Error getting shader profiles")
-        }
-    }
-
-    fun applyShaderProfile(profileName: String): Result<Unit> {
-        if (!available || !isShaderPackInUse().getOrDefault(false)) {
-            return Result.failure(IllegalStateException("Iris not available or no shader pack loaded"))
-        }
-
-        return runCatching {
-            val pack =
-                Iris.getCurrentPack().orElse(null)
-                    ?: throw IllegalStateException("No shader pack loaded")
-
-            val menuContainer = (pack as ShaderPackAccessor).getMenuContainer()
-            val profileSet = menuContainer.profiles
-
-            var foundProfile: Any? = null
-            profileSet.forEach { name, p ->
-                if (name == profileName) {
-                    foundProfile = p
-                }
-            }
-
-            val profile =
-                foundProfile ?: run {
-                    log.warn("Profile not found") { "profile" to profileName }
-                    throw IllegalArgumentException("Profile not found: $profileName")
-                }
-
-            Iris.queueShaderPackOptionsFromProfile(profile as net.irisshaders.iris.shaderpack.option.Profile)
-
-            val queue = Iris.getShaderPackOptionQueue()
-            if (queue.isEmpty()) {
-                log.warn("Profile queued but option queue is empty") { "profile" to profileName }
-            }
-
-            Iris.reload()
-            log.info("Applied shader profile") { "profile" to profileName }
-        }.onFailure { e ->
-            log.error(e, "Failed to apply shader profile") { "profile" to profileName }
-        }
-    }
-
-    fun resetShaderOptions(): Result<Unit> {
-        if (!available || !isShaderPackInUse().getOrDefault(false)) {
-            return Result.failure(IllegalStateException("Iris not available or no shader pack loaded"))
-        }
-
-        return runCatching {
-            Iris.getShaderPackOptionQueue().clear()
-            Iris.reload()
-            log.info("Reset shader options to defaults")
-        }.onFailure { e ->
-            log.error(e, "Failed to reset shader options")
         }
     }
 }

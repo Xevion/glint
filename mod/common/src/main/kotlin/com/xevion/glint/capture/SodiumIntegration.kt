@@ -44,6 +44,7 @@ object SodiumIntegration {
     private var getTotalThreadCountMethod: java.lang.reflect.Method? = null
     private var getTotalSectionsMethod: java.lang.reflect.Method? = null
 
+    @Suppress("unused")
     private var sawRebuildActivity: Boolean = false
 
     fun isAvailable(): Boolean {
@@ -271,6 +272,24 @@ object SodiumIntegration {
             return getTotalSectionsMethod!!.invoke(sectionManager) as Int
         } catch (e: Exception) {
             log.debug("Failed to get Sodium section count") { "error" to e.message }
+            return null
+        }
+    }
+
+    /**
+     * Check if Sodium's chunk build queue is empty.
+     * Returns null if Sodium is not available or reflection fails.
+     */
+    fun isBuildQueueEmpty(): Boolean? {
+        if (!isAvailable()) return null
+
+        try {
+            val renderer = instanceNullableMethod!!.invoke(null) ?: return null
+            val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
+            val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
+            return isBuildQueueEmptyMethod!!.invoke(builder) as Boolean
+        } catch (e: Exception) {
+            log.debug("Failed to check Sodium build queue") { "error" to e.message }
             return null
         }
     }

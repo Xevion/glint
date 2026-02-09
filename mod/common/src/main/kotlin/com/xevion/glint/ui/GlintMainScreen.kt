@@ -941,8 +941,8 @@ class GlintMainScreen(
         StatusLog.info("Teleporting to ${scene.name}...")
         onClose()
 
-        val success = SceneApplicator.apply(resolved)
-        if (success) {
+        val result = SceneApplicator.apply(resolved)
+        if (result != com.xevion.glint.scene.SceneApplyResult.FAILED) {
             StatusLog.info("Applied scene: ${scene.name}")
         } else {
             StatusLog.error("Failed to apply scene: ${scene.name}")
@@ -977,6 +977,7 @@ class GlintMainScreen(
                                     is PullResult.Success -> {
                                         StatusLog.info("Pulled ${result.count} scenes for ${world.name}")
                                     }
+
                                     is PullResult.Failure -> {
                                         StatusLog.error("Pull failed: ${result.error.userMessage}")
                                     }
@@ -1038,6 +1039,7 @@ class GlintMainScreen(
                                                                     "${result.updated} updated, ${result.removed} removed",
                                                             )
                                                         }
+
                                                         is PushResult.Failure -> {
                                                             StatusLog.error("Push failed: ${result.error.userMessage}")
                                                         }
@@ -1103,10 +1105,13 @@ class GlintMainScreen(
                             .thenAccept { result ->
                                 minecraft?.execute {
                                     when (result) {
-                                        is PullResult.Success ->
+                                        is PullResult.Success -> {
                                             StatusLog.info("Pulled ${result.count} scenes for ${world.name}")
-                                        is PullResult.Failure ->
+                                        }
+
+                                        is PullResult.Failure -> {
                                             StatusLog.warn("Could not pull scenes: ${result.error.userMessage}")
+                                        }
                                     }
                                     SceneManager.clearCache()
                                     refreshWorlds()

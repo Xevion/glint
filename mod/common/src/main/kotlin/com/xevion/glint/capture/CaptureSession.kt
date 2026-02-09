@@ -2,8 +2,9 @@ package com.xevion.glint.capture
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.orchestration.ShaderSpec
+import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.SceneApplicator
-import com.xevion.glint.scene.SceneManager
+import com.xevion.glint.scene.SceneApplyResult
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.nio.file.Path
@@ -11,20 +12,16 @@ import java.time.Instant
 import java.util.concurrent.CompletableFuture
 
 /**
- * Manages a multi-shader capture session for a single scene.
+ * Captures all scenes for a single already-loaded shader.
  *
- * Workflow:
- * 1. Start session - load and apply scene
- * 2. For each shader (including vanilla):
- *    a. Load shader (or disable for vanilla)
- *    b. Wait for stabilization (chunks, FPS)
- *    c. Take screenshot
- *    d. Wait a few ticks
- * 3. Restore original shader and world state
+ * The Orchestrator loads the shader and begins the 4K session before creating
+ * this class. CaptureSession handles scene iteration: teleport → stabilize → capture.
+ * Stabilization waits until the renderer is fully idle (chunks loaded, lighting done,
+ * build queue empty) before capturing.
  */
 class CaptureSession(
-    private val sceneId: String,
-    private val shaders: List<ShaderSpec>,
+    private val shader: ShaderSpec,
+    val scenes: List<SceneInput>,
     private val outputDir: File,
     private val worldName: String,
 ) {
@@ -32,27 +29,27 @@ class CaptureSession(
     private var state: State = State.Idle
     private var ticksInState: Int = 0
 
-    private var originalShaderPack: String? = null
-    private var shadersToCapture: List<ShaderSpec> = emptyList()
-    private var currentIndex: Int = 0
+    private var currentSceneIndex: Int = 0
     private var startedAt: Instant? = null
-    private val captureEntries: MutableList<CaptureEntry> = mutableListOf()
-
-    private val stabilizationDetector = StabilizationDetector()
-    private var resolvedScene: com.xevion.glint.scene.ResolvedScene? = null
-    private var sceneApplied: Boolean = false
     private var originalState: CaptureStateSnapshot? = null
 
-    private var sessionData: CaptureSessionData? = null
+    private val stabilizationDetector = StabilizationDetector()
+    private var sceneApplied: Boolean = false
     private var pendingCapture: CompletableFuture<Path>? = null
 
-    /** Called on Util.ioPool() thread after the capture file is written to disk. */
-    var onCaptureTaken: ((CaptureEntry, File) -> Unit)? = null
+    // Per-scene capture tracking, aggregated per scene across the session
+    private val sceneCaptures = mutableMapOf<String, MutableList<CaptureEntry>>()
+    private val sceneStartTimes = mutableMapOf<String, Instant>()
 
-    /**
-     * Starts a new capture session.
-     * @return true if session started, false if already running or scene/Iris unavailable
-     */
+    /** Called after the capture file is written to disk. */
+    var onCaptureTaken: ((CaptureEntry, File, String) -> Unit)? = null
+
+    /** Input scene for the session. */
+    data class SceneInput(
+        val sceneId: String,
+        val scene: ResolvedScene,
+    )
+
     fun start(): Boolean {
         if (state != State.Idle) {
             log.warn("Capture session already in progress")
@@ -60,59 +57,33 @@ class CaptureSession(
         }
 
         val mc = Minecraft.getInstance()
-
         if (mc.singleplayerServer == null) {
             log.error("Capture system is not available in multiplayer")
             return false
         }
 
-        resolvedScene = SceneManager.loadScene(sceneId)
-        if (resolvedScene == null) {
-            log.error("Failed to load scene") {
-                "scene_id" to sceneId
-            }
+        if (scenes.isEmpty()) {
+            log.error("No scenes to capture")
             return false
         }
 
         startedAt = Instant.now()
-        captureEntries.clear()
-
-        if (!IrisIntegration.isAvailable) {
-            log.warn("Iris is not available, capturing vanilla only")
-            shadersToCapture = listOf(ShaderSpec(filename = null))
-            originalShaderPack = null
-        } else {
-            originalShaderPack =
-                if (IrisIntegration.isShaderPackInUse().getOrDefault(false)) {
-                    IrisIntegration.getShaderPackName().getOrNull()
-                } else {
-                    null
-                }
-
-            shadersToCapture = shaders
-
-            log.info("Starting capture session") {
-                "config_count" to shadersToCapture.size
-            }
-        }
-
-        currentIndex = 0
+        currentSceneIndex = 0
+        sceneCaptures.clear()
+        sceneStartTimes.clear()
 
         originalState = CaptureStateSnapshot.capture()
         log.debug("Original client state saved")
 
-        if (!HighResCapture.beginSession()) {
-            log.error("Failed to begin high-res capture session")
-            return false
+        log.info("Starting capture session") {
+            "shader" to shader.displayName
+            "scene_count" to scenes.size
         }
 
         transitionTo(State.ApplyingScene)
         return true
     }
 
-    /**
-     * Called every client tick to advance the session state machine.
-     */
     fun tick() {
         if (state == State.Idle) return
 
@@ -129,10 +100,6 @@ class CaptureSession(
 
             State.ApplyingScene -> {
                 handleApplyingScene()
-            }
-
-            State.LoadingShader -> {
-                handleLoadingShader()
             }
 
             State.WaitingForStabilization -> {
@@ -153,10 +120,49 @@ class CaptureSession(
         }
     }
 
-    val isRunning: Boolean
-        get() = state != State.Idle
+    val isRunning: Boolean get() = state != State.Idle
 
-    fun getSessionData(): CaptureSessionData? = sessionData
+    /**
+     * Returns session data for all scenes captured.
+     * Each scene gets its own [CaptureSessionData] entry.
+     */
+    fun getAllSessionData(): List<CaptureSessionData> {
+        val mc = Minecraft.getInstance()
+        val completedAt = Instant.now()
+
+        return scenes.mapNotNull { sceneInput ->
+            val entries = sceneCaptures[sceneInput.sceneId] ?: return@mapNotNull null
+            val sceneStart = sceneStartTimes[sceneInput.sceneId] ?: startedAt ?: Instant.now()
+
+            val player = mc.player
+            val position = player?.let { Position(x = it.x, y = it.y, z = it.z) }
+            val camera = player?.let { Camera(yaw = it.yRot, pitch = it.xRot) }
+            val dimension =
+                mc.level
+                    ?.dimension()
+                    ?.location()
+                    ?.toString()
+            val sessionDirPath = outputDir.relativeTo(mc.gameDirectory).path
+
+            CaptureSessionData(
+                worldName = worldName,
+                sceneId = sceneInput.sceneId,
+                sessionDir = sessionDirPath,
+                startedAt = sceneStart.toString(),
+                completedAt = completedAt.toString(),
+                totalCaptures = entries.size,
+                shaders = listOfNotNull(shader.filename),
+                minecraft =
+                    MinecraftInfo(
+                        version = mc.launchedVersion,
+                        dimension = dimension,
+                        position = position,
+                        camera = camera,
+                    ),
+                captures = entries.toList(),
+            )
+        }
+    }
 
     private fun transitionTo(newState: State) {
         log.debug("Capture session state transition") {
@@ -176,97 +182,33 @@ class CaptureSession(
     }
 
     private fun handleApplyingScene() {
-        val scene = resolvedScene
-        if (scene == null) {
-            log.error("Scene not loaded")
-            transitionTo(State.Finishing)
-            return
-        }
-
-        if (!sceneApplied) {
-            log.debug("Applying scene") {
-                "scene_id" to scene.scene.id
-            }
-            if (!SceneApplicator.apply(scene)) {
-                log.error("Failed to apply scene")
+        val sceneInput =
+            scenes.getOrNull(currentSceneIndex) ?: run {
                 transitionTo(State.Finishing)
                 return
             }
+
+        if (!sceneApplied) {
+            sceneStartTimes.putIfAbsent(sceneInput.sceneId, Instant.now())
+
+            log.info("Applying scene") {
+                "scene_id" to sceneInput.sceneId
+                "progress" to "${currentSceneIndex + 1}/${scenes.size}"
+                "shader" to shader.displayName
+            }
+
+            val result = SceneApplicator.apply(sceneInput.scene)
+            if (result == SceneApplyResult.FAILED) {
+                log.error("Failed to apply scene") { "scene_id" to sceneInput.sceneId }
+                advanceToNextScene()
+                return
+            }
             sceneApplied = true
-            log.debug("Scene applied successfully")
         }
 
         if (ticksInState >= SCENE_APPLICATION_WAIT_TICKS) {
-            transitionTo(State.LoadingShader)
+            transitionTo(State.WaitingForStabilization)
         }
-    }
-
-    private fun handleLoadingShader() {
-        val config = shadersToCapture.getOrNull(currentIndex)
-        if (config == null) {
-            log.error("Invalid shader config") {
-                "index" to currentIndex
-            }
-            advanceToNextShader()
-            return
-        }
-
-        if (IrisIntegration.isAvailable) {
-            log.info("Loading shader configuration") {
-                "shader" to config.displayName
-            }
-
-            val result =
-                if (config.filename == null) {
-                    IrisIntegration.disableShaders()
-                } else {
-                    IrisIntegration.enableShaders(config.filename).onFailure {
-                        log.error("Failed to load shader pack") {
-                            "pack" to config.filename
-                        }
-                        advanceToNextShader()
-                        return
-                    }
-
-                    if (config.profile != null) {
-                        IrisIntegration.applyShaderProfile(config.profile).onFailure {
-                            log.error("Failed to apply profile, skipping") {
-                                "profile" to config.profile
-                            }
-                            advanceToNextShader()
-                            return
-                        }
-                    } else {
-                        IrisIntegration.resetShaderOptions()
-                    }
-
-                    Result.success(Unit)
-                }
-
-            if (result.isFailure) {
-                log.error("Failed to load shader configuration, skipping") {
-                    "shader" to config.displayName
-                }
-                advanceToNextShader()
-                return
-            }
-        }
-
-        val scene = resolvedScene
-        if (scene != null) {
-            log.debug("Reapplying scene for shader") {
-                "shader" to config.displayName
-            }
-            if (!SceneApplicator.apply(scene)) {
-                log.warn("Failed to reapply scene for shader") {
-                    "shader" to config.displayName
-                }
-            }
-        }
-
-        Minecraft.getInstance().levelRenderer.allChanged()
-
-        transitionTo(State.WaitingForStabilization)
     }
 
     private fun handleWaitingForStabilization() {
@@ -276,8 +218,6 @@ class CaptureSession(
     }
 
     private fun handleCapturing() {
-        // If a high-res capture is already in flight, wait for it to finish.
-        // HighResCapture advances itself via GameRendererMixin each frame.
         val pending = pendingCapture
         if (pending != null) {
             if (!pending.isDone) return
@@ -286,38 +226,35 @@ class CaptureSession(
             return
         }
 
-        // First tick in Capturing state — initiate the high-res capture
-        val config = shadersToCapture.getOrNull(currentIndex)
-        if (config == null) {
-            log.error("Invalid shader config") {
-                "index" to currentIndex
+        val sceneInput =
+            scenes.getOrNull(currentSceneIndex) ?: run {
+                advanceToNextScene()
+                return
             }
-            advanceToNextShader()
-            return
-        }
 
-        val captureFilename = buildCaptureFilename(config)
+        val captureFilename = buildCaptureFilename(shader)
         log.info("Taking high-res capture") {
-            "shader" to config.displayName
+            "shader" to shader.displayName
+            "scene" to sceneInput.sceneId
             "file" to captureFilename
             "resolution" to "${HighResCapture.CAPTURE_WIDTH}x${HighResCapture.CAPTURE_HEIGHT}"
         }
 
         val timestamp = Instant.now().toString()
-        val shaderInfo = config.filename?.let { parseShaderPackName(it) }
+        val shaderInfo = shader.filename?.let { parseShaderPackName(it) }
         val shaderMeta =
-            if (config.filename != null && shaderInfo != null) {
+            if (shader.filename != null && shaderInfo != null) {
                 ShaderMetadata(
-                    filename = config.filename,
+                    filename = shader.filename,
                     id = shaderInfo.id,
                     version = shaderInfo.version,
-                    profile = config.profile,
+                    profile = shader.profile,
                 )
             } else {
                 null
             }
 
-        captureEntries.add(
+        val entry =
             CaptureEntry(
                 file = captureFilename,
                 timestamp = timestamp,
@@ -327,12 +264,9 @@ class CaptureSession(
                         width = HighResCapture.CAPTURE_WIDTH,
                         height = HighResCapture.CAPTURE_HEIGHT,
                     ),
-            ),
-        )
+            )
 
-        val capturedEntry = captureEntries.last()
-        val captureFile = File(outputDir, "screenshots/$captureFilename")
-        val callback = onCaptureTaken
+        sceneCaptures.getOrPut(sceneInput.sceneId) { mutableListOf() }.add(entry)
 
         val screenshotsDir = File(outputDir, "screenshots")
         if (!screenshotsDir.exists()) {
@@ -340,32 +274,73 @@ class CaptureSession(
         }
 
         val outputPath = screenshotsDir.toPath().resolve(captureFilename)
+        val captureFile = File(outputDir, "screenshots/$captureFilename")
+        val callback = onCaptureTaken
+        val sceneId = sceneInput.sceneId
+
         val future =
             HighResCapture.startCapture(outputPath) ?: run {
                 log.error("Failed to start high-res capture (already in progress)")
-                advanceToNextShader()
+                advanceToNextScene()
                 return
             }
 
-        // When the file is written, invoke the session callback
         future.thenAccept {
-            log.debug("High-res capture saved") {
-                "file" to captureFilename
-            }
-            callback?.invoke(capturedEntry, captureFile)
+            log.debug("High-res capture saved") { "file" to captureFilename }
+            callback?.invoke(entry, captureFile, sceneId)
         }
 
         pendingCapture = future
     }
 
+    private fun handlePostCaptureCooldown() {
+        if (ticksInState >= POST_CAPTURE_COOLDOWN_TICKS) {
+            advanceToNextScene()
+        }
+    }
+
+    private fun advanceToNextScene() {
+        currentSceneIndex++
+        if (currentSceneIndex >= scenes.size) {
+            transitionTo(State.Finishing)
+        } else {
+            transitionTo(State.ApplyingScene)
+        }
+    }
+
+    private fun handleFinishing() {
+        log.info("Capture session complete, restoring state") {
+            "shader" to shader.displayName
+            "scenes_captured" to sceneCaptures.size
+        }
+
+        ChunkForceLoader.releaseAll()
+
+        originalState?.let {
+            it.restore()
+            log.debug("Original client state restored")
+        }
+
+        state = State.Idle
+        ticksInState = 0
+        currentSceneIndex = 0
+        originalState = null
+        pendingCapture = null
+    }
+
+    // ── Filename helpers ────────────────────────────────────────────────
+
     private fun buildCaptureFilename(config: ShaderSpec): String {
+        val sceneInput = scenes.getOrNull(currentSceneIndex) ?: return "unknown.webp"
+        val scenePrefix = sanitizeForFilename(sceneInput.sceneId)
+
         if (config.filename == null) {
-            return "vanilla.webp"
+            return "${scenePrefix}_vanilla.webp"
         }
 
         val shaderInfo = parseShaderPackName(config.filename)
         val profileSuffix = config.profile?.let { "_${sanitizeForFilename(it)}" } ?: ""
-        return "${shaderInfo.id}_${shaderInfo.version}$profileSuffix.webp"
+        return "${scenePrefix}_${shaderInfo.id}_${shaderInfo.version}$profileSuffix.webp"
     }
 
     private fun parseShaderPackName(filename: String): ShaderPackInfo {
@@ -406,92 +381,9 @@ class CaptureSession(
         val mcVersion: String?,
     )
 
-    private fun handlePostCaptureCooldown() {
-        if (ticksInState >= POST_CAPTURE_COOLDOWN_TICKS) {
-            advanceToNextShader()
-        }
-    }
-
-    private fun advanceToNextShader() {
-        currentIndex++
-        if (currentIndex >= shadersToCapture.size) {
-            transitionTo(State.Finishing)
-        } else {
-            transitionTo(State.LoadingShader)
-        }
-    }
-
-    private fun handleFinishing() {
-        log.info("Capture session complete, restoring original state")
-
-        ChunkForceLoader.releaseAll()
-
-        sessionData = buildSessionData()
-
-        HighResCapture.endSession()
-
-        if (IrisIntegration.isAvailable) {
-            originalShaderPack?.let { shaderPack ->
-                IrisIntegration.enableShaders(shaderPack)
-            } ?: IrisIntegration.disableShaders()
-        }
-
-        originalState?.let {
-            it.restore()
-            log.debug("Original client state restored")
-        }
-
-        state = State.Idle
-        ticksInState = 0
-        currentIndex = 0
-        shadersToCapture = emptyList()
-        originalShaderPack = null
-        captureEntries.clear()
-        startedAt = null
-        originalState = null
-
-        log.info("Capture session finished")
-    }
-
-    private fun buildSessionData(): CaptureSessionData {
-        val mc = Minecraft.getInstance()
-        val completedAt = Instant.now()
-
-        val player = mc.player
-        val position = player?.let { Position(x = it.x, y = it.y, z = it.z) }
-        val camera = player?.let { Camera(yaw = it.yRot, pitch = it.xRot) }
-
-        val dimension =
-            mc.level
-                ?.dimension()
-                ?.location()
-                ?.toString()
-
-        val sessionDirPath = outputDir.relativeTo(mc.gameDirectory).path
-
-        return CaptureSessionData(
-            worldName = worldName,
-            sceneId = resolvedScene?.scene?.id ?: "unknown",
-            sessionDir = sessionDirPath,
-            startedAt = startedAt.toString(),
-            completedAt = completedAt.toString(),
-            totalCaptures = captureEntries.size,
-            shaders = shadersToCapture.mapNotNull { it.filename }.distinct(),
-            minecraft =
-                MinecraftInfo(
-                    version = mc.launchedVersion,
-                    dimension = dimension,
-                    position = position,
-                    camera = camera,
-                ),
-            captures = captureEntries.toList(),
-        )
-    }
-
     private enum class State {
         Idle,
         ApplyingScene,
-        LoadingShader,
         WaitingForStabilization,
         Capturing,
         PostCaptureCooldown,
