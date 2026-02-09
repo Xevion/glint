@@ -20,6 +20,7 @@ import com.xevion.glint.session.SessionRegistry
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintTabbedScreen
 import com.xevion.glint.ui.base.GlintTheme
+import com.xevion.glint.upload.WorldUploader
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
@@ -250,7 +251,7 @@ class GlintMainScreen(
         }
 
         val addButton =
-            GlintComponents.listItemRow(onClick = { /* TODO */ }) {
+            GlintComponents.listItemRow(onClick = { openAddWorldPicker() }) {
                 horizontalAlignment(HorizontalAlignment.CENTER)
                 child(
                     Components
@@ -392,13 +393,18 @@ class GlintMainScreen(
             }
 
             "local" -> {
+                val config = ApiConfig.load()
+                val canUpload = config.isValid()
                 val uploadBtn =
                     GlintComponents.smallButton(
                         McComponent.literal("Upload"),
                         width = 55,
-                        tooltip = McComponent.literal("World upload not yet available"),
-                    ) { }
-                uploadBtn.active = false
+                        tooltip =
+                            McComponent.literal(
+                                if (canUpload) "Upload world to API" else "Configure API connection first",
+                            ),
+                    ) { uploadWorld(world) }
+                uploadBtn.active = canUpload
                 buttonRow.child(uploadBtn as Component)
 
                 buttonRow.child(
@@ -1186,6 +1192,168 @@ class GlintMainScreen(
                     rebuildStatusBar()
                 },
             ),
+        )
+    }
+
+    // ============================================
+    // World Upload
+    // ============================================
+
+    private fun uploadWorld(world: WorldEntry) {
+        val config = ApiConfig.load()
+        if (!config.isValid()) {
+            StatusLog.warn("API config not valid - open API Config to set it up")
+            rebuildStatusBar()
+            return
+        }
+
+        // Resolve the world directory
+        val mc =
+            net.minecraft.client.Minecraft
+                .getInstance()
+        val folder = world.collection?.folder ?: world.collectionFileName ?: return
+        val worldDir =
+            listOf(
+                java.io.File(mc.gameDirectory, "glint/worlds/$folder"),
+                java.io.File(mc.gameDirectory, "saves/$folder"),
+            ).firstOrNull { it.exists() && it.isDirectory }
+
+        if (worldDir == null) {
+            StatusLog.error("Could not find world directory for: ${world.name}")
+            rebuildStatusBar()
+            return
+        }
+
+        // Determine if this is the currently loaded world (needs force-save)
+        val currentWorldName = mc.singleplayerServer?.worldData?.levelName
+        val isCurrent = currentWorldName != null && worldDir.name == currentWorldName
+
+        minecraft?.setScreen(
+            WorldUploadDialog(
+                parentScreen = this,
+                worldDir = worldDir,
+                defaultName = world.name,
+            ) { name, slug, description ->
+                startUpload(worldDir, name, slug, description, isCurrent, config, world)
+            },
+        )
+    }
+
+    private fun uploadWorldFromDir(
+        worldDir: java.io.File,
+        worldName: String,
+    ) {
+        val config = ApiConfig.load()
+        if (!config.isValid()) {
+            StatusLog.warn("API config not valid - open API Config to set it up")
+            rebuildStatusBar()
+            return
+        }
+
+        val mc =
+            net.minecraft.client.Minecraft
+                .getInstance()
+        val currentWorldName = mc.singleplayerServer?.worldData?.levelName
+        val isCurrent = currentWorldName != null && worldDir.name == currentWorldName
+
+        minecraft?.setScreen(
+            WorldUploadDialog(
+                parentScreen = this,
+                worldDir = worldDir,
+                defaultName = worldName,
+            ) { name, slug, description ->
+                startUpload(worldDir, name, slug, description, isCurrent, config, null)
+            },
+        )
+    }
+
+    private fun startUpload(
+        worldDir: java.io.File,
+        name: String,
+        slug: String,
+        description: String?,
+        forceSave: Boolean,
+        config: ApiConfig,
+        existingWorld: WorldEntry?,
+    ) {
+        StatusLog.info("Starting upload: $name...")
+        rebuildStatusBar()
+
+        val progressDialog: WorldUploadProgressDialog
+
+        val future =
+            WorldUploader.uploadWorld(
+                worldDir = worldDir,
+                name = name,
+                slug = slug,
+                description = description,
+                minecraftVersion = "1.21.4",
+                apiUrl = config.apiUrl,
+                token = config.accessToken,
+                forceSave = forceSave,
+                progressCallback = { progress ->
+                    minecraft?.execute {
+                        // Update progress dialog if it's the current screen
+                        val screen = minecraft?.screen
+                        if (screen is WorldUploadProgressDialog) {
+                            screen.updateProgress(progress)
+                        }
+                    }
+                },
+            )
+
+        progressDialog =
+            WorldUploadProgressDialog(
+                parent = this,
+                worldName = name,
+                uploadFuture = future,
+                onComplete = { worldInfo ->
+                    // Auto-link apiWorldId on the local scene collection
+                    val collectionFileName =
+                        existingWorld?.collectionFileName
+                            ?: name
+                                .lowercase()
+                                .replace(' ', '_')
+                                .replace(Regex("[^a-z0-9_-]"), "")
+
+                    SceneManager.addCollectionForApiWorld(
+                        worldName = name,
+                        folder = worldDir.name,
+                        apiWorldId = worldInfo.id,
+                    )
+
+                    StatusLog.info("Uploaded: $name")
+                    SceneManager.clearCache()
+                    refreshWorlds()
+                    rebuildStatusBar()
+                },
+            )
+
+        minecraft?.setScreen(progressDialog)
+    }
+
+    private fun openAddWorldPicker() {
+        val localWorlds = WorldUploader.listLocalWorlds()
+        if (localWorlds.isEmpty()) {
+            StatusLog.warn("No local worlds found in saves/ or glint/worlds/")
+            rebuildStatusBar()
+            return
+        }
+
+        val config = ApiConfig.load()
+        if (!config.isValid()) {
+            StatusLog.warn("API config not valid - configure it in the Config tab first")
+            rebuildStatusBar()
+            return
+        }
+
+        minecraft?.setScreen(
+            WorldPickerDialog(
+                parentScreen = this,
+                worlds = localWorlds,
+            ) { worldDir, worldName ->
+                uploadWorldFromDir(worldDir, worldName)
+            },
         )
     }
 

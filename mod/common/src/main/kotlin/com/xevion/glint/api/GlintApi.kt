@@ -466,7 +466,9 @@ object GlintApi {
             connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
 
             when (connection.responseCode) {
-                204 -> Result.success(Unit)
+                204 -> {
+                    Result.success(Unit)
+                }
 
                 else -> {
                     val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
@@ -504,6 +506,99 @@ object GlintApi {
 
                 404 -> {
                     Result.failure(ApiError.HttpError(404, "Scene not found"))
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /**
+     * Initiates a world upload by creating the world record and obtaining a presigned upload URL.
+     * Requires authentication token.
+     */
+    fun createWorldUpload(
+        apiUrl: String,
+        request: CreateWorldUploadRequest,
+        token: String,
+    ): Result<CreateWorldUploadResponse> {
+        val url = "$apiUrl/api/worlds"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setAuthHeader(token)
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 10000
+
+            val requestBody = JSON.encodeToString(CreateWorldUploadRequest.serializer(), request)
+            connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                201 -> {
+                    val responseBody = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    try {
+                        val response = JSON.decodeFromString(CreateWorldUploadResponse.serializer(), responseBody)
+                        Result.success(response)
+                    } catch (e: Exception) {
+                        Result.failure(ApiError.ParseError("Failed to parse world upload response", e))
+                    }
+                }
+
+                409 -> {
+                    Result.failure(ApiError.HttpError(409, "World slug already exists"))
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /**
+     * Completes a world upload after the file has been uploaded to the presigned URL.
+     * Requires authentication token.
+     */
+    fun completeWorldUpload(
+        apiUrl: String,
+        worldSlug: String,
+        request: CompleteWorldUploadRequest,
+        token: String,
+    ): Result<WorldInfo> {
+        val url = "$apiUrl/api/worlds/$worldSlug/complete"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setAuthHeader(token)
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 10000
+
+            val requestBody = JSON.encodeToString(CompleteWorldUploadRequest.serializer(), request)
+            connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                201 -> {
+                    val responseBody = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    try {
+                        val world = JSON.decodeFromString(WorldInfo.serializer(), responseBody)
+                        Result.success(world)
+                    } catch (e: Exception) {
+                        Result.failure(ApiError.ParseError("Failed to parse world response", e))
+                    }
                 }
 
                 else -> {
@@ -634,4 +729,35 @@ data class DeviceTokenResponse(
     @SerialName("access_token") val accessToken: String,
     @SerialName("token_type") val tokenType: String,
     @SerialName("expires_in") val expiresIn: Long,
+)
+
+/**
+ * Request payload for initiating a world upload.
+ */
+@Serializable
+data class CreateWorldUploadRequest(
+    val name: String,
+    val slug: String,
+    val description: String? = null,
+    @SerialName("minecraft_version") val minecraftVersion: String,
+    @SerialName("file_hash") val fileHash: String,
+    @SerialName("file_size_bytes") val fileSizeBytes: Long,
+)
+
+/**
+ * Response from initiating a world upload, containing the presigned upload URL.
+ */
+@Serializable
+data class CreateWorldUploadResponse(
+    @SerialName("upload_id") val uploadId: String,
+    @SerialName("presigned_url") val presignedUrl: String,
+    @SerialName("expires_at") val expiresAt: String,
+)
+
+/**
+ * Request payload for completing a world upload.
+ */
+@Serializable
+data class CompleteWorldUploadRequest(
+    @SerialName("upload_id") val uploadId: String,
 )
