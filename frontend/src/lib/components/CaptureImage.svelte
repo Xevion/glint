@@ -7,6 +7,8 @@ interface Props {
 	src: string | null | undefined;
 	alt: string;
 	thumbhash?: string | null;
+	/** Aspect ratio (width / height) from resolution data. Reserves space to prevent layout shift. */
+	aspectRatio?: number | null;
 	preset?: ImagePreset;
 	sizes?: string;
 	priority?: boolean;
@@ -21,6 +23,7 @@ let {
 	src,
 	alt,
 	thumbhash,
+	aspectRatio,
 	preset = 'card',
 	sizes,
 	priority = false,
@@ -40,11 +43,21 @@ const resolvedDecoding = $derived(priority ? 'sync' : 'async');
 
 let loaded = $state(false);
 let lightboxOpen = $state(false);
+let imgEl = $state<HTMLImageElement | null>(null);
 
-// Reset loaded state when src changes
+// Reset loaded state only when src genuinely changes
+let prevSrc: string | null | undefined;
 $effect(() => {
-	if (src) {
+	if (src !== prevSrc) {
+		prevSrc = src;
 		loaded = false;
+	}
+});
+
+// Handle images that load from browser cache before effects run
+$effect(() => {
+	if (imgEl && !loaded && imgEl.complete && imgEl.naturalWidth > 0) {
+		loaded = true;
 	}
 });
 
@@ -80,6 +93,7 @@ function handleLightboxKeydown(e: KeyboardEvent) {
 	style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
 	style:background-size="cover"
 	style:background-position="center"
+	style:aspect-ratio={aspectRatio ? String(aspectRatio) : undefined}
 	role={lightbox ? 'button' : undefined}
 	tabindex={lightbox ? 0 : undefined}
 	onclick={lightbox ? () => (lightboxOpen = true) : undefined}
@@ -98,6 +112,7 @@ function handleLightboxKeydown(e: KeyboardEvent) {
 	{/if}
 	{#if fallbackSrc}
 		<img
+			bind:this={imgEl}
 			src={fallbackSrc}
 			srcset={srcset}
 			sizes={resolvedSizes}

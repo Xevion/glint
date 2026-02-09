@@ -70,13 +70,16 @@ async function confirmDelete() {
 	{/if}
 
 	<!-- Image Hero -->
-	{#if capture.image_url}
+	{#if capture.image_url ?? capture.thumbhash}
 		<CaptureImage
 			src={capture.image_url}
 			thumbhash={capture.thumbhash}
+			aspectRatio={capture.resolution_width && capture.resolution_height
+				? capture.resolution_width / capture.resolution_height
+				: 16 / 9}
 			preset="hero"
 			alt="Capture"
-			lightbox
+			lightbox={!!capture.image_url}
 			class="w-full"
 			containerClass="w-full overflow-hidden rounded-lg border"
 		/>
