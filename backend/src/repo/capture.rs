@@ -210,13 +210,14 @@ impl CaptureRepo {
         resolution_width: Option<i32>,
         resolution_height: Option<i32>,
         captured_at: Option<DateTime<Utc>>,
+        world_version_id: Option<&str>,
     ) -> AppResult<()> {
         sqlx::query!(
             r#"
             INSERT INTO captures (
                 id, shader_version_id, scene_id, profile, image_path, image_url,
-                resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, 'completed', $9, $9, $9)
+                resolution_width, resolution_height, world_version_id, status, created_at, updated_at, captured_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed', $10, $10, $10)
             "#,
             id,
             shader_version_id,
@@ -226,6 +227,7 @@ impl CaptureRepo {
             image_url,
             resolution_width,
             resolution_height,
+            world_version_id,
             captured_at
         )
         .execute(executor)
@@ -252,13 +254,14 @@ impl CaptureRepo {
         resolution_width: Option<i32>,
         resolution_height: Option<i32>,
         captured_at: Option<DateTime<Utc>>,
+        world_version_id: Option<&str>,
     ) -> AppResult<()> {
         sqlx::query!(
             r#"
             INSERT INTO captures (
                 id, shader_version_id, scene_id, profile, image_url,
-                resolution_width, resolution_height, outdated, status, created_at, updated_at, captured_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, 'uploading', $8, $8, $8)
+                resolution_width, resolution_height, world_version_id, status, created_at, updated_at, captured_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'uploading', $9, $9, $9)
             "#,
             id,
             shader_version_id,
@@ -267,6 +270,7 @@ impl CaptureRepo {
             image_url,
             resolution_width,
             resolution_height,
+            world_version_id,
             captured_at
         )
         .execute(executor)
@@ -303,66 +307,6 @@ impl CaptureRepo {
         debug!(id, "Capture upload confirmed");
         Ok(result.rows_affected() > 0)
     }
-
-    /// Mark captures as outdated for a scene (when scene is updated)
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn mark_outdated_for_scene(
-        executor: impl sqlx::PgExecutor<'_>,
-        scene_id: &str,
-    ) -> AppResult<u64> {
-        let result = sqlx::query!(
-            "UPDATE captures SET outdated = TRUE WHERE scene_id = $1 AND status = 'completed'",
-            scene_id
-        )
-        .execute(executor)
-        .await
-        .context(format!(
-            "failed to mark captures outdated for scene '{}'",
-            scene_id
-        ))?;
-
-        debug!(
-            scene_id,
-            count = result.rows_affected(),
-            "Marked captures outdated"
-        );
-        Ok(result.rows_affected())
-    }
-
-    /// Count captures by status for dashboard stats
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn count_by_status(
-        executor: impl sqlx::PgExecutor<'_>,
-    ) -> AppResult<CaptureStatusCounts> {
-        let row = sqlx::query!(
-            r#"
-            SELECT
-                COUNT(*) FILTER (WHERE status = 'pending')::int4 as "pending!",
-                COUNT(*) FILTER (WHERE status = 'completed')::int4 as "completed!",
-                COUNT(*) FILTER (WHERE status = 'failed')::int4 as "failed!",
-                COUNT(*) FILTER (WHERE outdated = TRUE)::int4 as "outdated!"
-            FROM captures
-            "#
-        )
-        .fetch_one(executor)
-        .await
-        .context("failed to count captures by status")?;
-
-        Ok(CaptureStatusCounts {
-            pending: row.pending,
-            completed: row.completed,
-            failed: row.failed,
-            outdated: row.outdated,
-        })
-    }
-}
-
-#[derive(Debug)]
-pub struct CaptureStatusCounts {
-    pub pending: i32,
-    pub completed: i32,
-    pub failed: i32,
-    pub outdated: i32,
 }
 
 #[derive(Debug, Serialize)]
@@ -495,7 +439,7 @@ impl CaptureRepo {
                 c.thumbhash
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
-            WHERE c.status = 'completed' AND c.outdated = FALSE AND c.image_url IS NOT NULL
+            WHERE c.status = 'completed' AND c.image_url IS NOT NULL
             ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST
             "#
         )
@@ -535,7 +479,7 @@ impl CaptureRepo {
                 c.image_url as "image_url!",
                 c.thumbhash
             FROM captures c
-            WHERE c.status = 'completed' AND c.outdated = FALSE AND c.image_url IS NOT NULL
+            WHERE c.status = 'completed' AND c.image_url IS NOT NULL
             ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
             "#
         )

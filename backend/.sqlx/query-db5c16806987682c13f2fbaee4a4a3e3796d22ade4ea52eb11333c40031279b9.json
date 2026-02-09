@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM worlds WHERE slug = $1",
+  "query": "\n            SELECT DISTINCT ON (world_id) *\n            FROM world_versions\n            ORDER BY world_id, created_at DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -10,49 +10,41 @@
       },
       {
         "ordinal": 1,
-        "name": "slug",
+        "name": "world_id",
         "type_info": "Text"
       },
       {
         "ordinal": 2,
-        "name": "name",
+        "name": "file_url",
         "type_info": "Text"
       },
       {
         "ordinal": 3,
-        "name": "description",
+        "name": "file_hash",
         "type_info": "Text"
       },
       {
         "ordinal": 4,
-        "name": "minecraft_version",
-        "type_info": "Text"
+        "name": "size_bytes",
+        "type_info": "Int8"
       },
       {
         "ordinal": 5,
         "name": "created_at",
         "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 6,
-        "name": "updated_at",
-        "type_info": "Timestamptz"
       }
     ],
     "parameters": {
-      "Left": [
-        "Text"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
       false,
-      false,
       true,
-      false,
-      false,
+      true,
+      true,
       false
     ]
   },
-  "hash": "d3648c31bf2625cda226937c8e30023a533af14dbad4e5f9a6806ddd46fe8e9c"
+  "hash": "db5c16806987682c13f2fbaee4a4a3e3796d22ade4ea52eb11333c40031279b9"
 }

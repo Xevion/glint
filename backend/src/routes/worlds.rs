@@ -12,10 +12,11 @@ use crate::{
     auth::AdminUser,
     error::{AppError, AppResult},
     models::{
-        CompleteWorldUploadRequest, CreateWorldRequest, CreateWorldUploadResponse,
-        UpdateWorldRequest, World, WorldWithScenes,
+        CompleteWorldUploadRequest, CompleteWorldVersionUploadRequest, CreateWorldRequest,
+        CreateWorldUploadResponse, CreateWorldVersionUploadResponse, UpdateWorldRequest, World,
+        WorldVersion, WorldWithDetails,
     },
-    repo::{PendingUploadRepo, SceneRepo, WorldRepo},
+    repo::{PendingUploadRepo, SceneRepo, WorldRepo, WorldVersionRepo},
     state::AppState,
 };
 
@@ -29,16 +30,43 @@ pub fn router() -> Router<AppState> {
             "/{id}",
             get(get_world).put(update_world).delete(delete_world),
         )
+        .route(
+            "/{id}/versions",
+            get(list_world_versions).post(create_world_version),
+        )
+        .route(
+            "/{id}/versions/complete",
+            post(complete_world_version_upload),
+        )
         .route("/{slug}/complete", post(complete_world_upload))
 }
 
-/// GET /api/worlds - List all worlds (admin)
+/// GET /api/worlds - List all worlds with latest version (admin)
 async fn list_worlds(
     _admin: AdminUser,
     State(state): State<AppState>,
-) -> AppResult<Json<Vec<World>>> {
-    let worlds = WorldRepo::list(state.db()).await?;
-    Ok(Json(worlds))
+) -> AppResult<Json<Vec<WorldWithDetails>>> {
+    let (worlds, latest_versions) = tokio::try_join!(
+        WorldRepo::list(state.db()),
+        WorldVersionRepo::batch_latest(state.db()),
+    )?;
+
+    let items = worlds
+        .into_iter()
+        .map(|world| {
+            let latest_version = latest_versions
+                .iter()
+                .find(|v| v.world_id == world.id)
+                .cloned();
+            WorldWithDetails {
+                world,
+                scenes: vec![],
+                latest_version,
+            }
+        })
+        .collect();
+
+    Ok(Json(items))
 }
 
 /// POST /api/worlds - Initiate world upload (admin)
@@ -149,8 +177,21 @@ async fn complete_world_upload(
 
     let pending = PendingUploadRepo::get_by_id(state.db(), &request.upload_id).await?;
 
+    // This endpoint is for world creation uploads (not version uploads)
+    let pending_slug = pending.slug.as_deref().ok_or_else(|| {
+        AppError::BadRequest("Upload ID is for a version upload, not world creation".into())
+    })?;
+    let pending_name = pending
+        .name
+        .clone()
+        .ok_or_else(|| AppError::BadRequest("Pending upload missing name".into()))?;
+    let pending_mc_version = pending
+        .minecraft_version
+        .clone()
+        .ok_or_else(|| AppError::BadRequest("Pending upload missing minecraft_version".into()))?;
+
     // Verify slug matches
-    if pending.slug != slug {
+    if pending_slug != slug {
         return Err(AppError::BadRequest(format!(
             "Upload ID '{}' does not match slug '{}'",
             request.upload_id, slug
@@ -211,8 +252,36 @@ async fn complete_world_upload(
         ));
     }
 
-    // Move file to final location: _uploads/{uuid}.zip -> worlds/{slug}.zip
-    let final_key = format!("worlds/{}.zip", pending.slug);
+    // Create world record first (to detect conflicts before moving files)
+    let world_id = Uuid::new_v4().to_string();
+    let version_id = Uuid::new_v4().to_string();
+    let world_result = WorldRepo::create(
+        state.db(),
+        &world_id,
+        &CreateWorldRequest {
+            name: &pending_name,
+            slug: pending_slug,
+            description: pending.description.as_deref(),
+            minecraft_version: &pending_mc_version,
+        },
+    )
+    .await;
+
+    // Handle conflict (another upload completed first)
+    if let Err(AppError::Conflict(_)) = &world_result {
+        // Delete pending record; cleanup service will remove the staging file
+        PendingUploadRepo::delete(state.db(), &request.upload_id).await?;
+
+        return Err(AppError::Conflict(format!(
+            "World with slug '{}' was created by another upload",
+            slug
+        )));
+    }
+
+    let world = world_result?;
+
+    // Move file to versioned location: _uploads/{uuid}.zip -> worlds/{slug}/{version_id}.zip
+    let final_key = format!("worlds/{}/{}.zip", pending_slug, version_id);
 
     // Copy to final location
     let copy_source = format!("{}/{}", bucket, pending.upload_key);
@@ -247,63 +316,40 @@ async fn complete_world_upload(
         format!("https://{}.r2.cloudflarestorage.com/{}", bucket, final_key)
     };
 
-    // Create world record
-    let world_id = Uuid::new_v4().to_string();
-    let world_result = WorldRepo::create(
+    // Create initial world version with artifact data
+    WorldVersionRepo::create(
         state.db(),
-        &world_id,
-        &CreateWorldRequest {
-            name: &pending.name,
-            slug: &pending.slug,
-            description: pending.description.as_deref(),
-            minecraft_version: &pending.minecraft_version,
-            file_url: &file_url,
-            file_hash: &pending.file_hash,
-            size_bytes: pending.size_bytes,
-        },
+        &version_id,
+        &world.id,
+        &file_url,
+        &pending.file_hash,
+        pending.size_bytes,
     )
-    .await;
-
-    // Handle conflict (another upload completed first)
-    if let Err(AppError::Conflict(_)) = &world_result {
-        // Clean up the file we just copied
-        if let Err(e) = s3
-            .delete_object()
-            .bucket(bucket)
-            .key(&final_key)
-            .send()
-            .await
-        {
-            warn!(key = %final_key, error = %e, "Failed to clean up conflicting upload");
-        }
-
-        // Delete pending record
-        PendingUploadRepo::delete(state.db(), &request.upload_id).await?;
-
-        return Err(AppError::Conflict(format!(
-            "World with slug '{}' was created by another upload",
-            slug
-        )));
-    }
-
-    let world = world_result?;
+    .await?;
 
     // Delete pending upload record
     PendingUploadRepo::delete(state.db(), &request.upload_id).await?;
 
-    info!(world_id = %world.id, slug = %world.slug, "World created");
+    info!(world_id = %world.id, slug = %world.slug, "World created with initial version");
     Ok((StatusCode::CREATED, Json(world)))
 }
 
-/// GET /api/worlds/{id} - Get world with scenes (admin)
+/// GET /api/worlds/{id} - Get world with scenes and latest version (admin)
 async fn get_world(
     _admin: AdminUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> AppResult<Json<WorldWithScenes>> {
-    let world = WorldRepo::get_by_id(state.db(), &id).await?;
-    let scenes = SceneRepo::list_by_world(state.db(), &id).await?;
-    Ok(Json(WorldWithScenes { world, scenes }))
+) -> AppResult<Json<WorldWithDetails>> {
+    let (world, scenes, latest_version) = tokio::try_join!(
+        WorldRepo::get_by_id(state.db(), &id),
+        SceneRepo::list_by_world(state.db(), &id),
+        WorldVersionRepo::get_latest_for_world(state.db(), &id),
+    )?;
+    Ok(Json(WorldWithDetails {
+        world,
+        scenes,
+        latest_version,
+    }))
 }
 
 /// PUT /api/worlds/{id} - Update world metadata (admin)
@@ -312,10 +358,17 @@ async fn update_world(
     State(state): State<AppState>,
     Path(id): Path<String>,
     Json(request): Json<UpdateWorldRequest>,
-) -> AppResult<Json<WorldWithScenes>> {
+) -> AppResult<Json<WorldWithDetails>> {
     let world = WorldRepo::update(state.db(), &id, &request).await?;
-    let scenes = SceneRepo::list_by_world(state.db(), &id).await?;
-    Ok(Json(WorldWithScenes { world, scenes }))
+    let (scenes, latest_version) = tokio::try_join!(
+        SceneRepo::list_by_world(state.db(), &id),
+        WorldVersionRepo::get_latest_for_world(state.db(), &id),
+    )?;
+    Ok(Json(WorldWithDetails {
+        world,
+        scenes,
+        latest_version,
+    }))
 }
 
 /// DELETE /api/worlds/{id} - Delete a world (admin)
@@ -324,20 +377,291 @@ async fn delete_world(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<StatusCode> {
-    let world = WorldRepo::get_by_id(state.db(), &id).await?;
+    // Verify world exists (404 if not)
+    WorldRepo::get_by_id(state.db(), &id).await?;
+
+    // Fetch versions before deletion (CASCADE will remove them from DB)
+    let versions = WorldVersionRepo::list_by_world(state.db(), &id).await?;
+
     let deleted = WorldRepo::delete(state.db(), &id).await?;
     if !deleted {
         return Err(AppError::NotFound("World not found".into()));
     }
 
+    // Clean up R2 files for all versions
     if let Some(s3) = state.s3() {
         let r2_config = &state.config().r2;
         let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
-        let r2_key = format!("worlds/{}.zip", world.slug);
-        if let Err(e) = s3.delete_object().bucket(bucket).key(&r2_key).send().await {
-            warn!(key = %r2_key, error = %e, "Failed to delete world file from R2");
+
+        let public_prefix = r2_config
+            .public_url
+            .as_deref()
+            .map(|p| format!("{}/", p))
+            .unwrap_or_else(|| format!("https://{}.r2.cloudflarestorage.com/", bucket));
+
+        for version in &versions {
+            if let Some(ref url) = version.file_url {
+                // Extract R2 key by stripping the public URL prefix
+                let key = url.strip_prefix(&public_prefix).unwrap_or_else(|| {
+                    // Fallback: legacy canonical path
+                    warn!(url = %url, "Could not extract R2 key from file_url, skipping");
+                    ""
+                });
+
+                if !key.is_empty()
+                    && let Err(e) = s3.delete_object().bucket(bucket).key(key).send().await
+                {
+                    warn!(key = %key, error = %e, "Failed to delete version file from R2");
+                }
+            }
         }
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/worlds/{id}/versions - List all versions for a world (admin)
+async fn list_world_versions(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> AppResult<Json<Vec<WorldVersion>>> {
+    // Verify world exists (404 if not)
+    WorldRepo::get_by_id(state.db(), &id).await?;
+    let versions = WorldVersionRepo::list_by_world(state.db(), &id).await?;
+    Ok(Json(versions))
+}
+
+/// Request to initiate a new version upload for an existing world
+#[derive(Debug, serde::Deserialize)]
+struct CreateWorldVersionUploadRequest {
+    /// SHA256 hash with algorithm prefix (e.g., "sha256:abc123...")
+    file_hash: String,
+    file_size_bytes: i64,
+}
+
+/// POST /api/worlds/{id}/versions - Initiate world version upload (admin)
+///
+/// Phase 1 of two-phase upload: creates a pending upload record and returns
+/// a presigned URL for uploading to a staging path. The client must call
+/// `POST /api/worlds/{id}/versions/complete` after uploading.
+async fn create_world_version(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<CreateWorldVersionUploadRequest>,
+) -> AppResult<(StatusCode, Json<CreateWorldVersionUploadResponse>)> {
+    let world = WorldRepo::get_by_id(state.db(), &id).await?;
+
+    // Validate hash format
+    if !request.file_hash.starts_with("sha256:") {
+        return Err(AppError::BadRequest(
+            "file_hash must have algorithm prefix (e.g., 'sha256:abc123...')".into(),
+        ));
+    }
+
+    // Validate file size (max 512 MiB)
+    const MAX_UPLOAD_SIZE: i64 = 512 * 1024 * 1024;
+    if request.file_size_bytes > MAX_UPLOAD_SIZE {
+        return Err(AppError::BadRequest(format!(
+            "File too large: {} bytes (max {} MiB)",
+            request.file_size_bytes,
+            MAX_UPLOAD_SIZE / 1024 / 1024
+        )));
+    }
+
+    // Require R2/S3
+    let s3 = state
+        .s3()
+        .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))?;
+
+    let r2_config = &state.config().r2;
+    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+
+    // Upload to staging path (not final location)
+    let upload_id = Uuid::new_v4().to_string();
+    let upload_key = format!("_uploads/{}.zip", upload_id);
+    let expires_at = Utc::now() + chrono::Duration::seconds(PRESIGN_EXPIRY_SECS as i64);
+
+    // Generate presigned PUT URL for staging path
+    let presigned = s3
+        .put_object()
+        .bucket(bucket)
+        .key(&upload_key)
+        .content_type("application/zip")
+        .metadata("sha256", request.file_hash.strip_prefix("sha256:").unwrap())
+        .presigned(
+            aws_sdk_s3::presigning::PresigningConfig::builder()
+                .expires_in(std::time::Duration::from_secs(PRESIGN_EXPIRY_SECS))
+                .build()
+                .expect("valid presigning config"),
+        )
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to generate presigned URL for version upload");
+            AppError::Internal(anyhow::anyhow!("Failed to generate presigned URL: {}", e))
+        })?;
+
+    // Store pending upload record
+    PendingUploadRepo::create_for_version(
+        state.db(),
+        &upload_id,
+        &world.id,
+        &request.file_hash,
+        request.file_size_bytes,
+        &upload_key,
+        expires_at,
+    )
+    .await?;
+
+    debug!(
+        upload_id = %upload_id,
+        world_id = %world.id,
+        expires_at = %expires_at,
+        "Pending version upload created"
+    );
+
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateWorldVersionUploadResponse {
+            upload_id,
+            presigned_url: presigned.uri().to_string(),
+            expires_at,
+        }),
+    ))
+}
+
+/// POST /api/worlds/{id}/versions/complete - Complete world version upload (admin)
+///
+/// Phase 2 of two-phase upload: verifies the file was uploaded to R2,
+/// checks the hash, moves it to a versioned path, and creates the
+/// WorldVersion database record.
+async fn complete_world_version_upload(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Path(world_id): Path<String>,
+    Json(request): Json<CompleteWorldVersionUploadRequest>,
+) -> AppResult<(StatusCode, Json<WorldVersion>)> {
+    debug!(world_id = %world_id, upload_id = %request.upload_id, "Completing world version upload");
+
+    let pending = PendingUploadRepo::get_by_id(state.db(), &request.upload_id).await?;
+
+    // Verify this is a version upload and world_id matches
+    let pending_world_id = pending.world_id.as_deref().ok_or_else(|| {
+        AppError::BadRequest("Upload ID is for world creation, not a version upload".into())
+    })?;
+    if pending_world_id != world_id {
+        return Err(AppError::BadRequest(format!(
+            "Upload ID '{}' does not match world '{}'",
+            request.upload_id, world_id
+        )));
+    }
+
+    // Check if expired
+    if pending.expires_at < Utc::now() {
+        PendingUploadRepo::delete(state.db(), &request.upload_id).await?;
+        return Err(AppError::Gone(
+            "Upload has expired. Please start a new upload.".into(),
+        ));
+    }
+
+    // Verify world still exists
+    let world = WorldRepo::get_by_id(state.db(), &world_id).await?;
+
+    // Require R2/S3
+    let s3 = state
+        .s3()
+        .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))?;
+
+    let r2_config = &state.config().r2;
+    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+
+    // Verify file exists in R2 via head_object
+    let head = s3
+        .head_object()
+        .bucket(bucket)
+        .key(&pending.upload_key)
+        .send()
+        .await
+        .map_err(|e| {
+            warn!(upload_id = %request.upload_id, error = %e, "Upload file not found in R2");
+            AppError::NotFound(
+                "Uploaded file not found in storage. Please retry the upload.".into(),
+            )
+        })?;
+
+    // Verify hash from metadata
+    let stored_hash = head.metadata().and_then(|m| m.get("sha256").cloned());
+    let expected_hash = pending
+        .file_hash
+        .strip_prefix("sha256:")
+        .unwrap_or(&pending.file_hash);
+
+    if stored_hash.as_deref() != Some(expected_hash) {
+        warn!(
+            upload_id = %request.upload_id,
+            expected = %expected_hash,
+            actual = ?stored_hash,
+            "Upload hash mismatch"
+        );
+        return Err(AppError::BadRequest(
+            "File hash mismatch. The uploaded file may be corrupted.".into(),
+        ));
+    }
+
+    // Move file to versioned location: _uploads/{uuid}.zip -> worlds/{slug}/{version_id}.zip
+    let version_id = Uuid::new_v4().to_string();
+    let final_key = format!("worlds/{}/{}.zip", world.slug, version_id);
+
+    let copy_source = format!("{}/{}", bucket, pending.upload_key);
+    s3.copy_object()
+        .bucket(bucket)
+        .copy_source(&copy_source)
+        .key(&final_key)
+        .metadata_directive(aws_sdk_s3::types::MetadataDirective::Copy)
+        .send()
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to copy version upload to final location");
+            AppError::Internal(anyhow::anyhow!("Failed to finalize upload: {}", e))
+        })?;
+
+    // Delete staging file
+    if let Err(e) = s3
+        .delete_object()
+        .bucket(bucket)
+        .key(&pending.upload_key)
+        .send()
+        .await
+    {
+        warn!(key = %pending.upload_key, error = %e, "Failed to delete temp upload file");
+    }
+
+    // Generate public URL
+    let file_url = if let Some(ref public_url_prefix) = r2_config.public_url {
+        format!("{}/{}", public_url_prefix, final_key)
+    } else {
+        format!("https://{}.r2.cloudflarestorage.com/{}", bucket, final_key)
+    };
+
+    // Create world version record
+    let version = WorldVersionRepo::create(
+        state.db(),
+        &version_id,
+        &world.id,
+        &file_url,
+        &pending.file_hash,
+        pending.size_bytes,
+    )
+    .await?;
+
+    // Delete pending upload record
+    PendingUploadRepo::delete(state.db(), &request.upload_id).await?;
+
+    info!(
+        world_id = %world.id,
+        version_id = %version.id,
+        "World version created and upload finalized"
+    );
+    Ok((StatusCode::CREATED, Json(version)))
 }

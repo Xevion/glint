@@ -2,7 +2,9 @@ package com.xevion.glint.upload
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.CompleteWorldUploadRequest
+import com.xevion.glint.api.CompleteWorldVersionUploadRequest
 import com.xevion.glint.api.CreateWorldUploadRequest
+import com.xevion.glint.api.CreateWorldVersionUploadRequest
 import com.xevion.glint.api.GlintApi
 import com.xevion.glint.api.WorldInfo
 import net.minecraft.client.Minecraft
@@ -148,6 +150,132 @@ object WorldUploader {
                 throw e
             } catch (e: Exception) {
                 log.error(e, "Unexpected error uploading world")
+                val userMessage = "Unexpected error: ${e.message}"
+                progressCallback(UploadProgress.failed(userMessage))
+                throw UploadException.UploadInterrupted(userMessage, e)
+            } finally {
+                zipFile?.delete()
+            }
+        }
+
+    /**
+     * Uploads the current world as a new version of an existing world.
+     * Uses the same two-phase upload flow as world creation:
+     * initiate → upload to staging → complete (verify + finalize).
+     *
+     * @param worldDir The world save directory on disk
+     * @param worldId Backend world ID to create a version for
+     * @param apiUrl Backend API URL
+     * @param token Auth token
+     * @param forceSave If true, force-save the currently loaded world before packaging
+     * @param progressCallback Called with upload progress updates
+     * @return CompletableFuture with the upload ID on success
+     */
+    fun uploadWorldVersion(
+        worldDir: File,
+        worldId: String,
+        apiUrl: String,
+        token: String,
+        forceSave: Boolean,
+        progressCallback: (UploadProgress) -> Unit,
+    ): CompletableFuture<String> =
+        CompletableFuture.supplyAsync {
+            var zipFile: File? = null
+            try {
+                // Step 1: Force-save if uploading the currently loaded world
+                if (forceSave) {
+                    progressCallback(UploadProgress.saving())
+                    forceSaveWorld()
+                }
+
+                // Step 2: Package world into ZIP
+                progressCallback(UploadProgress.packaging(0, 0))
+                val totalSize = calculateDirectorySize(worldDir)
+                zipFile = File.createTempFile("glint-upload-", ".zip")
+
+                log.info("Packaging world for version upload") {
+                    "path" to worldDir.absolutePath
+                    "worldId" to worldId
+                    "totalSize" to totalSize
+                }
+
+                val hash = packageWorld(worldDir, zipFile, totalSize, progressCallback)
+                val zipSize = zipFile.length()
+
+                log.info("World packaged for version upload") {
+                    "zipSize" to zipSize
+                    "hash" to hash
+                }
+
+                if (zipSize > MAX_UPLOAD_BYTES) {
+                    throw UploadException.FileTooLarge(zipSize, MAX_UPLOAD_BYTES)
+                }
+
+                // Step 3: Create version upload (get presigned URL)
+                progressCallback(UploadProgress.finalizing())
+                val fileHash = "sha256:$hash"
+
+                val createResult =
+                    GlintApi.createWorldVersionUpload(
+                        apiUrl = apiUrl,
+                        worldId = worldId,
+                        request =
+                            CreateWorldVersionUploadRequest(
+                                fileHash = fileHash,
+                                fileSizeBytes = zipSize,
+                            ),
+                        token = token,
+                    )
+
+                val response =
+                    createResult.getOrElse { error ->
+                        throw UploadException.FinalizationFailed(
+                            error.message ?: "Failed to create version upload",
+                        )
+                    }
+
+                log.info("Version upload initiated") {
+                    "uploadId" to response.uploadId
+                    "worldId" to worldId
+                }
+
+                // Step 4: Upload ZIP to presigned URL
+                uploadToPresignedUrl(
+                    zipFile = zipFile,
+                    presignedUrl = response.presignedUrl,
+                    hash = hash,
+                    progressCallback = progressCallback,
+                )
+
+                // Step 5: Complete upload (verify + create version record)
+                progressCallback(UploadProgress.finalizing())
+                val completeResult =
+                    GlintApi.completeWorldVersionUpload(
+                        apiUrl = apiUrl,
+                        worldId = worldId,
+                        request = CompleteWorldVersionUploadRequest(uploadId = response.uploadId),
+                        token = token,
+                    )
+
+                completeResult.getOrElse { error ->
+                    throw UploadException.FinalizationFailed(
+                        error.message ?: "Failed to complete version upload",
+                    )
+                }
+
+                progressCallback(UploadProgress.complete())
+                log.info("World version uploaded") {
+                    "uploadId" to response.uploadId
+                    "worldId" to worldId
+                }
+
+                response.uploadId
+            } catch (e: UploadException) {
+                log.error(e, "World version upload failed")
+                progressCallback(UploadProgress.failed(e.message ?: "Unknown error"))
+                throw e
+            } catch (e: Exception) {
+                log.error(e, "Unexpected error uploading world version")
                 val userMessage = "Unexpected error: ${e.message}"
                 progressCallback(UploadProgress.failed(userMessage))
                 throw UploadException.UploadInterrupted(userMessage, e)

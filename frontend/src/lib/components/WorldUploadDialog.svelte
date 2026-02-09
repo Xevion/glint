@@ -13,13 +13,18 @@ import {
 	validateFileSize
 } from '$lib/utils/compression';
 import { calculateSHA256 } from '$lib/utils/hash';
-import { FileArchive, Folder, Plus } from '@lucide/svelte';
+import { FileArchive, Folder, Plus, Upload } from '@lucide/svelte';
 
 interface Props {
 	onWorldCreated?: () => void;
+	/** When set, dialog operates in "new version" mode for this world */
+	worldId?: string;
+	/** Required when worldId is set — used for display */
+	worldName?: string;
 }
 
-let { onWorldCreated }: Props = $props();
+let { onWorldCreated, worldId, worldName }: Props = $props();
+let isVersionMode = $derived(!!worldId);
 
 type Step =
 	| 'select'
@@ -109,7 +114,11 @@ function handleFileSelect(event: Event) {
 	}
 
 	selectedFile = file;
-	step = 'metadata';
+	if (isVersionMode) {
+		void handleSubmit();
+	} else {
+		step = 'metadata';
+	}
 }
 
 async function handleDirectorySelect() {
@@ -143,7 +152,11 @@ async function startCompression() {
 		});
 
 		compressedBlob = result.blob;
-		step = 'metadata';
+		if (isVersionMode) {
+			void handleSubmit();
+		} else {
+			step = 'metadata';
+		}
 	} catch (e) {
 		error = e instanceof Error ? e.message : 'Compression failed';
 		step = 'error';
@@ -151,14 +164,84 @@ async function startCompression() {
 }
 
 async function handleSubmit() {
-	if (!name || !minecraftVersion) {
-		error = 'Please fill in all required fields';
-		return;
-	}
-
 	const fileToUpload = selectedFile ?? compressedBlob;
 	if (!fileToUpload) {
 		error = 'No file to upload';
+		return;
+	}
+
+	if (isVersionMode) {
+		await handleVersionUpload(fileToUpload);
+	} else {
+		await handleCreateUpload(fileToUpload);
+	}
+}
+
+async function handleVersionUpload(fileToUpload: Blob) {
+	try {
+		// Step 1: Compute hash
+		step = 'hashing';
+		hashingProgress = 0;
+		const hash = await calculateSHA256(fileToUpload);
+		const hashWithPrefix = `sha256:${hash}`;
+		hashingProgress = 1;
+
+		// Step 2: Request presigned URL for version
+		step = 'preparing';
+		const prepareResult = await api.worlds.createWorldVersionUpload(worldId!, {
+			file_hash: hashWithPrefix,
+			file_size_bytes: fileToUpload.size
+		});
+
+		if (prepareResult.isErr) {
+			error = prepareResult.error.message;
+			step = 'error';
+			return;
+		}
+
+		const { upload_id, presigned_url } = prepareResult.value;
+
+		// Step 3: Upload to R2
+		step = 'upload';
+		uploadProgress = 0;
+		const uploadResult = await api.worlds.uploadToPresignedUrl(
+			presigned_url,
+			fileToUpload,
+			hash,
+			(progress) => {
+				uploadProgress = progress.percentage / 100;
+			}
+		);
+
+		if (uploadResult.isErr) {
+			error = uploadResult.error.message;
+			step = 'error';
+			return;
+		}
+
+		// Step 4: Complete upload (verify + create version record)
+		step = 'finalizing';
+		const completeResult = await api.worlds.completeWorldVersionUpload(worldId!, {
+			upload_id
+		});
+
+		if (completeResult.isErr) {
+			error = completeResult.error.message;
+			step = 'error';
+			return;
+		}
+
+		resetAndClose();
+		onWorldCreated?.();
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Upload failed';
+		step = 'error';
+	}
+}
+
+async function handleCreateUpload(fileToUpload: Blob) {
+	if (!name || !minecraftVersion) {
+		error = 'Please fill in all required fields';
 		return;
 	}
 
@@ -259,7 +342,7 @@ function handleBack() {
 		selectedDirectory = null;
 		compressedBlob = null;
 	} else if (step === 'error') {
-		step = 'metadata';
+		step = isVersionMode ? 'select' : 'metadata';
 		error = null;
 	}
 }
@@ -267,7 +350,9 @@ function handleBack() {
 function getStepDescription(currentStep: Step): string {
 	switch (currentStep) {
 		case 'select':
-			return 'Select a world folder or .zip file to upload';
+			return isVersionMode
+				? 'Select a new version file to upload'
+				: 'Select a world folder or .zip file to upload';
 		case 'compress':
 			return 'Compressing world files...';
 		case 'metadata':
@@ -275,9 +360,9 @@ function getStepDescription(currentStep: Step): string {
 		case 'hashing':
 			return 'Computing file hash...';
 		case 'preparing':
-			return 'Preparing upload...';
+			return isVersionMode ? 'Preparing version upload...' : 'Preparing upload...';
 		case 'upload':
-			return 'Uploading world to storage...';
+			return isVersionMode ? 'Uploading new version...' : 'Uploading world to storage...';
 		case 'finalizing':
 			return 'Finalizing world creation...';
 		case 'error':
@@ -289,13 +374,19 @@ function getStepDescription(currentStep: Step): string {
 <Dialog.Root bind:open>
 	<Dialog.Trigger>
 		{#snippet child({ props })}
-			<Button {...props}><Plus class="mr-2 h-4 w-4" />Create World</Button>
+			{#if isVersionMode}
+				<Button {...props} variant="outline" size="sm">
+					<Upload class="mr-2 h-4 w-4" />Upload New Version
+				</Button>
+			{:else}
+				<Button {...props}><Plus class="mr-2 h-4 w-4" />Create World</Button>
+			{/if}
 		{/snippet}
 	</Dialog.Trigger>
 
 	<Dialog.Content class="sm:max-w-125">
 		<Dialog.Header>
-			<Dialog.Title>Create World</Dialog.Title>
+			<Dialog.Title>{isVersionMode ? `Upload New Version — ${worldName}` : 'Create World'}</Dialog.Title>
 			<Dialog.Description>
 				{getStepDescription(step)}
 			</Dialog.Description>
@@ -419,15 +510,15 @@ function getStepDescription(currentStep: Step): string {
 			{/if}
 		</div>
 
-		<Dialog.Footer>
-			{#if step === 'select' || step === 'metadata' || step === 'error'}
-				<Button variant="outline" onclick={step === 'error' ? handleBack : resetAndClose}>
-					{step === 'error' ? 'Back' : 'Cancel'}
-				</Button>
-			{/if}
-			{#if step === 'metadata'}
-				<Button onclick={handleSubmit} disabled={!name || !minecraftVersion}>Create World</Button>
-			{/if}
-		</Dialog.Footer>
+	<Dialog.Footer>
+		{#if step === 'select' || step === 'metadata' || step === 'error'}
+			<Button variant="outline" onclick={step === 'error' ? handleBack : resetAndClose}>
+				{step === 'error' ? 'Back' : 'Cancel'}
+			</Button>
+		{/if}
+		{#if step === 'metadata' && !isVersionMode}
+			<Button onclick={handleSubmit} disabled={!name || !minecraftVersion}>Create World</Button>
+		{/if}
+	</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

@@ -1,9 +1,18 @@
-import type { CreateWorldUploadResponse, World } from '$lib/bindings';
+import type {
+	CreateWorldUploadResponse,
+	CreateWorldVersionUploadResponse,
+	World
+} from '$lib/bindings';
 import { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import { ApiError, ApiErrorType } from '../errors';
 
-export type { CreateWorldUploadResponse };
+export type { CreateWorldUploadResponse, CreateWorldVersionUploadResponse };
+
+export interface CreateWorldVersionUploadRequest {
+	file_hash: string;
+	file_size_bytes: number;
+}
 
 export interface CreateWorldUploadRequest {
 	name: string;
@@ -15,6 +24,10 @@ export interface CreateWorldUploadRequest {
 }
 
 export interface CompleteWorldUploadRequest {
+	upload_id: string;
+}
+
+export interface CompleteWorldVersionUploadRequest {
 	upload_id: string;
 }
 
@@ -94,5 +107,22 @@ export class WorldsEndpoints extends ApiClient {
 		request: CompleteWorldUploadRequest
 	): Promise<Result<World, ApiError>> {
 		return this.post<World>(`/api/worlds/${encodeURIComponent(slug)}/complete`, request);
+	}
+
+	async createWorldVersionUpload(
+		worldId: string,
+		request: CreateWorldVersionUploadRequest
+	): Promise<Result<CreateWorldVersionUploadResponse, ApiError>> {
+		return this.post<CreateWorldVersionUploadResponse>(
+			`/api/worlds/${encodeURIComponent(worldId)}/versions`,
+			request
+		);
+	}
+
+	async completeWorldVersionUpload(
+		worldId: string,
+		request: CompleteWorldVersionUploadRequest
+	): Promise<Result<unknown, ApiError>> {
+		return this.post(`/api/worlds/${encodeURIComponent(worldId)}/versions/complete`, request);
 	}
 }

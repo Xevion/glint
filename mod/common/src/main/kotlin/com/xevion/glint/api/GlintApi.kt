@@ -610,6 +610,92 @@ object GlintApi {
             Result.failure(ApiError.fromException(e))
         }
     }
+
+    /**
+     * Initiates a new version upload for an existing world.
+     * Returns a presigned URL for uploading the world file to a staging path.
+     * After uploading, call [completeWorldVersionUpload] to verify and finalize.
+     */
+    fun createWorldVersionUpload(
+        apiUrl: String,
+        worldId: String,
+        request: CreateWorldVersionUploadRequest,
+        token: String,
+    ): Result<CreateWorldVersionUploadResponse> {
+        val url = "$apiUrl/api/worlds/$worldId/versions"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setAuthHeader(token)
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 10000
+
+            val requestBody = JSON.encodeToString(CreateWorldVersionUploadRequest.serializer(), request)
+            connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                201 -> {
+                    val responseBody = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    try {
+                        val response =
+                            JSON.decodeFromString(CreateWorldVersionUploadResponse.serializer(), responseBody)
+                        Result.success(response)
+                    } catch (e: Exception) {
+                        Result.failure(ApiError.ParseError("Failed to parse world version upload response", e))
+                    }
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
+
+    /**
+     * Phase 2 of world version upload: verifies the uploaded file and creates the version record.
+     */
+    fun completeWorldVersionUpload(
+        apiUrl: String,
+        worldId: String,
+        request: CompleteWorldVersionUploadRequest,
+        token: String,
+    ): Result<Unit> {
+        val url = "$apiUrl/api/worlds/$worldId/versions/complete"
+
+        return try {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setAuthHeader(token)
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 10000
+
+            val requestBody =
+                JSON.encodeToString(CompleteWorldVersionUploadRequest.serializer(), request)
+            connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
+
+            when (connection.responseCode) {
+                201 -> {
+                    Result.success(Unit)
+                }
+
+                else -> {
+                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(ApiError.fromException(e))
+        }
+    }
 }
 
 /**
@@ -680,7 +766,20 @@ data class ApiScene(
 )
 
 /**
- * World information from backend API.
+ * Version information nested in WorldInfo (from backend's WorldWithDetails).
+ */
+@Serializable
+data class WorldVersionInfo(
+    val id: String,
+    @SerialName("world_id") val worldId: String,
+    @SerialName("file_url") val fileUrl: String?,
+    @SerialName("file_hash") val fileHash: String?,
+    @SerialName("size_bytes") val sizeBytes: Long?,
+    @SerialName("created_at") val createdAt: String,
+)
+
+/**
+ * World information from backend API (WorldWithDetails shape).
  */
 @Serializable
 data class WorldInfo(
@@ -689,8 +788,9 @@ data class WorldInfo(
     val name: String,
     val description: String?,
     @SerialName("minecraft_version") val minecraftVersion: String,
-    @SerialName("file_url") val fileUrl: String?,
-    @SerialName("size_bytes") val sizeBytes: Long?,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String,
+    @SerialName("latest_version") val latestVersion: WorldVersionInfo?,
 )
 
 /**
@@ -759,5 +859,32 @@ data class CreateWorldUploadResponse(
  */
 @Serializable
 data class CompleteWorldUploadRequest(
+    @SerialName("upload_id") val uploadId: String,
+)
+
+/**
+ * Request payload for creating a new world version upload.
+ */
+@Serializable
+data class CreateWorldVersionUploadRequest(
+    @SerialName("file_hash") val fileHash: String,
+    @SerialName("file_size_bytes") val fileSizeBytes: Long,
+)
+
+/**
+ * Response from creating a world version upload, containing the presigned upload URL.
+ */
+@Serializable
+data class CreateWorldVersionUploadResponse(
+    @SerialName("upload_id") val uploadId: String,
+    @SerialName("presigned_url") val presignedUrl: String,
+    @SerialName("expires_at") val expiresAt: String,
+)
+
+/**
+ * Request payload for completing a world version upload.
+ */
+@Serializable
+data class CompleteWorldVersionUploadRequest(
     @SerialName("upload_id") val uploadId: String,
 )

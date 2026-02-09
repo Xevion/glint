@@ -3,7 +3,7 @@ import { goto, invalidateAll } from '$app/navigation';
 import { untrack } from 'svelte';
 import { api } from '$lib/api';
 import type { UpdateSceneMetadataRequest } from '$lib/api/endpoints/admin';
-import type { CaptureWithContext, Scene, WorldWithScenes } from '$lib/bindings';
+import type { CaptureWithContext, Scene, WorldWithDetails } from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminDetailField } from '$lib/components/admin';
@@ -17,7 +17,7 @@ import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
 let scene: Scene = $derived(data.scene);
-let world: WorldWithScenes | null = $derived(data.world);
+let world: WorldWithDetails | null = $derived(data.world);
 let captures: CaptureWithContext[] = $derived(data.captures);
 let captureCount: number = $derived(data.captureCount);
 

@@ -9,7 +9,8 @@ import type {
 	User,
 	UserWithSessions,
 	WorkItem,
-	WorldWithScenes
+	WorldVersion,
+	WorldWithDetails
 } from '$lib/bindings';
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
@@ -72,16 +73,20 @@ export class AdminEndpoints extends ApiClient {
 
 	// ============== Worlds ==============
 
-	getWorld(id: string): Promise<Result<WorldWithScenes, ApiError>> {
-		return super.get<WorldWithScenes>(`/api/worlds/${encodeURIComponent(id)}`);
+	getWorld(id: string): Promise<Result<WorldWithDetails, ApiError>> {
+		return super.get<WorldWithDetails>(`/api/worlds/${encodeURIComponent(id)}`);
 	}
 
-	updateWorld(id: string, request: UpdateWorldRequest): Promise<Result<WorldWithScenes, ApiError>> {
-		return super.put<WorldWithScenes>(`/api/worlds/${encodeURIComponent(id)}`, request);
+	updateWorld(id: string, request: UpdateWorldRequest): Promise<Result<WorldWithDetails, ApiError>> {
+		return super.put<WorldWithDetails>(`/api/worlds/${encodeURIComponent(id)}`, request);
 	}
 
 	deleteWorld(id: string): Promise<Result<null, ApiError>> {
 		return super.delete<null>(`/api/worlds/${encodeURIComponent(id)}`);
+	}
+
+	listWorldVersions(worldId: string): Promise<Result<WorldVersion[], ApiError>> {
+		return super.get<WorldVersion[]>(`/api/worlds/${encodeURIComponent(worldId)}/versions`);
 	}
 
 	// ============== Scenes ==============

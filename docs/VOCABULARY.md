@@ -8,9 +8,10 @@ Canonical terms for Glint's domain. Use these names consistently in types, API e
 |-------------------|------------|
 | **Shader**        | A shader pack identity. Represents one shader across all its versions, profiles, and platforms. Not "pack", "shaderpack", or "mod". |
 | **ShaderVersion** | A specific release of a Shader. Has a version string, download URL, file hash, and optionally a list of supported Iris profiles. The `(shader_id, version)` pair is unique. |
-| **World**         | A downloadable Minecraft world save file. Contains one or more Scenes. Has a Minecraft version, file URL, and hash. |
+| **World**         | A Minecraft world identity. Contains one or more Scenes. Has a Minecraft version. Artifact data (file URL, hash, size) lives on WorldVersion. |
+| **WorldVersion**  | A specific revision of a World's save file. Holds the file URL, hash, and size. Captures record which WorldVersion they were taken against, enabling computed staleness detection when worlds are rebuilt. Follows the same `DISTINCT ON ... ORDER BY created_at DESC` pattern as ShaderVersion for resolving the latest version. |
 | **Scene**         | A specific camera position and environment configuration within a World. Defines location (x/y/z), rotation (yaw/pitch), time of day, weather, dimension, biome, and render settings. Scenes are the *where* of a capture. |
-| **Capture**       | A single screenshot produced by rendering a specific ShaderVariant in a specific Scene. Contains the image URL, resolution, performance metrics, and metadata about the Minecraft/Iris versions used. Multiple Captures can exist for the same CaptureTarget. |
+| **Capture**       | A single screenshot produced by rendering a specific ShaderVariant in a specific Scene. Contains the image URL, resolution, performance metrics, and metadata about the Minecraft/Iris versions used. Records `world_version_id` to track which WorldVersion was active at capture time. Multiple Captures can exist for the same CaptureTarget. |
 | **CaptureRun**    | An auditable session of capture work. Created when the mod begins a batch of captures, tracks progress (total/completed/failed/skipped items), and completed when the batch finishes. |
 
 ## Composite Concepts
@@ -20,7 +21,7 @@ These are logical groupings that don't (yet) have their own database tables but 
 | Term               | Composition | Definition |
 |--------------------|-------------|------------|
 | **ShaderVariant**  | Shader + ShaderVersion + Profile | A specific renderable configuration: a particular version of a shader pack with a particular Iris profile (or the default/none). This is the *what* being rendered. A null profile means either vanilla rendering or a shader without Iris profiles. |
-| **CaptureTarget**  | ShaderVariant + Scene | The unique combination identifying *what should be captured where*. The work queue, deduplication, and capture history all revolve around this concept. Concretely: `(shader_version_id, scene_id, profile)`. |
+| **CaptureTarget**  | ShaderVariant + Scene | The unique combination identifying *what should be captured where*. The work queue, deduplication, and capture history all revolve around this concept. Concretely: `(shader_version_id, scene_id, profile)`. Staleness is computed by comparing a Capture's `world_version_id` against the latest WorldVersion for the Scene's World. |
 | **Latest Capture** | CaptureTarget → Capture | The most recent Capture for a given CaptureTarget, derived by `captured_at DESC`. This is what users see in the gallery and comparison views. Historical captures for the same target are retained but not displayed by default. Determined at query time, not a stored flag. |
 
 ## Taxonomy & Metadata
@@ -91,6 +92,7 @@ The mod has a layered capture architecture. From outermost to innermost:
 
 ```
 World
+├── WorldVersion (one-to-many, ordered by created_at)
 └── Scene (one-to-many)
     └── Tag (many-to-many)
 
@@ -103,7 +105,8 @@ Shader
 
 CaptureTarget = (ShaderVersion + Scene + Profile)
 └── Capture (one-to-many, ordered by captured_at)
-    └── Latest Capture (derived: most recent per target)
+    ├── Latest Capture (derived: most recent per target)
+    └── WorldVersion (many-to-one, records which version was active)
 
 CaptureRun
 └── CaptureRunItem (one-to-many)
@@ -120,4 +123,4 @@ Avoid these terms — they've been sources of confusion or have been superseded:
 | "screenshot", "image" | Capture | Domain-specific, includes metadata beyond the image |
 | "Job" | CaptureRun | `Job` was the legacy name, replaced in the capture redesign |
 | "config" (for shader settings) | Profile | "Config" is ambiguous — could mean SceneConfig, game settings, etc. |
-| "outdated capture" | historical capture | Prefer Latest Capture vs historical. Avoid implying a stored flag. |
+| "outdated capture" | stale capture | A capture whose `world_version_id` doesn't match the latest WorldVersion. Staleness is always computed at query time, never stored as a flag. |

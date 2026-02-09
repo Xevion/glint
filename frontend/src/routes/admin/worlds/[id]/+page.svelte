@@ -3,8 +3,9 @@ import { goto, invalidateAll } from '$app/navigation';
 import { untrack } from 'svelte';
 import { api } from '$lib/api';
 import type { UpdateWorldRequest } from '$lib/api/endpoints/admin';
-import type { Scene, WorldWithScenes } from '$lib/bindings';
+import type { Scene, WorldVersion, WorldWithDetails } from '$lib/bindings';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
+import WorldUploadDialog from '$lib/components/WorldUploadDialog.svelte';
 import { AdminDetailField } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
@@ -12,17 +13,21 @@ import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
 import { formatBytes } from '$lib/utils/display';
-import { ArrowLeft, Trash2 } from '@lucide/svelte';
+import { ArrowLeft, ChevronDown, ChevronRight, Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
-let world: WorldWithScenes = $derived(data.world);
+let world: WorldWithDetails = $derived(data.world);
 let scenes: Scene[] = $derived(data.world.scenes);
 
 let saving = $state(false);
 let actionLoading = $state(false);
 let error = $state<string | null>(null);
 let showDeleteConfirm = $state(false);
+
+let versions = $state<WorldVersion[]>([]);
+let loadingVersions = $state(false);
+let showVersions = $state(false);
 
 let editName = $state('');
 let editDescription = $state('');
@@ -79,6 +84,24 @@ async function confirmDelete() {
 		actionLoading = false;
 	}
 }
+
+async function toggleVersions() {
+	showVersions = !showVersions;
+	if (showVersions && versions.length === 0) {
+		await loadVersions();
+	}
+}
+
+async function loadVersions() {
+	loadingVersions = true;
+	const result = await api.admin.listWorldVersions(world.id);
+	if (result.isOk) {
+		versions = result.value;
+	} else {
+		error = result.error.message;
+	}
+	loadingVersions = false;
+}
 </script>
 
 <div class="space-y-6">
@@ -133,11 +156,11 @@ async function confirmDelete() {
 				<code class="rounded bg-muted px-1.5 py-0.5 text-xs">{world.minecraft_version}</code>
 			</AdminDetailField>
 			<AdminDetailField label="Size">
-				{world.size_bytes ? formatBytes(world.size_bytes) : '-'}
+				{world.latest_version?.size_bytes ? formatBytes(world.latest_version.size_bytes) : '-'}
 			</AdminDetailField>
-			{#if world.file_hash}
+			{#if world.latest_version?.file_hash}
 				<AdminDetailField label="File Hash">
-					<code class="text-xs">{world.file_hash}</code>
+					<code class="text-xs">{world.latest_version.file_hash}</code>
 				</AdminDetailField>
 			{/if}
 			<AdminDetailField label="Created">
@@ -147,6 +170,73 @@ async function confirmDelete() {
 				<TimeAgo timestamp={world.updated_at} />
 			</AdminDetailField>
 		</dl>
+	</div>
+
+	<!-- Versions Section -->
+	<div class="space-y-3">
+		<div class="flex items-center justify-between">
+			<h2 class="text-lg font-medium">Versions</h2>
+		<WorldUploadDialog
+			worldId={world.id}
+			worldName={world.name}
+			onWorldCreated={() => {
+				versions = [];
+				void invalidateAll();
+				if (showVersions) void loadVersions();
+			}}
+		/>
+		</div>
+
+		<button
+			type="button"
+			class="flex w-full items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+			onclick={toggleVersions}
+		>
+			{#if showVersions}
+				<ChevronDown class="h-4 w-4" />
+			{:else}
+				<ChevronRight class="h-4 w-4" />
+			{/if}
+			{showVersions ? 'Hide' : 'Show'} version history
+		</button>
+
+		{#if showVersions}
+			{#if loadingVersions}
+				<p class="text-sm text-muted-foreground">Loading versions...</p>
+			{:else if versions.length === 0}
+				<p class="text-sm text-muted-foreground">No versions found.</p>
+			{:else}
+				<div class="space-y-2">
+					{#each versions as version, i (version.id)}
+						<div
+							class="flex items-center justify-between rounded-lg border p-3 text-sm"
+						>
+							<div class="flex items-center gap-3">
+								<div>
+									<div class="flex items-center gap-2">
+										<TimeAgo timestamp={version.created_at} />
+										{#if i === 0}
+											<span
+												class="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+											>
+												Latest
+											</span>
+										{/if}
+									</div>
+									<div class="text-xs text-muted-foreground">
+										{version.size_bytes != null ? formatBytes(version.size_bytes) : '—'}
+										{#if version.file_hash}
+											&middot;
+											<code class="text-xs">{version.file_hash.slice(0, 16)}...</code>
+										{/if}
+									</div>
+								</div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		{/if}
 	</div>
 
 	<!-- Scenes Section -->

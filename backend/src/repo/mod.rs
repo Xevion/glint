@@ -11,6 +11,7 @@ pub mod taxonomy;
 pub mod user;
 pub mod work;
 pub mod world;
+pub mod world_version;
 
 pub use capture::{CaptureRepo, StorageBucket, StorageStats, ThumbnailInfo};
 pub use capture_health::CaptureHealthRepo;
@@ -25,3 +26,4 @@ pub use taxonomy::{CategoryRepo, FeatureRepo, TagRepo};
 pub use user::UserRepo;
 pub use work::WorkRepo;
 pub use world::WorldRepo;
+pub use world_version::WorldVersionRepo;

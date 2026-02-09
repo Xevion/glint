@@ -76,6 +76,12 @@
     },
     "world_slug": {
       "type": "string"
+    },
+    "world_version_id": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [

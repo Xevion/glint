@@ -34,6 +34,7 @@ impl PendingUploadRepo {
             .ok_or_else(|| AppError::NotFound(format!("Upload ID '{}' not found", upload_id)))
     }
 
+    /// Create a pending upload for world creation (slug/name/minecraft_version required).
     #[instrument(skip(executor), level = "debug")]
     #[allow(clippy::too_many_arguments)]
     pub async fn create(
@@ -68,6 +69,40 @@ impl PendingUploadRepo {
         .context(format!("failed to create pending upload '{}'", upload_id))?;
 
         debug!(upload_id, slug, "Pending upload created");
+        Ok(())
+    }
+
+    /// Create a pending upload for a new version of an existing world.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn create_for_version(
+        executor: impl sqlx::PgExecutor<'_>,
+        upload_id: &str,
+        world_id: &str,
+        file_hash: &str,
+        size_bytes: i64,
+        upload_key: &str,
+        expires_at: DateTime<Utc>,
+    ) -> AppResult<()> {
+        sqlx::query!(
+            r#"
+            INSERT INTO pending_uploads (upload_id, world_id, file_hash, size_bytes, upload_key, expires_at, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, now())
+            "#,
+            upload_id,
+            world_id,
+            file_hash,
+            size_bytes,
+            upload_key,
+            expires_at
+        )
+        .execute(executor)
+        .await
+        .context(format!(
+            "failed to create pending version upload '{}'",
+            upload_id
+        ))?;
+
+        debug!(upload_id, world_id, "Pending version upload created");
         Ok(())
     }
 

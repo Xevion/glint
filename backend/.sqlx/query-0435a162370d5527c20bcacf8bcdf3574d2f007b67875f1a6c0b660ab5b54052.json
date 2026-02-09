@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO worlds (id, name, slug, description, minecraft_version, file_url, file_hash, size_bytes, created_at, updated_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())\n            RETURNING *\n            ",
+  "query": "\n            INSERT INTO worlds (id, name, slug, description, minecraft_version, created_at, updated_at)\n            VALUES ($1, $2, $3, $4, $5, now(), now())\n            RETURNING *\n            ",
   "describe": {
     "columns": [
       {
@@ -30,26 +30,11 @@
       },
       {
         "ordinal": 5,
-        "name": "file_url",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 6,
-        "name": "file_hash",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 7,
-        "name": "size_bytes",
-        "type_info": "Int8"
-      },
-      {
-        "ordinal": 8,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 9,
+        "ordinal": 6,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -60,10 +45,7 @@
         "Text",
         "Text",
         "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Int8"
+        "Text"
       ]
     },
     "nullable": [
@@ -72,12 +54,9 @@
       false,
       true,
       false,
-      true,
-      true,
-      true,
       false,
       false
     ]
   },
-  "hash": "6d447306a289e923a70297664936af5ff7c9620e5896b1f82cdadae8dfd07aa2"
+  "hash": "0435a162370d5527c20bcacf8bcdf3574d2f007b67875f1a6c0b660ab5b54052"
 }

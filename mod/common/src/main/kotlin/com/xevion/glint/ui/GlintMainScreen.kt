@@ -372,7 +372,7 @@ class GlintMainScreen(
         when (world.status) {
             "remote" -> {
                 val apiWorld = world.apiWorld
-                if (apiWorld?.fileUrl != null) {
+                if (apiWorld?.latestVersion?.fileUrl != null) {
                     buttonRow.child(
                         GlintComponents.smallButton(
                             McComponent.literal("Download"),
@@ -417,6 +417,20 @@ class GlintMainScreen(
             }
 
             "synced", "stale" -> {
+                val config = ApiConfig.load()
+                val canUpload = config.isValid()
+                val updateBtn =
+                    GlintComponents.smallButton(
+                        McComponent.literal("Update"),
+                        width = 55,
+                        tooltip =
+                            McComponent.literal(
+                                if (canUpload) "Upload new world version" else "Configure API connection first",
+                            ),
+                    ) { updateWorldVersion(world) }
+                updateBtn.active = canUpload
+                buttonRow.child(updateBtn as Component)
+
                 buttonRow.child(
                     GlintComponents.smallButton(
                         McComponent.literal("Pull"),
@@ -1070,7 +1084,7 @@ class GlintMainScreen(
 
     private fun downloadWorld(world: WorldEntry) {
         val apiWorld = world.apiWorld ?: return
-        val fileUrl = apiWorld.fileUrl ?: return
+        val fileUrl = apiWorld.latestVersion?.fileUrl ?: return
 
         StatusLog.info("Starting download: ${world.name}...")
         rebuildStatusBar()
@@ -1193,6 +1207,80 @@ class GlintMainScreen(
                 },
             ),
         )
+    }
+
+    // ============================================
+    // World Version Update
+    // ============================================
+
+    private fun updateWorldVersion(world: WorldEntry) {
+        val config = ApiConfig.load()
+        if (!config.isValid()) {
+            StatusLog.warn("API config not valid - open API Config to set it up")
+            rebuildStatusBar()
+            return
+        }
+
+        val apiWorld = world.apiWorld ?: return
+
+        val mc =
+            net.minecraft.client.Minecraft
+                .getInstance()
+        val folder = world.collection?.folder ?: world.collectionFileName ?: return
+        val worldDir =
+            listOf(
+                java.io.File(mc.gameDirectory, "glint/worlds/$folder"),
+                java.io.File(mc.gameDirectory, "saves/$folder"),
+            ).firstOrNull { it.exists() && it.isDirectory }
+
+        if (worldDir == null) {
+            StatusLog.error("Could not find world directory for: ${world.name}")
+            rebuildStatusBar()
+            return
+        }
+
+        val currentWorldName = mc.singleplayerServer?.worldData?.levelName
+        val isCurrent = currentWorldName != null && worldDir.name == currentWorldName
+
+        StatusLog.info("Updating world version: ${world.name}...")
+        rebuildStatusBar()
+
+        val future =
+            WorldUploader.uploadWorldVersion(
+                worldDir = worldDir,
+                worldId = apiWorld.id,
+                apiUrl = config.apiUrl,
+                token = config.accessToken,
+                forceSave = isCurrent,
+                progressCallback = { progress ->
+                    minecraft?.execute {
+                        val screen = minecraft?.screen
+                        if (screen is WorldUploadProgressDialog) {
+                            screen.updateProgress(progress)
+                        }
+                    }
+                },
+            )
+
+        // uploadWorldVersion returns CompletableFuture<String> (version ID), but
+        // WorldUploadProgressDialog expects CompletableFuture<WorldInfo>. Adapt by
+        // returning the existing apiWorld on success.
+        val adaptedFuture = future.thenApply { _ -> apiWorld }
+
+        val progressDialog =
+            WorldUploadProgressDialog(
+                parent = this,
+                worldName = world.name,
+                uploadFuture = adaptedFuture,
+                onComplete = { _ ->
+                    StatusLog.info("Updated version: ${world.name}")
+                    SceneManager.clearCache()
+                    refreshWorlds()
+                    rebuildStatusBar()
+                },
+            )
+
+        minecraft?.setScreen(progressDialog)
     }
 
     // ============================================

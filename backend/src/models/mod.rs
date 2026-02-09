@@ -15,23 +15,36 @@ pub struct World {
     pub name: String,
     pub description: Option<String>,
     pub minecraft_version: String,
-    pub file_url: Option<String>,
-    pub file_hash: Option<String>,
-    pub size_bytes: Option<i64>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
     pub updated_at: DateTime<Utc>,
 }
 
-/// Tracks pending world uploads (presigned URL workflow)
+/// A specific revision of a World's save file
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export)]
+pub struct WorldVersion {
+    pub id: String,
+    pub world_id: String,
+    pub file_url: Option<String>,
+    pub file_hash: Option<String>,
+    pub size_bytes: Option<i64>,
+    #[ts(type = "string")]
+    pub created_at: DateTime<Utc>,
+}
+
+/// Tracks pending world uploads (presigned URL workflow).
+/// World creation uploads set slug/name/minecraft_version.
+/// Version uploads set world_id instead.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PendingUpload {
     pub upload_id: String,
-    pub slug: String,
-    pub name: String,
+    pub world_id: Option<String>,
+    pub slug: Option<String>,
+    pub name: Option<String>,
     pub description: Option<String>,
-    pub minecraft_version: String,
+    pub minecraft_version: Option<String>,
     pub file_hash: String,
     pub size_bytes: i64,
     pub upload_key: String,
@@ -141,7 +154,7 @@ pub struct Capture {
     pub thumbhash: Option<String>,
     pub file_size_bytes: Option<i64>,
     pub content_type: Option<String>,
-    pub outdated: bool,
+    pub world_version_id: Option<String>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
@@ -385,13 +398,14 @@ pub struct CaptureWithContext {
     pub scene_slug: Option<String>,
 }
 
-/// World with its associated scenes
+/// World with its associated scenes and latest version
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
-pub struct WorldWithScenes {
+pub struct WorldWithDetails {
     #[serde(flatten)]
     pub world: World,
     pub scenes: Vec<Scene>,
+    pub latest_version: Option<WorldVersion>,
 }
 
 /// Paginated captures response envelope
@@ -493,9 +507,25 @@ pub struct CreateWorldUploadResponse {
     pub expires_at: DateTime<Utc>,
 }
 
+/// Response with presigned URL for world version upload
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct CreateWorldVersionUploadResponse {
+    pub upload_id: String,
+    pub presigned_url: String,
+    #[ts(type = "string")]
+    pub expires_at: DateTime<Utc>,
+}
+
 /// Request to complete a world upload
 #[derive(Debug, Deserialize)]
 pub struct CompleteWorldUploadRequest {
+    pub upload_id: String,
+}
+
+/// Request to complete a world version upload
+#[derive(Debug, Deserialize)]
+pub struct CompleteWorldVersionUploadRequest {
     pub upload_id: String,
 }
 
@@ -506,9 +536,6 @@ pub struct CreateWorldRequest<'a> {
     pub slug: &'a str,
     pub description: Option<&'a str>,
     pub minecraft_version: &'a str,
-    pub file_url: &'a str,
-    pub file_hash: &'a str,
-    pub size_bytes: i64,
 }
 
 /// Helper types for scene position and camera

@@ -30,26 +30,11 @@
       },
       {
         "ordinal": 5,
-        "name": "file_url",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 6,
-        "name": "file_hash",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 7,
-        "name": "size_bytes",
-        "type_info": "Int8"
-      },
-      {
-        "ordinal": 8,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 9,
+        "ordinal": 6,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -67,9 +52,6 @@
       false,
       true,
       false,
-      true,
-      true,
-      true,
       false,
       false
     ]

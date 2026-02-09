@@ -188,9 +188,6 @@ async fn update_scene(
     // Update scene
     let updated = SceneRepo::update(state.db(), &scene.id, &request).await?;
 
-    // Mark captures as outdated
-    CaptureRepo::mark_outdated_for_scene(state.db(), &scene.id).await?;
-
     Ok(Json(updated))
 }
 

@@ -52,6 +52,11 @@
         "ordinal": 9,
         "name": "created_at",
         "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "world_id",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -61,15 +66,16 @@
     },
     "nullable": [
       false,
-      false,
-      false,
+      true,
+      true,
+      true,
       true,
       false,
       false,
       false,
       false,
       false,
-      false
+      true
     ]
   },
   "hash": "1ad53e1f8c6467076aae32a931a82b2328cb31d9c73773bbeade87d0b5aa8e52"

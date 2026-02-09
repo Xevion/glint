@@ -26,6 +26,7 @@ pub struct WorkItem {
     pub world_file_url: Option<String>,
     pub world_file_hash: Option<String>,
     pub world_size_bytes: Option<i64>,
+    pub world_version_id: Option<String>,
     pub profile: Option<String>,
 }
 
@@ -51,6 +52,12 @@ impl WorkRepo {
                 FROM shader_versions
                 ORDER BY shader_id, created_at DESC
             ),
+            latest_world_versions AS (
+                SELECT DISTINCT ON (world_id)
+                    id, world_id, file_url, file_hash, size_bytes
+                FROM world_versions
+                ORDER BY world_id, created_at DESC
+            ),
             needed AS (
                 -- Branch 1: shader versions WITH profiles
                 SELECT
@@ -70,11 +77,13 @@ impl WorkRepo {
                   AND ($2 OR sv.capture_failure_count < 3)
                   AND ($2 OR NOT EXISTS (
                     SELECT 1 FROM captures c
+                    JOIN scenes cs ON cs.id = c.scene_id
+                    LEFT JOIN latest_world_versions lwv ON lwv.world_id = cs.world_id
                     WHERE c.shader_version_id = sv.id
                       AND c.scene_id = s.id
                       AND c.profile = p.profile
                       AND c.status IN ('completed', 'uploading')
-                      AND c.outdated = FALSE
+                      AND c.world_version_id IS NOT DISTINCT FROM lwv.id
                   ))
 
                 UNION ALL
@@ -91,11 +100,13 @@ impl WorkRepo {
                   AND (sv.supported_profiles IS NULL OR sv.supported_profiles = '[]')
                   AND ($2 OR NOT EXISTS (
                     SELECT 1 FROM captures c
+                    JOIN scenes cs ON cs.id = c.scene_id
+                    LEFT JOIN latest_world_versions lwv ON lwv.world_id = cs.world_id
                     WHERE c.shader_version_id = sv.id
                       AND c.scene_id = s.id
                       AND c.profile IS NULL
                       AND c.status IN ('completed', 'uploading')
-                      AND c.outdated = FALSE
+                      AND c.world_version_id IS NOT DISTINCT FROM lwv.id
                   ))
             )
             SELECT
@@ -125,15 +136,17 @@ impl WorkRepo {
                 w.id AS "world_id!",
                 w.slug AS "world_slug!",
                 w.name AS "world_name!",
-                w.file_url AS world_file_url,
-                w.file_hash AS world_file_hash,
-                w.size_bytes AS world_size_bytes,
+                lwv.file_url AS world_file_url,
+                lwv.file_hash AS world_file_hash,
+                lwv.size_bytes AS world_size_bytes,
+                lwv.id AS world_version_id,
                 n.profile
             FROM needed n
             JOIN shader_versions sv ON sv.id = n.shader_version_id
             JOIN shaders sh ON sh.id = sv.shader_id
             JOIN scenes sc ON sc.id = n.scene_id
             JOIN worlds w ON w.id = sc.world_id
+            LEFT JOIN latest_world_versions lwv ON lwv.world_id = w.id
             WHERE ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))
               AND ($4::text IS NULL OR sc.slug = ANY(string_to_array($4, ',')))
             ORDER BY

@@ -88,8 +88,8 @@ impl WorldRepo {
         let result = sqlx::query_as!(
             World,
             r#"
-            INSERT INTO worlds (id, name, slug, description, minecraft_version, file_url, file_hash, size_bytes, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())
+            INSERT INTO worlds (id, name, slug, description, minecraft_version, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, now(), now())
             RETURNING *
             "#,
             id,
@@ -97,9 +97,6 @@ impl WorldRepo {
             req.slug,
             req.description,
             req.minecraft_version,
-            req.file_url,
-            req.file_hash,
-            req.size_bytes
         )
         .fetch_one(executor)
         .await;
