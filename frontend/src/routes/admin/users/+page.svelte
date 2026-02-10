@@ -1,25 +1,14 @@
 <script lang="ts">
-import { invalidateAll } from '$app/navigation';
-import { api } from '$lib/api';
-import type { User, UserWithSessions } from '$lib/bindings';
+import { goto, invalidateAll } from '$app/navigation';
+import type { User } from '$lib/bindings';
 import AdminTable from '$lib/components/AdminTable.svelte';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminDetailField, AdminPageHeader, AdminSlideOver } from '$lib/components/admin';
-import { Button } from '$lib/components/ui/button';
-import { ConfirmDialog } from '$lib/components/ui/dialog';
-import * as Select from '$lib/components/ui/select';
+import { AdminPageHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
-import { Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
 let users = $derived(data.users);
-let selected = $state<UserWithSessions | null>(null);
 let refreshing = $state(false);
-let error = $state<string | null>(null);
-let showDeleteSessionsConfirm = $state(false);
-
-const ROLES = ['user', 'admin', 'agent'] as const;
 
 const roleColors: Record<string, string> = {
 	admin: 'bg-destructive/15 text-destructive',
@@ -37,55 +26,12 @@ const columns = [
 
 async function refresh() {
 	refreshing = true;
-	error = null;
 	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
 	refreshing = false;
 }
 
-async function loadUser(id: number) {
-	const result = await api.admin.getUser(id);
-	result.match({
-		Ok: (user) => {
-			selected = user;
-		},
-		Err: (err) => {
-			error = err.message;
-		}
-	});
-}
-
-async function handleRoleChange(newRole: string) {
-	if (!selected) return;
-	const result = await api.admin.updateUserRole(selected.id, newRole);
-	result.match({
-		Ok: (value) => {
-			selected = { ...selected!, ...value };
-			void refresh();
-		},
-		Err: (err) => {
-			error = err.message;
-		}
-	});
-}
-
-function handleDeleteSessions() {
-	if (!selected) return;
-	showDeleteSessionsConfirm = true;
-}
-
-async function confirmDeleteSessions() {
-	if (!selected) return;
-	const result = await api.admin.deleteUserSessions(selected.id);
-	result.match({
-		Ok: () => void loadUser(selected!.id),
-		Err: (err) => {
-			error = err.message;
-		}
-	});
-}
-
 function handleRowClick(user: User) {
-	void loadUser(user.id);
+	void goto(`/admin/users/${user.id}`);
 }
 </script>
 
@@ -94,15 +40,14 @@ function handleRowClick(user: User) {
 <div class="space-y-4">
 	<AdminPageHeader title="Users" count={users.length} {refreshing} onrefresh={refresh} />
 
-	{#if error}
-		<Alert variant="destructive">Error: {error}</Alert>
+	{#if data.error}
+		<Alert variant="destructive">Error: {data.error}</Alert>
 	{:else if users.length === 0}
 		<p class="text-muted-foreground">No users yet.</p>
 	{:else}
 		<AdminTable
 			data={users}
 			{columns}
-			selectedId={selected?.id?.toString()}
 			onRowClick={handleRowClick}
 			getRowId={(u: User) => u.id.toString()}
 		>
@@ -115,7 +60,11 @@ function handleRowClick(user: User) {
 							class="h-8 w-8 rounded-full"
 						/>
 					{:else}
-						<div class="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs">?</div>
+						<div
+							class="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs"
+						>
+							?
+						</div>
 					{/if}
 				{:else if columnId === 'username'}
 					<span class="font-medium">{value}</span>
@@ -131,99 +80,3 @@ function handleRowClick(user: User) {
 		</AdminTable>
 	{/if}
 </div>
-
-<AdminSlideOver
-	open={selected !== null}
-	title={selected?.discord_username ?? ''}
-	onClose={() => (selected = null)}
-	width="wide"
->
-	{#if selected}
-		<dl class="space-y-4">
-			<div class="flex items-center gap-4">
-				{#if selected.discord_avatar}
-					<img
-						src="https://cdn.discordapp.com/avatars/{selected.discord_id}/{selected.discord_avatar}.png?size=80"
-						alt="Avatar"
-						class="h-16 w-16 rounded-full"
-					/>
-				{:else}
-					<div class="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-2xl">
-						?
-					</div>
-				{/if}
-				<div>
-					<div class="text-lg font-medium">{selected.discord_username}</div>
-					<div class="text-sm text-muted-foreground">{selected.discord_id}</div>
-				</div>
-			</div>
-
-			<AdminDetailField label="User ID">
-				{selected.id}
-			</AdminDetailField>
-
-			<AdminDetailField label="Role">
-				<Select.Root
-					type="single"
-					value={selected.role}
-					onValueChange={(v: string) => v && handleRoleChange(v)}
-				>
-					<Select.Trigger class="w-32">
-						{selected.role}
-					</Select.Trigger>
-					<Select.Content>
-					{#each ROLES as role (role)}
-						<Select.Item value={role}>{role}</Select.Item>
-					{/each}
-					</Select.Content>
-				</Select.Root>
-			</AdminDetailField>
-
-			<AdminDetailField label="Joined">
-				<TimeAgo timestamp={selected.created_at} />
-			</AdminDetailField>
-
-			<AdminDetailField label="Last Updated">
-				<TimeAgo timestamp={selected.updated_at} />
-			</AdminDetailField>
-
-			<div class="border-t pt-4">
-				<div class="mb-2 flex items-center justify-between">
-					<h3 class="font-medium">Sessions ({selected.sessions.length})</h3>
-					{#if selected.sessions.length > 0}
-						<Button variant="destructive" size="sm" onclick={handleDeleteSessions}>
-							<Trash2 class="mr-2 h-4 w-4" />
-							Delete All
-						</Button>
-					{/if}
-				</div>
-
-				{#if selected.sessions.length === 0}
-					<p class="text-sm text-muted-foreground">No active sessions</p>
-				{:else}
-					<div class="space-y-2">
-						{#each selected.sessions as session (session.token_prefix)}
-							<div class="flex items-center justify-between rounded border p-2 text-sm">
-								<div>
-									<code class="text-xs">{session.token_prefix}...</code>
-									<div class="text-xs text-muted-foreground">
-										Created <TimeAgo timestamp={session.created_at} /> &middot;
-										Expires <TimeAgo timestamp={session.expires_at} />
-									</div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
-		</dl>
-	{/if}
-</AdminSlideOver>
-
-<ConfirmDialog
-	bind:open={showDeleteSessionsConfirm}
-	title="Delete Sessions"
-	description={`Delete all sessions for ${selected?.discord_username}? They will be logged out.`}
-	confirmLabel="Delete All"
-	onConfirm={confirmDeleteSessions}
-/>

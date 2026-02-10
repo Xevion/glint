@@ -125,7 +125,7 @@ async function loadVersions() {
 	{/if}
 
 	<!-- Edit Section -->
-	<div class="space-y-4 rounded-lg border p-4">
+	<div class="space-y-4 rounded-lg border bg-card p-4">
 		<div class="grid gap-2">
 			<Label for="name">Name</Label>
 			<Input id="name" bind:value={editName} />
@@ -144,7 +144,7 @@ async function loadVersions() {
 	</div>
 
 	<!-- Metadata -->
-	<div class="rounded-lg border p-4">
+	<div class="rounded-lg border bg-card p-4">
 		<dl class="space-y-2 text-sm">
 			<AdminDetailField label="ID">
 				<code class="text-xs">{world.id}</code>
@@ -209,7 +209,7 @@ async function loadVersions() {
 				<div class="space-y-2">
 					{#each versions as version, i (version.id)}
 						<div
-							class="flex items-center justify-between rounded-lg border p-3 text-sm"
+							class="flex items-center justify-between rounded-lg border bg-card p-3 text-sm"
 						>
 							<div class="flex items-center gap-3">
 								<div>
@@ -249,7 +249,7 @@ async function loadVersions() {
 				{#each scenes as scene (scene.id)}
 					<a
 						href="/admin/scenes/{scene.id}"
-						class="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+						class="flex items-center justify-between rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50"
 					>
 						<div>
 							<div class="font-medium">{scene.name}</div>

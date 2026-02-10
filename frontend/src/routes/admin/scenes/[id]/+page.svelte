@@ -131,7 +131,7 @@ async function handleReactivate() {
 	{/if}
 
 	<!-- Edit Section -->
-	<div class="space-y-4 rounded-lg border p-4">
+	<div class="space-y-4 rounded-lg border bg-card p-4">
 		<div class="grid gap-2">
 			<Label for="name">Name</Label>
 			<Input id="name" bind:value={editName} />
@@ -150,7 +150,7 @@ async function handleReactivate() {
 	</div>
 
 	<!-- Metadata -->
-	<div class="rounded-lg border p-4">
+	<div class="rounded-lg border bg-card p-4">
 		<dl class="space-y-2 text-sm">
 			<AdminDetailField label="ID">
 				<code class="text-xs">{scene.id}</code>

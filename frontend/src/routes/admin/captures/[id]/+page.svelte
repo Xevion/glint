@@ -13,7 +13,8 @@ import { Alert } from '$lib/components/ui/alert';
 import { formatBytes } from '$lib/utils/format';
 import { preloadImage } from '$lib/utils/image';
 import { statusColorFallback, statusColors } from '$lib/utils/status';
-import { ArrowLeft, ChevronRight, Trash2 } from '@lucide/svelte';
+import { AdminBreadcrumb } from '$lib/components/admin';
+import { Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -135,41 +136,28 @@ const freshnessColors = {
 <div class="space-y-6">
 	<!-- Breadcrumb Header -->
 	<header class="flex items-center justify-between">
-		<nav class="flex items-center gap-1.5 text-sm">
-			<a
-				href="/admin/captures"
-				class="text-muted-foreground hover:text-foreground"
-				aria-label="Back to captures"
-			>
-				<ArrowLeft class="h-4 w-4" />
-			</a>
-			{#each breadcrumbs as segment, i (segment.label)}
-				{#if i > 0}
-					<ChevronRight class="h-3.5 w-3.5 text-muted-foreground/60" />
-				{/if}
-				{#if segment.href}
-					<a href={segment.href} class="text-muted-foreground hover:text-foreground">
-						{segment.label}
-					</a>
-				{:else}
-					<span class="font-medium text-foreground">{segment.label}</span>
-				{/if}
-			{/each}
-		{#if capture.status !== 'completed'}
-			<span
-				class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
-					capture.status
-				] ?? statusColorFallback}"
-			>
-				{capture.status}
-			</span>
-		{/if}
-		<span
-			class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[capture.freshness]}"
+		<AdminBreadcrumb
+			backHref="/admin/captures"
+			backLabel="Back to captures"
+			segments={breadcrumbs}
 		>
-			{capture.freshness}
-		</span>
-	</nav>
+			{#snippet trailing()}
+				{#if capture.status !== 'completed'}
+					<span
+						class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
+							capture.status
+						] ?? statusColorFallback}"
+					>
+						{capture.status}
+					</span>
+				{/if}
+				<span
+					class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[capture.freshness]}"
+				>
+					{capture.freshness}
+				</span>
+			{/snippet}
+		</AdminBreadcrumb>
 		<Button
 			variant="destructive"
 			size="icon"
@@ -219,7 +207,7 @@ const freshnessColors = {
 		<!-- Metadata Sidebar -->
 		<div class="space-y-4">
 			<!-- Capture Info -->
-			<div class="rounded-lg border p-4">
+			<div class="rounded-lg border bg-card p-4">
 				<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
 					<dt class="text-muted-foreground">ID</dt>
 					<dd><code class="text-xs">{capture.id}</code></dd>
@@ -320,7 +308,7 @@ const freshnessColors = {
 
 			<!-- Technical Metadata -->
 			{#if hasTechnicalData}
-				<div class="rounded-lg border p-4">
+				<div class="rounded-lg border bg-card p-4">
 					<h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
 						Technical
 					</h3>
