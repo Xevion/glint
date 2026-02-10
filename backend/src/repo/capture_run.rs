@@ -404,7 +404,10 @@ impl CaptureRunRepo {
         .await
         .context("failed to skip remaining items")?;
 
-        // Finalize the run with accurate counts
+        // Finalize the run with accurate counts.
+        // Set completed_at to the last real item activity (claim/complete/fail),
+        // not now(), so the run's duration reflects actual work rather than
+        // including the idle timeout period.
         sqlx::query!(
             r#"
             WITH counts AS (
@@ -413,14 +416,19 @@ impl CaptureRunRepo {
                     COUNT(*) FILTER (WHERE status = 'failed') AS failed,
                     COUNT(*) FILTER (WHERE status = 'skipped') AS skipped
                 FROM capture_run_items WHERE run_id = $1
+            ),
+            last_activity AS (
+                SELECT GREATEST(MAX(started_at), MAX(completed_at)) AS ts
+                FROM capture_run_items
+                WHERE run_id = $1
             )
             UPDATE capture_runs SET
-                completed_at = now(),
+                completed_at = COALESCE(last_activity.ts, capture_runs.started_at),
                 completed_items = counts.completed::int4,
                 failed_items = counts.failed::int4,
                 skipped_items = counts.skipped::int4,
                 status = 'timed_out'
-            FROM counts
+            FROM counts, last_activity
             WHERE capture_runs.id = $1
             "#,
             run_id

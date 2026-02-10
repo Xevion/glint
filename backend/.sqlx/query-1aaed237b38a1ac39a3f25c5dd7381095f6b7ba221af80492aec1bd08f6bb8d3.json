@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH counts AS (\n                SELECT\n                    COUNT(*) FILTER (WHERE status = 'completed') AS completed,\n                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,\n                    COUNT(*) FILTER (WHERE status = 'skipped') AS skipped\n                FROM capture_run_items WHERE run_id = $1\n            ),\n            last_activity AS (\n                SELECT GREATEST(MAX(started_at), MAX(completed_at)) AS ts\n                FROM capture_run_items\n                WHERE run_id = $1\n            )\n            UPDATE capture_runs SET\n                completed_at = COALESCE(last_activity.ts, capture_runs.started_at),\n                completed_items = counts.completed::int4,\n                failed_items = counts.failed::int4,\n                skipped_items = counts.skipped::int4,\n                status = 'timed_out'\n            FROM counts, last_activity\n            WHERE capture_runs.id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1aaed237b38a1ac39a3f25c5dd7381095f6b7ba221af80492aec1bd08f6bb8d3"
+}

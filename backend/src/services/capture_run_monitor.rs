@@ -9,8 +9,8 @@ use crate::repo::CaptureRunRepo;
 /// How often the monitor checks for stale runs (60 seconds)
 const CHECK_INTERVAL_SECS: u64 = 60;
 
-/// A run is considered stale after 30 minutes of no item activity
-const RUN_TIMEOUT_SECS: i64 = 30 * 60;
+/// A run is considered stale after 5 minutes of no item activity
+const RUN_TIMEOUT_SECS: i64 = 5 * 60;
 
 /// Background task that detects and times out stale capture runs.
 ///
