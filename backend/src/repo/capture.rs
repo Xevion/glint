@@ -8,7 +8,7 @@ use tracing::{debug, instrument};
 
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
-use crate::models::{Capture, CaptureDetail, CaptureWithContext};
+use crate::models::{Capture, CaptureDetail, CaptureFreshness, CaptureWithContext};
 
 pub struct ThumbnailInfo {
     pub image_url: String,
@@ -33,6 +33,14 @@ macro_rules! capture_ctx_query {
         sqlx::query_as!(
             CaptureWithContext,
             r#"
+            WITH _lwv AS (
+                SELECT DISTINCT ON (world_id) id, world_id
+                FROM world_versions ORDER BY world_id, created_at DESC
+            ),
+            _lsv AS (
+                SELECT DISTINCT ON (scene_id) id, scene_id
+                FROM scene_versions ORDER BY scene_id, created_at DESC
+            )
             SELECT
                 c.id,
                 c.scene_id,
@@ -51,13 +59,30 @@ macro_rules! capture_ctx_query {
                 cr.status as "run_status?: String",
                 (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
                 sc.name as "scene_name?: String",
-                sc.slug as "scene_slug?: String"
+                sc.slug as "scene_slug?: String",
+                CASE
+                    WHEN c.status != 'completed' AND c.status != 'uploading' THEN 'superseded'
+                    WHEN EXISTS (
+                        SELECT 1 FROM captures c2
+                        WHERE c2.shader_version_id = c.shader_version_id
+                          AND c2.scene_id = c.scene_id
+                          AND c2.profile IS NOT DISTINCT FROM c.profile
+                          AND c2.status IN ('completed', 'uploading')
+                          AND c2.captured_at > c.captured_at
+                    ) THEN 'superseded'
+                    WHEN c.world_version_id IS DISTINCT FROM _lwv.id
+                      OR c.scene_version_id IS DISTINCT FROM _lsv.id
+                    THEN 'stale'
+                    ELSE 'fresh'
+                END as "freshness!: CaptureFreshness"
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             JOIN shaders s ON sv.shader_id = s.id
             LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
             LEFT JOIN capture_runs cr ON cri.run_id = cr.id
             LEFT JOIN scenes sc ON c.scene_id = sc.id
+            LEFT JOIN _lwv ON _lwv.world_id = sc.world_id
+            LEFT JOIN _lsv ON _lsv.scene_id = sc.id
             "# + $suffix
             $(, $arg)*
         )
@@ -65,7 +90,16 @@ macro_rules! capture_ctx_query {
     (distinct: $distinct:literal, $suffix:literal $(, $arg:expr)* $(,)?) => {
         sqlx::query_as!(
             CaptureWithContext,
-            r#"SELECT DISTINCT ON ("# + $distinct + r#")
+            r#"
+            WITH _lwv AS (
+                SELECT DISTINCT ON (world_id) id, world_id
+                FROM world_versions ORDER BY world_id, created_at DESC
+            ),
+            _lsv AS (
+                SELECT DISTINCT ON (scene_id) id, scene_id
+                FROM scene_versions ORDER BY scene_id, created_at DESC
+            )
+            SELECT DISTINCT ON ("# + $distinct + r#")
                 c.id,
                 c.scene_id,
                 s.slug as shader_slug,
@@ -83,13 +117,30 @@ macro_rules! capture_ctx_query {
                 cr.status as "run_status?: String",
                 (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
                 sc.name as "scene_name?: String",
-                sc.slug as "scene_slug?: String"
+                sc.slug as "scene_slug?: String",
+                CASE
+                    WHEN c.status != 'completed' AND c.status != 'uploading' THEN 'superseded'
+                    WHEN EXISTS (
+                        SELECT 1 FROM captures c2
+                        WHERE c2.shader_version_id = c.shader_version_id
+                          AND c2.scene_id = c.scene_id
+                          AND c2.profile IS NOT DISTINCT FROM c.profile
+                          AND c2.status IN ('completed', 'uploading')
+                          AND c2.captured_at > c.captured_at
+                    ) THEN 'superseded'
+                    WHEN c.world_version_id IS DISTINCT FROM _lwv.id
+                      OR c.scene_version_id IS DISTINCT FROM _lsv.id
+                    THEN 'stale'
+                    ELSE 'fresh'
+                END as "freshness!: CaptureFreshness"
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             JOIN shaders s ON sv.shader_id = s.id
             LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
             LEFT JOIN capture_runs cr ON cri.run_id = cr.id
             LEFT JOIN scenes sc ON c.scene_id = sc.id
+            LEFT JOIN _lwv ON _lwv.world_id = sc.world_id
+            LEFT JOIN _lsv ON _lsv.scene_id = sc.id
             "# + $suffix
             $(, $arg)*
         )
@@ -395,6 +446,7 @@ impl CaptureRepo {
             shader_author: Option<String>,
             scene_name: Option<String>,
             scene_slug: Option<String>,
+            freshness: CaptureFreshness,
             // Technical metadata
             status: String,
             error_message: Option<String>,
@@ -417,6 +469,14 @@ impl CaptureRepo {
         let row = sqlx::query_as!(
             CaptureFullRow,
             r#"
+            WITH _lwv AS (
+                SELECT DISTINCT ON (world_id) id, world_id
+                FROM world_versions ORDER BY world_id, created_at DESC
+            ),
+            _lsv AS (
+                SELECT DISTINCT ON (scene_id) id, scene_id
+                FROM scene_versions ORDER BY scene_id, created_at DESC
+            )
             SELECT
                 c.id,
                 c.scene_id,
@@ -437,6 +497,21 @@ impl CaptureRepo {
                 (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
                 sc.name as "scene_name?: String",
                 sc.slug as "scene_slug?: String",
+                CASE
+                    WHEN c.status != 'completed' AND c.status != 'uploading' THEN 'superseded'
+                    WHEN EXISTS (
+                        SELECT 1 FROM captures c2
+                        WHERE c2.shader_version_id = c.shader_version_id
+                          AND c2.scene_id = c.scene_id
+                          AND c2.profile IS NOT DISTINCT FROM c.profile
+                          AND c2.status IN ('completed', 'uploading')
+                          AND c2.captured_at > c.captured_at
+                    ) THEN 'superseded'
+                    WHEN c.world_version_id IS DISTINCT FROM _lwv.id
+                      OR c.scene_version_id IS DISTINCT FROM _lsv.id
+                    THEN 'stale'
+                    ELSE 'fresh'
+                END as "freshness!: CaptureFreshness",
                 c.status,
                 c.error_message,
                 c.video_url,
@@ -459,6 +534,8 @@ impl CaptureRepo {
             LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
             LEFT JOIN capture_runs cr ON cri.run_id = cr.id
             LEFT JOIN scenes sc ON c.scene_id = sc.id
+            LEFT JOIN _lwv ON _lwv.world_id = sc.world_id
+            LEFT JOIN _lsv ON _lsv.scene_id = sc.id
             WHERE c.id = $1
             "#,
             id
@@ -550,6 +627,7 @@ impl CaptureRepo {
             shader_author: row.shader_author,
             scene_name: row.scene_name,
             scene_slug: row.scene_slug,
+            freshness: row.freshness,
             status: row.status,
             error_message: row.error_message,
             video_url: row.video_url,

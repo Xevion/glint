@@ -250,17 +250,25 @@ async function confirmDelete() {
 		<p class="text-sm text-muted-foreground">No captures yet.</p>
 	{:else}
 		<CaptureGridAdmin {captures} alt={(c: CaptureWithContext) => c.scene_name ?? c.scene_id}>
-			{#snippet footer(capture: CaptureWithContext)}
-				<div class="p-2">
+		{#snippet footer(capture: CaptureWithContext)}
+			<div class="p-2">
+				<div class="flex items-center justify-between">
 					<div class="text-sm font-medium">{capture.scene_name ?? capture.scene_id}</div>
-					<div class="text-xs text-muted-foreground">
-						{capture.shader_version}
-						{#if capture.profile}
-							&middot; {capture.profile}
-						{/if}
-					</div>
+					{#if capture.freshness !== 'fresh'}
+						{@const colors = { stale: 'bg-warning/15 text-warning', superseded: 'bg-muted text-muted-foreground', fresh: '' }}
+						<span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium {colors[capture.freshness]}">
+							{capture.freshness}
+						</span>
+					{/if}
 				</div>
-			{/snippet}
+				<div class="text-xs text-muted-foreground">
+					{capture.shader_version}
+					{#if capture.profile}
+						&middot; {capture.profile}
+					{/if}
+				</div>
+			</div>
+		{/snippet}
 		</CaptureGridAdmin>
 	{/if}
 	</div>

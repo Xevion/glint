@@ -2,6 +2,7 @@ pub mod agent;
 pub mod device;
 
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use ts_rs::TS;
@@ -361,6 +362,37 @@ pub struct SceneWithCaptures {
     pub captures: Vec<CaptureWithContext>,
 }
 
+/// Freshness status of a capture relative to current versions and newer captures
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum CaptureFreshness {
+    /// Latest capture for its target, world + scene versions match current
+    Fresh,
+    /// Latest capture for its target, but world or scene version is outdated
+    Stale,
+    /// A newer capture exists for this target — this capture is obsolete
+    Superseded,
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Postgres> for CaptureFreshness {
+    fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+        match s {
+            "fresh" => Ok(Self::Fresh),
+            "stale" => Ok(Self::Stale),
+            "superseded" => Ok(Self::Superseded),
+            _ => Err(format!("unknown freshness value: {s}").into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Postgres> for CaptureFreshness {
+    fn type_info() -> sqlx::postgres::PgTypeInfo {
+        <&str as sqlx::Type<sqlx::Postgres>>::type_info()
+    }
+}
+
 /// Capture with denormalized shader/version info for API responses
 #[derive(Debug, Serialize, FromRow, TS)]
 #[ts(export)]
@@ -387,6 +419,8 @@ pub struct CaptureWithContext {
     // Scene context
     pub scene_name: Option<String>,
     pub scene_slug: Option<String>,
+    // Freshness status
+    pub freshness: CaptureFreshness,
 }
 
 /// Full capture details for admin detail view, including technical metadata
@@ -415,6 +449,8 @@ pub struct CaptureDetail {
     pub shader_author: Option<String>,
     pub scene_name: Option<String>,
     pub scene_slug: Option<String>,
+    // Freshness status
+    pub freshness: CaptureFreshness,
     // Technical metadata (from Capture model)
     pub status: String,
     pub error_message: Option<String>,

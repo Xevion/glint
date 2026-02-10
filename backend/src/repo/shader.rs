@@ -8,8 +8,8 @@ use crate::capture_ctx_query;
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
 use crate::models::{
-    CaptureWithContext, CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderAdopted,
-    ShaderVersion, ShaderVersionDetail, UpdateShaderRequest,
+    CaptureFreshness, CaptureWithContext, CreateShaderRequest, CreateShaderVersionRequest, Shader,
+    ShaderAdopted, ShaderVersion, ShaderVersionDetail, UpdateShaderRequest,
 };
 use crate::platform::{Platform, PlatformMetadata, PlatformVersion};
 

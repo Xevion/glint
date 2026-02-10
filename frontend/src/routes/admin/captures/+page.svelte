@@ -54,6 +54,7 @@ const columns = [
 	{ id: 'resolution', key: 'resolution_width', name: 'Resolution' },
 	{ id: 'file_size', key: 'file_size_bytes', name: 'Size' },
 	{ id: 'captured_at', key: 'captured_at', name: 'Captured', component: 'time' as const },
+	{ id: 'freshness', key: 'freshness', name: 'Freshness' },
 	{ id: 'run', key: 'run_id', name: 'Run' }
 ];
 
@@ -158,9 +159,18 @@ async function refresh() {
 					{row.resolution_width && row.resolution_height
 						? `${row.resolution_width}x${row.resolution_height}`
 						: '-'}
-				{:else if columnId === 'file_size'}
-				{value ? formatBytes(value as number) : '-'}
-			{:else if columnId === 'run'}
+			{:else if columnId === 'file_size'}
+			{value ? formatBytes(value as number) : '-'}
+			{:else if columnId === 'freshness'}
+				{@const colors = {
+					fresh: 'bg-success/15 text-success',
+					stale: 'bg-warning/15 text-warning',
+					superseded: 'bg-muted text-muted-foreground',
+				}}
+				<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {colors[row.freshness]}">
+					{row.freshness}
+				</span>
+		{:else if columnId === 'run'}
 					{#if row.run_id}
 						<a
 							href="/admin/runs/{row.run_id}"

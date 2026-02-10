@@ -4,6 +4,7 @@ export type { AdoptPreviewAuthor } from "./AdoptPreviewAuthor";
 export type { AdoptPreviewResponse } from "./AdoptPreviewResponse";
 export type { Capture } from "./Capture";
 export type { CaptureDetail } from "./CaptureDetail";
+export type { CaptureFreshness } from "./CaptureFreshness";
 export type { CaptureHealthResponse } from "./CaptureHealthResponse";
 export type { CaptureHealthSummary } from "./CaptureHealthSummary";
 export type { CaptureRun } from "./CaptureRun";

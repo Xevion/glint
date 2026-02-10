@@ -122,6 +122,12 @@ function formatMs(value: number | null): string {
 	if (value == null) return '\u2014';
 	return `${value.toFixed(2)}ms`;
 }
+
+const freshnessColors = {
+	fresh: 'bg-success/15 text-success',
+	stale: 'bg-warning/15 text-warning',
+	superseded: 'bg-muted text-muted-foreground'
+} as const;
 </script>
 
 <svelte:head><title>Capture Details - Glint</title></svelte:head>
@@ -149,16 +155,21 @@ function formatMs(value: number | null): string {
 					<span class="font-medium text-foreground">{segment.label}</span>
 				{/if}
 			{/each}
-			{#if capture.status !== 'completed'}
-				<span
-					class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
-						capture.status
-					] ?? statusColorFallback}"
-				>
-					{capture.status}
-				</span>
-			{/if}
-		</nav>
+		{#if capture.status !== 'completed'}
+			<span
+				class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
+					capture.status
+				] ?? statusColorFallback}"
+			>
+				{capture.status}
+			</span>
+		{/if}
+		<span
+			class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[capture.freshness]}"
+		>
+			{capture.freshness}
+		</span>
+	</nav>
 		<Button
 			variant="destructive"
 			size="icon"
@@ -260,16 +271,23 @@ function formatMs(value: number | null): string {
 						<dd>{capture.content_type}</dd>
 					{/if}
 
-					<dt class="text-muted-foreground">Captured</dt>
-					<dd>
-						{#if capture.captured_at}
-							<TimeAgo timestamp={capture.captured_at} />
-						{:else}
-							&mdash;
-						{/if}
-					</dd>
+				<dt class="text-muted-foreground">Captured</dt>
+				<dd>
+					{#if capture.captured_at}
+						<TimeAgo timestamp={capture.captured_at} />
+					{:else}
+						&mdash;
+					{/if}
+				</dd>
 
-					{#if capture.run_id}
+				<dt class="text-muted-foreground">Freshness</dt>
+				<dd>
+					<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[capture.freshness]}">
+						{capture.freshness}
+					</span>
+				</dd>
+
+				{#if capture.run_id}
 						<dt class="text-muted-foreground">Run</dt>
 						<dd>
 							<a
@@ -381,26 +399,34 @@ function formatMs(value: number | null): string {
 						captures={capture.same_shader_scene}
 						alt={(c: CaptureWithContext) => `${c.shader_name} ${c.shader_version}`}
 					>
-						{#snippet footer(c: CaptureWithContext)}
-							<div class="p-2">
+					{#snippet footer(c: CaptureWithContext)}
+						<div class="p-2">
+							<div class="flex items-center justify-between">
 								<div class="text-sm font-medium">
 									{c.shader_version}
 									{#if c.profile}
 										&middot; {c.profile}
 									{/if}
 								</div>
-								{#if c.captured_at}
-									<div class="text-xs text-muted-foreground">
-										<TimeAgo timestamp={c.captured_at} />
-									</div>
+								{#if c.freshness !== 'fresh'}
+									{@const freshnessColors3 = { stale: 'bg-warning/15 text-warning', superseded: 'bg-muted text-muted-foreground', fresh: '' }}
+									<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors3[c.freshness]}">
+										{c.freshness}
+									</span>
 								{/if}
 							</div>
-						{/snippet}
-					</CaptureGridAdmin>
-				</Tabs.Content>
-			{/if}
+							{#if c.captured_at}
+								<div class="text-xs text-muted-foreground">
+									<TimeAgo timestamp={c.captured_at} />
+								</div>
+							{/if}
+						</div>
+					{/snippet}
+				</CaptureGridAdmin>
+			</Tabs.Content>
+		{/if}
 
-			{#if capture.same_scene.length > 0}
+		{#if capture.same_scene.length > 0}
 				<Tabs.Content value="scene">
 					<CaptureGridAdmin
 						captures={capture.same_scene}
