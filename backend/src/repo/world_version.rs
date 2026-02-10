@@ -90,7 +90,7 @@ impl WorldVersionRepo {
             r#"
             SELECT DISTINCT ON (world_id) *
             FROM world_versions
-            ORDER BY world_id, created_at DESC
+            ORDER BY world_id, created_at DESC, id DESC
             "#,
         )
         .fetch_all(executor)

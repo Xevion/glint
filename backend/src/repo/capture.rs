@@ -35,11 +35,11 @@ macro_rules! capture_ctx_query {
             r#"
             WITH _lwv AS (
                 SELECT DISTINCT ON (world_id) id, world_id
-                FROM world_versions ORDER BY world_id, created_at DESC
+                FROM world_versions ORDER BY world_id, created_at DESC, id DESC
             ),
             _lsv AS (
                 SELECT DISTINCT ON (scene_id) id, scene_id
-                FROM scene_versions ORDER BY scene_id, created_at DESC
+                FROM scene_versions ORDER BY scene_id, created_at DESC, id DESC
             )
             SELECT
                 c.id,
@@ -93,11 +93,11 @@ macro_rules! capture_ctx_query {
             r#"
             WITH _lwv AS (
                 SELECT DISTINCT ON (world_id) id, world_id
-                FROM world_versions ORDER BY world_id, created_at DESC
+                FROM world_versions ORDER BY world_id, created_at DESC, id DESC
             ),
             _lsv AS (
                 SELECT DISTINCT ON (scene_id) id, scene_id
-                FROM scene_versions ORDER BY scene_id, created_at DESC
+                FROM scene_versions ORDER BY scene_id, created_at DESC, id DESC
             )
             SELECT DISTINCT ON ("# + $distinct + r#")
                 c.id,
@@ -427,11 +427,11 @@ impl CaptureRepo {
             r#"
             WITH _lwv AS (
                 SELECT DISTINCT ON (world_id) id, world_id
-                FROM world_versions ORDER BY world_id, created_at DESC
+                FROM world_versions ORDER BY world_id, created_at DESC, id DESC
             ),
             _lsv AS (
                 SELECT DISTINCT ON (scene_id) id, scene_id
-                FROM scene_versions ORDER BY scene_id, created_at DESC
+                FROM scene_versions ORDER BY scene_id, created_at DESC, id DESC
             )
             SELECT
                 c.id,

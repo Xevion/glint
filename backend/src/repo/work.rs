@@ -81,7 +81,7 @@ impl WorkRepo {
                 SELECT DISTINCT ON (world_id)
                     id, world_id, file_url, file_hash, size_bytes
                 FROM world_versions
-                ORDER BY world_id, created_at DESC
+                ORDER BY world_id, created_at DESC, id DESC
             ),
             latest_scene_versions AS (
                 SELECT DISTINCT ON (scene_id)

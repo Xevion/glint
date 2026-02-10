@@ -98,13 +98,13 @@ impl CaptureHealthRepo {
                 SELECT DISTINCT ON (world_id)
                     id, world_id
                 FROM world_versions
-                ORDER BY world_id, created_at DESC
+                ORDER BY world_id, created_at DESC, id DESC
             ),
             latest_scene_versions AS (
                 SELECT DISTINCT ON (scene_id)
                     id, scene_id
                 FROM scene_versions
-                ORDER BY scene_id, created_at DESC
+                ORDER BY scene_id, created_at DESC, id DESC
             ),
             target_matrix AS (
                 -- Branch 1: shader versions WITH profiles
