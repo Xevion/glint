@@ -2,7 +2,7 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use tracing::{debug, instrument, trace};
 
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::models::PendingUpload;
 
 pub struct PendingUploadRepo;
@@ -22,16 +22,6 @@ impl PendingUploadRepo {
         .await
         .context(format!("failed to find pending upload '{}'", upload_id))
         .map_err(Into::into)
-    }
-
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn get_by_id(
-        executor: impl sqlx::PgExecutor<'_>,
-        upload_id: &str,
-    ) -> AppResult<PendingUpload> {
-        Self::find_by_id(executor, upload_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound(format!("Upload ID '{}' not found", upload_id)))
     }
 
     /// Create a pending upload for world creation (slug/name/minecraft_version required).

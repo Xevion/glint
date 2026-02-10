@@ -1,7 +1,7 @@
 use anyhow::Context;
 use tracing::{debug, instrument};
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppResult, OptionNotFoundExt};
 use crate::models::User;
 
 pub struct UserRepo;
@@ -17,13 +17,6 @@ impl UserRepo {
             .await
             .context(format!("failed to find user by id '{}'", id))
             .map_err(Into::into)
-    }
-
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn get_by_id(executor: impl sqlx::PgExecutor<'_>, id: i32) -> AppResult<User> {
-        Self::find_by_id(executor, id)
-            .await?
-            .ok_or_else(|| AppError::NotFound(format!("User with id '{}' not found", id)))
     }
 
     #[instrument(skip(executor), level = "debug")]
@@ -43,18 +36,6 @@ impl UserRepo {
             discord_id
         ))
         .map_err(Into::into)
-    }
-
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn get_by_discord_id(
-        executor: impl sqlx::PgExecutor<'_>,
-        discord_id: &str,
-    ) -> AppResult<User> {
-        Self::find_by_discord_id(executor, discord_id)
-            .await?
-            .ok_or_else(|| {
-                AppError::NotFound(format!("User with discord_id '{}' not found", discord_id))
-            })
     }
 
     /// Create or update a user from Discord OAuth data
@@ -107,7 +88,7 @@ impl UserRepo {
         .fetch_optional(executor)
         .await
         .context(format!("failed to update role for user '{}'", id))?
-        .ok_or_else(|| AppError::NotFound(format!("User with id '{}' not found", id)))
+        .or_not_found("User", id)
     }
 
     #[instrument(skip(executor), level = "debug")]

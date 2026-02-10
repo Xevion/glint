@@ -4,12 +4,13 @@ use sqlx::FromRow;
 use ts_rs::TS;
 
 use super::scene::Scene;
+use crate::id::{WorldId, WorldVersionId};
 
 /// Downloadable world files containing scenes
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
 pub struct World {
-    pub id: String,
+    pub id: WorldId,
     pub slug: String,
     pub name: String,
     pub description: Option<String>,
@@ -24,8 +25,8 @@ pub struct World {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
 pub struct WorldVersion {
-    pub id: String,
-    pub world_id: String,
+    pub id: WorldVersionId,
+    pub world_id: WorldId,
     pub file_url: Option<String>,
     pub file_hash: Option<String>,
     pub size_bytes: Option<i64>,

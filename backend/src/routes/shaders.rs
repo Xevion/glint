@@ -13,12 +13,14 @@ use uuid::Uuid;
 use crate::{
     auth::AdminUser,
     error::{AppError, AppResult},
+    id::ShaderVersionId,
     models::{
-        CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderListItem, ShaderVersion,
-        ShaderWithCaptures, UpdateShaderRequest,
+        CaptureStatus, CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderListItem,
+        ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
     },
     repo::{
         CaptureRepo, CategoryRepo, FeatureRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo,
+        capture::{CaptureDistinct, CaptureFilters},
     },
     state::AppState,
 };
@@ -49,7 +51,10 @@ async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shade
     // Group by shader_id
     let mut authors_map: HashMap<String, Vec<_>> = HashMap::new();
     for a in authors {
-        authors_map.entry(a.shader_id.clone()).or_default().push(a);
+        authors_map
+            .entry(a.shader_id.0.clone())
+            .or_default()
+            .push(a);
     }
 
     let mut categories_map: HashMap<String, Vec<_>> = HashMap::new();
@@ -64,15 +69,16 @@ async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shade
 
     let items = shaders
         .into_iter()
-        .filter(|shader| thumbnails.contains_key(&shader.id))
+        .filter(|shader| thumbnails.contains_key(shader.id.as_ref()))
         .map(|shader| {
             let id = &shader.id;
+            let id_str: &str = id.as_ref();
             let version = versions.get(id);
-            let thumb = thumbnails.get(id);
+            let thumb = thumbnails.get(id_str);
             ShaderListItem {
-                authors: authors_map.remove(id).unwrap_or_default(),
-                categories: categories_map.remove(id).unwrap_or_default(),
-                features: features_map.remove(id).unwrap_or_default(),
+                authors: authors_map.remove(id_str).unwrap_or_default(),
+                categories: categories_map.remove(id_str).unwrap_or_default(),
+                features: features_map.remove(id_str).unwrap_or_default(),
                 latest_version: version.map(|v| v.version.clone()),
                 game_versions: version.and_then(|v| v.game_versions.clone()),
                 image_url: thumb.map(|t| t.image_url.clone()),
@@ -98,20 +104,26 @@ async fn get_shader(
     Query(query): Query<ShaderDetailQuery>,
 ) -> AppResult<Json<ShaderWithCaptures>> {
     let shader = ShaderRepo::get(state.db(), &id).await?;
-    let versions = ShaderVersionRepo::list_by_shader_with_counts(state.db(), &shader.id).await?;
+    let versions =
+        ShaderVersionRepo::list_by_shader_with_counts(state.db(), shader.id.as_ref()).await?;
 
     // Default to latest version when no version_id is specified
     let effective_version_id = query
         .version_id
+        .map(ShaderVersionId::from)
         .or_else(|| versions.first().map(|v| v.version.id.clone()));
 
-    let captures = ShaderRepo::get_captures_with_context_filtered(
-        state.db(),
-        &shader.id,
-        effective_version_id.as_deref(),
-        query.profile.as_deref(),
-    )
-    .await?;
+    let filters = CaptureFilters {
+        shader_id: Some(shader.id.clone()),
+        version_id: effective_version_id,
+        profile: query.profile,
+        status: Some(CaptureStatus::Completed),
+        scene_active: Some(true),
+        ..Default::default()
+    };
+    let (captures, _) =
+        CaptureRepo::list_with_context(state.db(), &filters, None, CaptureDistinct::PerScene)
+            .await?;
 
     Ok(Json(ShaderWithCaptures {
         shader,

@@ -18,7 +18,7 @@ const ID_ALPHABET: [char; 56] = [
 
 use crate::auth::AuthUser;
 use crate::error::{AppError, AppResult};
-use crate::models::{CaptureRun, CaptureRunItemWithContext};
+use crate::models::{CaptureRun, CaptureRunItemWithContext, CaptureStatus};
 use crate::repo::{CaptureRepo, CaptureRunRepo, ShaderVersionRepo};
 use crate::state::AppState;
 
@@ -215,7 +215,7 @@ async fn fail_item(
     Json(request): Json<FailItemRequest>,
 ) -> AppResult<StatusCode> {
     let item = CaptureRunRepo::get_item_by_id(state.db(), &item_id).await?;
-    if item.run_id != run_id {
+    if item.run_id.as_ref() != run_id {
         return Err(AppError::NotFound(format!(
             "Run item '{}' not found in run '{}'",
             item_id, run_id
@@ -243,14 +243,14 @@ async fn claim_item(
     let db = state.db();
 
     let item = CaptureRunRepo::get_item_by_id(db, &item_id).await?;
-    if item.run_id != run_id {
+    if item.run_id.as_ref() != run_id {
         return Err(AppError::NotFound(format!(
             "Run item '{}' not found in run '{}'",
             item_id, run_id
         )));
     }
 
-    let shader_id = ShaderVersionRepo::get_shader_id(db, &item.shader_version_id).await?;
+    let shader_id = ShaderVersionRepo::get_shader_id(db, item.shader_version_id.as_ref()).await?;
 
     let capture_id = nanoid!(ID_LENGTH, &ID_ALPHABET);
     let r2_key = format!(
@@ -273,8 +273,8 @@ async fn claim_item(
     CaptureRepo::insert(
         &mut *tx,
         &capture_id,
-        &item.shader_version_id,
-        &item.scene_id,
+        item.shader_version_id.as_ref(),
+        item.scene_id.as_ref(),
         item.profile.as_deref(),
         None,
         Some(&image_url),
@@ -283,7 +283,7 @@ async fn claim_item(
         Some(request.captured_at),
         request.world_version_id.as_deref(),
         request.scene_version_id.as_deref(),
-        "uploading",
+        CaptureStatus::Uploading,
     )
     .await?;
 
@@ -306,7 +306,7 @@ async fn confirm_upload(
     Json(request): Json<ConfirmUploadRequest>,
 ) -> AppResult<StatusCode> {
     let item = CaptureRunRepo::get_item_by_id(state.db(), &item_id).await?;
-    if item.run_id != run_id {
+    if item.run_id.as_ref() != run_id {
         return Err(AppError::NotFound(format!(
             "Run item '{}' not found in run '{}'",
             item_id, run_id
@@ -315,18 +315,19 @@ async fn confirm_upload(
 
     let capture_id = item
         .capture_id
-        .as_deref()
+        .as_ref()
         .ok_or_else(|| AppError::BadRequest("Run item has no capture_id".to_string()))?;
+    let capture_id_str: &str = capture_id.as_ref();
 
     let mut tx = state.begin_tx().await?;
-    CaptureRepo::confirm_upload(&mut *tx, capture_id, request.image_path.as_deref()).await?;
-    CaptureRunRepo::complete_item(&mut *tx, &item_id, capture_id, None).await?;
+    CaptureRepo::confirm_upload(&mut *tx, capture_id_str, request.image_path.as_deref()).await?;
+    CaptureRunRepo::complete_item(&mut *tx, &item_id, capture_id_str, None).await?;
     tx.commit().await?;
 
     // Queue capture metadata processing (fire-and-forget)
-    let _ = state.metadata_tx().send(capture_id.to_string());
+    let _ = state.metadata_tx().send(capture_id_str.to_string());
 
-    debug!(item_id, capture_id, "Upload confirmed");
+    debug!(item_id, capture_id = capture_id_str, "Upload confirmed");
     Ok(StatusCode::OK)
 }
 

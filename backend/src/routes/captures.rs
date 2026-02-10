@@ -8,9 +8,13 @@ use serde::Deserialize;
 
 use crate::{
     auth::AdminUser,
-    error::{AppError, AppResult},
-    models::{Capture, CaptureDetail, PaginatedCaptures},
-    repo::{CaptureRepo, SceneRepo},
+    error::{AppError, AppResult, OptionNotFoundExt},
+    id::{CaptureRunId, SceneId},
+    models::{Capture, CaptureDetail, CaptureStatus, PaginatedCaptures},
+    repo::{
+        CaptureRepo, SceneRepo,
+        capture::{CaptureDistinct, CaptureFilters, Pagination},
+    },
     state::AppState,
 };
 
@@ -20,7 +24,7 @@ pub struct CaptureListParams {
     pub page_size: Option<i32>,
     pub shader: Option<String>,
     pub scene: Option<String>,
-    pub status: Option<String>,
+    pub status: Option<CaptureStatus>,
     pub run_id: Option<String>,
 }
 
@@ -48,20 +52,29 @@ async fn list_captures_all(
     let page_size = params.page_size.unwrap_or(50).clamp(1, 250);
     let offset = (page - 1) * page_size;
 
-    let (items, total) = CaptureRepo::list_all_with_context_paginated(
+    let filters = CaptureFilters {
+        shader_slug: params.shader,
+        scene_id: params.scene.map(SceneId::from),
+        status: params.status,
+        run_id: params.run_id.map(CaptureRunId::from),
+        ..Default::default()
+    };
+    let pagination = Pagination {
+        limit: page_size as i64,
+        offset: offset as i64,
+    };
+
+    let (items, total) = CaptureRepo::list_with_context(
         state.db(),
-        page_size as i64,
-        offset as i64,
-        params.shader.as_deref(),
-        params.scene.as_deref(),
-        params.status.as_deref(),
-        params.run_id.as_deref(),
+        &filters,
+        Some(&pagination),
+        CaptureDistinct::None,
     )
     .await?;
 
     Ok(Json(PaginatedCaptures {
         items,
-        total,
+        total: total.unwrap_or(0),
         page,
         page_size,
     }))
@@ -72,10 +85,12 @@ async fn get_capture_public(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<Capture>> {
-    let capture = CaptureRepo::get_by_id(state.db(), &id).await?;
+    let capture = CaptureRepo::find_by_id(state.db(), &id)
+        .await?
+        .or_not_found("Capture", &id)?;
 
     // Verify the capture's scene is active (don't leak disabled-scene captures)
-    let scene = SceneRepo::find_by_id(state.db(), &capture.scene_id).await?;
+    let scene = SceneRepo::find_by_id(state.db(), capture.scene_id.as_ref()).await?;
     match scene {
         Some(s) if s.active => {}
         _ => return Err(AppError::NotFound(format!("Capture '{}' not found", id))),

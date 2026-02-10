@@ -135,3 +135,36 @@ impl IntoResponse for AppError {
 }
 
 pub type AppResult<T> = Result<T, AppError>;
+
+/// Extension trait for `Option<T>` to convert `None` into [`AppError::NotFound`].
+pub trait OptionNotFoundExt<T> {
+    /// Convert `None` into [`AppError::NotFound`] with a message like
+    /// `"Shader 'abc123' not found"`.
+    fn or_not_found(self, entity: &str, id: impl std::fmt::Display) -> AppResult<T>;
+}
+
+impl<T> OptionNotFoundExt<T> for Option<T> {
+    fn or_not_found(self, entity: &str, id: impl std::fmt::Display) -> AppResult<T> {
+        self.ok_or_else(|| AppError::NotFound(format!("{entity} '{id}' not found")))
+    }
+}
+
+/// Extension trait for `Result<T, sqlx::Error>` to handle unique constraint violations.
+pub trait SqlxResultExt<T> {
+    /// Convert a PostgreSQL unique-constraint violation (`23505`) into
+    /// [`AppError::Conflict`] with the given message. All other errors
+    /// become [`AppError::Database`]; `Ok` values pass through.
+    fn conflict_on_unique(self, message: impl Into<String>) -> AppResult<T>;
+}
+
+impl<T> SqlxResultExt<T> for Result<T, sqlx::Error> {
+    fn conflict_on_unique(self, message: impl Into<String>) -> AppResult<T> {
+        match self {
+            Ok(val) => Ok(val),
+            Err(sqlx::Error::Database(ref db_err)) if db_err.code().as_deref() == Some("23505") => {
+                Err(AppError::Conflict(message.into()))
+            }
+            Err(e) => Err(AppError::Database(e)),
+        }
+    }
+}

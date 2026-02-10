@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{
     auth::AdminUser,
     config::R2Config,
-    error::{AppError, AppResult},
+    error::{AppError, AppResult, OptionNotFoundExt},
     models::{
         CompleteUploadRequest, CreateWorldRequest, CreateWorldVersionUploadRequest, PendingUpload,
         UpdateWorldRequest, UploadResponse, World, WorldListItem, WorldPreviewCapture,
@@ -286,32 +286,31 @@ async fn list_worlds(
         },
     )?;
 
-    let items = worlds
-        .into_iter()
-        .map(|world| {
-            let latest_version = latest_versions
-                .iter()
-                .find(|v| v.world_id == world.id)
-                .cloned();
-            let agg = aggregates.iter().find(|a| a.world_id == world.id);
-            let preview =
-                previews
+    let items =
+        worlds
+            .into_iter()
+            .map(|world| {
+                let latest_version = latest_versions
                     .iter()
-                    .find(|p| p.world_id == world.id)
-                    .map(|p| WorldPreviewCapture {
+                    .find(|v| v.world_id == world.id)
+                    .cloned();
+                let agg = aggregates.iter().find(|a| a.world_id == world.id.0);
+                let preview = previews.iter().find(|p| p.world_id == world.id.0).map(|p| {
+                    WorldPreviewCapture {
                         image_url: p.image_url.clone(),
                         thumbhash: p.thumbhash.clone(),
-                    });
-            WorldListItem {
-                world,
-                latest_version,
-                scene_count: agg.map_or(0, |a| a.scene_count),
-                version_count: agg.map_or(0, |a| a.version_count),
-                capture_count: agg.map_or(0, |a| a.capture_count),
-                preview,
-            }
-        })
-        .collect();
+                    }
+                });
+                WorldListItem {
+                    world,
+                    latest_version,
+                    scene_count: agg.map_or(0, |a| a.scene_count),
+                    version_count: agg.map_or(0, |a| a.version_count),
+                    capture_count: agg.map_or(0, |a| a.capture_count),
+                    preview,
+                }
+            })
+            .collect();
 
     Ok(Json(items))
 }
@@ -380,7 +379,9 @@ async fn complete_world_upload(
 ) -> AppResult<(StatusCode, Json<World>)> {
     debug!(slug = %slug, upload_id = %request.upload_id, "Completing world upload");
 
-    let pending = PendingUploadRepo::get_by_id(state.db(), &request.upload_id).await?;
+    let pending = PendingUploadRepo::find_by_id(state.db(), &request.upload_id)
+        .await?
+        .or_not_found("Upload", &request.upload_id)?;
 
     // This endpoint is for world creation uploads (not version uploads)
     let pending_slug = pending.slug.as_deref().ok_or_else(|| {
@@ -449,7 +450,7 @@ async fn complete_world_upload(
     WorldVersionRepo::create(
         &mut *tx,
         &finalized.version_id,
-        &world.id,
+        world.id.as_ref(),
         &finalized.file_url,
         &pending.file_hash,
         pending.size_bytes,
@@ -470,7 +471,11 @@ async fn get_world(
     Path(id): Path<String>,
 ) -> AppResult<Json<WorldWithDetails>> {
     let (world, scenes, latest_version) = tokio::try_join!(
-        WorldRepo::get_by_id(state.db(), &id),
+        async {
+            WorldRepo::find_by_id(state.db(), &id)
+                .await?
+                .or_not_found("World", &id)
+        },
         SceneRepo::list_by_world(state.db(), &id),
         WorldVersionRepo::get_latest_for_world(state.db(), &id),
     )?;
@@ -507,7 +512,9 @@ async fn delete_world(
     Path(id): Path<String>,
 ) -> AppResult<StatusCode> {
     // Verify world exists (404 if not)
-    WorldRepo::get_by_id(state.db(), &id).await?;
+    WorldRepo::find_by_id(state.db(), &id)
+        .await?
+        .or_not_found("World", &id)?;
 
     // Fetch versions before deletion (CASCADE will remove them from DB)
     let versions = WorldVersionRepo::list_by_world(state.db(), &id).await?;
@@ -556,7 +563,9 @@ async fn list_world_versions(
     Path(id): Path<String>,
 ) -> AppResult<Json<Vec<WorldVersion>>> {
     // Verify world exists (404 if not)
-    WorldRepo::get_by_id(state.db(), &id).await?;
+    WorldRepo::find_by_id(state.db(), &id)
+        .await?
+        .or_not_found("World", &id)?;
     let versions = WorldVersionRepo::list_by_world(state.db(), &id).await?;
     Ok(Json(versions))
 }
@@ -572,7 +581,9 @@ async fn create_world_version(
     Path(id): Path<String>,
     Json(request): Json<CreateWorldVersionUploadRequest>,
 ) -> AppResult<(StatusCode, Json<UploadResponse>)> {
-    let world = WorldRepo::get_by_id(state.db(), &id).await?;
+    let world = WorldRepo::find_by_id(state.db(), &id)
+        .await?
+        .or_not_found("World", &id)?;
 
     validate_upload_request(&request.file_hash, request.file_size_bytes)?;
 
@@ -585,7 +596,7 @@ async fn create_world_version(
     PendingUploadRepo::create_for_version(
         state.db(),
         &upload.upload_id,
-        &world.id,
+        world.id.as_ref(),
         &request.file_hash,
         request.file_size_bytes,
         &upload.upload_key,
@@ -623,7 +634,9 @@ async fn complete_world_version_upload(
 ) -> AppResult<(StatusCode, Json<WorldVersion>)> {
     debug!(world_id = %world_id, upload_id = %request.upload_id, "Completing world version upload");
 
-    let pending = PendingUploadRepo::get_by_id(state.db(), &request.upload_id).await?;
+    let pending = PendingUploadRepo::find_by_id(state.db(), &request.upload_id)
+        .await?
+        .or_not_found("Upload", &request.upload_id)?;
 
     // Verify this is a version upload and world_id matches
     let pending_world_id = pending.world_id.as_deref().ok_or_else(|| {
@@ -645,7 +658,9 @@ async fn complete_world_version_upload(
     }
 
     // Verify world still exists
-    let world = WorldRepo::get_by_id(state.db(), &world_id).await?;
+    let world = WorldRepo::find_by_id(state.db(), &world_id)
+        .await?
+        .or_not_found("World", &world_id)?;
 
     let s3 = require_s3(&state)?;
     let r2_config = &state.config().r2;
@@ -659,7 +674,7 @@ async fn complete_world_version_upload(
     let version = WorldVersionRepo::create(
         &mut *tx,
         &finalized.version_id,
-        &world.id,
+        world.id.as_ref(),
         &finalized.file_url,
         &pending.file_hash,
         pending.size_bytes,

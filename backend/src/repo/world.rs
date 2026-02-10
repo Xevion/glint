@@ -1,7 +1,7 @@
 use anyhow::Context;
 use tracing::{debug, instrument};
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppResult, SqlxResultExt};
 use crate::models::{CreateWorldRequest, UpdateWorldRequest, World};
 
 pub struct WorldRepo;
@@ -20,13 +20,6 @@ impl WorldRepo {
     }
 
     #[instrument(skip(executor), level = "debug")]
-    pub async fn get_by_id(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<World> {
-        Self::find_by_id(executor, id)
-            .await?
-            .ok_or_else(|| AppError::NotFound(format!("World '{}' not found", id)))
-    }
-
-    #[instrument(skip(executor), level = "debug")]
     pub async fn find_by_slug(
         executor: impl sqlx::PgExecutor<'_>,
         slug: &str,
@@ -36,13 +29,6 @@ impl WorldRepo {
             .await
             .context(format!("failed to find world by slug '{}'", slug))
             .map_err(Into::into)
-    }
-
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn get_by_slug(executor: impl sqlx::PgExecutor<'_>, slug: &str) -> AppResult<World> {
-        Self::find_by_slug(executor, slug)
-            .await?
-            .ok_or_else(|| AppError::NotFound(format!("World '{}' not found", slug)))
     }
 
     #[instrument(skip(executor), level = "debug")]
@@ -101,18 +87,7 @@ impl WorldRepo {
         .fetch_one(executor)
         .await;
 
-        match result {
-            Err(sqlx::Error::Database(ref db_err)) if db_err.code().as_deref() == Some("23505") => {
-                Err(AppError::Conflict(format!(
-                    "World with slug '{}' already exists",
-                    req.slug
-                )))
-            }
-            Err(e) => Err(e)
-                .context(format!("failed to create world '{}'", req.slug))
-                .map_err(Into::into),
-            Ok(world) => Ok(world),
-        }
+        result.conflict_on_unique(format!("World with slug '{}' already exists", req.slug))
     }
 
     #[instrument(skip(executor), level = "debug")]

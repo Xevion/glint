@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                cri.id,\n                cri.run_id AS \"run_id: CaptureRunId\",\n                cri.shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                cri.scene_id AS \"scene_id: SceneId\",\n                cri.profile,\n                cri.status AS \"status!: CaptureRunItemStatus\",\n                cri.capture_id AS \"capture_id: CaptureId\",\n                cri.error_message, cri.error_log, cri.duration_ms,\n                cri.started_at, cri.completed_at,\n                s.name as shader_name,\n                s.slug as shader_slug,\n                sv.version as shader_version,\n                sc.name as scene_name\n            FROM capture_run_items cri\n            JOIN shader_versions sv ON cri.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            JOIN scenes sc ON cri.scene_id = sc.id\n            WHERE cri.run_id = $1\n            ORDER BY cri.started_at ASC NULLS LAST\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "run_id: CaptureRunId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "shader_version_id: ShaderVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "scene_id: SceneId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "profile",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "status!: CaptureRunItemStatus",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "capture_id: CaptureId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "error_log",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "duration_ms",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "shader_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "shader_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "shader_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "scene_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e0f6016b9ef5c34916db993053e4f0fd7df40aa12b5fa250309df2d1c9506233"
+}

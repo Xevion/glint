@@ -1,15 +1,189 @@
+use std::fmt;
+
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use ts_rs::TS;
 
+use crate::id::{
+    CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderVersionId, WorldVersionId,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum CaptureStatus {
+    Uploading,
+    Completed,
+    Failed,
+}
+
+impl fmt::Display for CaptureStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl CaptureStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Uploading => "uploading",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+        }
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Postgres> for CaptureStatus {
+    fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+        match s {
+            "uploading" => Ok(Self::Uploading),
+            "completed" => Ok(Self::Completed),
+            "failed" => Ok(Self::Failed),
+            _ => Err(format!("unknown capture status: {s}").into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Postgres> for CaptureStatus {
+    fn type_info() -> sqlx::postgres::PgTypeInfo {
+        <&str as sqlx::Type<sqlx::Postgres>>::type_info()
+    }
+}
+
+impl sqlx::Encode<'_, sqlx::Postgres> for CaptureStatus {
+    fn encode_by_ref(
+        &self,
+        buf: &mut sqlx::postgres::PgArgumentBuffer,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        <&str as sqlx::Encode<sqlx::Postgres>>::encode_by_ref(&self.as_str(), buf)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum CaptureRunStatus {
+    Running,
+    Completed,
+    Partial,
+    Failed,
+    TimedOut,
+}
+
+impl fmt::Display for CaptureRunStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl CaptureRunStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Running => "running",
+            Self::Completed => "completed",
+            Self::Partial => "partial",
+            Self::Failed => "failed",
+            Self::TimedOut => "timed_out",
+        }
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Postgres> for CaptureRunStatus {
+    fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+        match s {
+            "running" => Ok(Self::Running),
+            "completed" => Ok(Self::Completed),
+            "partial" => Ok(Self::Partial),
+            "failed" => Ok(Self::Failed),
+            "timed_out" => Ok(Self::TimedOut),
+            _ => Err(format!("unknown capture run status: {s}").into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Postgres> for CaptureRunStatus {
+    fn type_info() -> sqlx::postgres::PgTypeInfo {
+        <&str as sqlx::Type<sqlx::Postgres>>::type_info()
+    }
+}
+
+impl sqlx::Encode<'_, sqlx::Postgres> for CaptureRunStatus {
+    fn encode_by_ref(
+        &self,
+        buf: &mut sqlx::postgres::PgArgumentBuffer,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        <&str as sqlx::Encode<sqlx::Postgres>>::encode_by_ref(&self.as_str(), buf)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum CaptureRunItemStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+    Skipped,
+}
+
+impl fmt::Display for CaptureRunItemStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl CaptureRunItemStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Running => "running",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+            Self::Skipped => "skipped",
+        }
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Postgres> for CaptureRunItemStatus {
+    fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+        match s {
+            "pending" => Ok(Self::Pending),
+            "running" => Ok(Self::Running),
+            "completed" => Ok(Self::Completed),
+            "failed" => Ok(Self::Failed),
+            "skipped" => Ok(Self::Skipped),
+            _ => Err(format!("unknown capture run item status: {s}").into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Postgres> for CaptureRunItemStatus {
+    fn type_info() -> sqlx::postgres::PgTypeInfo {
+        <&str as sqlx::Type<sqlx::Postgres>>::type_info()
+    }
+}
+
+impl sqlx::Encode<'_, sqlx::Postgres> for CaptureRunItemStatus {
+    fn encode_by_ref(
+        &self,
+        buf: &mut sqlx::postgres::PgArgumentBuffer,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        <&str as sqlx::Encode<sqlx::Postgres>>::encode_by_ref(&self.as_str(), buf)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
 pub struct Capture {
-    pub id: String,
-    pub shader_version_id: String,
-    pub scene_id: String,
+    pub id: CaptureId,
+    pub shader_version_id: ShaderVersionId,
+    pub scene_id: SceneId,
     pub profile: Option<String>,
     pub image_url: Option<String>,
     pub image_path: Option<String>,
@@ -26,13 +200,13 @@ pub struct Capture {
     pub resolution_height: Option<i32>,
     #[ts(type = "string | null")]
     pub captured_at: Option<DateTime<Utc>>,
-    pub status: String,
+    pub status: CaptureStatus,
     pub error_message: Option<String>,
     pub thumbhash: Option<String>,
     pub file_size_bytes: Option<i64>,
     pub content_type: Option<String>,
-    pub world_version_id: Option<String>,
-    pub scene_version_id: Option<String>,
+    pub world_version_id: Option<WorldVersionId>,
+    pub scene_version_id: Option<SceneVersionId>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
@@ -42,13 +216,13 @@ pub struct Capture {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
 pub struct CaptureRun {
-    pub id: String,
+    pub id: CaptureRunId,
     pub agent_id: Option<String>,
     #[ts(type = "string")]
     pub started_at: DateTime<Utc>,
     #[ts(type = "string | null")]
     pub completed_at: Option<DateTime<Utc>>,
-    pub status: String,
+    pub status: CaptureRunStatus,
     pub total_items: i32,
     pub completed_items: i32,
     pub failed_items: i32,
@@ -60,12 +234,12 @@ pub struct CaptureRun {
 #[ts(export)]
 pub struct CaptureRunItem {
     pub id: String,
-    pub run_id: String,
-    pub shader_version_id: String,
-    pub scene_id: String,
+    pub run_id: CaptureRunId,
+    pub shader_version_id: ShaderVersionId,
+    pub scene_id: SceneId,
     pub profile: Option<String>,
-    pub status: String,
-    pub capture_id: Option<String>,
+    pub status: CaptureRunItemStatus,
+    pub capture_id: Option<CaptureId>,
     pub error_message: Option<String>,
     pub error_log: Option<String>,
     pub duration_ms: Option<i32>,
@@ -80,12 +254,12 @@ pub struct CaptureRunItem {
 #[ts(export)]
 pub struct CaptureRunItemWithContext {
     pub id: String,
-    pub run_id: String,
-    pub shader_version_id: String,
-    pub scene_id: String,
+    pub run_id: CaptureRunId,
+    pub shader_version_id: ShaderVersionId,
+    pub scene_id: SceneId,
     pub profile: Option<String>,
-    pub status: String,
-    pub capture_id: Option<String>,
+    pub status: CaptureRunItemStatus,
+    pub capture_id: Option<CaptureId>,
     pub error_message: Option<String>,
     pub error_log: Option<String>,
     pub duration_ms: Option<i32>,
@@ -135,8 +309,8 @@ impl sqlx::Type<sqlx::Postgres> for CaptureFreshness {
 #[derive(Debug, Serialize, FromRow, TS)]
 #[ts(export)]
 pub struct CaptureWithContext {
-    pub id: String,
-    pub scene_id: String,
+    pub id: CaptureId,
+    pub scene_id: SceneId,
     pub shader_slug: String,
     pub shader_name: String,
     pub shader_version: String,
@@ -150,8 +324,8 @@ pub struct CaptureWithContext {
     pub resolution_height: Option<i32>,
     pub file_size_bytes: Option<i64>,
     // Run context
-    pub run_id: Option<String>,
-    pub run_status: Option<String>,
+    pub run_id: Option<CaptureRunId>,
+    pub run_status: Option<CaptureRunStatus>,
     // Shader author
     pub shader_author: Option<String>,
     // Scene context
@@ -169,8 +343,8 @@ pub struct CaptureDetail {
     #[serde(flatten)]
     pub context: CaptureWithContext,
     // Technical metadata (detail-only fields from Capture model)
-    pub shader_version_id: String,
-    pub status: String,
+    pub shader_version_id: ShaderVersionId,
+    pub status: CaptureStatus,
     pub error_message: Option<String>,
     pub video_url: Option<String>,
     pub avg_fps: Option<f64>,
@@ -182,8 +356,8 @@ pub struct CaptureDetail {
     pub iris_version: Option<String>,
     pub gpu_model: Option<String>,
     pub content_type: Option<String>,
-    pub world_version_id: Option<String>,
-    pub scene_version_id: Option<String>,
+    pub world_version_id: Option<WorldVersionId>,
+    pub scene_version_id: Option<SceneVersionId>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "string")]

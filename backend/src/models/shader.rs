@@ -5,12 +5,13 @@ use ts_rs::TS;
 
 use super::capture::CaptureWithContext;
 use super::taxonomy::{Category, Feature};
+use crate::id::{ShaderId, ShaderVersionId};
 
 /// Shader pack identity (not version-specific)
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
 pub struct Shader {
-    pub id: String,
+    pub id: ShaderId,
     pub name: String,
     pub slug: String,
     pub description: Option<String>,
@@ -35,8 +36,8 @@ pub struct Shader {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
 pub struct ShaderVersion {
-    pub id: String,
-    pub shader_id: String,
+    pub id: ShaderVersionId,
+    pub shader_id: ShaderId,
     pub version: String,
     pub modrinth_version_id: Option<String>,
     pub curseforge_file_id: Option<i32>,
@@ -103,7 +104,7 @@ pub struct ShaderWithCaptures {
 #[ts(export)]
 pub struct ShaderAuthor {
     pub id: String,
-    pub shader_id: String,
+    pub shader_id: ShaderId,
     pub name: String,
     pub url: Option<String>,
     pub platform: String,
@@ -113,7 +114,7 @@ pub struct ShaderAuthor {
 #[derive(Debug, Clone, Serialize, FromRow, TS)]
 #[ts(export)]
 pub struct ShaderAdopted {
-    pub id: String,
+    pub id: ShaderId,
     pub slug: String,
 }
 

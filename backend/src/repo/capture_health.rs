@@ -8,6 +8,7 @@ use ts_rs::TS;
 
 use crate::db::DbPool;
 use crate::error::AppResult;
+use crate::id::{SceneId, ShaderId, ShaderVersionId};
 
 /// Health status of a single capture target
 #[derive(Debug, Clone, Serialize, JsonSchema, TS, PartialEq, Eq)]
@@ -60,12 +61,12 @@ impl sqlx::Type<sqlx::Postgres> for TargetHealth {
 #[derive(Debug, Clone, Serialize, JsonSchema, TS)]
 #[ts(export)]
 pub struct CaptureTargetHealth {
-    pub shader_id: String,
+    pub shader_id: ShaderId,
     pub shader_name: String,
     pub shader_slug: String,
-    pub shader_version_id: String,
+    pub shader_version_id: ShaderVersionId,
     pub version: String,
-    pub scene_id: String,
+    pub scene_id: SceneId,
     pub scene_name: String,
     pub scene_slug: String,
     pub profile: Option<String>,
@@ -97,12 +98,12 @@ pub struct CaptureHealthResponse {
 
 #[derive(Debug, sqlx::FromRow)]
 struct CaptureHealthRow {
-    shader_id: String,
+    shader_id: ShaderId,
     shader_name: String,
     shader_slug: String,
-    shader_version_id: String,
+    shader_version_id: ShaderVersionId,
     version: String,
-    scene_id: String,
+    scene_id: SceneId,
     scene_name: String,
     scene_slug: String,
     profile: Option<String>,
@@ -144,12 +145,12 @@ impl CaptureHealthRepo {
                 ORDER BY shader_version_id, scene_id, profile, captured_at DESC
             )
             SELECT
-                sh.id AS "shader_id!",
+                sh.id AS "shader_id!: ShaderId",
                 sh.name AS "shader_name!",
                 sh.slug AS "shader_slug!",
-                sv.id AS "shader_version_id!",
+                sv.id AS "shader_version_id!: ShaderVersionId",
                 sv.version AS "version!",
-                sc.id AS "scene_id!",
+                sc.id AS "scene_id!: SceneId",
                 sc.name AS "scene_name!",
                 sc.slug AS "scene_slug!",
                 tm.profile,

@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::{
     db::DbTransaction,
-    error::{AppError, AppResult},
+    error::{AppError, AppResult, OptionNotFoundExt},
     models::{AdoptPreviewAuthor, AdoptPreviewResponse, Shader},
     platform::{self, Platform, PlatformAuthor, PlatformVersion, ProjectData},
     repo::{ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo},
@@ -127,7 +127,9 @@ impl PlatformService {
             );
         }
 
-        ShaderRepo::get_by_id(state.db(), &shader_id).await
+        ShaderRepo::find_by_id(state.db(), &shader_id)
+            .await?
+            .or_not_found("Shader", &shader_id)
     }
 
     /// Link another platform to an existing shader
@@ -154,14 +156,27 @@ impl PlatformService {
         let (platform, data, versions) = Self::fetch_platform_data(state, platform_ref).await?;
 
         let mut tx = state.begin_tx().await?;
-        ShaderRepo::link_platform(&mut *tx, &shader.id, platform, &data.metadata.platform_id)
-            .await?;
-        Self::upsert_versions(&mut tx, &shader.id, &versions).await?;
-        Self::upsert_authors(&mut tx, &shader.id, &platform.to_string(), &data.authors).await?;
+        ShaderRepo::link_platform(
+            &mut *tx,
+            shader.id.as_ref(),
+            platform,
+            &data.metadata.platform_id,
+        )
+        .await?;
+        Self::upsert_versions(&mut tx, shader.id.as_ref(), &versions).await?;
+        Self::upsert_authors(
+            &mut tx,
+            shader.id.as_ref(),
+            &platform.to_string(),
+            &data.authors,
+        )
+        .await?;
         tx.commit().await?;
 
         info!(shader_id = %shader.id, platform = %platform, "Linked platform to shader");
-        ShaderRepo::get_by_id(state.db(), &shader.id).await
+        ShaderRepo::find_by_id(state.db(), shader.id.as_ref())
+            .await?
+            .or_not_found("Shader", &shader.id)
     }
 
     /// Sync a shader from all linked platforms
@@ -190,13 +205,14 @@ impl PlatformService {
 
                     match state.modrinth().fetch_shader_versions(modrinth_id).await {
                         Ok(versions) => {
-                            Self::upsert_versions(&mut tx, &shader.id, &versions).await?
+                            Self::upsert_versions(&mut tx, shader.id.as_ref(), &versions).await?
                         }
                         Err(e) => {
                             tracing::warn!(error = ?e, modrinth_id = %modrinth_id, "Failed to fetch versions from Modrinth")
                         }
                     }
-                    Self::upsert_authors(&mut tx, &shader.id, "modrinth", &data.authors).await?;
+                    Self::upsert_authors(&mut tx, shader.id.as_ref(), "modrinth", &data.authors)
+                        .await?;
                 }
                 Err(e) => {
                     tracing::warn!(error = ?e, modrinth_id = %modrinth_id, "Failed to sync from Modrinth");
@@ -222,13 +238,14 @@ impl PlatformService {
 
                     match cf.fetch_shader_versions(curseforge_id).await {
                         Ok(versions) => {
-                            Self::upsert_versions(&mut tx, &shader.id, &versions).await?
+                            Self::upsert_versions(&mut tx, shader.id.as_ref(), &versions).await?
                         }
                         Err(e) => {
                             tracing::warn!(error = ?e, curseforge_id = %curseforge_id, "Failed to fetch versions from CurseForge")
                         }
                     }
-                    Self::upsert_authors(&mut tx, &shader.id, "curseforge", &data.authors).await?;
+                    Self::upsert_authors(&mut tx, shader.id.as_ref(), "curseforge", &data.authors)
+                        .await?;
                 }
                 Err(e) => {
                     tracing::warn!(error = ?e, curseforge_id = %curseforge_id, "Failed to sync from CurseForge");
@@ -238,7 +255,7 @@ impl PlatformService {
 
         ShaderRepo::update_sync_metadata(
             &mut *tx,
-            &shader.id,
+            shader.id.as_ref(),
             &name,
             description.as_deref(),
             icon_url.as_deref(),
@@ -252,7 +269,9 @@ impl PlatformService {
         tx.commit().await?;
 
         info!(shader_id = %shader.id, "Synced shader from upstream platforms");
-        ShaderRepo::get_by_id(state.db(), &shader.id).await
+        ShaderRepo::find_by_id(state.db(), shader.id.as_ref())
+            .await?
+            .or_not_found("Shader", &shader.id)
     }
 
     #[instrument(skip(tx, versions), level = "debug")]

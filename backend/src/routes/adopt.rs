@@ -7,7 +7,7 @@ use axum::{
 
 use crate::{
     auth::AdminUser,
-    error::{AppError, AppResult},
+    error::{AppError, AppResult, OptionNotFoundExt},
     models::{
         AdoptPreviewResponse, AdoptShaderRequest, LinkShaderRequest, Shader, ShaderSearchRequest,
         ShaderSearchResponse, ShaderSearchResult, ShaderSearchSort,
@@ -209,7 +209,9 @@ async fn link_platform(
     Path(shader_id): Path<String>,
     Json(request): Json<LinkShaderRequest>,
 ) -> AppResult<Json<Shader>> {
-    let shader = ShaderRepo::get_by_id(state.db(), &shader_id).await?;
+    let shader = ShaderRepo::find_by_id(state.db(), &shader_id)
+        .await?
+        .or_not_found("Shader", &shader_id)?;
     let platform_ref = platform::parse_platform_url(&request.url)
         .ok_or_else(|| AppError::BadRequest("Invalid or unsupported platform URL".into()))?;
 
@@ -223,7 +225,9 @@ async fn sync_shader(
     State(state): State<AppState>,
     Path(shader_id): Path<String>,
 ) -> AppResult<Json<Shader>> {
-    let shader = ShaderRepo::get_by_id(state.db(), &shader_id).await?;
+    let shader = ShaderRepo::find_by_id(state.db(), &shader_id)
+        .await?
+        .or_not_found("Shader", &shader_id)?;
     let shader = PlatformService::sync_shader(&state, &shader).await?;
     Ok(Json(shader))
 }

@@ -7,15 +7,16 @@ use validator::{Validate, ValidationError};
 use super::capture::CaptureWithContext;
 use super::taxonomy::Tag;
 use super::world::World;
+use crate::id::{SceneId, SceneVersionId, WorldId};
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
 pub struct Scene {
-    pub id: String,
+    pub id: SceneId,
     pub name: String,
     pub slug: String,
     pub description: Option<String>,
-    pub world_id: String,
+    pub world_id: WorldId,
     pub dimension: String,
     pub parent_scene_id: Option<String>,
     pub active: bool,
@@ -27,8 +28,8 @@ pub struct Scene {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export)]
 pub struct SceneVersion {
-    pub id: String,
-    pub scene_id: String,
+    pub id: SceneVersionId,
+    pub scene_id: SceneId,
     pub x: f64,
     pub y: f64,
     pub z: f64,
@@ -124,7 +125,7 @@ pub struct Camera {
 /// Create scene request (from mod - includes name, no description/tags)
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateSceneRequest {
-    pub world_id: String,
+    pub world_id: WorldId,
     pub slug: String,
     pub name: String,
     #[validate(nested)]
@@ -150,7 +151,7 @@ pub struct CreateSceneRequest {
 /// Update scene request (from mod - no name/description/tags, only positioning)
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdateSceneRequest {
-    pub world_id: String,
+    pub world_id: WorldId,
     #[validate(nested)]
     pub position: Position,
     #[validate(nested)]

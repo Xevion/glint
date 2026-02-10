@@ -6,19 +6,20 @@ use ts_rs::TS;
 
 use crate::db::DbPool;
 use crate::error::AppResult;
+use crate::id::{SceneId, SceneVersionId, ShaderId, ShaderVersionId, WorldId, WorldVersionId};
 
 /// A single work item: one (shader_version, scene, profile) triple to capture
 #[derive(Debug, sqlx::FromRow, serde::Serialize, JsonSchema, TS)]
 #[ts(export)]
 pub struct WorkItem {
-    pub shader_version_id: String,
-    pub shader_id: String,
+    pub shader_version_id: ShaderVersionId,
+    pub shader_id: ShaderId,
     pub shader_slug: String,
     pub shader_name: String,
     pub version: String,
     pub download_url: Option<String>,
     pub file_hash: Option<String>,
-    pub scene_id: String,
+    pub scene_id: SceneId,
     pub scene_slug: String,
     pub scene_name: String,
     pub scene_dimension: String,
@@ -32,14 +33,14 @@ pub struct WorkItem {
     pub scene_weather_intensity: f64,
     pub scene_moon_phase: Option<i32>,
     pub scene_biome: Option<String>,
-    pub world_id: String,
+    pub world_id: WorldId,
     pub world_slug: String,
     pub world_name: String,
     pub world_file_url: Option<String>,
     pub world_file_hash: Option<String>,
     pub world_size_bytes: Option<i64>,
-    pub world_version_id: Option<String>,
-    pub scene_version_id: Option<String>,
+    pub world_version_id: Option<WorldVersionId>,
+    pub scene_version_id: Option<SceneVersionId>,
     pub profile: Option<String>,
 }
 
@@ -83,14 +84,14 @@ impl WorkRepo {
                 ORDER BY shader_version_id, scene_id, profile, captured_at DESC
             )
             SELECT
-                tm.shader_version_id AS "shader_version_id!",
-                sh.id AS "shader_id!",
+                tm.shader_version_id AS "shader_version_id!: ShaderVersionId",
+                sh.id AS "shader_id!: ShaderId",
                 sh.slug AS "shader_slug!",
                 sh.name AS "shader_name!",
                 sv.version AS "version!",
                 sv.download_url,
                 sv.file_hash,
-                tm.scene_id AS "scene_id!",
+                tm.scene_id AS "scene_id!: SceneId",
                 sc.slug AS "scene_slug!",
                 sc.name AS "scene_name!",
                 sc.dimension AS "scene_dimension!",
@@ -104,14 +105,14 @@ impl WorkRepo {
                 lsv.weather_intensity AS "scene_weather_intensity!",
                 lsv.moon_phase AS scene_moon_phase,
                 lsv.biome AS scene_biome,
-                w.id AS "world_id!",
+                w.id AS "world_id!: WorldId",
                 w.slug AS "world_slug!",
                 w.name AS "world_name!",
                 lwv.file_url AS world_file_url,
                 lwv.file_hash AS world_file_hash,
                 lwv.size_bytes AS world_size_bytes,
-                lwv.id AS world_version_id,
-                lsv.id AS scene_version_id,
+                lwv.id AS "world_version_id: WorldVersionId",
+                lsv.id AS "scene_version_id: SceneVersionId",
                 tm.profile
             FROM capture_target_matrix tm
             JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id

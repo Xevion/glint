@@ -1,8 +1,11 @@
 use anyhow::Context;
 use tracing::{debug, instrument, warn};
 
-use crate::error::{AppError, AppResult};
-use crate::models::{CaptureRun, CaptureRunItem, CaptureRunItemWithContext};
+use crate::error::{AppResult, OptionNotFoundExt};
+use crate::id::{CaptureId, CaptureRunId, SceneId, ShaderVersionId};
+use crate::models::{
+    CaptureRun, CaptureRunItem, CaptureRunItemStatus, CaptureRunItemWithContext, CaptureRunStatus,
+};
 
 pub struct CaptureRunRepo;
 
@@ -21,7 +24,13 @@ impl CaptureRunRepo {
             r#"
             INSERT INTO capture_runs (id, agent_id, total_items, metadata_json, status, started_at)
             VALUES ($1, $2, $3, $4, 'running', now())
-            RETURNING *
+            RETURNING id AS "id: CaptureRunId", agent_id, started_at, completed_at,
+                status AS "status!: CaptureRunStatus",
+                total_items,
+                completed_items,
+                failed_items,
+                skipped_items,
+                metadata_json
             "#,
             id,
             agent_id,
@@ -43,8 +52,8 @@ impl CaptureRunRepo {
             CaptureRun,
             r#"
             SELECT
-                cr.id, cr.agent_id, cr.started_at, cr.completed_at,
-                cr.status, cr.total_items,
+                cr.id AS "id: CaptureRunId", cr.agent_id, cr.started_at, cr.completed_at,
+                cr.status AS "status!: CaptureRunStatus", cr.total_items,
                 COALESCE(counts.completed, 0)::int4 as "completed_items!",
                 COALESCE(counts.failed, 0)::int4 as "failed_items!",
                 COALESCE(counts.skipped, 0)::int4 as "skipped_items!",
@@ -64,7 +73,7 @@ impl CaptureRunRepo {
         .fetch_optional(executor)
         .await
         .context(format!("failed to find capture run '{}'", id))?
-        .ok_or_else(|| AppError::NotFound(format!("Capture run '{}' not found", id)))
+        .or_not_found("Capture run", id)
     }
 
     /// List all capture runs (admin)
@@ -74,8 +83,8 @@ impl CaptureRunRepo {
             CaptureRun,
             r#"
             SELECT
-                cr.id, cr.agent_id, cr.started_at, cr.completed_at,
-                cr.status, cr.total_items,
+                cr.id AS "id: CaptureRunId", cr.agent_id, cr.started_at, cr.completed_at,
+                cr.status AS "status!: CaptureRunStatus", cr.total_items,
                 COALESCE(counts.completed, 0)::int4 as "completed_items!",
                 COALESCE(counts.failed, 0)::int4 as "failed_items!",
                 COALESCE(counts.skipped, 0)::int4 as "skipped_items!",
@@ -123,14 +132,21 @@ impl CaptureRunRepo {
                 END
             FROM counts
             WHERE capture_runs.id = $1
-            RETURNING capture_runs.*
+            RETURNING capture_runs.id AS "id: CaptureRunId", capture_runs.agent_id,
+                capture_runs.started_at, capture_runs.completed_at,
+                capture_runs.status AS "status!: CaptureRunStatus",
+                capture_runs.total_items,
+                capture_runs.completed_items,
+                capture_runs.failed_items,
+                capture_runs.skipped_items,
+                capture_runs.metadata_json
             "#,
             id
         )
         .fetch_optional(executor)
         .await
         .context(format!("failed to complete capture run '{}'", id))?
-        .ok_or_else(|| AppError::NotFound(format!("Capture run '{}' not found", id)))?;
+        .or_not_found("Capture run", id)?;
 
         debug!(run_id = id, status = %run.status, "Completed capture run");
         Ok(run)
@@ -231,13 +247,22 @@ impl CaptureRunRepo {
     ) -> AppResult<CaptureRunItem> {
         sqlx::query_as!(
             CaptureRunItem,
-            "SELECT * FROM capture_run_items WHERE id = $1",
+            r#"SELECT id,
+                run_id AS "run_id: CaptureRunId",
+                shader_version_id AS "shader_version_id: ShaderVersionId",
+                scene_id AS "scene_id: SceneId",
+                profile,
+                status AS "status!: CaptureRunItemStatus",
+                capture_id AS "capture_id: CaptureId",
+                error_message, error_log, duration_ms,
+                started_at, completed_at
+            FROM capture_run_items WHERE id = $1"#,
             item_id
         )
         .fetch_optional(executor)
         .await
         .context(format!("failed to find run item '{}'", item_id))?
-        .ok_or_else(|| AppError::NotFound(format!("Run item '{}' not found", item_id)))
+        .or_not_found("Run item", item_id)
     }
 
     /// Claim a run item: set status to 'running' and link a capture
@@ -266,7 +291,16 @@ impl CaptureRunRepo {
     ) -> AppResult<Vec<CaptureRunItem>> {
         let items = sqlx::query_as!(
             CaptureRunItem,
-            "SELECT * FROM capture_run_items WHERE run_id = $1 ORDER BY started_at ASC NULLS LAST",
+            r#"SELECT id,
+                run_id AS "run_id: CaptureRunId",
+                shader_version_id AS "shader_version_id: ShaderVersionId",
+                scene_id AS "scene_id: SceneId",
+                profile,
+                status AS "status!: CaptureRunItemStatus",
+                capture_id AS "capture_id: CaptureId",
+                error_message, error_log, duration_ms,
+                started_at, completed_at
+            FROM capture_run_items WHERE run_id = $1 ORDER BY started_at ASC NULLS LAST"#,
             run_id
         )
         .fetch_all(executor)
@@ -286,8 +320,13 @@ impl CaptureRunRepo {
             CaptureRunItemWithContext,
             r#"
             SELECT
-                cri.id, cri.run_id, cri.shader_version_id, cri.scene_id,
-                cri.profile, cri.status, cri.capture_id,
+                cri.id,
+                cri.run_id AS "run_id: CaptureRunId",
+                cri.shader_version_id AS "shader_version_id: ShaderVersionId",
+                cri.scene_id AS "scene_id: SceneId",
+                cri.profile,
+                cri.status AS "status!: CaptureRunItemStatus",
+                cri.capture_id AS "capture_id: CaptureId",
                 cri.error_message, cri.error_log, cri.duration_ms,
                 cri.started_at, cri.completed_at,
                 s.name as shader_name,

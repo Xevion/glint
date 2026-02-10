@@ -7,7 +7,7 @@ use axum::{
 
 use crate::{
     auth::AdminUser,
-    error::AppResult,
+    error::{AppResult, OptionNotFoundExt},
     models::{UpdateUserRoleRequest, User, UserWithSessions},
     repo::{SessionRepo, UserRepo},
     state::AppState,
@@ -36,7 +36,9 @@ async fn get_user(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<UserWithSessions>> {
-    let user = UserRepo::get_by_id(state.db(), id).await?;
+    let user = UserRepo::find_by_id(state.db(), id)
+        .await?
+        .or_not_found("User", id)?;
     let sessions = SessionRepo::list_for_user(state.db(), id).await?;
     Ok(Json(UserWithSessions { user, sessions }))
 }

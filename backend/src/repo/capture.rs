@@ -7,12 +7,47 @@ use sqlx::FromRow;
 use tracing::{debug, instrument};
 
 use crate::db::DbPool;
-use crate::error::{AppError, AppResult};
-use crate::models::{Capture, CaptureDetail, CaptureFreshness, CaptureWithContext};
+use crate::error::{AppResult, OptionNotFoundExt};
+use crate::id::{
+    CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderId, ShaderVersionId, WorldVersionId,
+};
+use crate::models::{
+    Capture, CaptureDetail, CaptureFreshness, CaptureRunStatus, CaptureStatus, CaptureWithContext,
+};
 
 pub struct ThumbnailInfo {
     pub image_url: String,
     pub thumbhash: Option<String>,
+}
+
+/// Optional filters for listing captures with context.
+#[derive(Default)]
+pub struct CaptureFilters {
+    pub shader_id: Option<ShaderId>,
+    pub shader_slug: Option<String>,
+    pub scene_id: Option<SceneId>,
+    pub version_id: Option<ShaderVersionId>,
+    pub profile: Option<String>,
+    pub status: Option<CaptureStatus>,
+    pub run_id: Option<CaptureRunId>,
+    pub scene_active: Option<bool>,
+}
+
+#[derive(Debug)]
+pub struct Pagination {
+    pub limit: i64,
+    pub offset: i64,
+}
+
+/// Controls DISTINCT ON behavior for capture list queries.
+#[derive(Debug)]
+pub enum CaptureDistinct {
+    /// No deduplication — return all matching rows.
+    None,
+    /// DISTINCT ON (shader_id) — one capture per shader (scene detail page).
+    PerShader,
+    /// DISTINCT ON (scene_id) — one capture per scene (shader detail page).
+    PerScene,
 }
 
 pub struct CaptureRepo;
@@ -23,18 +58,28 @@ impl CaptureRepo {
         executor: impl sqlx::PgExecutor<'_>,
         id: &str,
     ) -> AppResult<Option<Capture>> {
-        sqlx::query_as!(Capture, "SELECT * FROM captures WHERE id = $1", id)
-            .fetch_optional(executor)
-            .await
-            .context(format!("failed to find capture '{}'", id))
-            .map_err(Into::into)
-    }
-
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn get_by_id(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<Capture> {
-        Self::find_by_id(executor, id)
-            .await?
-            .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
+        sqlx::query_as!(
+            Capture,
+            r#"SELECT
+                id AS "id: CaptureId",
+                shader_version_id AS "shader_version_id: ShaderVersionId",
+                scene_id AS "scene_id: SceneId",
+                profile, image_url, image_path,
+                video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
+                minecraft_version, iris_version, gpu_model, resolution_width,
+                resolution_height, captured_at,
+                status AS "status!: CaptureStatus",
+                error_message, thumbhash, file_size_bytes, content_type,
+                world_version_id AS "world_version_id: WorldVersionId",
+                scene_version_id AS "scene_version_id: SceneVersionId",
+                created_at, updated_at
+            FROM captures WHERE id = $1"#,
+            id
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to find capture '{}'", id))
+        .map_err(Into::into)
     }
 
     /// List all completed captures (only from active scenes)
@@ -43,7 +88,20 @@ impl CaptureRepo {
         let captures = sqlx::query_as!(
             Capture,
             r#"
-            SELECT c.*
+            SELECT
+                c.id AS "id: CaptureId",
+                c.shader_version_id AS "shader_version_id: ShaderVersionId",
+                c.scene_id AS "scene_id: SceneId",
+                c.profile, c.image_url,
+                c.image_path, c.video_url, c.avg_fps, c.min_fps, c.max_fps,
+                c.frame_time_avg, c.frame_time_p99, c.minecraft_version,
+                c.iris_version, c.gpu_model, c.resolution_width, c.resolution_height,
+                c.captured_at,
+                c.status AS "status!: CaptureStatus",
+                c.error_message, c.thumbhash, c.file_size_bytes, c.content_type,
+                c.world_version_id AS "world_version_id: WorldVersionId",
+                c.scene_version_id AS "scene_version_id: SceneVersionId",
+                c.created_at, c.updated_at
             FROM captures c
             JOIN scenes sc ON c.scene_id = sc.id
             WHERE c.status = 'completed' AND sc.active = TRUE
@@ -66,7 +124,20 @@ impl CaptureRepo {
     ) -> AppResult<Vec<Capture>> {
         let captures = sqlx::query_as!(
             Capture,
-            "SELECT * FROM captures WHERE shader_version_id = $1 ORDER BY created_at DESC",
+            r#"SELECT
+                id AS "id: CaptureId",
+                shader_version_id AS "shader_version_id: ShaderVersionId",
+                scene_id AS "scene_id: SceneId",
+                profile, image_url, image_path,
+                video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
+                minecraft_version, iris_version, gpu_model, resolution_width,
+                resolution_height, captured_at,
+                status AS "status!: CaptureStatus",
+                error_message, thumbhash, file_size_bytes, content_type,
+                world_version_id AS "world_version_id: WorldVersionId",
+                scene_version_id AS "scene_version_id: SceneVersionId",
+                created_at, updated_at
+            FROM captures WHERE shader_version_id = $1 ORDER BY created_at DESC"#,
             shader_version_id
         )
         .fetch_all(executor)
@@ -88,7 +159,20 @@ impl CaptureRepo {
     ) -> AppResult<Vec<Capture>> {
         let captures = sqlx::query_as!(
             Capture,
-            "SELECT * FROM captures WHERE scene_id = $1 ORDER BY created_at DESC",
+            r#"SELECT
+                id AS "id: CaptureId",
+                shader_version_id AS "shader_version_id: ShaderVersionId",
+                scene_id AS "scene_id: SceneId",
+                profile, image_url, image_path,
+                video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
+                minecraft_version, iris_version, gpu_model, resolution_width,
+                resolution_height, captured_at,
+                status AS "status!: CaptureStatus",
+                error_message, thumbhash, file_size_bytes, content_type,
+                world_version_id AS "world_version_id: WorldVersionId",
+                scene_version_id AS "scene_version_id: SceneVersionId",
+                created_at, updated_at
+            FROM captures WHERE scene_id = $1 ORDER BY created_at DESC"#,
             scene_id
         )
         .fetch_all(executor)
@@ -99,38 +183,211 @@ impl CaptureRepo {
         Ok(captures)
     }
 
-    /// Fetch the latest capture per shader for a scene (for scene detail page)
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn list_with_context_for_scene(
-        executor: impl sqlx::PgExecutor<'_>,
-        scene_id: &str,
-    ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = sqlx::query_as!(
-            CaptureWithContext,
-            r#"
-            SELECT DISTINCT ON (shader_id)
-                id AS "id!", scene_id AS "scene_id!",
-                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
-                shader_version AS "shader_version!",
-                profile, image_path, image_url, thumbhash, captured_at,
-                resolution_width, resolution_height, file_size_bytes,
-                run_id, run_status, shader_author, scene_name, scene_slug,
-                freshness AS "freshness!: CaptureFreshness"
-            FROM capture_contexts
-            WHERE scene_id = $1 AND capture_status = 'completed'
-            ORDER BY shader_id, captured_at DESC NULLS LAST
-            "#,
-            scene_id
-        )
-        .fetch_all(executor)
-        .await
-        .context(format!(
-            "failed to get captures with context for scene '{}'",
-            scene_id
-        ))?;
+    /// List captures with context, supporting flexible filtering, pagination, and deduplication.
+    ///
+    /// Replaces the former `list_all_with_context`, `list_all_with_context_paginated`,
+    /// `list_with_context_for_scene`, `list_with_context_for_shader`, and
+    /// `list_with_context_for_shader_filtered` methods.
+    ///
+    /// Returns `(captures, total_count)` where `total_count` is `Some` only when
+    /// `pagination` is provided.
+    #[instrument(skip(db, filters), level = "debug")]
+    pub async fn list_with_context(
+        db: &DbPool,
+        filters: &CaptureFilters,
+        pagination: Option<&Pagination>,
+        distinct: CaptureDistinct,
+    ) -> AppResult<(Vec<CaptureWithContext>, Option<i64>)> {
+        let status_str = filters.status.map(|s| s.as_str().to_owned());
+        let shader_id = filters.shader_id.as_ref().map(AsRef::<str>::as_ref);
+        let scene_id = filters.scene_id.as_ref().map(AsRef::<str>::as_ref);
+        let version_id = filters.version_id.as_ref().map(AsRef::<str>::as_ref);
+        let run_id = filters.run_id.as_ref().map(AsRef::<str>::as_ref);
 
-        debug!(count = captures.len(), "Fetched captures with context");
-        Ok(captures)
+        let items = match distinct {
+            CaptureDistinct::None => {
+                if let Some(page) = pagination {
+                    sqlx::query_as!(
+                        CaptureWithContext,
+                        r#"
+                        SELECT
+                            id AS "id!", scene_id AS "scene_id!",
+                            shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                            shader_version AS "shader_version!",
+                            profile, image_path, image_url, thumbhash, captured_at,
+                            resolution_width, resolution_height, file_size_bytes,
+                            run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
+                            shader_author, scene_name, scene_slug,
+                            freshness AS "freshness!: CaptureFreshness"
+                        FROM capture_contexts
+                        WHERE ($1::text IS NULL OR shader_id = $1)
+                          AND ($2::text IS NULL OR shader_slug = $2)
+                          AND ($3::text IS NULL OR scene_id = $3)
+                          AND ($4::text IS NULL OR shader_version_id = $4)
+                          AND ($5::text IS NULL OR profile = $5)
+                          AND ($6::text IS NULL OR capture_status = $6)
+                          AND ($7::text IS NULL OR run_id = $7)
+                          AND ($8::bool IS NULL OR scene_active = $8)
+                        ORDER BY captured_at DESC NULLS LAST
+                        LIMIT $9 OFFSET $10
+                        "#,
+                        shader_id,
+                        filters.shader_slug,
+                        scene_id,
+                        version_id,
+                        filters.profile,
+                        status_str,
+                        run_id,
+                        filters.scene_active,
+                        page.limit,
+                        page.offset,
+                    )
+                    .fetch_all(db)
+                    .await
+                    .context("failed to list captures with context")?
+                } else {
+                    sqlx::query_as!(
+                        CaptureWithContext,
+                        r#"
+                        SELECT
+                            id AS "id!", scene_id AS "scene_id!",
+                            shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                            shader_version AS "shader_version!",
+                            profile, image_path, image_url, thumbhash, captured_at,
+                            resolution_width, resolution_height, file_size_bytes,
+                            run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
+                            shader_author, scene_name, scene_slug,
+                            freshness AS "freshness!: CaptureFreshness"
+                        FROM capture_contexts
+                        WHERE ($1::text IS NULL OR shader_id = $1)
+                          AND ($2::text IS NULL OR shader_slug = $2)
+                          AND ($3::text IS NULL OR scene_id = $3)
+                          AND ($4::text IS NULL OR shader_version_id = $4)
+                          AND ($5::text IS NULL OR profile = $5)
+                          AND ($6::text IS NULL OR capture_status = $6)
+                          AND ($7::text IS NULL OR run_id = $7)
+                          AND ($8::bool IS NULL OR scene_active = $8)
+                        ORDER BY captured_at DESC NULLS LAST
+                        "#,
+                        shader_id,
+                        filters.shader_slug,
+                        scene_id,
+                        version_id,
+                        filters.profile,
+                        status_str,
+                        run_id,
+                        filters.scene_active,
+                    )
+                    .fetch_all(db)
+                    .await
+                    .context("failed to list captures with context")?
+                }
+            }
+            CaptureDistinct::PerShader => sqlx::query_as!(
+                CaptureWithContext,
+                r#"
+                    SELECT DISTINCT ON (shader_id)
+                        id AS "id!", scene_id AS "scene_id!",
+                        shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                        shader_version AS "shader_version!",
+                        profile, image_path, image_url, thumbhash, captured_at,
+                        resolution_width, resolution_height, file_size_bytes,
+                        run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
+                        shader_author, scene_name, scene_slug,
+                        freshness AS "freshness!: CaptureFreshness"
+                    FROM capture_contexts
+                    WHERE ($1::text IS NULL OR shader_id = $1)
+                      AND ($2::text IS NULL OR shader_slug = $2)
+                      AND ($3::text IS NULL OR scene_id = $3)
+                      AND ($4::text IS NULL OR shader_version_id = $4)
+                      AND ($5::text IS NULL OR profile = $5)
+                      AND ($6::text IS NULL OR capture_status = $6)
+                      AND ($7::text IS NULL OR run_id = $7)
+                      AND ($8::bool IS NULL OR scene_active = $8)
+                    ORDER BY shader_id, captured_at DESC NULLS LAST
+                    "#,
+                shader_id,
+                filters.shader_slug,
+                scene_id,
+                version_id,
+                filters.profile,
+                status_str,
+                run_id,
+                filters.scene_active,
+            )
+            .fetch_all(db)
+            .await
+            .context("failed to list captures with context (per-shader)")?,
+            CaptureDistinct::PerScene => sqlx::query_as!(
+                CaptureWithContext,
+                r#"
+                    SELECT DISTINCT ON (scene_id)
+                        id AS "id!", scene_id AS "scene_id!",
+                        shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                        shader_version AS "shader_version!",
+                        profile, image_path, image_url, thumbhash, captured_at,
+                        resolution_width, resolution_height, file_size_bytes,
+                        run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
+                        shader_author, scene_name, scene_slug,
+                        freshness AS "freshness!: CaptureFreshness"
+                    FROM capture_contexts
+                    WHERE ($1::text IS NULL OR shader_id = $1)
+                      AND ($2::text IS NULL OR shader_slug = $2)
+                      AND ($3::text IS NULL OR scene_id = $3)
+                      AND ($4::text IS NULL OR shader_version_id = $4)
+                      AND ($5::text IS NULL OR profile = $5)
+                      AND ($6::text IS NULL OR capture_status = $6)
+                      AND ($7::text IS NULL OR run_id = $7)
+                      AND ($8::bool IS NULL OR scene_active = $8)
+                    ORDER BY scene_id, captured_at DESC NULLS LAST
+                    "#,
+                shader_id,
+                filters.shader_slug,
+                scene_id,
+                version_id,
+                filters.profile,
+                status_str,
+                run_id,
+                filters.scene_active,
+            )
+            .fetch_all(db)
+            .await
+            .context("failed to list captures with context (per-scene)")?,
+        };
+
+        let count = if let Some(_page) = pagination {
+            let total = sqlx::query_scalar!(
+                r#"
+                SELECT COUNT(*) AS "count!"
+                FROM capture_contexts
+                WHERE ($1::text IS NULL OR shader_id = $1)
+                  AND ($2::text IS NULL OR shader_slug = $2)
+                  AND ($3::text IS NULL OR scene_id = $3)
+                  AND ($4::text IS NULL OR shader_version_id = $4)
+                  AND ($5::text IS NULL OR profile = $5)
+                  AND ($6::text IS NULL OR capture_status = $6)
+                  AND ($7::text IS NULL OR run_id = $7)
+                  AND ($8::bool IS NULL OR scene_active = $8)
+                "#,
+                shader_id,
+                filters.shader_slug,
+                scene_id,
+                version_id,
+                filters.profile,
+                status_str,
+                run_id,
+                filters.scene_active,
+            )
+            .fetch_one(db)
+            .await
+            .context("failed to count captures with context")?;
+            Some(total)
+        } else {
+            None
+        };
+
+        debug!(count = items.len(), "Listed captures with context");
+        Ok((items, count))
     }
 
     /// Insert a new capture (append-only — no upsert)
@@ -149,7 +406,7 @@ impl CaptureRepo {
         captured_at: Option<DateTime<Utc>>,
         world_version_id: Option<&str>,
         scene_version_id: Option<&str>,
-        status: &str,
+        status: CaptureStatus,
     ) -> AppResult<()> {
         sqlx::query!(
             r#"
@@ -169,7 +426,7 @@ impl CaptureRepo {
             resolution_height,
             world_version_id,
             scene_version_id,
-            status,
+            status as CaptureStatus,
             captured_at
         )
         .execute(executor)
@@ -179,7 +436,7 @@ impl CaptureRepo {
             scene_id, shader_version_id
         ))?;
 
-        debug!(scene_id, shader_version_id, status, "Capture inserted");
+        debug!(scene_id, shader_version_id, %status, "Capture inserted");
         Ok(())
     }
 
@@ -226,34 +483,6 @@ pub struct StorageBucket {
 }
 
 impl CaptureRepo {
-    /// List all captures with context (for admin dashboard)
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn list_all_with_context(
-        executor: impl sqlx::PgExecutor<'_>,
-    ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = sqlx::query_as!(
-            CaptureWithContext,
-            r#"
-            SELECT
-                id AS "id!", scene_id AS "scene_id!",
-                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
-                shader_version AS "shader_version!",
-                profile, image_path, image_url, thumbhash, captured_at,
-                resolution_width, resolution_height, file_size_bytes,
-                run_id, run_status, shader_author, scene_name, scene_slug,
-                freshness AS "freshness!: CaptureFreshness"
-            FROM capture_contexts
-            ORDER BY captured_at DESC NULLS LAST
-            "#
-        )
-        .fetch_all(executor)
-        .await
-        .context("failed to list all captures with context")?;
-
-        debug!(count = captures.len(), "Listed all captures with context");
-        Ok(captures)
-    }
-
     /// Get a single capture with context (for admin detail view)
     #[instrument(skip(executor), level = "debug")]
     pub async fn get_with_context(
@@ -269,7 +498,8 @@ impl CaptureRepo {
                 shader_version AS "shader_version!",
                 profile, image_path, image_url, thumbhash, captured_at,
                 resolution_width, resolution_height, file_size_bytes,
-                run_id, run_status, shader_author, scene_name, scene_slug,
+                run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
+                shader_author, scene_name, scene_slug,
                 freshness AS "freshness!: CaptureFreshness"
             FROM capture_contexts
             WHERE id = $1
@@ -279,7 +509,7 @@ impl CaptureRepo {
         .fetch_optional(executor)
         .await
         .context(format!("failed to get capture with context '{}'", id))?
-        .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
+        .or_not_found("Capture", id)
     }
 
     /// Full capture detail with technical metadata and related captures.
@@ -290,12 +520,12 @@ impl CaptureRepo {
         #[derive(FromRow)]
         struct DetailRow {
             // Context fields
-            id: String,
-            scene_id: String,
+            id: CaptureId,
+            scene_id: SceneId,
             shader_slug: String,
             shader_name: String,
             shader_version: String,
-            shader_version_id: String,
+            shader_version_id: ShaderVersionId,
             profile: Option<String>,
             image_path: Option<String>,
             image_url: Option<String>,
@@ -304,14 +534,14 @@ impl CaptureRepo {
             resolution_width: Option<i32>,
             resolution_height: Option<i32>,
             file_size_bytes: Option<i64>,
-            run_id: Option<String>,
-            run_status: Option<String>,
+            run_id: Option<CaptureRunId>,
+            run_status: Option<CaptureRunStatus>,
             shader_author: Option<String>,
             scene_name: Option<String>,
             scene_slug: Option<String>,
             freshness: CaptureFreshness,
             // Technical metadata
-            status: String,
+            status: CaptureStatus,
             error_message: Option<String>,
             video_url: Option<String>,
             avg_fps: Option<f64>,
@@ -323,8 +553,8 @@ impl CaptureRepo {
             iris_version: Option<String>,
             gpu_model: Option<String>,
             content_type: Option<String>,
-            world_version_id: Option<String>,
-            scene_version_id: Option<String>,
+            world_version_id: Option<WorldVersionId>,
+            scene_version_id: Option<SceneVersionId>,
             created_at: DateTime<Utc>,
             updated_at: DateTime<Utc>,
         }
@@ -333,18 +563,21 @@ impl CaptureRepo {
             DetailRow,
             r#"
             SELECT
-                id AS "id!", scene_id AS "scene_id!",
+                id AS "id!: CaptureId", scene_id AS "scene_id!: SceneId",
                 shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                 shader_version AS "shader_version!",
-                shader_version_id AS "shader_version_id!",
+                shader_version_id AS "shader_version_id!: ShaderVersionId",
                 profile, image_path, image_url, thumbhash,
                 captured_at, resolution_width, resolution_height, file_size_bytes,
-                run_id, run_status, shader_author, scene_name, scene_slug,
+                run_id AS "run_id: CaptureRunId",
+                run_status AS "run_status: CaptureRunStatus",
+                shader_author, scene_name, scene_slug,
                 freshness AS "freshness!: CaptureFreshness",
-                status AS "status!", error_message, video_url,
+                status AS "status!: CaptureStatus", error_message, video_url,
                 avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
                 minecraft_version, iris_version, gpu_model, content_type,
-                world_version_id, scene_version_id,
+                world_version_id AS "world_version_id: WorldVersionId",
+                scene_version_id AS "scene_version_id: SceneVersionId",
                 created_at AS "created_at!", updated_at AS "updated_at!"
             FROM capture_details
             WHERE id = $1
@@ -354,13 +587,13 @@ impl CaptureRepo {
         .fetch_optional(db)
         .await
         .context(format!("failed to get capture detail '{}'", id))?
-        .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))?;
+        .or_not_found("Capture", id)?;
 
         // Fetch related captures in parallel
-        let scene_id = row.scene_id.clone();
-        let shader_version_id = row.shader_version_id.clone();
-        let capture_id = row.id.clone();
-        let run_id = row.run_id.clone();
+        let scene_id_str = row.scene_id.0.clone();
+        let shader_version_id_str = row.shader_version_id.0.clone();
+        let capture_id_str = row.id.0.clone();
+        let run_id_str = row.run_id.as_ref().map(|r| r.0.clone());
 
         // Same shader + same scene (different profiles/versions of same shader in same scene)
         let same_shader_scene_fut = sqlx::query_as!(
@@ -372,7 +605,8 @@ impl CaptureRepo {
                 shader_version AS "shader_version!",
                 profile, image_path, image_url, thumbhash, captured_at,
                 resolution_width, resolution_height, file_size_bytes,
-                run_id, run_status, shader_author, scene_name, scene_slug,
+                run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
+                shader_author, scene_name, scene_slug,
                 freshness AS "freshness!: CaptureFreshness"
             FROM capture_contexts
             WHERE scene_id = $1
@@ -382,9 +616,9 @@ impl CaptureRepo {
             ORDER BY captured_at DESC NULLS LAST
             LIMIT 8
             "#,
-            scene_id,
-            shader_version_id,
-            capture_id,
+            scene_id_str,
+            shader_version_id_str,
+            capture_id_str,
         )
         .fetch_all(db);
 
@@ -398,7 +632,8 @@ impl CaptureRepo {
                 shader_version AS "shader_version!",
                 profile, image_path, image_url, thumbhash, captured_at,
                 resolution_width, resolution_height, file_size_bytes,
-                run_id, run_status, shader_author, scene_name, scene_slug,
+                run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
+                shader_author, scene_name, scene_slug,
                 freshness AS "freshness!: CaptureFreshness"
             FROM capture_contexts
             WHERE scene_id = $1
@@ -408,13 +643,13 @@ impl CaptureRepo {
             ORDER BY captured_at DESC NULLS LAST
             LIMIT 8
             "#,
-            scene_id,
-            shader_version_id,
-            capture_id,
+            scene_id_str,
+            shader_version_id_str,
+            capture_id_str,
         )
         .fetch_all(db);
 
-        let (same_shader_scene, same_scene, same_run) = if let Some(ref rid) = run_id {
+        let (same_shader_scene, same_scene, same_run) = if let Some(ref rid) = run_id_str {
             let same_run_fut = sqlx::query_as!(
                 CaptureWithContext,
                 r#"
@@ -424,17 +659,18 @@ impl CaptureRepo {
                     shader_version AS "shader_version!",
                     profile, image_path, image_url, thumbhash, captured_at,
                     resolution_width, resolution_height, file_size_bytes,
-                    run_id, run_status, shader_author, scene_name, scene_slug,
-                    freshness AS "freshness!: CaptureFreshness"
-                FROM capture_contexts
-                WHERE run_id = $1
-                  AND id != $2
+                run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
+                shader_author, scene_name, scene_slug,
+                freshness AS "freshness!: CaptureFreshness"
+            FROM capture_contexts
+            WHERE run_id = $1
+              AND id != $2
                   AND capture_status = 'completed'
                 ORDER BY captured_at DESC NULLS LAST
                 LIMIT 8
                 "#,
                 rid,
-                capture_id,
+                capture_id_str,
             )
             .fetch_all(db);
 
@@ -493,68 +729,6 @@ impl CaptureRepo {
             same_scene,
             same_run,
         })
-    }
-
-    /// List captures with context, pagination, and filtering (admin)
-    #[instrument(skip(db), level = "debug")]
-    pub async fn list_all_with_context_paginated(
-        db: &DbPool,
-        limit: i64,
-        offset: i64,
-        shader: Option<&str>,
-        scene: Option<&str>,
-        status: Option<&str>,
-        run_id: Option<&str>,
-    ) -> AppResult<(Vec<CaptureWithContext>, i64)> {
-        let items = sqlx::query_as!(
-            CaptureWithContext,
-            r#"
-            SELECT
-                id AS "id!", scene_id AS "scene_id!",
-                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
-                shader_version AS "shader_version!",
-                profile, image_path, image_url, thumbhash, captured_at,
-                resolution_width, resolution_height, file_size_bytes,
-                run_id, run_status, shader_author, scene_name, scene_slug,
-                freshness AS "freshness!: CaptureFreshness"
-            FROM capture_contexts
-            WHERE ($1::text IS NULL OR shader_slug = $1)
-              AND ($2::text IS NULL OR scene_id = $2)
-              AND ($3::text IS NULL OR capture_status = $3)
-              AND ($4::text IS NULL OR run_id = $4)
-            ORDER BY captured_at DESC NULLS LAST
-            LIMIT $5 OFFSET $6
-            "#,
-            shader,
-            scene,
-            status,
-            run_id,
-            limit,
-            offset,
-        )
-        .fetch_all(db)
-        .await
-        .context("failed to list captures with context (paginated)")?;
-
-        let count = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*) as "count!"
-            FROM capture_contexts
-            WHERE ($1::text IS NULL OR shader_slug = $1)
-              AND ($2::text IS NULL OR scene_id = $2)
-              AND ($3::text IS NULL OR capture_status = $3)
-              AND ($4::text IS NULL OR run_id = $4)
-            "#,
-            shader,
-            scene,
-            status,
-            run_id,
-        )
-        .fetch_one(db)
-        .await
-        .context("failed to count captures (paginated)")?;
-
-        Ok((items, count))
     }
 
     /// Delete a capture

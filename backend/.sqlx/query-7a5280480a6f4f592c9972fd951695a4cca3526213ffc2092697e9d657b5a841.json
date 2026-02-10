@@ -1,0 +1,232 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id AS \"id!: CaptureId\", scene_id AS \"scene_id!: SceneId\",\n                shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                shader_version AS \"shader_version!\",\n                shader_version_id AS \"shader_version_id!: ShaderVersionId\",\n                profile, image_path, image_url, thumbhash,\n                captured_at, resolution_width, resolution_height, file_size_bytes,\n                run_id AS \"run_id: CaptureRunId\",\n                run_status AS \"run_status: CaptureRunStatus\",\n                shader_author, scene_name, scene_slug,\n                freshness AS \"freshness!: CaptureFreshness\",\n                status AS \"status!: CaptureStatus\", error_message, video_url,\n                avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,\n                minecraft_version, iris_version, gpu_model, content_type,\n                world_version_id AS \"world_version_id: WorldVersionId\",\n                scene_version_id AS \"scene_version_id: SceneVersionId\",\n                created_at AS \"created_at!\", updated_at AS \"updated_at!\"\n            FROM capture_details\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!: CaptureId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "scene_id!: SceneId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "shader_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "shader_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "shader_version!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "shader_version_id!: ShaderVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "profile",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "image_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "image_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "thumbhash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "captured_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "resolution_width",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "resolution_height",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "file_size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 14,
+        "name": "run_id: CaptureRunId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "run_status: CaptureRunStatus",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "shader_author",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "scene_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "scene_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "freshness!: CaptureFreshness",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "status!: CaptureStatus",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 22,
+        "name": "video_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 23,
+        "name": "avg_fps",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 24,
+        "name": "min_fps",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 25,
+        "name": "max_fps",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 26,
+        "name": "frame_time_avg",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 27,
+        "name": "frame_time_p99",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 28,
+        "name": "minecraft_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 29,
+        "name": "iris_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 30,
+        "name": "gpu_model",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 31,
+        "name": "content_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 32,
+        "name": "world_version_id: WorldVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 33,
+        "name": "scene_version_id: SceneVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 34,
+        "name": "created_at!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 35,
+        "name": "updated_at!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "7a5280480a6f4f592c9972fd951695a4cca3526213ffc2092697e9d657b5a841"
+}

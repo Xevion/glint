@@ -4,6 +4,7 @@ use anyhow::Context;
 use tracing::{debug, instrument, warn};
 
 use crate::error::{AppError, AppResult};
+use crate::id::{SceneId, SceneVersionId, WorldId};
 use chrono::{DateTime, Utc};
 
 use crate::models::{
@@ -48,8 +49,8 @@ impl From<SceneWithWorldRow> for SceneWithWorld {
         let version = row
             .version_id
             .map(|vid| SceneVersion {
-                id: vid,
-                scene_id: row.id.clone(),
+                id: SceneVersionId(vid),
+                scene_id: SceneId(row.id.clone()),
                 x: row.version_x.unwrap_or(0.0),
                 y: row.version_y.unwrap_or(0.0),
                 z: row.version_z.unwrap_or(0.0),
@@ -65,11 +66,11 @@ impl From<SceneWithWorldRow> for SceneWithWorld {
             .expect("scene must have at least one version (post-migration invariant)");
         Self {
             scene: Scene {
-                id: row.id,
+                id: SceneId(row.id),
                 name: row.name,
                 slug: row.slug,
                 description: row.description,
-                world_id: row.world_id,
+                world_id: WorldId(row.world_id),
                 dimension: row.dimension,
                 parent_scene_id: row.parent_scene_id,
                 active: row.active,
@@ -98,13 +99,6 @@ impl SceneRepo {
             .await
             .context(format!("failed to find scene '{}'", id))
             .map_err(Into::into)
-    }
-
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn get_by_id(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<Scene> {
-        Self::find_by_id(executor, id)
-            .await?
-            .ok_or_else(|| AppError::NotFound(format!("Scene '{}' not found", id)))
     }
 
     /// List all active scenes
@@ -181,17 +175,6 @@ impl SceneRepo {
         .map_err(Into::into)
     }
 
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn get_by_slug_and_world(
-        executor: impl sqlx::PgExecutor<'_>,
-        slug: &str,
-        world_id: &str,
-    ) -> AppResult<Scene> {
-        Self::find_by_slug_and_world(executor, slug, world_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound(format!("Scene '{}' not found in this world", slug)))
-    }
-
     /// Check if a scene slug exists in a world (active only)
     #[instrument(skip(executor), level = "debug")]
     pub async fn exists_by_slug_in_world(
@@ -252,7 +235,7 @@ impl SceneRepo {
             id,
             req.name,
             req.slug,
-            req.world_id,
+            req.world_id.as_ref(),
             req.dimension,
             req.parent_scene_id,
         )
@@ -261,7 +244,8 @@ impl SceneRepo {
         .context(format!("failed to create scene '{}'", req.slug))?;
 
         let version_id = uuid::Uuid::new_v4().to_string();
-        let version = SceneVersionRepo::create_inner(&mut *tx, &version_id, &scene.id, req).await?;
+        let version =
+            SceneVersionRepo::create_inner(&mut *tx, &version_id, scene.id.as_ref(), req).await?;
 
         tx.commit()
             .await
@@ -579,7 +563,7 @@ impl SceneVersionRepo {
     pub async fn get_latest_batch(
         executor: impl sqlx::PgExecutor<'_>,
         scene_ids: &[String],
-    ) -> AppResult<HashMap<String, SceneVersion>> {
+    ) -> AppResult<HashMap<SceneId, SceneVersion>> {
         let rows = sqlx::query_as!(
             SceneVersion,
             r#"
