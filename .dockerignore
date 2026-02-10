@@ -1,0 +1,15 @@
+# Ignore everything, then whitelist what we need
+*
+
+# Docker support files
+!docker/
+docker/output/
+
+# Mod source (needed for Stage 1 build)
+!mod/
+
+# Exclude mod build artifacts and IDE files
+mod/**/build/
+mod/**/.gradle/
+mod/**/.idea/
+mod/**/run/

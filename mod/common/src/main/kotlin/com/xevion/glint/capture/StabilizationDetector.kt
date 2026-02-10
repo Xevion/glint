@@ -114,6 +114,7 @@ class StabilizationDetector {
             log.debug("Stabilize: chunks loading") {
                 "loaded" to loadedChunks
                 "total" to totalChunks
+                "server_generated" to ChunkForceLoader.isGenerationComplete()
             }
         }
 

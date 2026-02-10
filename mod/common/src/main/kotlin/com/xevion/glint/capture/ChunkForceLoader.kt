@@ -3,6 +3,7 @@ package com.xevion.glint.capture
 import com.xevion.glint.Loggers
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.ChunkPos
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Utility for force loading chunks within render distance.
@@ -20,6 +21,10 @@ object ChunkForceLoader {
     private val log = Loggers.Capture.get()
     private val forcedChunks = mutableSetOf<Long>()
     private var forcedDimension: net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>? = null
+    private val generationComplete = AtomicBoolean(false)
+
+    /** Whether blocking server-side chunk generation has finished. */
+    fun isGenerationComplete(): Boolean = generationComplete.get()
 
     /**
      * Force load all chunks in render distance around the player.
@@ -37,21 +42,25 @@ object ChunkForceLoader {
         val renderDistance = mc.options.effectiveRenderDistance
         val dimension = player.level().dimension()
 
+        generationComplete.set(false)
+
         // Execute on server thread
         server.execute {
             val serverLevel = server.getLevel(dimension) ?: return@execute
 
             forcedDimension = dimension
             var count = 0
+            val allPositions = mutableListOf<Long>()
 
+            // Phase 1: Mark all chunks as force-loaded (prevents unloading, starts async generation)
             for (dx in -renderDistance..renderDistance) {
                 for (dz in -renderDistance..renderDistance) {
-                    // Use circular pattern matching chunk loading behavior
                     if (dx * dx + dz * dz > renderDistance * renderDistance) continue
 
                     val cx = chunkX + dx
                     val cz = chunkZ + dz
                     val chunkPos = ChunkPos.asLong(cx, cz)
+                    allPositions.add(chunkPos)
 
                     if (serverLevel.setChunkForced(cx, cz, true)) {
                         forcedChunks.add(chunkPos)
@@ -63,6 +72,22 @@ object ChunkForceLoader {
                 "count" to count
                 "render_distance" to renderDistance
             }
+
+            // Phase 2: Block until every chunk reaches FULL status on the server.
+            // Level.getChunk(x, z) calls getChunk(x, z, FULL, true) which blocks via
+            // managedBlock — this processes pending server tasks (including sending
+            // completed chunk packets to the client) while waiting, so chunk generation
+            // workers continue in parallel and the client receives data during the wait.
+            log.debug("Blocking on server-side chunk generation") {
+                "total" to allPositions.size
+            }
+            for (chunkPos in allPositions) {
+                serverLevel.getChunk(ChunkPos.getX(chunkPos), ChunkPos.getZ(chunkPos))
+            }
+            log.info("Server-side chunk generation complete") {
+                "total" to allPositions.size
+            }
+            generationComplete.set(true)
         }
         return true
     }
@@ -94,6 +119,7 @@ object ChunkForceLoader {
 
         forcedChunks.clear()
         forcedDimension = null
+        generationComplete.set(false)
     }
 
     /**

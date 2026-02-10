@@ -141,6 +141,58 @@ mcjar +args='':
     set -euo pipefail
     exec bun ./scripts/mcjar.ts "$@"
 
+# === Docker (Headless Capture) ===
+
+# Build the headless capture Docker image
+docker-build *flags:
+    docker build -t glint-capture:latest -f docker/Dockerfile {{flags}} .
+
+# Run a capture session in Docker (requires NVIDIA GPU + Container Toolkit)
+# Set RECORD=true to save a screen recording to docker/output/capture.mp4
+docker-run *flags:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -f .env ] && set -a && source .env && set +a
+    # NVIDIA Container Toolkit (as of early 2026) doesn't mount libnvidia-gpucomp.so,
+    # a dependency added in driver ~560+. Find and mount it if present on the host.
+    GPUCOMP_MOUNT=""
+    GPUCOMP_PATH=$(find /usr/lib/x86_64-linux-gnu -name "libnvidia-gpucomp.so.*" -not -name "*.so" 2>/dev/null | head -1 || true)
+    if [ -n "$GPUCOMP_PATH" ]; then
+        GPUCOMP_MOUNT="-v ${GPUCOMP_PATH}:${GPUCOMP_PATH}:ro"
+    fi
+    mkdir -p docker/output
+    docker run --rm \
+        --gpus all \
+        --device=/dev/dri:/dev/dri \
+        --add-host=host.docker.internal:host-gateway \
+        -e NVIDIA_DRIVER_CAPABILITIES=all \
+        -e GLINT_AUTONOMOUS="${GLINT_AUTONOMOUS:-true}" \
+        -e GLINT_API_URL="${GLINT_API_URL:-http://host.docker.internal:8080}" \
+        -e GLINT_API_TOKEN="${GLINT_API_TOKEN:?GLINT_API_TOKEN must be set in .env}" \
+        -e RECORD="${RECORD:-false}" \
+        -v mc-assets:/minecraft/assets \
+        -v "$(pwd)/docker/output:/output" \
+        $GPUCOMP_MOUNT \
+        {{flags}} \
+        glint-capture:latest
+
+# Smoke test: verify Xvfb + VirtualGL can see the GPU inside the container
+docker-smoke:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    GPUCOMP_MOUNT=""
+    GPUCOMP_PATH=$(find /usr/lib/x86_64-linux-gnu -name "libnvidia-gpucomp.so.*" -not -name "*.so" 2>/dev/null | head -1 || true)
+    if [ -n "$GPUCOMP_PATH" ]; then
+        GPUCOMP_MOUNT="-v ${GPUCOMP_PATH}:${GPUCOMP_PATH}:ro"
+    fi
+    docker run --rm \
+        --gpus all \
+        --device=/dev/dri:/dev/dri \
+        -e NVIDIA_DRIVER_CAPABILITIES=all \
+        $GPUCOMP_MOUNT \
+        glint-capture:latest \
+        bash -c 'Xvfb :99 -screen 0 1024x768x24 -ac +iglx &>/dev/null & sleep 2 && DISPLAY=:99 VGL_DISPLAY=egl vglrun glxinfo | head -30'
+
 # Install git pre-commit hooks
 install-hooks:
     #!/usr/bin/env bash

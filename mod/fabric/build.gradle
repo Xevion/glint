@@ -33,6 +33,7 @@ dependencies {
     modImplementation libs.kotlinx.serialization.json
 
     // Bundle dependencies into the mod JAR
+    include libs.kotlin.stdlib
     include libs.kotlinx.coroutines.core
     include libs.kotlinx.serialization.core
     include libs.kotlinx.serialization.json

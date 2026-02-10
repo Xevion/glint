@@ -19,6 +19,9 @@
 # Logs
 *.log
 
+# Docker capture output
+docker/output/
+
 # Rust workspace build output
 /target/
 
