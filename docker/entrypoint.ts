@@ -271,16 +271,23 @@ let ffmpeg: Subprocess | null = null;
 if (RECORD) {
 	const [width, height] = RESOLUTION.split("x");
 	const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-	const recordPath = process.env.RECORD_PATH ?? `/output/capture-${timestamp}.mp4`;
+	const recordPath = process.env.RECORD_PATH ?? `/output/capture-${timestamp}.mkv`;
 
 	console.log(`  Recording to: ${recordPath}`);
 
+	// MKV container survives unclean shutdowns (no moov atom finalization like MP4).
+	// Scale to 720p and use low framerate for storage efficiency — this is debug capture,
+	// not gameplay footage. veryfast preset gives much better compression than ultrafast
+	// with minimal CPU overhead. CRF 28 is visually fine for Minecraft.
 	ffmpeg = Bun.spawn(
 		[
 			"ffmpeg", "-y", "-f", "x11grab",
 			"-video_size", `${width}x${height}`,
-			"-framerate", "30", "-i", `:${DISPLAY_NUM}`,
-			"-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p",
+			"-framerate", "15", "-i", `:${DISPLAY_NUM}`,
+			"-vf", "scale=1280:720",
+			"-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+			"-pix_fmt", "yuv420p",
+			"-g", "30",
 			recordPath,
 		],
 		{ stdin: "ignore", stdout: "ignore", stderr: "ignore" },
