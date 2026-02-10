@@ -50,7 +50,7 @@ impl WorkRepo {
                     id, shader_id, supported_profiles, capture_failure_count,
                     version, download_url, file_hash, upstream_published_at
                 FROM shader_versions
-                ORDER BY shader_id, created_at DESC
+                ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC
             ),
             latest_world_versions AS (
                 SELECT DISTINCT ON (world_id)

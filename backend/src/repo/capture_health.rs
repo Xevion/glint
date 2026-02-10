@@ -91,7 +91,7 @@ impl CaptureHealthRepo {
                 SELECT DISTINCT ON (shader_id)
                     id, shader_id, version, capture_failure_count, supported_profiles
                 FROM shader_versions
-                ORDER BY shader_id, created_at DESC
+                ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC
             ),
             latest_world_versions AS (
                 SELECT DISTINCT ON (world_id)
