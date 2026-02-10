@@ -270,18 +270,20 @@ async fn claim_item(
 
     let mut tx = state.begin_tx().await?;
 
-    CaptureRepo::insert_uploading(
+    CaptureRepo::insert(
         &mut *tx,
         &capture_id,
         &item.shader_version_id,
         &item.scene_id,
         item.profile.as_deref(),
+        None,
         Some(&image_url),
         Some(request.resolution_width),
         Some(request.resolution_height),
         Some(request.captured_at),
         request.world_version_id.as_deref(),
         request.scene_version_id.as_deref(),
+        "uploading",
     )
     .await?;
 

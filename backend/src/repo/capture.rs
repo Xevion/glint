@@ -270,6 +270,7 @@ impl CaptureRepo {
         captured_at: Option<DateTime<Utc>>,
         world_version_id: Option<&str>,
         scene_version_id: Option<&str>,
+        status: &str,
     ) -> AppResult<()> {
         sqlx::query!(
             r#"
@@ -277,7 +278,7 @@ impl CaptureRepo {
                 id, shader_version_id, scene_id, profile, image_path, image_url,
                 resolution_width, resolution_height, world_version_id, scene_version_id,
                 status, created_at, updated_at, captured_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, $11, $11)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12, $12)
             "#,
             id,
             shader_version_id,
@@ -289,6 +290,7 @@ impl CaptureRepo {
             resolution_height,
             world_version_id,
             scene_version_id,
+            status,
             captured_at
         )
         .execute(executor)
@@ -298,53 +300,7 @@ impl CaptureRepo {
             scene_id, shader_version_id
         ))?;
 
-        debug!(scene_id, shader_version_id, "Capture inserted");
-        Ok(())
-    }
-
-    /// Insert a capture in 'uploading' status (upload in flight, not yet confirmed)
-    #[instrument(skip(executor), level = "debug")]
-    #[allow(clippy::too_many_arguments)]
-    pub async fn insert_uploading(
-        executor: impl sqlx::PgExecutor<'_>,
-        id: &str,
-        shader_version_id: &str,
-        scene_id: &str,
-        profile: Option<&str>,
-        image_url: Option<&str>,
-        resolution_width: Option<i32>,
-        resolution_height: Option<i32>,
-        captured_at: Option<DateTime<Utc>>,
-        world_version_id: Option<&str>,
-        scene_version_id: Option<&str>,
-    ) -> AppResult<()> {
-        sqlx::query!(
-            r#"
-            INSERT INTO captures (
-                id, shader_version_id, scene_id, profile, image_url,
-                resolution_width, resolution_height, world_version_id, scene_version_id,
-                status, created_at, updated_at, captured_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'uploading', $10, $10, $10)
-            "#,
-            id,
-            shader_version_id,
-            scene_id,
-            profile,
-            image_url,
-            resolution_width,
-            resolution_height,
-            world_version_id,
-            scene_version_id,
-            captured_at
-        )
-        .execute(executor)
-        .await
-        .context(format!(
-            "failed to insert uploading capture for scene '{}' with shader version '{}'",
-            scene_id, shader_version_id
-        ))?;
-
-        debug!(scene_id, shader_version_id, "Uploading capture inserted");
+        debug!(scene_id, shader_version_id, status, "Capture inserted");
         Ok(())
     }
 
@@ -607,13 +563,12 @@ impl CaptureRepo {
             (ss, sc, Vec::new())
         };
 
-        Ok(CaptureDetail {
+        let context = CaptureWithContext {
             id: row.id,
             scene_id: row.scene_id,
             shader_slug: row.shader_slug,
             shader_name: row.shader_name,
             shader_version: row.shader_version,
-            shader_version_id: row.shader_version_id,
             profile: row.profile,
             image_path: row.image_path,
             image_url: row.image_url,
@@ -628,6 +583,11 @@ impl CaptureRepo {
             scene_name: row.scene_name,
             scene_slug: row.scene_slug,
             freshness: row.freshness,
+        };
+
+        Ok(CaptureDetail {
+            context,
+            shader_version_id: row.shader_version_id,
             status: row.status,
             error_message: row.error_message,
             video_url: row.video_url,

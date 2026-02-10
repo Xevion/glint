@@ -105,57 +105,32 @@ impl AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        // Handle RateLimited separately to add Retry-After header
+        let (status, code) = self.status_and_code();
+
+        let message = match &self {
+            AppError::Database(e) => {
+                error!(error = %e, "Database error");
+                "Database error occurred".to_string()
+            }
+            AppError::Internal(e) => {
+                error!(error = ?e, "Internal error: {:#}", e);
+                "Internal server error occurred".to_string()
+            }
+            other => other.to_string(),
+        };
+
+        let body = Json(json!({ "error": message, "code": code }));
+
         if let AppError::RateLimited { retry_after_secs } = &self {
-            let body = Json(json!({
-                "error": self.to_string(),
-                "code": "RATE_LIMITED"
-            }));
-            return (
-                StatusCode::TOO_MANY_REQUESTS,
+            (
+                status,
                 [("retry-after", retry_after_secs.to_string())],
                 body,
             )
-                .into_response();
+                .into_response()
+        } else {
+            (status, body).into_response()
         }
-
-        let (status, error_code, message) = match &self {
-            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone()),
-            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg.clone()),
-            AppError::Conflict(msg) => (StatusCode::CONFLICT, "CONFLICT", msg.clone()),
-            AppError::Gone(msg) => (StatusCode::GONE, "GONE", msg.clone()),
-            AppError::ServiceUnavailable(msg) => (
-                StatusCode::SERVICE_UNAVAILABLE,
-                "SERVICE_UNAVAILABLE",
-                msg.clone(),
-            ),
-            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg.clone()),
-            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, "FORBIDDEN", msg.clone()),
-            AppError::Database(e) => {
-                error!(error = %e, "Database error");
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "DATABASE_ERROR",
-                    "Database error occurred".to_string(),
-                )
-            }
-            AppError::Internal(e) => {
-                // Log full error chain for debugging
-                error!(error = ?e, "Internal error: {:#}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "INTERNAL_ERROR",
-                    "Internal server error occurred".to_string(),
-                )
-            }
-            AppError::RateLimited { .. } => unreachable!("handled above"),
-        };
-
-        let body = Json(json!({
-            "error": message,
-            "code": error_code
-        }));
-        (status, body).into_response()
     }
 }
 

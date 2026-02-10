@@ -1,15 +1,9 @@
-import type {
-	CreateWorldUploadResponse,
-	CreateWorldVersionUploadResponse,
-	World,
-	WorldListItem,
-	WorldVersion
-} from '$lib/bindings';
+import type { UploadResponse, World, WorldListItem, WorldVersion } from '$lib/bindings';
 import { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import { ApiError, ApiErrorType } from '../errors';
 
-export type { CreateWorldUploadResponse, CreateWorldVersionUploadResponse };
+export type { UploadResponse };
 
 export interface CreateWorldVersionUploadRequest {
 	file_hash: string;
@@ -25,11 +19,7 @@ export interface CreateWorldUploadRequest {
 	file_size_bytes: number;
 }
 
-export interface CompleteWorldUploadRequest {
-	upload_id: string;
-}
-
-export interface CompleteWorldVersionUploadRequest {
+export interface CompleteUploadRequest {
 	upload_id: string;
 }
 
@@ -44,10 +34,8 @@ export class WorldsEndpoints extends ApiClient {
 		return this.get<WorldListItem[]>('/api/worlds');
 	}
 
-	createWorldUpload(
-		request: CreateWorldUploadRequest
-	): Promise<Result<CreateWorldUploadResponse, ApiError>> {
-		return this.post<CreateWorldUploadResponse>('/api/worlds', request);
+	createWorldUpload(request: CreateWorldUploadRequest): Promise<Result<UploadResponse, ApiError>> {
+		return this.post<UploadResponse>('/api/worlds', request);
 	}
 
 	/**
@@ -106,7 +94,7 @@ export class WorldsEndpoints extends ApiClient {
 
 	completeWorldUpload(
 		slug: string,
-		request: CompleteWorldUploadRequest
+		request: CompleteUploadRequest
 	): Promise<Result<World, ApiError>> {
 		return this.post<World>(`/api/worlds/${encodeURIComponent(slug)}/complete`, request);
 	}
@@ -114,16 +102,13 @@ export class WorldsEndpoints extends ApiClient {
 	createWorldVersionUpload(
 		worldId: string,
 		request: CreateWorldVersionUploadRequest
-	): Promise<Result<CreateWorldVersionUploadResponse, ApiError>> {
-		return this.post<CreateWorldVersionUploadResponse>(
-			`/api/worlds/${encodeURIComponent(worldId)}/versions`,
-			request
-		);
+	): Promise<Result<UploadResponse, ApiError>> {
+		return this.post<UploadResponse>(`/api/worlds/${encodeURIComponent(worldId)}/versions`, request);
 	}
 
 	completeWorldVersionUpload(
 		worldId: string,
-		request: CompleteWorldVersionUploadRequest
+		request: CompleteUploadRequest
 	): Promise<Result<WorldVersion, ApiError>> {
 		return this.post<WorldVersion>(
 			`/api/worlds/${encodeURIComponent(worldId)}/versions/complete`,

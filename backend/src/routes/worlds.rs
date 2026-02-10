@@ -15,10 +15,9 @@ use crate::{
     config::R2Config,
     error::{AppError, AppResult},
     models::{
-        CompleteWorldUploadRequest, CompleteWorldVersionUploadRequest, CreateWorldRequest,
-        CreateWorldUploadResponse, CreateWorldVersionUploadRequest,
-        CreateWorldVersionUploadResponse, PendingUpload, UpdateWorldRequest, World, WorldListItem,
-        WorldPreviewCapture, WorldVersion, WorldWithDetails,
+        CompleteUploadRequest, CreateWorldRequest, CreateWorldVersionUploadRequest, PendingUpload,
+        UpdateWorldRequest, UploadResponse, World, WorldListItem, WorldPreviewCapture,
+        WorldVersion, WorldWithDetails,
     },
     repo::{PendingUploadRepo, SceneRepo, WorldRepo, WorldVersionRepo},
     state::AppState,
@@ -50,6 +49,59 @@ fn validate_upload_request(file_hash: &str, file_size_bytes: i64) -> AppResult<(
         )));
     }
     Ok(())
+}
+
+/// Result of generating a presigned upload URL for S3 staging.
+struct PresignedUpload {
+    upload_id: String,
+    upload_key: String,
+    presigned_url: String,
+    expires_at: chrono::DateTime<Utc>,
+}
+
+/// Generate a presigned PUT URL for uploading a file to the S3 staging path.
+async fn generate_presigned_upload(
+    s3: &S3Client,
+    bucket: &str,
+    file_hash: &str,
+) -> AppResult<PresignedUpload> {
+    let upload_id = Uuid::new_v4().to_string();
+    let upload_key = format!("_uploads/{}.zip", upload_id);
+    let expires_at = Utc::now() + chrono::Duration::seconds(PRESIGN_EXPIRY_SECS as i64);
+
+    let hash_value = file_hash.strip_prefix("sha256:").unwrap_or(file_hash);
+
+    let presigned = s3
+        .put_object()
+        .bucket(bucket)
+        .key(&upload_key)
+        .content_type("application/zip")
+        .metadata("sha256", hash_value)
+        .presigned(
+            aws_sdk_s3::presigning::PresigningConfig::builder()
+                .expires_in(std::time::Duration::from_secs(PRESIGN_EXPIRY_SECS))
+                .build()
+                .expect("valid presigning config"),
+        )
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to generate presigned URL");
+            AppError::Internal(anyhow::anyhow!("Failed to generate presigned URL: {}", e))
+        })?;
+
+    Ok(PresignedUpload {
+        upload_id,
+        upload_key,
+        presigned_url: presigned.uri().to_string(),
+        expires_at,
+    })
+}
+
+/// Require S3 to be configured, returning a service-unavailable error if not.
+fn require_s3(state: &AppState) -> AppResult<&S3Client> {
+    state
+        .s3()
+        .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))
 }
 
 /// Result of successfully verifying and moving a staged upload in S3.
@@ -269,7 +321,7 @@ async fn create_world_upload(
     _admin: AdminUser,
     State(state): State<AppState>,
     Json(request): Json<crate::models::CreateWorldUploadRequest>,
-) -> AppResult<(StatusCode, Json<CreateWorldUploadResponse>)> {
+) -> AppResult<(StatusCode, Json<UploadResponse>)> {
     debug!(slug = %request.slug, "Preparing world upload");
 
     validate_upload_request(&request.file_hash, request.file_size_bytes)?;
@@ -282,66 +334,39 @@ async fn create_world_upload(
         )));
     }
 
-    // Require R2/S3 to be configured
-    let s3 = state
-        .s3()
-        .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))?;
+    let s3 = require_s3(&state)?;
+    let bucket = state.config().r2.bucket.as_deref().unwrap_or("glint");
 
-    let r2_config = &state.config().r2;
-    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
-
-    // Generate upload ID and key
-    let upload_id = Uuid::new_v4().to_string();
-    let upload_key = format!("_uploads/{}.zip", upload_id);
-    let expires_at = Utc::now() + chrono::Duration::seconds(PRESIGN_EXPIRY_SECS as i64);
-
-    // Generate presigned PUT URL with hash metadata requirement
-    let presigned = s3
-        .put_object()
-        .bucket(bucket)
-        .key(&upload_key)
-        .content_type("application/zip")
-        .metadata("sha256", request.file_hash.strip_prefix("sha256:").unwrap())
-        .presigned(
-            aws_sdk_s3::presigning::PresigningConfig::builder()
-                .expires_in(std::time::Duration::from_secs(PRESIGN_EXPIRY_SECS))
-                .build()
-                .expect("valid presigning config"),
-        )
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to generate presigned URL");
-            AppError::Internal(anyhow::anyhow!("Failed to generate presigned URL: {}", e))
-        })?;
+    let upload = generate_presigned_upload(s3, bucket, &request.file_hash).await?;
 
     // Store pending upload record
     PendingUploadRepo::create(
         state.db(),
-        &upload_id,
+        &upload.upload_id,
         &request.slug,
         &request.name,
         request.description.as_deref(),
         &request.minecraft_version,
         &request.file_hash,
         request.file_size_bytes,
-        &upload_key,
-        expires_at,
+        &upload.upload_key,
+        upload.expires_at,
     )
     .await?;
 
     debug!(
-        upload_id = %upload_id,
+        upload_id = %upload.upload_id,
         slug = %request.slug,
-        expires_at = %expires_at,
+        expires_at = %upload.expires_at,
         "Pending upload created"
     );
 
     Ok((
         StatusCode::CREATED,
-        Json(CreateWorldUploadResponse {
-            upload_id,
-            presigned_url: presigned.uri().to_string(),
-            expires_at,
+        Json(UploadResponse {
+            upload_id: upload.upload_id,
+            presigned_url: upload.presigned_url,
+            expires_at: upload.expires_at,
         }),
     ))
 }
@@ -351,7 +376,7 @@ async fn complete_world_upload(
     _admin: AdminUser,
     State(state): State<AppState>,
     Path(slug): Path<String>,
-    Json(request): Json<CompleteWorldUploadRequest>,
+    Json(request): Json<CompleteUploadRequest>,
 ) -> AppResult<(StatusCode, Json<World>)> {
     debug!(slug = %slug, upload_id = %request.upload_id, "Completing world upload");
 
@@ -387,11 +412,7 @@ async fn complete_world_upload(
         ));
     }
 
-    // Require R2/S3
-    let s3 = state
-        .s3()
-        .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))?;
-
+    let s3 = require_s3(&state)?;
     let r2_config = &state.config().r2;
 
     // Verify and move staged file in S3
@@ -550,68 +571,41 @@ async fn create_world_version(
     State(state): State<AppState>,
     Path(id): Path<String>,
     Json(request): Json<CreateWorldVersionUploadRequest>,
-) -> AppResult<(StatusCode, Json<CreateWorldVersionUploadResponse>)> {
+) -> AppResult<(StatusCode, Json<UploadResponse>)> {
     let world = WorldRepo::get_by_id(state.db(), &id).await?;
 
     validate_upload_request(&request.file_hash, request.file_size_bytes)?;
 
-    // Require R2/S3
-    let s3 = state
-        .s3()
-        .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))?;
+    let s3 = require_s3(&state)?;
+    let bucket = state.config().r2.bucket.as_deref().unwrap_or("glint");
 
-    let r2_config = &state.config().r2;
-    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
-
-    // Upload to staging path (not final location)
-    let upload_id = Uuid::new_v4().to_string();
-    let upload_key = format!("_uploads/{}.zip", upload_id);
-    let expires_at = Utc::now() + chrono::Duration::seconds(PRESIGN_EXPIRY_SECS as i64);
-
-    // Generate presigned PUT URL for staging path
-    let presigned = s3
-        .put_object()
-        .bucket(bucket)
-        .key(&upload_key)
-        .content_type("application/zip")
-        .metadata("sha256", request.file_hash.strip_prefix("sha256:").unwrap())
-        .presigned(
-            aws_sdk_s3::presigning::PresigningConfig::builder()
-                .expires_in(std::time::Duration::from_secs(PRESIGN_EXPIRY_SECS))
-                .build()
-                .expect("valid presigning config"),
-        )
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to generate presigned URL for version upload");
-            AppError::Internal(anyhow::anyhow!("Failed to generate presigned URL: {}", e))
-        })?;
+    let upload = generate_presigned_upload(s3, bucket, &request.file_hash).await?;
 
     // Store pending upload record
     PendingUploadRepo::create_for_version(
         state.db(),
-        &upload_id,
+        &upload.upload_id,
         &world.id,
         &request.file_hash,
         request.file_size_bytes,
-        &upload_key,
-        expires_at,
+        &upload.upload_key,
+        upload.expires_at,
     )
     .await?;
 
     debug!(
-        upload_id = %upload_id,
+        upload_id = %upload.upload_id,
         world_id = %world.id,
-        expires_at = %expires_at,
+        expires_at = %upload.expires_at,
         "Pending version upload created"
     );
 
     Ok((
         StatusCode::CREATED,
-        Json(CreateWorldVersionUploadResponse {
-            upload_id,
-            presigned_url: presigned.uri().to_string(),
-            expires_at,
+        Json(UploadResponse {
+            upload_id: upload.upload_id,
+            presigned_url: upload.presigned_url,
+            expires_at: upload.expires_at,
         }),
     ))
 }
@@ -625,7 +619,7 @@ async fn complete_world_version_upload(
     _admin: AdminUser,
     State(state): State<AppState>,
     Path(world_id): Path<String>,
-    Json(request): Json<CompleteWorldVersionUploadRequest>,
+    Json(request): Json<CompleteUploadRequest>,
 ) -> AppResult<(StatusCode, Json<WorldVersion>)> {
     debug!(world_id = %world_id, upload_id = %request.upload_id, "Completing world version upload");
 
@@ -653,11 +647,7 @@ async fn complete_world_version_upload(
     // Verify world still exists
     let world = WorldRepo::get_by_id(state.db(), &world_id).await?;
 
-    // Require R2/S3
-    let s3 = state
-        .s3()
-        .ok_or_else(|| AppError::ServiceUnavailable("R2/S3 storage not configured".into()))?;
-
+    let s3 = require_s3(&state)?;
     let r2_config = &state.config().r2;
 
     // Verify and move staged file in S3
