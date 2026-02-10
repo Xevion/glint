@@ -39,6 +39,7 @@ export type { ShaderVersion } from "./ShaderVersion";
 export type { ShaderVersionDetail } from "./ShaderVersionDetail";
 export type { ShaderWithCaptures } from "./ShaderWithCaptures";
 export type { ShaderWithVersions } from "./ShaderWithVersions";
+export type { StaleReason } from "./StaleReason";
 export type { Tag } from "./Tag";
 export type { TargetHealth } from "./TargetHealth";
 export type { UploadResponse } from "./UploadResponse";

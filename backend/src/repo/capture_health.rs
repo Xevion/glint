@@ -24,6 +24,19 @@ pub enum TargetHealth {
     Failed,
 }
 
+/// Why a capture target is stale (only present when status == Stale)
+#[derive(Debug, Clone, Serialize, JsonSchema, TS, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum StaleReason {
+    /// The world has been updated since the capture
+    WorldUpdated,
+    /// The scene has been updated since the capture
+    SceneUpdated,
+    /// Both world and scene have been updated since the capture
+    BothUpdated,
+}
+
 impl<'r> sqlx::Decode<'r, sqlx::Postgres> for TargetHealth {
     fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
@@ -57,6 +70,7 @@ pub struct CaptureTargetHealth {
     pub scene_slug: String,
     pub profile: Option<String>,
     pub status: TargetHealth,
+    pub stale_reason: Option<StaleReason>,
     #[ts(type = "string | null")]
     pub last_capture_at: Option<DateTime<Utc>>,
     pub failure_count: i32,
@@ -95,6 +109,8 @@ struct CaptureHealthRow {
     capture_failure_count: i32,
     last_capture_at: Option<DateTime<Utc>>,
     status: TargetHealth,
+    world_outdated: bool,
+    scene_outdated: bool,
 }
 
 pub struct CaptureHealthRepo;
@@ -120,7 +136,9 @@ impl CaptureHealthRepo {
                     scene_id,
                     profile,
                     captured_at,
-                    freshness
+                    freshness,
+                    world_version_id,
+                    scene_version_id
                 FROM captures_with_freshness
                 WHERE status IN ('completed', 'uploading')
                 ORDER BY shader_version_id, scene_id, profile, captured_at DESC
@@ -142,7 +160,9 @@ impl CaptureHealthRepo {
                     WHEN bc.captured_at IS NULL THEN 'missing'
                     WHEN bc.freshness != 'fresh' THEN 'stale'
                     ELSE 'completed'
-                END AS "status!: TargetHealth"
+                END AS "status!: TargetHealth",
+                COALESCE(bc.world_version_id IS DISTINCT FROM lwv.id, FALSE) AS "world_outdated!",
+                COALESCE(bc.scene_version_id IS DISTINCT FROM lsv.id, FALSE) AS "scene_outdated!"
             FROM capture_target_matrix tm
             JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id
             JOIN shaders sh ON sh.id = sv.shader_id
@@ -151,6 +171,8 @@ impl CaptureHealthRepo {
                 ON bc.shader_version_id = tm.shader_version_id
                 AND bc.scene_id = tm.scene_id
                 AND (bc.profile IS NOT DISTINCT FROM tm.profile)
+            LEFT JOIN latest_world_versions lwv ON lwv.world_id = sc.world_id
+            LEFT JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id
             ORDER BY sh.name ASC, sv.version DESC, sc.name ASC, tm.profile NULLS LAST
             "#
         )
@@ -161,19 +183,34 @@ impl CaptureHealthRepo {
 
         let targets: Vec<CaptureTargetHealth> = rows
             .into_iter()
-            .map(|row| CaptureTargetHealth {
-                shader_id: row.shader_id,
-                shader_name: row.shader_name,
-                shader_slug: row.shader_slug,
-                shader_version_id: row.shader_version_id,
-                version: row.version,
-                scene_id: row.scene_id,
-                scene_name: row.scene_name,
-                scene_slug: row.scene_slug,
-                profile: row.profile,
-                status: row.status,
-                last_capture_at: row.last_capture_at,
-                failure_count: row.capture_failure_count,
+            .map(|row| {
+                let stale_reason = if row.status == TargetHealth::Stale {
+                    Some(match (row.world_outdated, row.scene_outdated) {
+                        (true, true) => StaleReason::BothUpdated,
+                        (true, false) => StaleReason::WorldUpdated,
+                        (false, true) => StaleReason::SceneUpdated,
+                        // Fallback: freshness was non-fresh but neither flag tripped
+                        // (shouldn't happen, but handle gracefully)
+                        (false, false) => StaleReason::WorldUpdated,
+                    })
+                } else {
+                    None
+                };
+                CaptureTargetHealth {
+                    shader_id: row.shader_id,
+                    shader_name: row.shader_name,
+                    shader_slug: row.shader_slug,
+                    shader_version_id: row.shader_version_id,
+                    version: row.version,
+                    scene_id: row.scene_id,
+                    scene_name: row.scene_name,
+                    scene_slug: row.scene_slug,
+                    profile: row.profile,
+                    status: row.status,
+                    stale_reason,
+                    last_capture_at: row.last_capture_at,
+                    failure_count: row.capture_failure_count,
+                }
             })
             .collect();
 

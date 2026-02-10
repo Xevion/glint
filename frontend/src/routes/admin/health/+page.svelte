@@ -1,6 +1,6 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
-import type { CaptureTargetHealth, TargetHealth } from '$lib/bindings';
+import type { CaptureTargetHealth, StaleReason, TargetHealth } from '$lib/bindings';
 import { Badge } from '$lib/components/ui/badge';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
 import * as Table from '$lib/components/ui/table';
@@ -99,20 +99,56 @@ const BADGE_VARIANTS: Record<TargetHealth, 'default' | 'secondary' | 'destructiv
 	failed: 'outline'
 };
 
+const STALE_REASON_LABELS: Record<StaleReason, string> = {
+	world_updated: 'World updated',
+	scene_updated: 'Scene updated',
+	both_updated: 'World + scene updated'
+};
+
+function relativeTime(iso: string): string {
+	const ms = Date.now() - new Date(iso).getTime();
+	const seconds = Math.floor(ms / 1000);
+	if (seconds < 60) return 'just now';
+	const minutes = Math.floor(seconds / 60);
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	if (days < 30) return `${days}d ago`;
+	const months = Math.floor(days / 30);
+	return `${months}mo ago`;
+}
+
+function targetDetail(t: CaptureTargetHealth): string {
+	const age = t.last_capture_at ? relativeTime(t.last_capture_at) : null;
+	switch (t.status) {
+		case 'stale': {
+			const reason = t.stale_reason ? STALE_REASON_LABELS[t.stale_reason] : 'Stale';
+			return age ? `${reason} — captured ${age}` : reason;
+		}
+		case 'missing':
+			return 'Missing — no capture exists';
+		case 'failed':
+			return `Failed — ${t.failure_count} consecutive failures`;
+		case 'completed':
+			return age ? `Completed — captured ${age}` : 'Completed';
+	}
+}
+
 function tooltipSummary(shaderSlug: string, sceneSlug: string): string {
 	const targets = targetsByCell.get(`${shaderSlug}:${sceneSlug}`) ?? [];
 	if (targets.length === 0) return 'No targets';
 	if (targets.length === 1) {
 		const t = targets[0];
-		return `${STATUS_LABELS[t.status]}${t.profile ? ` (${t.profile})` : ''}`;
+		const detail = targetDetail(t);
+		return t.profile ? `${detail} (${t.profile})` : detail;
 	}
-	const counts: Record<string, number> = {};
-	for (const t of targets) {
-		counts[t.status] = (counts[t.status] ?? 0) + 1;
-	}
-	return Object.entries(counts)
-		.map(([s, c]) => `${c} ${s}`)
-		.join(', ');
+	return targets
+		.map((t) => {
+			const label = t.profile ?? 'Default';
+			return `${label}: ${targetDetail(t)}`;
+		})
+		.join('\n');
 }
 
 let selectedTargets = $derived.by(() => {
