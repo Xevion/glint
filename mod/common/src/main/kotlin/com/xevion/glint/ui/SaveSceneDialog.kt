@@ -373,7 +373,8 @@ class SaveSceneDialog(
                 camera = camera,
                 timeOfDay = selectedTimeOfDay,
                 weather = selectedWeather,
-                weatherIntensity = 0.0f,
+                weatherIntensity =
+                    if (selectedWeather == Weather.CLEAR) 0.0f else 1.0f,
             )
 
         if (isEditMode) {

@@ -177,11 +177,11 @@ object SceneApplicator {
                 overworld.setWeatherParameters(0, 6000, true, false)
                 log.debug("Set weather") { "weather" to "RAIN" }
 
-                // Note: Weather intensity (rainLevel/thunderLevel) is protected in Level class
-                // It's automatically calculated by the game based on isRaining/isThundering state
-                // Manual intensity control would require mixins or reflection
-                if (scene.weatherIntensity != null) {
-                    log.warn("Weather intensity setting not supported (requires protected field access)")
+                // Apply intensity via public Level.setRainLevel/setThunderLevel (0.0–1.0)
+                val intensity = scene.weatherIntensity
+                if (intensity > 0f) {
+                    overworld.setRainLevel(intensity)
+                    log.debug("Set rain intensity") { "intensity" to intensity }
                 }
             }
 
@@ -190,8 +190,11 @@ object SceneApplicator {
                 overworld.setWeatherParameters(0, 6000, true, true)
                 log.debug("Set weather") { "weather" to "THUNDER" }
 
-                if (scene.weatherIntensity != null) {
-                    log.warn("Weather intensity setting not supported (requires protected field access)")
+                val intensity = scene.weatherIntensity
+                if (intensity > 0f) {
+                    overworld.setRainLevel(intensity)
+                    overworld.setThunderLevel(intensity)
+                    log.debug("Set storm intensity") { "intensity" to intensity }
                 }
             }
         }

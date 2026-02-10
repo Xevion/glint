@@ -241,8 +241,13 @@ object SceneManager {
                 position = position,
                 camera = camera,
                 timeOfDay = timeOfDay,
-                weather = if (level.levelData.isRaining) Weather.RAIN else Weather.CLEAR,
-                weatherIntensity = 0.0f, // Cannot read rain intensity on client
+                weather =
+                    when {
+                        level.levelData.isThundering -> Weather.THUNDER
+                        level.levelData.isRaining -> Weather.RAIN
+                        else -> Weather.CLEAR
+                    },
+                weatherIntensity = level.getRainLevel(1.0f),
             )
 
         val collection =
