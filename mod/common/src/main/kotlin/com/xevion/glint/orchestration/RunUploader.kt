@@ -17,6 +17,12 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+/** Resolved item metadata from the work→run item mapping. */
+data class RunItemInfo(
+    val itemId: String,
+    val worldVersionId: String?,
+)
+
 /**
  * Manages the capture-to-upload pipeline for a single capture run.
  *
@@ -26,7 +32,7 @@ class RunUploader(
     private val apiUrl: String,
     private val apiToken: String,
     private val runId: String,
-    private val itemLookup: Map<Triple<String, String, String?>, String>,
+    private val itemLookup: Map<Triple<String, String, String?>, RunItemInfo>,
     maxConcurrent: Int = 4,
 ) {
     private val log = Loggers.Orchestration.get()
@@ -51,8 +57,8 @@ class RunUploader(
         event: CaptureTakenEvent,
     ) {
         val key = Triple(shaderVersionId, event.sceneId, event.entry.shader?.profile)
-        val itemId = itemLookup[key]
-        if (itemId == null) {
+        val info = itemLookup[key]
+        if (info == null) {
             log.warn("No run item found for capture") {
                 "scene_id" to event.sceneId
                 "profile" to (event.entry.shader?.profile ?: "null")
@@ -60,10 +66,10 @@ class RunUploader(
             return
         }
 
-        submittedItemIds.add(itemId)
+        submittedItemIds.add(info.itemId)
         val pending = pendingCount.incrementAndGet()
         log.debug("Upload queued") {
-            "item_id" to itemId
+            "item_id" to info.itemId
             "scene_id" to event.sceneId
             "bytes" to event.fileBytes.size
             "pending" to pending
@@ -71,17 +77,17 @@ class RunUploader(
 
         executor.submit {
             try {
-                executeUpload(itemId, event)
+                executeUpload(info.itemId, info.worldVersionId, event)
                 val completed = completedCount.incrementAndGet()
                 log.debug("Upload succeeded") {
-                    "item_id" to itemId
+                    "item_id" to info.itemId
                     "completed" to completed
                     "failed" to failedCount.get()
                 }
             } catch (e: Exception) {
                 val failed = failedCount.incrementAndGet()
                 log.error("Upload failed") {
-                    "item_id" to itemId
+                    "item_id" to info.itemId
                     "error" to e.message
                     "completed" to completedCount.get()
                     "failed" to failed
@@ -91,12 +97,12 @@ class RunUploader(
                         apiUrl,
                         apiToken,
                         runId,
-                        itemId,
+                        info.itemId,
                         FailItemRequest(errorMessage = "Upload failed: ${e.message}"),
                     )
                 } catch (failError: Exception) {
                     log.error("Failed to report item failure") {
-                        "item_id" to itemId
+                        "item_id" to info.itemId
                         "error" to failError.message
                     }
                 }
@@ -118,9 +124,9 @@ class RunUploader(
         val unsubmittedEntries =
             items.mapNotNull { item ->
                 val key = Triple(shaderVersionId, item.sceneId, item.profile)
-                val itemId = itemLookup[key] ?: return@mapNotNull null
-                if (itemId in submittedItemIds) return@mapNotNull null
-                item to itemId
+                val info = itemLookup[key] ?: return@mapNotNull null
+                if (info.itemId in submittedItemIds) return@mapNotNull null
+                item to info.itemId
             }
 
         for ((item, itemId) in unsubmittedEntries) {
@@ -220,6 +226,7 @@ class RunUploader(
      */
     private fun executeUpload(
         itemId: String,
+        worldVersionId: String?,
         event: CaptureTakenEvent,
     ) {
         log.debug("Claiming item") { "item_id" to itemId }
@@ -234,6 +241,7 @@ class RunUploader(
                         resolutionWidth = event.entry.resolution.width,
                         resolutionHeight = event.entry.resolution.height,
                         capturedAt = event.entry.timestamp,
+                        worldVersionId = worldVersionId,
                     ),
                 ).getOrThrow()
 

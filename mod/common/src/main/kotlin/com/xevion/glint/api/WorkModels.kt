@@ -23,6 +23,7 @@ data class WorkItem(
     @SerialName("world_file_url") val worldFileUrl: String? = null,
     @SerialName("world_file_hash") val worldFileHash: String? = null,
     @SerialName("world_size_bytes") val worldSizeBytes: Long? = null,
+    @SerialName("world_version_id") val worldVersionId: String? = null,
     val profile: String? = null,
 )
 
@@ -112,6 +113,7 @@ data class ClaimItemRequest(
     @SerialName("resolution_width") val resolutionWidth: Int,
     @SerialName("resolution_height") val resolutionHeight: Int,
     @SerialName("captured_at") val capturedAt: String,
+    @SerialName("world_version_id") val worldVersionId: String? = null,
 )
 
 /** Response from claiming a run item. */

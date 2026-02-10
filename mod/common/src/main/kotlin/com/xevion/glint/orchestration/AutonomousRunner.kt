@@ -57,11 +57,26 @@ class AutonomousRunner(
     /** Call every client tick from SessionRegistry or Glint.onClientTick(). */
     fun tick() {
         when (state) {
-            State.FetchingWork -> tickFetchingWork()
-            State.CreatingRun -> tickCreatingRun()
-            State.PreparingCapture -> tickPreparingCapture()
-            State.Capturing -> tickCapturing()
-            State.FinalizingRun -> tickFinalizingRun()
+            State.FetchingWork -> {
+                tickFetchingWork()
+            }
+
+            State.CreatingRun -> {
+                tickCreatingRun()
+            }
+
+            State.PreparingCapture -> {
+                tickPreparingCapture()
+            }
+
+            State.Capturing -> {
+                tickCapturing()
+            }
+
+            State.FinalizingRun -> {
+                tickFinalizingRun()
+            }
+
             State.Done -> {}
         }
     }
@@ -155,10 +170,15 @@ class AutonomousRunner(
                 "items" to runItems.size
             }
 
-            // Build lookup: (shaderVersionId, sceneId, profile) → runItemId
+            // Build lookup: (shaderVersionId, sceneId, profile) → RunItemInfo
+            // Merge run items (which have item IDs) with work items (which have world version IDs)
+            val workItemsByKey =
+                workItems.associateBy { Triple(it.shaderVersionId, it.sceneId, it.profile) }
             val itemLookup =
                 runItems.associate { item ->
-                    Triple(item.shaderVersionId, item.sceneId, item.profile) to item.id
+                    val key = Triple(item.shaderVersionId, item.sceneId, item.profile)
+                    val workItem = workItemsByKey[key]
+                    key to RunItemInfo(item.id, workItem?.worldVersionId)
                 }
 
             runUploader = RunUploader(apiUrl, apiToken, runId, itemLookup)

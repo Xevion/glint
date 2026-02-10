@@ -153,9 +153,8 @@ impl CaptureHealthRepo {
                 bc.captured_at AS last_capture_at,
                 CASE
                     WHEN bc.captured_at IS NULL THEN NULL
-                    WHEN bc.world_version_id IS NULL THEN TRUE
-                    WHEN bc.world_version_id != lwv.id THEN TRUE
-                    ELSE FALSE
+                    WHEN bc.world_version_id IS NOT DISTINCT FROM lwv.id THEN FALSE
+                    ELSE TRUE
                 END AS "world_version_stale?: bool",
                 (bc.captured_at IS NOT NULL) AS "has_capture!"
             FROM target_matrix tm
