@@ -310,11 +310,17 @@ async function refresh() {
 					{#each workQueue as item, i (i)}
 						<Table.Row class="last:border-b-0">
 							<Table.Cell class="p-3 text-muted-foreground">{i + 1}</Table.Cell>
-							<Table.Cell class="p-3 font-medium">{item.shader_name}</Table.Cell>
+							<Table.Cell class="p-3 font-medium">
+								<a href="/admin/shaders/{item.shader_slug}" class="hover:underline">{item.shader_name}</a>
+							</Table.Cell>
 							<Table.Cell class="p-3 text-muted-foreground">{item.version}</Table.Cell>
-							<Table.Cell class="p-3">{item.scene_name}</Table.Cell>
+							<Table.Cell class="p-3">
+								<a href="/admin/scenes/{item.scene_id}" class="hover:underline">{item.scene_name}</a>
+							</Table.Cell>
 							<Table.Cell class="p-3 text-muted-foreground">{item.profile ?? '—'}</Table.Cell>
-							<Table.Cell class="p-3 text-muted-foreground">{item.world_name}</Table.Cell>
+							<Table.Cell class="p-3 text-muted-foreground">
+								<a href="/admin/worlds/{item.world_id}" class="hover:underline">{item.world_name}</a>
+							</Table.Cell>
 						</Table.Row>
 					{/each}
 				</Table.Body>

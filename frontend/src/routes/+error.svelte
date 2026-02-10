@@ -1,4 +1,5 @@
 <script lang="ts">
+import { dev } from '$app/environment';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
 import { Button } from '$lib/components/ui/button';
@@ -30,6 +31,9 @@ let message = $derived(
 		description: page.error?.message ?? 'An unexpected error occurred.'
 	}
 );
+
+let devMessage = $derived(dev ? page.error?.message : null);
+let devStack = $derived(dev ? page.error?.stack : null);
 </script>
 
 <div class="py-16">
@@ -48,6 +52,20 @@ let message = $derived(
 		>
 			{message.description}
 		</p>
+
+		{#if devMessage}
+			<div in:fade={{ duration: 300, delay: 250 }} class="mx-auto mb-8 max-w-xl text-left">
+				<div class="rounded-lg border border-orange-500/30 bg-orange-500/5 p-4">
+					<div class="mb-2 text-xs font-semibold uppercase tracking-wider text-orange-400">
+						Dev Error
+					</div>
+					<p class="text-sm text-foreground">{devMessage}</p>
+					{#if devStack}
+						<pre class="mt-3 max-h-64 overflow-auto rounded bg-black/50 p-3 text-left font-mono text-xs text-muted-foreground">{devStack}</pre>
+					{/if}
+				</div>
+			</div>
+		{/if}
 
 		<div in:fade={{ duration: 300, delay: 300 }}>
 			<Button href={resolve('/', {})} variant="default" size="lg">Go Home</Button>

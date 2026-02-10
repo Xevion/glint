@@ -1,5 +1,6 @@
 import type { Handle, HandleFetch, HandleServerError } from '@sveltejs/kit';
 import { PostHog } from 'posthog-node';
+import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { env as publicEnv } from '$env/dynamic/public';
 
@@ -7,7 +8,8 @@ const backendUrl = publicEnv.PUBLIC_BACKEND_URL ?? 'http://localhost:8080';
 
 export const handle: Handle = ({ event, resolve }) => {
 	return resolve(event, {
-		transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', 'en')
+		transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', 'en'),
+		filterSerializedResponseHeaders: (name) => name === 'content-length' || name === 'content-type'
 	});
 };
 
@@ -41,7 +43,16 @@ export const handleError: HandleServerError = ({ error, event, status }) => {
 		});
 	}
 
+	const message =
+		status === 404
+			? 'Not Found'
+			: dev && error instanceof Error
+				? error.message
+				: 'An error occurred';
+
 	return {
-		message: status === 404 ? 'Not Found' : 'An error occurred'
+		message,
+		// Expose stack trace in dev for the error page to display
+		...(dev && error instanceof Error && error.stack ? { stack: error.stack } : {})
 	};
 };
