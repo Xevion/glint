@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM captures WHERE status = 'completed' ORDER BY created_at DESC",
+  "query": "\n            SELECT c.*\n            FROM captures c\n            JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.status = 'completed' AND sc.active = TRUE\n            ORDER BY c.created_at DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -166,5 +166,5 @@
       true
     ]
   },
-  "hash": "1a2c065f430f38a67c4e7715d1d44781166fbe16593930168f89c9725bca240a"
+  "hash": "ce6324c63fa812c22b1d5ffdaa4589e928b4d4060b1ad8175df537fd6cb063f3"
 }

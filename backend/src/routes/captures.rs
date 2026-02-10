@@ -10,7 +10,7 @@ use crate::{
     auth::AdminUser,
     error::{AppError, AppResult},
     models::{Capture, CaptureDetail, PaginatedCaptures},
-    repo::CaptureRepo,
+    repo::{CaptureRepo, SceneRepo},
     state::AppState,
 };
 
@@ -67,12 +67,20 @@ async fn list_captures_all(
     }))
 }
 
-/// GET /api/captures/{id} - Get capture by ID (public)
+/// GET /api/captures/{id} - Get capture by ID (public, only from active scenes)
 async fn get_capture_public(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<Capture>> {
     let capture = CaptureRepo::get_by_id(state.db(), &id).await?;
+
+    // Verify the capture's scene is active (don't leak disabled-scene captures)
+    let scene = SceneRepo::find_by_id(state.db(), &capture.scene_id).await?;
+    match scene {
+        Some(s) if s.active => {}
+        _ => return Err(AppError::NotFound(format!("Capture '{}' not found", id))),
+    }
+
     Ok(Json(capture))
 }
 

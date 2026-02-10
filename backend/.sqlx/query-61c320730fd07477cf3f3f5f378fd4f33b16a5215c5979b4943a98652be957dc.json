@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT DISTINCT ON (c.scene_id)\n                c.id,\n                c.scene_id,\n                s.slug as shader_slug,\n                s.name as shader_name,\n                sv.version as shader_version,\n                c.profile,\n                c.image_path,\n                c.image_url,\n                c.thumbhash,\n                c.captured_at,\n                c.resolution_width,\n                c.resolution_height,\n                c.file_size_bytes,\n                cri.run_id as \"run_id?: String\",\n                cr.status as \"run_status?: String\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,\n                sc.name as \"scene_name?: String\",\n                sc.slug as \"scene_slug?: String\"\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id\n            LEFT JOIN capture_runs cr ON cri.run_id = cr.id\n            LEFT JOIN scenes sc ON c.scene_id = sc.id\n            \n                    WHERE s.id = $1 AND c.status = 'completed'\n                    ORDER BY c.scene_id, c.captured_at DESC NULLS LAST\n                    ",
+  "query": "SELECT DISTINCT ON (c.scene_id)\n                c.id,\n                c.scene_id,\n                s.slug as shader_slug,\n                s.name as shader_name,\n                sv.version as shader_version,\n                c.profile,\n                c.image_path,\n                c.image_url,\n                c.thumbhash,\n                c.captured_at,\n                c.resolution_width,\n                c.resolution_height,\n                c.file_size_bytes,\n                cri.run_id as \"run_id?: String\",\n                cr.status as \"run_status?: String\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,\n                sc.name as \"scene_name?: String\",\n                sc.slug as \"scene_slug?: String\"\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id\n            LEFT JOIN capture_runs cr ON cri.run_id = cr.id\n            LEFT JOIN scenes sc ON c.scene_id = sc.id\n            \n                    WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE AND c.profile = $2\n                    ORDER BY c.scene_id, c.captured_at DESC NULLS LAST\n                    ",
   "describe": {
     "columns": [
       {
@@ -96,6 +96,7 @@
     ],
     "parameters": {
       "Left": [
+        "Text",
         "Text"
       ]
     },
@@ -120,5 +121,5 @@
       false
     ]
   },
-  "hash": "f17eb6981344143a5e09b4b9ac140d13aba14e66a7f82d85154890b09cf7a6f7"
+  "hash": "61c320730fd07477cf3f3f5f378fd4f33b16a5215c5979b4943a98652be957dc"
 }

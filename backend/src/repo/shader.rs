@@ -378,7 +378,7 @@ impl ShaderRepo {
         Ok(result)
     }
 
-    /// Fetch captures with shader/version context for a given shader
+    /// Fetch captures with shader/version context for a given shader (active scenes only)
     #[instrument(skip(executor), level = "debug")]
     pub async fn get_captures_with_context(
         executor: impl sqlx::PgExecutor<'_>,
@@ -387,7 +387,7 @@ impl ShaderRepo {
         let captures = capture_ctx_query!(
             distinct: "c.scene_id",
             r#"
-            WHERE s.id = $1 AND c.status = 'completed'
+            WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE
             ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
             "#,
             shader_id
@@ -400,7 +400,7 @@ impl ShaderRepo {
         Ok(captures)
     }
 
-    /// Fetch captures with shader/version context, filtered by optional version and profile
+    /// Fetch captures with shader/version context, filtered by optional version and profile (active scenes only)
     #[instrument(skip(executor), level = "debug")]
     pub async fn get_captures_with_context_filtered(
         executor: impl sqlx::PgExecutor<'_>,
@@ -413,7 +413,7 @@ impl ShaderRepo {
                 capture_ctx_query!(
                     distinct: "c.scene_id",
                     r#"
-                    WHERE s.id = $1 AND c.status = 'completed' AND sv.id = $2 AND c.profile = $3
+                    WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE AND sv.id = $2 AND c.profile = $3
                     ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
                     "#,
                     shader_id,
@@ -427,7 +427,7 @@ impl ShaderRepo {
                 capture_ctx_query!(
                     distinct: "c.scene_id",
                     r#"
-                    WHERE s.id = $1 AND c.status = 'completed' AND sv.id = $2
+                    WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE AND sv.id = $2
                     ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
                     "#,
                     shader_id,
@@ -440,7 +440,7 @@ impl ShaderRepo {
                 capture_ctx_query!(
                     distinct: "c.scene_id",
                     r#"
-                    WHERE s.id = $1 AND c.status = 'completed' AND c.profile = $2
+                    WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE AND c.profile = $2
                     ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
                     "#,
                     shader_id,
@@ -453,7 +453,7 @@ impl ShaderRepo {
                 capture_ctx_query!(
                     distinct: "c.scene_id",
                     r#"
-                    WHERE s.id = $1 AND c.status = 'completed'
+                    WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE
                     ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
                     "#,
                     shader_id

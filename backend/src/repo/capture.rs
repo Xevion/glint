@@ -116,12 +116,18 @@ impl CaptureRepo {
             .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
     }
 
-    /// List all completed captures
+    /// List all completed captures (only from active scenes)
     #[instrument(skip(executor), level = "debug")]
     pub async fn list_completed(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<Capture>> {
         let captures = sqlx::query_as!(
             Capture,
-            "SELECT * FROM captures WHERE status = 'completed' ORDER BY created_at DESC"
+            r#"
+            SELECT c.*
+            FROM captures c
+            JOIN scenes sc ON c.scene_id = sc.id
+            WHERE c.status = 'completed' AND sc.active = TRUE
+            ORDER BY c.created_at DESC
+            "#
         )
         .fetch_all(executor)
         .await
@@ -623,7 +629,7 @@ impl CaptureRepo {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Get the most recent completed non-outdated thumbnail per shader
+    /// Get the most recent completed non-outdated thumbnail per shader (active scenes only)
     #[instrument(skip(executor), level = "debug")]
     pub async fn batch_thumbnails_by_shader(
         executor: impl sqlx::PgExecutor<'_>,
@@ -642,7 +648,8 @@ impl CaptureRepo {
                 c.thumbhash
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
-            WHERE c.status = 'completed' AND c.image_url IS NOT NULL
+            JOIN scenes sc ON c.scene_id = sc.id
+            WHERE c.status = 'completed' AND c.image_url IS NOT NULL AND sc.active = TRUE
             ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST
             "#
         )
@@ -664,7 +671,7 @@ impl CaptureRepo {
             .collect())
     }
 
-    /// Get the most recent completed non-outdated thumbnail per scene
+    /// Get the most recent completed non-outdated thumbnail per scene (active scenes only)
     #[instrument(skip(executor), level = "debug")]
     pub async fn batch_thumbnails_by_scene(
         executor: impl sqlx::PgExecutor<'_>,
@@ -682,7 +689,8 @@ impl CaptureRepo {
                 c.image_url as "image_url!",
                 c.thumbhash
             FROM captures c
-            WHERE c.status = 'completed' AND c.image_url IS NOT NULL
+            JOIN scenes sc ON c.scene_id = sc.id
+            WHERE c.status = 'completed' AND c.image_url IS NOT NULL AND sc.active = TRUE
             ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
             "#
         )
@@ -818,7 +826,7 @@ impl CaptureRepo {
         Ok(ids)
     }
 
-    /// Count completed captures per scene
+    /// Count completed captures per scene (active scenes only)
     #[instrument(skip(executor), level = "debug")]
     pub async fn batch_count_by_scene(
         executor: impl sqlx::PgExecutor<'_>,
@@ -830,10 +838,11 @@ impl CaptureRepo {
         let rows = sqlx::query_as!(
             Row,
             r#"
-            SELECT scene_id, COUNT(*) as "count!"
-            FROM captures
-            WHERE status = 'completed'
-            GROUP BY scene_id
+            SELECT c.scene_id, COUNT(*) as "count!"
+            FROM captures c
+            JOIN scenes sc ON c.scene_id = sc.id
+            WHERE c.status = 'completed' AND sc.active = TRUE
+            GROUP BY c.scene_id
             "#
         )
         .fetch_all(executor)

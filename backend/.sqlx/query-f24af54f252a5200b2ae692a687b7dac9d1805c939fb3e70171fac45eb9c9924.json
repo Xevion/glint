@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT ON (sv.shader_id)\n                sv.shader_id,\n                c.image_url as \"image_url!\",\n                c.thumbhash\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.status = 'completed' AND c.image_url IS NOT NULL AND sc.active = TRUE\n            ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "image_url!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "thumbhash",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "f24af54f252a5200b2ae692a687b7dac9d1805c939fb3e70171fac45eb9c9924"
+}
