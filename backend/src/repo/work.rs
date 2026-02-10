@@ -70,99 +70,27 @@ impl WorkRepo {
         let items = sqlx::query_as!(
             WorkItem,
             r#"
-            WITH latest_versions AS (
-                SELECT DISTINCT ON (shader_id)
-                    id, shader_id, supported_profiles, capture_failure_count,
-                    version, download_url, file_hash, upstream_published_at
-                FROM shader_versions
-                ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC
-            ),
-            latest_world_versions AS (
-                SELECT DISTINCT ON (world_id)
-                    id, world_id, file_url, file_hash, size_bytes
-                FROM world_versions
-                ORDER BY world_id, created_at DESC, id DESC
-            ),
-            latest_scene_versions AS (
-                SELECT DISTINCT ON (scene_id)
-                    id, scene_id, x, y, z, pitch, yaw,
-                    time_of_day_ticks, weather, weather_intensity, moon_phase, biome
-                FROM scene_versions
-                ORDER BY scene_id, created_at DESC, id DESC
-            ),
-            -- Pre-compute which shader_versions already have completed captures.
-            -- Used in ORDER BY to prioritize uncaptured shaders.
-            has_captures AS (
+            WITH has_captures AS (
                 SELECT DISTINCT shader_version_id
                 FROM captures
                 WHERE status = 'completed'
             ),
-            needed AS (
-                -- Branch 1: shader versions WITH profiles
-                SELECT
-                    sv.id AS shader_version_id,
-                    s.id AS scene_id,
-                    s.world_id,
-                    p.profile AS profile
-                FROM latest_versions sv
-                CROSS JOIN scenes s
-                CROSS JOIN LATERAL jsonb_array_elements_text(
-                    CASE
-                        WHEN sv.supported_profiles IS NOT NULL AND sv.supported_profiles != '[]'
-                        THEN sv.supported_profiles::jsonb
-                        ELSE '[]'::jsonb
-                    END
-                ) AS p(profile)
-                WHERE s.active = TRUE
-                  AND ($2 OR sv.capture_failure_count < 3)
-                  AND ($2 OR NOT EXISTS (
-                    SELECT 1 FROM captures c
-                    LEFT JOIN latest_world_versions lwv ON lwv.world_id = s.world_id
-                    LEFT JOIN latest_scene_versions lsv2 ON lsv2.scene_id = s.id
-                    WHERE c.shader_version_id = sv.id
-                      AND c.scene_id = s.id
-                      AND c.profile = p.profile
-                      AND c.status IN ('completed', 'uploading')
-                      AND c.world_version_id IS NOT DISTINCT FROM lwv.id
-                      AND c.scene_version_id IS NOT NULL
-                      AND c.scene_version_id = lsv2.id
-                  ))
-
-                UNION ALL
-
-                -- Branch 2: shader versions WITHOUT profiles
-                SELECT
-                    sv.id AS shader_version_id,
-                    s.id AS scene_id,
-                    s.world_id,
-                    NULL AS profile
-                FROM latest_versions sv
-                CROSS JOIN scenes s
-                WHERE s.active = TRUE
-                  AND ($2 OR sv.capture_failure_count < 3)
-                  AND (sv.supported_profiles IS NULL OR sv.supported_profiles = '[]')
-                  AND ($2 OR NOT EXISTS (
-                    SELECT 1 FROM captures c
-                    LEFT JOIN latest_world_versions lwv ON lwv.world_id = s.world_id
-                    LEFT JOIN latest_scene_versions lsv2 ON lsv2.scene_id = s.id
-                    WHERE c.shader_version_id = sv.id
-                      AND c.scene_id = s.id
-                      AND c.profile IS NULL
-                      AND c.status IN ('completed', 'uploading')
-                      AND c.world_version_id IS NOT DISTINCT FROM lwv.id
-                      AND c.scene_version_id IS NOT NULL
-                      AND c.scene_version_id = lsv2.id
-                  ))
+            best_captures AS (
+                SELECT DISTINCT ON (shader_version_id, scene_id, profile)
+                    shader_version_id, scene_id, profile, freshness
+                FROM captures_with_freshness
+                WHERE status IN ('completed', 'uploading')
+                ORDER BY shader_version_id, scene_id, profile, captured_at DESC
             )
             SELECT
-                n.shader_version_id AS "shader_version_id!",
+                tm.shader_version_id AS "shader_version_id!",
                 sh.id AS "shader_id!",
                 sh.slug AS "shader_slug!",
                 sh.name AS "shader_name!",
                 sv.version AS "version!",
                 sv.download_url,
                 sv.file_hash,
-                n.scene_id AS "scene_id!",
+                tm.scene_id AS "scene_id!",
                 sc.slug AS "scene_slug!",
                 sc.name AS "scene_name!",
                 sc.dimension AS "scene_dimension!",
@@ -184,16 +112,22 @@ impl WorkRepo {
                 lwv.size_bytes AS world_size_bytes,
                 lwv.id AS world_version_id,
                 lsv.id AS scene_version_id,
-                n.profile
-            FROM needed n
-            JOIN shader_versions sv ON sv.id = n.shader_version_id
+                tm.profile
+            FROM capture_target_matrix tm
+            JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id
             JOIN shaders sh ON sh.id = sv.shader_id
-            JOIN scenes sc ON sc.id = n.scene_id
-            JOIN worlds w ON w.id = n.world_id
+            JOIN scenes sc ON sc.id = tm.scene_id
+            JOIN worlds w ON w.id = tm.world_id
             LEFT JOIN latest_world_versions lwv ON lwv.world_id = w.id
             JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id
-            LEFT JOIN has_captures hc ON hc.shader_version_id = n.shader_version_id
-            WHERE ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))
+            LEFT JOIN has_captures hc ON hc.shader_version_id = tm.shader_version_id
+            LEFT JOIN best_captures bc
+                ON bc.shader_version_id = tm.shader_version_id
+                AND bc.scene_id = tm.scene_id
+                AND (bc.profile IS NOT DISTINCT FROM tm.profile)
+            WHERE ($2 OR sv.capture_failure_count < 3)
+              AND ($2 OR bc.shader_version_id IS NULL OR bc.freshness != 'fresh')
+              AND ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))
               AND ($4::text IS NULL OR sc.slug = ANY(string_to_array($4, ',')))
             ORDER BY
                 hc.shader_version_id IS NOT NULL ASC,
@@ -201,7 +135,7 @@ impl WorkRepo {
                 sv.upstream_published_at DESC NULLS LAST,
                 sh.name ASC,
                 sc.name ASC,
-                n.profile NULLS LAST
+                tm.profile NULLS LAST
             LIMIT $1
             "#,
             limit,

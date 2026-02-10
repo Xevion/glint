@@ -17,136 +17,6 @@ pub struct ThumbnailInfo {
 
 pub struct CaptureRepo;
 
-/// Compile-time checked query returning `CaptureWithContext`.
-///
-/// SQLx macros require string-literal concatenation (`"a" + "b"`), so this
-/// macro injects the shared SELECT/FROM/JOIN fragment and appends a caller-
-/// supplied suffix (WHERE, ORDER BY, LIMIT, etc.).
-///
-/// # Variants
-///
-/// - `capture_ctx_query!($suffix, $args...)` — plain SELECT
-/// - `capture_ctx_query!(distinct: $expr, $suffix, $args...)` — SELECT DISTINCT ON ($expr)
-#[macro_export]
-macro_rules! capture_ctx_query {
-    ($suffix:literal $(, $arg:expr)* $(,)?) => {
-        sqlx::query_as!(
-            CaptureWithContext,
-            r#"
-            WITH _lwv AS (
-                SELECT DISTINCT ON (world_id) id, world_id
-                FROM world_versions ORDER BY world_id, created_at DESC, id DESC
-            ),
-            _lsv AS (
-                SELECT DISTINCT ON (scene_id) id, scene_id
-                FROM scene_versions ORDER BY scene_id, created_at DESC, id DESC
-            )
-            SELECT
-                c.id,
-                c.scene_id,
-                s.slug as shader_slug,
-                s.name as shader_name,
-                sv.version as shader_version,
-                c.profile,
-                c.image_path,
-                c.image_url,
-                c.thumbhash,
-                c.captured_at,
-                c.resolution_width,
-                c.resolution_height,
-                c.file_size_bytes,
-                cri.run_id as "run_id?: String",
-                cr.status as "run_status?: String",
-                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
-                sc.name as "scene_name?: String",
-                sc.slug as "scene_slug?: String",
-                CASE
-                    WHEN c.status != 'completed' AND c.status != 'uploading' THEN 'superseded'
-                    WHEN EXISTS (
-                        SELECT 1 FROM captures c2
-                        WHERE c2.shader_version_id = c.shader_version_id
-                          AND c2.scene_id = c.scene_id
-                          AND c2.profile IS NOT DISTINCT FROM c.profile
-                          AND c2.status IN ('completed', 'uploading')
-                          AND c2.captured_at > c.captured_at
-                    ) THEN 'superseded'
-                    WHEN c.world_version_id IS DISTINCT FROM _lwv.id
-                      OR c.scene_version_id IS DISTINCT FROM _lsv.id
-                    THEN 'stale'
-                    ELSE 'fresh'
-                END as "freshness!: CaptureFreshness"
-            FROM captures c
-            JOIN shader_versions sv ON c.shader_version_id = sv.id
-            JOIN shaders s ON sv.shader_id = s.id
-            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
-            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
-            LEFT JOIN scenes sc ON c.scene_id = sc.id
-            LEFT JOIN _lwv ON _lwv.world_id = sc.world_id
-            LEFT JOIN _lsv ON _lsv.scene_id = sc.id
-            "# + $suffix
-            $(, $arg)*
-        )
-    };
-    (distinct: $distinct:literal, $suffix:literal $(, $arg:expr)* $(,)?) => {
-        sqlx::query_as!(
-            CaptureWithContext,
-            r#"
-            WITH _lwv AS (
-                SELECT DISTINCT ON (world_id) id, world_id
-                FROM world_versions ORDER BY world_id, created_at DESC, id DESC
-            ),
-            _lsv AS (
-                SELECT DISTINCT ON (scene_id) id, scene_id
-                FROM scene_versions ORDER BY scene_id, created_at DESC, id DESC
-            )
-            SELECT DISTINCT ON ("# + $distinct + r#")
-                c.id,
-                c.scene_id,
-                s.slug as shader_slug,
-                s.name as shader_name,
-                sv.version as shader_version,
-                c.profile,
-                c.image_path,
-                c.image_url,
-                c.thumbhash,
-                c.captured_at,
-                c.resolution_width,
-                c.resolution_height,
-                c.file_size_bytes,
-                cri.run_id as "run_id?: String",
-                cr.status as "run_status?: String",
-                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
-                sc.name as "scene_name?: String",
-                sc.slug as "scene_slug?: String",
-                CASE
-                    WHEN c.status != 'completed' AND c.status != 'uploading' THEN 'superseded'
-                    WHEN EXISTS (
-                        SELECT 1 FROM captures c2
-                        WHERE c2.shader_version_id = c.shader_version_id
-                          AND c2.scene_id = c.scene_id
-                          AND c2.profile IS NOT DISTINCT FROM c.profile
-                          AND c2.status IN ('completed', 'uploading')
-                          AND c2.captured_at > c.captured_at
-                    ) THEN 'superseded'
-                    WHEN c.world_version_id IS DISTINCT FROM _lwv.id
-                      OR c.scene_version_id IS DISTINCT FROM _lsv.id
-                    THEN 'stale'
-                    ELSE 'fresh'
-                END as "freshness!: CaptureFreshness"
-            FROM captures c
-            JOIN shader_versions sv ON c.shader_version_id = sv.id
-            JOIN shaders s ON sv.shader_id = s.id
-            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
-            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
-            LEFT JOIN scenes sc ON c.scene_id = sc.id
-            LEFT JOIN _lwv ON _lwv.world_id = sc.world_id
-            LEFT JOIN _lsv ON _lsv.scene_id = sc.id
-            "# + $suffix
-            $(, $arg)*
-        )
-    };
-}
-
 impl CaptureRepo {
     #[instrument(skip(executor), level = "debug")]
     pub async fn find_by_id(
@@ -235,11 +105,20 @@ impl CaptureRepo {
         executor: impl sqlx::PgExecutor<'_>,
         scene_id: &str,
     ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = capture_ctx_query!(
-            distinct: "sv.shader_id",
+        let captures = sqlx::query_as!(
+            CaptureWithContext,
             r#"
-            WHERE c.scene_id = $1 AND c.status = 'completed'
-            ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST
+            SELECT DISTINCT ON (shader_id)
+                id AS "id!", scene_id AS "scene_id!",
+                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                shader_version AS "shader_version!",
+                profile, image_path, image_url, thumbhash, captured_at,
+                resolution_width, resolution_height, file_size_bytes,
+                run_id, run_status, shader_author, scene_name, scene_slug,
+                freshness AS "freshness!: CaptureFreshness"
+            FROM capture_contexts
+            WHERE scene_id = $1 AND capture_status = 'completed'
+            ORDER BY shader_id, captured_at DESC NULLS LAST
             "#,
             scene_id
         )
@@ -352,10 +231,24 @@ impl CaptureRepo {
     pub async fn list_all_with_context(
         executor: impl sqlx::PgExecutor<'_>,
     ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = capture_ctx_query!(" ORDER BY c.created_at DESC")
-            .fetch_all(executor)
-            .await
-            .context("failed to list all captures with context")?;
+        let captures = sqlx::query_as!(
+            CaptureWithContext,
+            r#"
+            SELECT
+                id AS "id!", scene_id AS "scene_id!",
+                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                shader_version AS "shader_version!",
+                profile, image_path, image_url, thumbhash, captured_at,
+                resolution_width, resolution_height, file_size_bytes,
+                run_id, run_status, shader_author, scene_name, scene_slug,
+                freshness AS "freshness!: CaptureFreshness"
+            FROM capture_contexts
+            ORDER BY captured_at DESC NULLS LAST
+            "#
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to list all captures with context")?;
 
         debug!(count = captures.len(), "Listed all captures with context");
         Ok(captures)
@@ -367,11 +260,26 @@ impl CaptureRepo {
         executor: impl sqlx::PgExecutor<'_>,
         id: &str,
     ) -> AppResult<CaptureWithContext> {
-        capture_ctx_query!(" WHERE c.id = $1", id)
-            .fetch_optional(executor)
-            .await
-            .context(format!("failed to get capture with context '{}'", id))?
-            .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
+        sqlx::query_as!(
+            CaptureWithContext,
+            r#"
+            SELECT
+                id AS "id!", scene_id AS "scene_id!",
+                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                shader_version AS "shader_version!",
+                profile, image_path, image_url, thumbhash, captured_at,
+                resolution_width, resolution_height, file_size_bytes,
+                run_id, run_status, shader_author, scene_name, scene_slug,
+                freshness AS "freshness!: CaptureFreshness"
+            FROM capture_contexts
+            WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to get capture with context '{}'", id))?
+        .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
     }
 
     /// Full capture detail with technical metadata and related captures.
@@ -379,9 +287,8 @@ impl CaptureRepo {
     /// three groups of related captures for cross-referencing.
     #[instrument(skip(db), level = "debug")]
     pub async fn get_detail(db: &DbPool, id: &str) -> AppResult<CaptureDetail> {
-        // Row type for the combined capture + context query
         #[derive(FromRow)]
-        struct CaptureFullRow {
+        struct DetailRow {
             // Context fields
             id: String,
             scene_id: String,
@@ -423,76 +330,24 @@ impl CaptureRepo {
         }
 
         let row = sqlx::query_as!(
-            CaptureFullRow,
+            DetailRow,
             r#"
-            WITH _lwv AS (
-                SELECT DISTINCT ON (world_id) id, world_id
-                FROM world_versions ORDER BY world_id, created_at DESC, id DESC
-            ),
-            _lsv AS (
-                SELECT DISTINCT ON (scene_id) id, scene_id
-                FROM scene_versions ORDER BY scene_id, created_at DESC, id DESC
-            )
             SELECT
-                c.id,
-                c.scene_id,
-                s.slug as shader_slug,
-                s.name as shader_name,
-                sv.version as shader_version,
-                c.shader_version_id,
-                c.profile,
-                c.image_path,
-                c.image_url,
-                c.thumbhash,
-                c.captured_at,
-                c.resolution_width,
-                c.resolution_height,
-                c.file_size_bytes,
-                cri.run_id as "run_id?: String",
-                cr.status as "run_status?: String",
-                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
-                sc.name as "scene_name?: String",
-                sc.slug as "scene_slug?: String",
-                CASE
-                    WHEN c.status != 'completed' AND c.status != 'uploading' THEN 'superseded'
-                    WHEN EXISTS (
-                        SELECT 1 FROM captures c2
-                        WHERE c2.shader_version_id = c.shader_version_id
-                          AND c2.scene_id = c.scene_id
-                          AND c2.profile IS NOT DISTINCT FROM c.profile
-                          AND c2.status IN ('completed', 'uploading')
-                          AND c2.captured_at > c.captured_at
-                    ) THEN 'superseded'
-                    WHEN c.world_version_id IS DISTINCT FROM _lwv.id
-                      OR c.scene_version_id IS DISTINCT FROM _lsv.id
-                    THEN 'stale'
-                    ELSE 'fresh'
-                END as "freshness!: CaptureFreshness",
-                c.status,
-                c.error_message,
-                c.video_url,
-                c.avg_fps,
-                c.min_fps,
-                c.max_fps,
-                c.frame_time_avg,
-                c.frame_time_p99,
-                c.minecraft_version,
-                c.iris_version,
-                c.gpu_model,
-                c.content_type,
-                c.world_version_id,
-                c.scene_version_id,
-                c.created_at,
-                c.updated_at
-            FROM captures c
-            JOIN shader_versions sv ON c.shader_version_id = sv.id
-            JOIN shaders s ON sv.shader_id = s.id
-            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
-            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
-            LEFT JOIN scenes sc ON c.scene_id = sc.id
-            LEFT JOIN _lwv ON _lwv.world_id = sc.world_id
-            LEFT JOIN _lsv ON _lsv.scene_id = sc.id
-            WHERE c.id = $1
+                id AS "id!", scene_id AS "scene_id!",
+                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                shader_version AS "shader_version!",
+                shader_version_id AS "shader_version_id!",
+                profile, image_path, image_url, thumbhash,
+                captured_at, resolution_width, resolution_height, file_size_bytes,
+                run_id, run_status, shader_author, scene_name, scene_slug,
+                freshness AS "freshness!: CaptureFreshness",
+                status AS "status!", error_message, video_url,
+                avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
+                minecraft_version, iris_version, gpu_model, content_type,
+                world_version_id, scene_version_id,
+                created_at AS "created_at!", updated_at AS "updated_at!"
+            FROM capture_details
+            WHERE id = $1
             "#,
             id
         )
@@ -508,13 +363,23 @@ impl CaptureRepo {
         let run_id = row.run_id.clone();
 
         // Same shader + same scene (different profiles/versions of same shader in same scene)
-        let same_shader_scene_fut = capture_ctx_query!(
+        let same_shader_scene_fut = sqlx::query_as!(
+            CaptureWithContext,
             r#"
-            WHERE c.scene_id = $1
-              AND sv.shader_id = (SELECT shader_id FROM shader_versions WHERE id = $2)
-              AND c.id != $3
-              AND c.status = 'completed'
-            ORDER BY c.created_at DESC
+            SELECT
+                id AS "id!", scene_id AS "scene_id!",
+                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                shader_version AS "shader_version!",
+                profile, image_path, image_url, thumbhash, captured_at,
+                resolution_width, resolution_height, file_size_bytes,
+                run_id, run_status, shader_author, scene_name, scene_slug,
+                freshness AS "freshness!: CaptureFreshness"
+            FROM capture_contexts
+            WHERE scene_id = $1
+              AND shader_id = (SELECT shader_id FROM shader_versions WHERE id = $2)
+              AND id != $3
+              AND capture_status = 'completed'
+            ORDER BY captured_at DESC NULLS LAST
             LIMIT 8
             "#,
             scene_id,
@@ -524,13 +389,23 @@ impl CaptureRepo {
         .fetch_all(db);
 
         // Same scene, different shaders
-        let same_scene_fut = capture_ctx_query!(
+        let same_scene_fut = sqlx::query_as!(
+            CaptureWithContext,
             r#"
-            WHERE c.scene_id = $1
-              AND sv.shader_id != (SELECT shader_id FROM shader_versions WHERE id = $2)
-              AND c.id != $3
-              AND c.status = 'completed'
-            ORDER BY c.created_at DESC
+            SELECT
+                id AS "id!", scene_id AS "scene_id!",
+                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                shader_version AS "shader_version!",
+                profile, image_path, image_url, thumbhash, captured_at,
+                resolution_width, resolution_height, file_size_bytes,
+                run_id, run_status, shader_author, scene_name, scene_slug,
+                freshness AS "freshness!: CaptureFreshness"
+            FROM capture_contexts
+            WHERE scene_id = $1
+              AND shader_id != (SELECT shader_id FROM shader_versions WHERE id = $2)
+              AND id != $3
+              AND capture_status = 'completed'
+            ORDER BY captured_at DESC NULLS LAST
             LIMIT 8
             "#,
             scene_id,
@@ -540,12 +415,22 @@ impl CaptureRepo {
         .fetch_all(db);
 
         let (same_shader_scene, same_scene, same_run) = if let Some(ref rid) = run_id {
-            let same_run_fut = capture_ctx_query!(
+            let same_run_fut = sqlx::query_as!(
+                CaptureWithContext,
                 r#"
-                WHERE cri.run_id = $1
-                  AND c.id != $2
-                  AND c.status = 'completed'
-                ORDER BY c.created_at DESC
+                SELECT
+                    id AS "id!", scene_id AS "scene_id!",
+                    shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                    shader_version AS "shader_version!",
+                    profile, image_path, image_url, thumbhash, captured_at,
+                    resolution_width, resolution_height, file_size_bytes,
+                    run_id, run_status, shader_author, scene_name, scene_slug,
+                    freshness AS "freshness!: CaptureFreshness"
+                FROM capture_contexts
+                WHERE run_id = $1
+                  AND id != $2
+                  AND capture_status = 'completed'
+                ORDER BY captured_at DESC NULLS LAST
                 LIMIT 8
                 "#,
                 rid,
@@ -621,13 +506,23 @@ impl CaptureRepo {
         status: Option<&str>,
         run_id: Option<&str>,
     ) -> AppResult<(Vec<CaptureWithContext>, i64)> {
-        let items = capture_ctx_query!(
+        let items = sqlx::query_as!(
+            CaptureWithContext,
             r#"
-            WHERE ($1::text IS NULL OR s.slug = $1)
-              AND ($2::text IS NULL OR c.scene_id = $2)
-              AND ($3::text IS NULL OR c.status = $3)
-              AND ($4::text IS NULL OR cri.run_id = $4)
-            ORDER BY c.created_at DESC
+            SELECT
+                id AS "id!", scene_id AS "scene_id!",
+                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                shader_version AS "shader_version!",
+                profile, image_path, image_url, thumbhash, captured_at,
+                resolution_width, resolution_height, file_size_bytes,
+                run_id, run_status, shader_author, scene_name, scene_slug,
+                freshness AS "freshness!: CaptureFreshness"
+            FROM capture_contexts
+            WHERE ($1::text IS NULL OR shader_slug = $1)
+              AND ($2::text IS NULL OR scene_id = $2)
+              AND ($3::text IS NULL OR capture_status = $3)
+              AND ($4::text IS NULL OR run_id = $4)
+            ORDER BY captured_at DESC NULLS LAST
             LIMIT $5 OFFSET $6
             "#,
             shader,
@@ -644,14 +539,11 @@ impl CaptureRepo {
         let count = sqlx::query_scalar!(
             r#"
             SELECT COUNT(*) as "count!"
-            FROM captures c
-            JOIN shader_versions sv ON c.shader_version_id = sv.id
-            JOIN shaders s ON sv.shader_id = s.id
-            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
-            WHERE ($1::text IS NULL OR s.slug = $1)
-              AND ($2::text IS NULL OR c.scene_id = $2)
-              AND ($3::text IS NULL OR c.status = $3)
-              AND ($4::text IS NULL OR cri.run_id = $4)
+            FROM capture_contexts
+            WHERE ($1::text IS NULL OR shader_slug = $1)
+              AND ($2::text IS NULL OR scene_id = $2)
+              AND ($3::text IS NULL OR capture_status = $3)
+              AND ($4::text IS NULL OR run_id = $4)
             "#,
             shader,
             scene,

@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT ON (world_id) *\n            FROM world_versions\n            ORDER BY world_id, created_at DESC, id DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "world_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "file_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "a4ac9ed5e6687cc0b4a0376a6165018c35eb93492163748394d53843f1d9c00a"
+}

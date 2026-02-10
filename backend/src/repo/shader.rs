@@ -4,7 +4,6 @@ use anyhow::Context;
 use tracing::{debug, instrument};
 use uuid::Uuid;
 
-use crate::capture_ctx_query;
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
 use crate::models::{
@@ -384,11 +383,20 @@ impl ShaderRepo {
         executor: impl sqlx::PgExecutor<'_>,
         shader_id: &str,
     ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = capture_ctx_query!(
-            distinct: "c.scene_id",
+        let captures = sqlx::query_as!(
+            CaptureWithContext,
             r#"
-            WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE
-            ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
+            SELECT DISTINCT ON (scene_id)
+                id AS "id!", scene_id AS "scene_id!",
+                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                shader_version AS "shader_version!",
+                profile, image_path, image_url, thumbhash, captured_at,
+                resolution_width, resolution_height, file_size_bytes,
+                run_id, run_status, shader_author, scene_name, scene_slug,
+                freshness AS "freshness!: CaptureFreshness"
+            FROM capture_contexts
+            WHERE shader_id = $1 AND capture_status = 'completed' AND scene_active = TRUE
+            ORDER BY scene_id, captured_at DESC NULLS LAST
             "#,
             shader_id
         )
@@ -408,60 +416,31 @@ impl ShaderRepo {
         version_id: Option<&str>,
         profile: Option<&str>,
     ) -> AppResult<Vec<CaptureWithContext>> {
-        let captures = match (version_id, profile) {
-            (Some(vid), Some(prof)) => {
-                capture_ctx_query!(
-                    distinct: "c.scene_id",
-                    r#"
-                    WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE AND sv.id = $2 AND c.profile = $3
-                    ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
-                    "#,
-                    shader_id,
-                    vid,
-                    prof
-                )
-                .fetch_all(executor)
-                .await
-            }
-            (Some(vid), None) => {
-                capture_ctx_query!(
-                    distinct: "c.scene_id",
-                    r#"
-                    WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE AND sv.id = $2
-                    ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
-                    "#,
-                    shader_id,
-                    vid
-                )
-                .fetch_all(executor)
-                .await
-            }
-            (None, Some(prof)) => {
-                capture_ctx_query!(
-                    distinct: "c.scene_id",
-                    r#"
-                    WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE AND c.profile = $2
-                    ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
-                    "#,
-                    shader_id,
-                    prof
-                )
-                .fetch_all(executor)
-                .await
-            }
-            (None, None) => {
-                capture_ctx_query!(
-                    distinct: "c.scene_id",
-                    r#"
-                    WHERE s.id = $1 AND c.status = 'completed' AND sc.active = TRUE
-                    ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
-                    "#,
-                    shader_id
-                )
-                .fetch_all(executor)
-                .await
-            }
-        }
+        let captures = sqlx::query_as!(
+            CaptureWithContext,
+            r#"
+            SELECT DISTINCT ON (scene_id)
+                id AS "id!", scene_id AS "scene_id!",
+                shader_slug AS "shader_slug!", shader_name AS "shader_name!",
+                shader_version AS "shader_version!",
+                profile, image_path, image_url, thumbhash, captured_at,
+                resolution_width, resolution_height, file_size_bytes,
+                run_id, run_status, shader_author, scene_name, scene_slug,
+                freshness AS "freshness!: CaptureFreshness"
+            FROM capture_contexts
+            WHERE shader_id = $1
+              AND capture_status = 'completed'
+              AND scene_active = TRUE
+              AND ($2::text IS NULL OR shader_version_id = $2)
+              AND ($3::text IS NULL OR profile = $3)
+            ORDER BY scene_id, captured_at DESC NULLS LAST
+            "#,
+            shader_id,
+            version_id,
+            profile
+        )
+        .fetch_all(executor)
+        .await
         .context(format!(
             "failed to get filtered captures for shader '{}'",
             shader_id

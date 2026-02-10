@@ -105,9 +105,11 @@ db cmd="start":
 migrate-reset:
     cd backend && cargo sqlx database reset -y
 
-# Run pending migrations
+# Run pending migrations, then apply views
 migrate-run:
     cd backend && cargo sqlx migrate run
+    @echo "Applying views..."
+    cd backend && bash -c 'source .env 2>/dev/null && psql "$DATABASE_URL" -f views.sql -q' || echo "⚠ psql not available or failed; views will be applied on next app startup"
 
 # Create new migration file
 migrate-create name:

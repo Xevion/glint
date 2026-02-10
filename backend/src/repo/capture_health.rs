@@ -1,9 +1,12 @@
+use anyhow::Context;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::Serialize;
+use sqlx::Executor;
 use tracing::{debug, instrument};
 use ts_rs::TS;
 
+use crate::db::DbPool;
 use crate::error::AppResult;
 
 /// Health status of a single capture target
@@ -19,6 +22,25 @@ pub enum TargetHealth {
     Completed,
     /// Shader version hit the failure cap (capture_failure_count >= 3)
     Failed,
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Postgres> for TargetHealth {
+    fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+        match s {
+            "missing" => Ok(Self::Missing),
+            "stale" => Ok(Self::Stale),
+            "completed" => Ok(Self::Completed),
+            "failed" => Ok(Self::Failed),
+            _ => Err(format!("unknown target health value: {s}").into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Postgres> for TargetHealth {
+    fn type_info() -> sqlx::postgres::PgTypeInfo {
+        <&str as sqlx::Type<sqlx::Postgres>>::type_info()
+    }
 }
 
 /// A single capture target with its health status
@@ -59,7 +81,6 @@ pub struct CaptureHealthResponse {
     pub summary: CaptureHealthSummary,
 }
 
-/// Raw row from the health query before status classification
 #[derive(Debug, sqlx::FromRow)]
 struct CaptureHealthRow {
     shader_id: String,
@@ -73,79 +94,36 @@ struct CaptureHealthRow {
     profile: Option<String>,
     capture_failure_count: i32,
     last_capture_at: Option<DateTime<Utc>>,
-    world_version_stale: Option<bool>,
-    scene_version_stale: Option<bool>,
-    has_capture: bool,
+    status: TargetHealth,
 }
 
 pub struct CaptureHealthRepo;
 
 impl CaptureHealthRepo {
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn get_capture_health(
-        executor: impl sqlx::PgExecutor<'_>,
-    ) -> AppResult<CaptureHealthResponse> {
+    /// Compute health status for every capture target in the matrix.
+    /// JIT is disabled because the query uses capture_target_matrix (cross-join
+    /// fanout inflates cost estimates, same issue as the work query).
+    #[instrument(skip(pool), level = "debug")]
+    pub async fn get_capture_health(pool: &DbPool) -> AppResult<CaptureHealthResponse> {
+        let mut tx = pool.begin().await.context("failed to begin transaction")?;
+
+        tx.execute("SET LOCAL jit = off")
+            .await
+            .context("failed to disable JIT")?;
+
         let rows = sqlx::query_as!(
             CaptureHealthRow,
             r#"
-            WITH latest_versions AS (
-                SELECT DISTINCT ON (shader_id)
-                    id, shader_id, version, capture_failure_count, supported_profiles
-                FROM shader_versions
-                ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC
-            ),
-            latest_world_versions AS (
-                SELECT DISTINCT ON (world_id)
-                    id, world_id
-                FROM world_versions
-                ORDER BY world_id, created_at DESC, id DESC
-            ),
-            latest_scene_versions AS (
-                SELECT DISTINCT ON (scene_id)
-                    id, scene_id
-                FROM scene_versions
-                ORDER BY scene_id, created_at DESC, id DESC
-            ),
-            target_matrix AS (
-                -- Branch 1: shader versions WITH profiles
-                SELECT
-                    sv.id AS shader_version_id,
-                    s.id AS scene_id,
-                    p.profile AS profile
-                FROM latest_versions sv
-                CROSS JOIN scenes s
-                CROSS JOIN LATERAL jsonb_array_elements_text(
-                    CASE
-                        WHEN sv.supported_profiles IS NOT NULL AND sv.supported_profiles != '[]'
-                        THEN sv.supported_profiles::jsonb
-                        ELSE '[]'::jsonb
-                    END
-                ) AS p(profile)
-                WHERE s.active = TRUE
-
-                UNION ALL
-
-                -- Branch 2: shader versions WITHOUT profiles
-                SELECT
-                    sv.id AS shader_version_id,
-                    s.id AS scene_id,
-                    NULL AS profile
-                FROM latest_versions sv
-                CROSS JOIN scenes s
-                WHERE s.active = TRUE
-                  AND (sv.supported_profiles IS NULL OR sv.supported_profiles = '[]')
-            ),
-            best_captures AS (
-                SELECT DISTINCT ON (c.shader_version_id, c.scene_id, c.profile)
-                    c.shader_version_id,
-                    c.scene_id,
-                    c.profile,
-                    c.captured_at,
-                    c.world_version_id,
-                    c.scene_version_id
-                FROM captures c
-                WHERE c.status IN ('completed', 'uploading')
-                ORDER BY c.shader_version_id, c.scene_id, c.profile, c.captured_at DESC
+            WITH best_captures AS (
+                SELECT DISTINCT ON (shader_version_id, scene_id, profile)
+                    shader_version_id,
+                    scene_id,
+                    profile,
+                    captured_at,
+                    freshness
+                FROM captures_with_freshness
+                WHERE status IN ('completed', 'uploading')
+                ORDER BY shader_version_id, scene_id, profile, captured_at DESC
             )
             SELECT
                 sh.id AS "shader_id!",
@@ -160,22 +138,15 @@ impl CaptureHealthRepo {
                 sv.capture_failure_count AS "capture_failure_count!",
                 bc.captured_at AS last_capture_at,
                 CASE
-                    WHEN bc.captured_at IS NULL THEN NULL
-                    WHEN bc.world_version_id IS NOT DISTINCT FROM lwv.id THEN FALSE
-                    ELSE TRUE
-                END AS "world_version_stale?: bool",
-                CASE
-                    WHEN bc.captured_at IS NULL THEN NULL
-                    WHEN bc.scene_version_id IS NOT DISTINCT FROM lsv.id THEN FALSE
-                    ELSE TRUE
-                END AS "scene_version_stale?: bool",
-                (bc.captured_at IS NOT NULL) AS "has_capture!"
-            FROM target_matrix tm
-            JOIN latest_versions sv ON sv.id = tm.shader_version_id
+                    WHEN sv.capture_failure_count >= 3 THEN 'failed'
+                    WHEN bc.captured_at IS NULL THEN 'missing'
+                    WHEN bc.freshness != 'fresh' THEN 'stale'
+                    ELSE 'completed'
+                END AS "status!: TargetHealth"
+            FROM capture_target_matrix tm
+            JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id
             JOIN shaders sh ON sh.id = sv.shader_id
             JOIN scenes sc ON sc.id = tm.scene_id
-            LEFT JOIN latest_world_versions lwv ON lwv.world_id = sc.world_id
-            LEFT JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id
             LEFT JOIN best_captures bc
                 ON bc.shader_version_id = tm.shader_version_id
                 AND bc.scene_id = tm.scene_id
@@ -183,38 +154,26 @@ impl CaptureHealthRepo {
             ORDER BY sh.name ASC, sv.version DESC, sc.name ASC, tm.profile NULLS LAST
             "#
         )
-        .fetch_all(executor)
+        .fetch_all(&mut *tx)
         .await?;
+
+        tx.commit().await.context("failed to commit transaction")?;
 
         let targets: Vec<CaptureTargetHealth> = rows
             .into_iter()
-            .map(|row| {
-                let status = if row.capture_failure_count >= 3 {
-                    TargetHealth::Failed
-                } else if !row.has_capture {
-                    TargetHealth::Missing
-                } else if row.world_version_stale.unwrap_or(false)
-                    || row.scene_version_stale.unwrap_or(false)
-                {
-                    TargetHealth::Stale
-                } else {
-                    TargetHealth::Completed
-                };
-
-                CaptureTargetHealth {
-                    shader_id: row.shader_id,
-                    shader_name: row.shader_name,
-                    shader_slug: row.shader_slug,
-                    shader_version_id: row.shader_version_id,
-                    version: row.version,
-                    scene_id: row.scene_id,
-                    scene_name: row.scene_name,
-                    scene_slug: row.scene_slug,
-                    profile: row.profile,
-                    status,
-                    last_capture_at: row.last_capture_at,
-                    failure_count: row.capture_failure_count,
-                }
+            .map(|row| CaptureTargetHealth {
+                shader_id: row.shader_id,
+                shader_name: row.shader_name,
+                shader_slug: row.shader_slug,
+                shader_version_id: row.shader_version_id,
+                version: row.version,
+                scene_id: row.scene_id,
+                scene_name: row.scene_name,
+                scene_slug: row.scene_slug,
+                profile: row.profile,
+                status: row.status,
+                last_capture_at: row.last_capture_at,
+                failure_count: row.capture_failure_count,
             })
             .collect();
 
