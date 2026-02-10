@@ -6,6 +6,7 @@ import net.minecraft.client.CloudStatus
 import net.minecraft.client.GraphicsStatus
 import net.minecraft.client.Minecraft
 import net.minecraft.server.level.ParticleStatus
+import net.minecraft.world.level.GameType
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -73,6 +74,7 @@ data class CaptureStateSnapshot(
     val fovEffects: Double,
     val mipmapLevels: Int,
     val cameraType: CameraType,
+    val gameMode: GameType?,
 ) {
     companion object {
         /**
@@ -81,6 +83,13 @@ data class CaptureStateSnapshot(
         fun capture(): CaptureStateSnapshot {
             val mc = Minecraft.getInstance()
             val options = mc.options
+
+            val serverGameMode =
+                mc.singleplayerServer
+                    ?.playerList
+                    ?.getPlayer(mc.player?.uuid)
+                    ?.gameMode
+                    ?.getGameModeForPlayer()
 
             return CaptureStateSnapshot(
                 fov = options.fov().get(),
@@ -101,6 +110,7 @@ data class CaptureStateSnapshot(
                 fovEffects = options.fovEffectScale().get(),
                 mipmapLevels = options.mipmapLevels().get(),
                 cameraType = options.getCameraType(),
+                gameMode = serverGameMode,
             )
         }
     }
@@ -130,5 +140,13 @@ data class CaptureStateSnapshot(
         options.fovEffectScale().set(fovEffects)
         options.mipmapLevels().set(mipmapLevels)
         options.setCameraType(cameraType)
+
+        // Restore game mode on the server player
+        if (gameMode != null) {
+            mc.singleplayerServer
+                ?.playerList
+                ?.getPlayer(mc.player?.uuid)
+                ?.setGameMode(gameMode)
+        }
     }
 }

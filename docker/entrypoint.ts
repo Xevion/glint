@@ -15,7 +15,8 @@ import type { Subprocess } from "bun";
 const MC_DIR = process.env.MC_DIR ?? "/minecraft";
 const DISPLAY_NUM = process.env.DISPLAY_NUM ?? "99";
 const RESOLUTION = process.env.RESOLUTION ?? "1920x1080x24";
-const JAVA_MEM = process.env.JAVA_MEM ?? "4G";
+const JAVA_MEM = process.env.JAVA_MEM ?? "6G";
+const JAVA_MEM_INITIAL = process.env.JAVA_MEM_INITIAL ?? "2G";
 const RECORD = process.env.RECORD === "true";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -87,7 +88,7 @@ process.env.XDG_SESSION_TYPE = "x11";
 
 console.log("=== Glint Capture Container ===");
 console.log(`  Display:     :${DISPLAY_NUM} (${RESOLUTION})`);
-console.log(`  Java memory: ${JAVA_MEM}`);
+console.log(`  Java memory: ${JAVA_MEM_INITIAL} initial, ${JAVA_MEM} max`);
 console.log(`  Autonomous:  ${process.env.GLINT_AUTONOMOUS ?? "false"}`);
 console.log(`  API URL:     ${process.env.GLINT_API_URL ?? "<not set>"}`);
 
@@ -209,7 +210,7 @@ console.log(`  Classpath entries: ${classpathCount}`);
 
 const javaArgs = [
 	`-Xmx${JAVA_MEM}`,
-	`-Xms${JAVA_MEM}`,
+	`-Xms${JAVA_MEM_INITIAL}`,
 	"-XX:+UseG1GC",
 	"-XX:+UnlockExperimentalVMOptions",
 	"-XX:G1NewSizePercent=20",

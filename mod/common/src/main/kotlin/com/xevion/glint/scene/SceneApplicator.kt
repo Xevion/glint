@@ -3,6 +3,8 @@ package com.xevion.glint.scene
 import com.xevion.glint.Loggers
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.GameRules
+import net.minecraft.world.level.GameType
+import net.minecraft.world.phys.Vec3
 import net.minecraft.client.CameraType as MinecraftCameraType
 
 /** Result of applying a scene. */
@@ -102,7 +104,18 @@ object SceneApplicator {
             return
         }
 
-        // Teleport player
+        // Switch to spectator mode so the player is invulnerable, flying,
+        // immune to gravity, and invisible to mobs.
+        mc.singleplayerServer?.let { server ->
+            val serverPlayer = server.playerList.getPlayer(player.uuid)
+            if (serverPlayer != null && !serverPlayer.isSpectator) {
+                serverPlayer.setGameMode(GameType.SPECTATOR)
+                log.debug("Set spectator mode for capture")
+            }
+        }
+
+        // Teleport player and zero velocity to prevent any residual drift
+        player.setDeltaMovement(Vec3.ZERO)
         player.moveTo(
             scene.position.x,
             scene.position.y,
@@ -110,6 +123,13 @@ object SceneApplicator {
             scene.camera.yaw,
             scene.camera.pitch,
         )
+        player.setDeltaMovement(Vec3.ZERO)
+
+        // Also zero velocity on the server-side player entity
+        mc.singleplayerServer?.let { server ->
+            val serverPlayer = server.playerList.getPlayer(player.uuid)
+            serverPlayer?.setDeltaMovement(Vec3.ZERO)
+        }
 
         // Set camera type
         val cameraType = config.cameraType ?: CameraType.FIRST_PERSON
