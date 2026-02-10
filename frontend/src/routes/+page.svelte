@@ -1,7 +1,7 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
-import HeroSlider from '$lib/components/hero/HeroSlider.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
+import HeroSlider from '$lib/components/hero/HeroSlider.svelte';
 import { Button } from '$lib/components/ui/button';
 import { fade, fly } from 'svelte/transition';
 import type { PageData } from './$types';
@@ -19,6 +19,8 @@ const hasStats = $derived(shaders.length > 0 || captures.length > 0);
 const hasFeaturedPairs = $derived(featuredPairs.length > 0);
 
 const sceneCount = $derived(new Set(captures.map((c) => c.scene_id)).size);
+
+let overlayVisible = $state(true);
 </script>
 
 {#snippet statsBar()}
@@ -38,13 +40,13 @@ const sceneCount = $derived(new Set(captures.map((c) => c.scene_id)).size);
 	<div in:fade={{ duration: 400 }} class="py-8 sm:py-12">
 		<!-- Hero slider with overlay text -->
 		<div class="relative">
-			<HeroSlider pairs={featuredPairs} />
+			<HeroSlider pairs={featuredPairs} bind:overlayVisible />
 
-			<!-- Desktop overlay: scrim + centered text (hidden on mobile) -->
-			<div
-				class="pointer-events-none absolute inset-0 z-30 hidden select-none sm:flex flex-col items-center justify-center"
-				style="background: radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 40%, transparent 70%);"
-			>
+		<!-- Desktop overlay: scrim + centered text (hidden on mobile, fades on slider interaction) -->
+		<div
+			class="pointer-events-none absolute inset-0 z-30 hidden select-none sm:flex flex-col items-center justify-center transition-opacity duration-300 {overlayVisible ? '' : 'opacity-0'}"
+			style="background: radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 40%, transparent 70%);"
+		>
 				<h1
 					class="text-5xl font-bold tracking-tight text-white drop-shadow-lg lg:text-6xl"
 					style="text-shadow: 0 2px 12px rgba(0,0,0,0.5);"
@@ -57,7 +59,7 @@ const sceneCount = $derived(new Set(captures.map((c) => c.scene_id)).size);
 				>
 					Shader Preview Catalog for Minecraft
 				</p>
-				<div class="pointer-events-auto mt-6 flex gap-4">
+				<div class="mt-6 flex gap-4 {overlayVisible ? 'pointer-events-auto' : 'pointer-events-none'}">
 					<Button href={resolve('/shaders', {})} size="lg" class="shadow-lg">Browse Shaders</Button>
 					<Button href={resolve('/compare', {})} variant="outline" size="lg" class="border-white/50 bg-black/30 text-white shadow-lg backdrop-blur-sm hover:bg-black/50">Compare</Button>
 				</div>

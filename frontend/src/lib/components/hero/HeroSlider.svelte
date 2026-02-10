@@ -1,74 +1,119 @@
 <script lang="ts">
-import { onMount } from 'svelte';
 import { browser } from '$app/environment';
 import type { FeaturedPair } from '$lib/bindings';
-import ComparisonSlider from './ComparisonSlider.svelte';
-import { SKEW_DEG, type Orientation } from './types';
 import { preloadImage } from '$lib/utils/image';
+import { createTimerGroup } from '$lib/utils/timer';
+import { createTween } from '$lib/utils/tween';
 import PauseIcon from '@lucide/svelte/icons/pause';
 import PlayIcon from '@lucide/svelte/icons/play';
+import { onMount } from 'svelte';
+import ComparisonSlider from './ComparisonSlider.svelte';
+import { EMPTY_SIDE, type Orientation, SKEW_DEG, type SliderSide, pairToSides } from './types';
 
 interface Props {
 	pairs: FeaturedPair[];
+	overlayVisible?: boolean;
 }
 
-let { pairs }: Props = $props();
+let { pairs, overlayVisible = $bindable(true) }: Props = $props();
 
 // --- Constants ---
-const REST_DURATION = 5000;
-const SHOWCASE_DURATION = 1200;
-const SWEEP_DURATION = 800;
+const SWEEP_MS = 600;
 const SWAP_DELAY = 50;
 const RESUME_AFTER_DRAG = 3000;
 
-const SHOWCASE_NEAR = 0.2;
-const SHOWCASE_FAR = 0.8;
+// --- Showcase movement patterns ---
+// Each pattern is a series of divider positions the slider visits during the
+// matched-scene showcase phase. Every pattern starts and ends at 0.5 so the
+// sweep-out always begins from center.
+interface Waypoint {
+	target: number;
+	duration: number;
+}
+
+interface ShowcasePattern {
+	name: string;
+	waypoints: Waypoint[];
+}
+
+const SHOWCASE_PATTERNS: ShowcasePattern[] = [
+	{
+		name: 'classic-sweep',
+		waypoints: [
+			{ target: 0.25, duration: 1200 },
+			{ target: 0.75, duration: 1600 },
+			{ target: 0.5, duration: 1200 }
+		]
+	},
+	{
+		name: 'gentle-drift',
+		waypoints: [
+			{ target: 0.38, duration: 1500 },
+			{ target: 0.62, duration: 1500 },
+			{ target: 0.5, duration: 1000 }
+		]
+	},
+	{
+		name: 'quick-peek',
+		waypoints: [
+			{ target: 0.2, duration: 800 },
+			{ target: 0.5, duration: 800 },
+			{ target: 0.8, duration: 800 },
+			{ target: 0.5, duration: 600 }
+		]
+	},
+	{
+		name: 'slow-reveal',
+		waypoints: [
+			{ target: 0.15, duration: 2000 },
+			{ target: 0.85, duration: 2500 },
+			{ target: 0.5, duration: 1500 }
+		]
+	}
+];
 
 // --- Orientation cycle ---
 const ORIENTATIONS: Orientation[] = ['vertical', 'horizontal', 'diagonal'];
 
-// --- Image pool ---
-// Flatten pairs into individual image entries that we rotate through independently
-// per side. Left slot draws from left images, right slot from right images.
-interface ImageEntry {
-	url: string;
-	thumbhash: string | null;
-	label: string;
-	slug: string;
-	author: string | null;
-	version: string;
+// --- Image pools (SliderSide arrays derived from pairs) ---
+const leftPool = $derived<SliderSide[]>(pairs.map((p) => pairToSides(p).left));
+const rightPool = $derived<SliderSide[]>(pairs.map((p) => pairToSides(p).right));
+
+// --- Transition state machine ---
+type TransitionState = 'resting' | 'showcase' | 'sweep-out' | 'swapping' | 'sweep-in';
+
+const TRANSITION_GRAPH: Record<TransitionState, TransitionState | null> = {
+	resting: 'showcase',
+	showcase: 'sweep-out',
+	'sweep-out': 'swapping',
+	swapping: 'sweep-in',
+	'sweep-in': null // loops back to showcase via startCycle()
+};
+
+function nextState(current: TransitionState): TransitionState {
+	return TRANSITION_GRAPH[current] ?? 'resting';
 }
 
-const leftImages = $derived<ImageEntry[]>(
-	pairs.map((p) => ({
-		url: p.left_image_url,
-		thumbhash: p.left_thumbhash ?? null,
-		label: p.left_shader_name,
-		slug: p.left_shader_slug,
-		author: p.left_shader_author,
-		version: p.left_shader_version
-	}))
-);
-const rightImages = $derived<ImageEntry[]>(
-	pairs.map((p) => ({
-		url: p.right_image_url,
-		thumbhash: p.right_thumbhash ?? null,
-		label: p.right_shader_name,
-		slug: p.right_shader_slug,
-		author: p.right_shader_author,
-		version: p.right_shader_version
-	}))
-);
+function advanceTo(target: TransitionState) {
+	const expected = nextState(transitionState);
+	if (expected !== target) return; // invalid transition, ignore
+	transitionState = target;
+}
+
+// --- Pattern selection (avoid repeating the same pattern consecutively) ---
+let lastPatternIndex = -1;
+
+function pickPattern(): ShowcasePattern {
+	if (SHOWCASE_PATTERNS.length === 1) return SHOWCASE_PATTERNS[0];
+	let idx: number;
+	do {
+		idx = Math.floor(Math.random() * SHOWCASE_PATTERNS.length);
+	} while (idx === lastPatternIndex);
+	lastPatternIndex = idx;
+	return SHOWCASE_PATTERNS[idx];
+}
 
 // --- State ---
-type TransitionState =
-	| 'resting'
-	| 'showcase-a'
-	| 'showcase-b'
-	| 'sweep-out'
-	| 'swapping'
-	| 'sweep-in';
-
 let transitionState = $state<TransitionState>('resting');
 let dividerPosition = $state(0.5);
 let orientation = $state<Orientation>('vertical');
@@ -89,146 +134,106 @@ let rightIndex = $state(0);
 // Which side gets swapped next (alternates each cycle)
 let swapSide = $state<'left' | 'right'>('left');
 
-// Timer IDs
-let cycleTimer: ReturnType<typeof setTimeout> | null = null;
-let resumeTimer: ReturnType<typeof setTimeout> | null = null;
-let swapTimer: ReturnType<typeof setTimeout> | null = null;
-let tweenRaf: number | null = null;
-
-// Display state for each slot
-let displayLeftImage = $state('');
-let displayLeftThumbhash = $state<string | null>(null);
-let displayLeftLabel = $state('');
-let displayLeftSlug = $state('');
-let displayLeftAuthor = $state<string | null>(null);
-let displayLeftVersion = $state('');
-let displayRightImage = $state('');
-let displayRightThumbhash = $state<string | null>(null);
-let displayRightLabel = $state('');
-let displayRightSlug = $state('');
-let displayRightAuthor = $state<string | null>(null);
-let displayRightVersion = $state('');
+// Display state: two SliderSide objects instead of 12 individual fields
+let displayLeft = $state<SliderSide>({ ...EMPTY_SIDE });
+let displayRight = $state<SliderSide>({ ...EMPTY_SIDE });
 
 const hasPairs = $derived(pairs.length > 0);
 const hasMultiplePairs = $derived(pairs.length > 1);
 const isAnimating = $derived(transitionState !== 'resting');
 
 // Dot indicators: tracks the last pair explicitly synced (via init or dot click).
-// leftIndex/rightIndex diverge during alternating swaps, so neither alone is meaningful.
 let activePairIndex = $state(0);
 
-// --- Easing ---
+// --- Timers & Tween ---
+const timers = createTimerGroup('cycle', 'resume', 'swap', 'overlay');
+const tween = createTween();
 
-function easeInOutCubic(t: number): number {
-	return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
+// --- Drag smoothing (rAF chase loop) ---
+// Instead of snapping to cursor, the divider chases the target with exponential decay.
+// Higher DRAG_SPEED = snappier response. 15 feels responsive with a slight trail.
+const DRAG_SPEED = 15;
+let dragTarget = 0.5;
+let dragRafId: number | null = null;
+let dragLastTime = 0;
 
-// --- Tween engine ---
+function startDragLoop() {
+	if (dragRafId !== null) return;
+	dragLastTime = performance.now();
 
-function tweenTo(target: number, duration: number): Promise<void> {
-	return new Promise((resolve, reject) => {
-		cancelTween();
+	function tick(now: number) {
+		const dt = (now - dragLastTime) / 1000;
+		dragLastTime = now;
 
-		const start = dividerPosition;
-		const delta = target - start;
-		if (Math.abs(delta) < 0.001) {
-			dividerPosition = target;
-			resolve();
+		const diff = dragTarget - dividerPosition;
+		if (Math.abs(diff) < 0.0005) {
+			dividerPosition = dragTarget;
+			dragRafId = null;
 			return;
 		}
 
-		const startTime = performance.now();
-		let cancelled = false;
+		// Time-based exponential interpolation (frame-rate independent)
+		dividerPosition += diff * (1 - Math.exp(-DRAG_SPEED * dt));
+		dragRafId = requestAnimationFrame(tick);
+	}
 
-		function tick(now: number) {
-			if (cancelled) {
-				reject(new Error('cancelled'));
-				return;
-			}
-
-			const elapsed = now - startTime;
-			const progress = Math.min(1, elapsed / duration);
-			const eased = easeInOutCubic(progress);
-
-			dividerPosition = start + delta * eased;
-
-			if (progress < 1) {
-				tweenRaf = requestAnimationFrame(tick);
-			} else {
-				dividerPosition = target;
-				tweenRaf = null;
-				resolve();
-			}
-		}
-
-		tweenRaf = requestAnimationFrame(tick);
-
-		cancelTween = () => {
-			if (tweenRaf !== null) {
-				cancelAnimationFrame(tweenRaf);
-				tweenRaf = null;
-			}
-			cancelled = true;
-			cancelTween = cancelTweenNoop;
-		};
-	});
+	dragRafId = requestAnimationFrame(tick);
 }
 
-function cancelTweenNoop() {
-	if (tweenRaf !== null) {
-		cancelAnimationFrame(tweenRaf);
-		tweenRaf = null;
+function stopDragLoop() {
+	if (dragRafId !== null) {
+		cancelAnimationFrame(dragRafId);
+		dragRafId = null;
 	}
 }
-let cancelTween = cancelTweenNoop;
+
+function tweenTo(target: number, duration: number): Promise<void> {
+	return tween.tweenTo(
+		target,
+		duration,
+		(v) => {
+			dividerPosition = v;
+		},
+		() => dividerPosition
+	);
+}
+
+function scheduleOverlayRestore() {
+	timers.overlay.set(() => {
+		overlayVisible = true;
+	}, RESUME_AFTER_DRAG);
+}
 
 // --- Display sync ---
 
 function syncLeftFromIndex(idx: number) {
-	const entry = leftImages[idx];
-	displayLeftImage = entry.url;
-	displayLeftThumbhash = entry.thumbhash;
-	displayLeftLabel = entry.label;
-	displayLeftSlug = entry.slug;
-	displayLeftAuthor = entry.author;
-	displayLeftVersion = entry.version;
+	displayLeft = leftPool[idx];
 }
 
 function syncRightFromIndex(idx: number) {
-	const entry = rightImages[idx];
-	displayRightImage = entry.url;
-	displayRightThumbhash = entry.thumbhash;
-	displayRightLabel = entry.label;
-	displayRightSlug = entry.slug;
-	displayRightAuthor = entry.author;
-	displayRightVersion = entry.version;
+	displayRight = rightPool[idx];
 }
 
 // --- Transition state machine ---
 
 function startCycle() {
-	clearTimers();
+	clearCycleTimers();
 	if (!hasMultiplePairs || reducedMotion || isUserDragging || isPaused || isHovered) return;
 
-	cycleTimer = setTimeout(() => {
-		void beginTransition();
-	}, REST_DURATION);
+	// No rest phase — begin the next transition immediately
+	void beginTransition();
 }
 
 /** Wait for a duration, rejecting if the generation has been bumped. */
 function generationDelay(ms: number, gen: number): Promise<void> {
 	return new Promise((resolve, reject) => {
-		const id = setTimeout(() => {
+		timers.swap.set(() => {
 			if (generation !== gen) {
 				reject(new Error('cancelled'));
 			} else {
 				resolve();
 			}
 		}, ms);
-		// If the generation bumps before the timeout fires, the next
-		// cancelTween() + clearTimers() will handle cleanup. We also
-		// store the timeout so clearTimers can cancel it.
-		swapTimer = id;
 	});
 }
 
@@ -237,76 +242,61 @@ async function beginTransition() {
 
 	const gen = generation;
 
-	// Determine sweep direction based on which side we're swapping:
-	// To hide the LEFT image, sweep divider to 0% (left edge).
-	//   The clip-path clips the right image to show from dividerPos rightward,
-	//   so at 0% the right image covers everything and left is hidden.
-	// To hide the RIGHT image, sweep divider to 100% (right edge).
-	//   At 100% the right image is fully clipped away, left covers everything.
+	// Determine sweep direction based on which side we're swapping
 	const hidingLeft = swapSide === 'left';
 
-	// Diagonal clip-paths need to overshoot the edge so the angled split
-	// clears the viewport entirely. The polygon offsets by SKEW_DEG% from
-	// the position, so we push past the edge by that amount.
+	// Diagonal clip-paths need to overshoot the edge
 	const overshoot = orientation === 'diagonal' ? SKEW_DEG / 100 : 0;
 	const edgeTarget = hidingLeft ? 0 - overshoot : 1 + overshoot;
-
-	// Showcase sweep goes toward the side we'll eventually hide, then the opposite
-	const nearTarget = hidingLeft ? SHOWCASE_NEAR : SHOWCASE_FAR;
-	const farTarget = hidingLeft ? SHOWCASE_FAR : SHOWCASE_NEAR;
 
 	// Pick next orientation (applied on sweep-in)
 	orientationIndex = (orientationIndex + 1) % ORIENTATIONS.length;
 	const nextOrientation: Orientation = ORIENTATIONS[orientationIndex] ?? 'vertical';
 
+	// Pick a showcase movement pattern
+	const pattern = pickPattern();
+
 	try {
-		// Phase 1: Showcase sweep A (center → toward the swap side)
-		transitionState = 'showcase-a';
-		await tweenTo(nearTarget, SHOWCASE_DURATION);
+		// Phase 1: Showcase — run through pattern waypoints (matched scene visible)
+		advanceTo('showcase');
+		for (const waypoint of pattern.waypoints) {
+			await tweenTo(waypoint.target, waypoint.duration);
+			if (generation !== gen) return;
+		}
+
+		// Phase 2: Sweep to edge (hides the target side)
+		advanceTo('sweep-out');
+		await tweenTo(edgeTarget, SWEEP_MS);
 		if (generation !== gen) return;
 
-		// Phase 2: Showcase sweep B (across to the other side)
-		transitionState = 'showcase-b';
-		await tweenTo(farTarget, SHOWCASE_DURATION);
-		if (generation !== gen) return;
-
-		// Phase 3: Sweep to edge (hides the target side)
-		transitionState = 'sweep-out';
-		await tweenTo(edgeTarget, SWEEP_DURATION);
-		if (generation !== gen) return;
-
-		// Phase 4: Swap the hidden image only
-		transitionState = 'swapping';
+		// Phase 3: Swap the hidden image only
+		advanceTo('swapping');
 
 		if (hidingLeft) {
-			leftIndex = (leftIndex + 1) % leftImages.length;
+			leftIndex = (leftIndex + 1) % leftPool.length;
 			syncLeftFromIndex(leftIndex);
 		} else {
-			rightIndex = (rightIndex + 1) % rightImages.length;
+			rightIndex = (rightIndex + 1) % rightPool.length;
 			syncRightFromIndex(rightIndex);
 		}
 
-		// Alternate for next cycle
 		swapSide = swapSide === 'left' ? 'right' : 'left';
 
-		// Brief pause for image swap to render (cancellable via generation)
+		// Brief pause for image swap to render
 		await generationDelay(SWAP_DELAY, gen);
 		if (generation !== gen) return;
 
-		// Phase 5: Sweep back to center with new orientation
-		transitionState = 'sweep-in';
+		// Phase 4: Sweep back to center with new orientation
+		advanceTo('sweep-in');
 		orientation = nextOrientation;
 
-		// Jump to the correct overshoot for the new orientation before sweeping in.
-		// If the new orientation is diagonal, the divider must start further out so
-		// the angled split enters from fully off-screen.
 		const inOvershoot = nextOrientation === 'diagonal' ? SKEW_DEG / 100 : 0;
 		dividerPosition = hidingLeft ? 0 - inOvershoot : 1 + inOvershoot;
 
-		await tweenTo(0.5, SWEEP_DURATION);
+		await tweenTo(0.5, SWEEP_MS);
 		if (generation !== gen) return;
 
-		// Done — rest
+		// Done — immediately start next cycle (no rest phase)
 		transitionState = 'resting';
 		startCycle();
 	} catch {
@@ -314,49 +304,49 @@ async function beginTransition() {
 	}
 }
 
-function clearTimers() {
-	if (cycleTimer) {
-		clearTimeout(cycleTimer);
-		cycleTimer = null;
-	}
-	if (resumeTimer) {
-		clearTimeout(resumeTimer);
-		resumeTimer = null;
-	}
-	if (swapTimer) {
-		clearTimeout(swapTimer);
-		swapTimer = null;
-	}
+function clearCycleTimers() {
+	timers.cycle.clear();
+	timers.resume.clear();
+	timers.swap.clear();
 }
 
 // --- User interaction ---
 
 function handleDrag(pos: number) {
-	dividerPosition = pos;
+	dragTarget = pos;
+	startDragLoop();
 }
 
 function handleDragStart() {
 	isUserDragging = true;
+	overlayVisible = false;
+	timers.overlay.clear();
 	generation++;
-	clearTimers();
-	cancelTween();
+	clearCycleTimers();
+	tween.cancel();
 	transitionState = 'resting';
 }
 
 function handleDragEnd() {
 	isUserDragging = false;
-	if (isPaused) return;
-	resumeTimer = setTimeout(() => {
-		startCycle();
-	}, RESUME_AFTER_DRAG);
+	stopDragLoop();
+	dividerPosition = dragTarget;
+	scheduleOverlayRestore();
+	if (!isPaused) {
+		timers.resume.set(() => {
+			startCycle();
+		}, RESUME_AFTER_DRAG);
+	}
 }
 
 function handleDotClick(index: number) {
 	if (index === activePairIndex) return;
 	generation++;
-	clearTimers();
-	cancelTween();
+	clearCycleTimers();
+	timers.overlay.clear();
+	tween.cancel();
 	transitionState = 'resting';
+	overlayVisible = true;
 	leftIndex = index;
 	rightIndex = index;
 	activePairIndex = index;
@@ -370,9 +360,11 @@ function togglePause() {
 	isPaused = !isPaused;
 	if (isPaused) {
 		generation++;
-		clearTimers();
-		cancelTween();
+		clearCycleTimers();
+		timers.overlay.clear();
+		tween.cancel();
 		transitionState = 'resting';
+		overlayVisible = true;
 		dividerPosition = 0.5;
 	} else {
 		startCycle();
@@ -381,11 +373,14 @@ function togglePause() {
 
 function handleHoverEnter() {
 	isHovered = true;
-	// Cancel the rest timer so no new transition starts, but let any
-	// in-flight transition finish naturally (it checks isHovered on completion).
-	if (cycleTimer) {
-		clearTimeout(cycleTimer);
-		cycleTimer = null;
+	generation++;
+	clearCycleTimers();
+	tween.cancel();
+	transitionState = 'resting';
+
+	// Smoothly return to center instead of snapping
+	if (Math.abs(dividerPosition - 0.5) > 0.01) {
+		void tweenTo(0.5, 400);
 	}
 }
 
@@ -396,16 +391,16 @@ function handleHoverLeave() {
 	}
 }
 
-// Preload the next image for whichever side will be swapped next (using 'hero' preset to match display)
+// Preload the next image during the showcase phase (when both matched images are visible)
 $effect(() => {
 	let img: HTMLImageElement | null = null;
-	if (transitionState === 'resting' && hasMultiplePairs && browser) {
+	if (transitionState === 'showcase' && hasMultiplePairs && browser) {
 		if (swapSide === 'left') {
-			const nextIdx = (leftIndex + 1) % leftImages.length;
-			img = preloadImage(leftImages[nextIdx].url);
+			const nextIdx = (leftIndex + 1) % leftPool.length;
+			img = preloadImage(leftPool[nextIdx].image);
 		} else {
-			const nextIdx = (rightIndex + 1) % rightImages.length;
-			img = preloadImage(rightImages[nextIdx].url);
+			const nextIdx = (rightIndex + 1) % rightPool.length;
+			img = preloadImage(rightPool[nextIdx].image);
 		}
 	}
 	return () => {
@@ -421,8 +416,8 @@ onMount(() => {
 	const handler = (e: MediaQueryListEvent) => {
 		reducedMotion = e.matches;
 		if (e.matches) {
-			clearTimers();
-			cancelTween();
+			clearCycleTimers();
+			tween.cancel();
 			transitionState = 'resting';
 			dividerPosition = 0.5;
 		} else {
@@ -442,8 +437,9 @@ onMount(() => {
 	}
 
 	return () => {
-		clearTimers();
-		cancelTween();
+		clearCycleTimers();
+		timers.overlay.clear();
+		tween.cancel();
 		mq.removeEventListener('change', handler);
 	};
 });
@@ -459,18 +455,8 @@ onMount(() => {
 		onmouseleave={handleHoverLeave}
 	>
 		<ComparisonSlider
-			leftImage={displayLeftImage}
-			rightImage={displayRightImage}
-			leftThumbhash={displayLeftThumbhash}
-			rightThumbhash={displayRightThumbhash}
-			leftLabel={displayLeftLabel}
-			rightLabel={displayRightLabel}
-			leftSlug={displayLeftSlug}
-			rightSlug={displayRightSlug}
-			leftAuthor={displayLeftAuthor}
-			rightAuthor={displayRightAuthor}
-			leftVersion={displayLeftVersion}
-			rightVersion={displayRightVersion}
+			left={displayLeft}
+			right={displayRight}
 			{dividerPosition}
 			{orientation}
 			disabled={isAnimating}

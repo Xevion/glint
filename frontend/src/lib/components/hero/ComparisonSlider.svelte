@@ -1,24 +1,11 @@
 <script lang="ts">
-import { resolve } from '$app/paths';
+import ComparisonSide from './ComparisonSide.svelte';
 import DividerLine from './DividerLine.svelte';
-import { SKEW_DEG, type Orientation } from './types';
-import { cfImageSrcset, cfImageUrl } from '$lib/utils/image';
-import { formatVersion } from '$lib/utils/display';
-import { decodeThumbhash } from '$lib/utils/thumbhash';
+import { type Orientation, type SliderSide, computeClipPaths } from './types';
 
 interface Props {
-	leftImage: string;
-	rightImage: string;
-	leftThumbhash: string | null;
-	rightThumbhash: string | null;
-	leftLabel: string;
-	rightLabel: string;
-	leftSlug: string;
-	rightSlug: string;
-	leftAuthor: string | null;
-	rightAuthor: string | null;
-	leftVersion: string;
-	rightVersion: string;
+	left: SliderSide;
+	right: SliderSide;
 	/** Divider position 0-1 (externally controlled) */
 	dividerPosition?: number;
 	orientation?: Orientation;
@@ -31,18 +18,8 @@ interface Props {
 }
 
 let {
-	leftImage,
-	rightImage,
-	leftThumbhash,
-	rightThumbhash,
-	leftLabel,
-	rightLabel,
-	leftSlug,
-	rightSlug,
-	leftAuthor,
-	rightAuthor,
-	leftVersion,
-	rightVersion,
+	left,
+	right,
 	dividerPosition = 0.5,
 	orientation = 'vertical',
 	disabled = false,
@@ -54,26 +31,18 @@ let {
 
 let containerEl: HTMLDivElement | undefined = $state();
 let isDragging = $state(false);
-let leftLoaded = $state(false);
-let rightLoaded = $state(false);
+let isKeyboardDragging = $state(false);
+let keyboardEndTimer: ReturnType<typeof setTimeout> | null = null;
+const KEYBOARD_IDLE_MS = 500;
 
-const leftPlaceholder = $derived(decodeThumbhash(leftThumbhash));
-const rightPlaceholder = $derived(decodeThumbhash(rightThumbhash));
-
-const leftSrc = $derived(cfImageUrl(leftImage, { width: 1280, format: 'auto' }));
-const rightSrc = $derived(cfImageUrl(rightImage, { width: 1280, format: 'auto' }));
-const leftSrcset = $derived(cfImageSrcset(leftImage, 'hero'));
-const rightSrcset = $derived(cfImageSrcset(rightImage, 'hero'));
-
-// Reset loaded state when images change — each effect tracks one prop
+// Clean up keyboard debounce timer on destroy
 $effect(() => {
-	void leftImage; // subscribe to trigger on change
-	leftLoaded = false;
+	return () => {
+		if (keyboardEndTimer) clearTimeout(keyboardEndTimer);
+	};
 });
-$effect(() => {
-	void rightImage; // subscribe to trigger on change
-	rightLoaded = false;
-});
+
+const clipPaths = $derived(computeClipPaths(dividerPosition, orientation));
 
 // --- Pointer interaction (on the whole container) ---
 
@@ -96,6 +65,14 @@ function handlePointerDown(e: PointerEvent) {
 	if (target.closest('a, button')) return;
 
 	e.preventDefault();
+
+	// If keyboard drag was in progress, cancel it (pointer takes over)
+	if (isKeyboardDragging) {
+		if (keyboardEndTimer) clearTimeout(keyboardEndTimer);
+		keyboardEndTimer = null;
+		isKeyboardDragging = false;
+	}
+
 	isDragging = true;
 	containerEl?.setPointerCapture(e.pointerId);
 	onDragStart?.();
@@ -155,36 +132,26 @@ function handleKeydown(e: KeyboardEvent) {
 	}
 
 	e.preventDefault();
+
+	// Start keyboard drag session (same path as pointer drag) unless pointer is active
+	if (!isDragging && !isKeyboardDragging) {
+		isKeyboardDragging = true;
+		onDragStart?.();
+	}
+
 	const newPos = Math.max(0, Math.min(1, dividerPosition + delta));
 	onDrag?.(newPos);
-}
 
-/**
- * Compute CSS clip-paths for left and right image layers.
- * The left layer shows the portion before the divider, the right layer after.
- */
-const clipPaths = $derived.by(() => {
-	const pos = dividerPosition * 100;
-
-	if (orientation === 'vertical') {
-		return {
-			left: `inset(0 ${100 - pos}% 0 0)`,
-			right: `inset(0 0 0 ${pos}%)`
-		};
-	} else if (orientation === 'horizontal') {
-		return {
-			left: `inset(0 0 ${100 - pos}% 0)`,
-			right: `inset(${pos}% 0 0 0)`
-		};
-	} else {
-		const l = pos - SKEW_DEG;
-		const r = pos + SKEW_DEG;
-		return {
-			left: `polygon(0% 0%, ${r}% 0%, ${l}% 100%, 0% 100%)`,
-			right: `polygon(${r}% 0%, 100% 0%, 100% 100%, ${l}% 100%)`
-		};
+	// Debounce keyboard drag end (only when no pointer drag active)
+	if (!isDragging) {
+		if (keyboardEndTimer) clearTimeout(keyboardEndTimer);
+		keyboardEndTimer = setTimeout(() => {
+			isKeyboardDragging = false;
+			keyboardEndTimer = null;
+			onDragEnd?.();
+		}, KEYBOARD_IDLE_MS);
 	}
-});
+}
 
 /** Cursor for the divider handle zone */
 const handleCursor = $derived(
@@ -196,63 +163,6 @@ const touchAction = $derived(orientation === 'horizontal' ? 'pan-x' : 'pan-y');
 
 const willChangeClip = $derived(isAnimating || isDragging);
 </script>
-
-{#snippet imageSlot(
-	src: string | null,
-	srcset: string | null,
-	placeholder: string | null,
-	loaded: boolean,
-	onLoad: () => void,
-	alt: string,
-	label: string,
-	slug: string,
-	author: string | null,
-	version: string,
-	side: 'left' | 'right',
-	clipPath: string
-)}
-	<div
-		class="absolute inset-0"
-		class:will-change-[clip-path]={willChangeClip}
-		style:clip-path={clipPath}
-	>
-		{#if placeholder}
-			<div
-				class="absolute inset-0 bg-cover bg-center transition-opacity duration-300"
-				class:opacity-0={loaded}
-				style:background-image="url({placeholder})"
-			></div>
-		{/if}
-		<img
-			src={src}
-			srcset={srcset}
-			sizes="(min-width: 1024px) 66vw, 100vw"
-			{alt}
-			class="pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
-			class:opacity-0={!loaded}
-			loading="eager"
-			decoding="async"
-			fetchpriority="high"
-			draggable="false"
-			onload={onLoad}
-		/>
-		{#if label}
-			{@const href = resolve('/shaders/[id]', { id: slug })}
-			{@const detail = author && version ? `by ${author}, ${formatVersion(version)}` : version ? formatVersion(version) : author ? `by ${author}` : undefined}
-			<a
-				{href}
-				class="pointer-events-auto absolute z-20 block rounded-md border border-white/15 bg-black/60 px-3 py-1.5 backdrop-blur-sm transition-all hover:border-white/30 hover:bg-black/70
-					{side === 'left' ? 'left-4' : 'right-4'}
-					{orientation === (side === 'left' ? 'horizontal' : 'diagonal') ? 'top-4' : 'bottom-4'}"
-			>
-				<span class="text-sm font-medium text-white">{label}</span>
-				{#if detail}
-					<div class="hidden text-xs text-white/70 md:block">{detail}</div>
-				{/if}
-			</a>
-		{/if}
-	</div>
-{/snippet}
 
 <div
 	bind:this={containerEl}
@@ -271,35 +181,21 @@ const willChangeClip = $derived(isAnimating || isDragging);
 	onpointercancel={handlePointerUp}
 	onkeydown={handleKeydown}
 >
-	{@render imageSlot(
-		leftSrc,
-		leftSrcset,
-		leftPlaceholder,
-		leftLoaded,
-		() => (leftLoaded = true),
-		leftLabel ?? 'Left comparison',
-		leftLabel,
-		leftSlug,
-		leftAuthor,
-		leftVersion,
-		'left',
-		clipPaths.left
-	)}
+	<ComparisonSide
+		side={left}
+		position="left"
+		clipPath={clipPaths.left}
+		{orientation}
+		willChange={willChangeClip}
+	/>
 
-	{@render imageSlot(
-		rightSrc,
-		rightSrcset,
-		rightPlaceholder,
-		rightLoaded,
-		() => (rightLoaded = true),
-		rightLabel ?? 'Right comparison',
-		rightLabel,
-		rightSlug,
-		rightAuthor,
-		rightVersion,
-		'right',
-		clipPaths.right
-	)}
+	<ComparisonSide
+		side={right}
+		position="right"
+		clipPath={clipPaths.right}
+		{orientation}
+		willChange={willChangeClip}
+	/>
 
 	<!-- Divider line with wider cursor zone -->
 	<DividerLine

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { SKEW_DEG, type Orientation } from './types';
+import { type Orientation, SKEW_DEG } from './types';
 
 interface Props {
 	/** Divider position from 0 to 1 */
@@ -30,60 +30,44 @@ const diagonalHeight = $derived.by(() => {
 	const rad = lineAngle * (Math.PI / 180);
 	return `${(100 / Math.cos(rad)).toFixed(1)}%`;
 });
+
+const isHorizontal = $derived(orientation === 'horizontal');
+
+/** Computed positioning styles for both the visible line and the cursor hitzone. */
+const lineStyle = $derived.by(() => {
+	const pos = `${position * 100}%`;
+
+	if (orientation === 'diagonal') {
+		return {
+			base: `left: ${pos}; top: 50%; width: 1px; height: ${diagonalHeight}; transform: translate(-50%, -50%) rotate(${lineAngle}deg); transform-origin: center center;`,
+			hitzone: `left: ${pos}; top: 50%; width: 32px; height: ${diagonalHeight}; transform: translate(-50%, -50%) rotate(${lineAngle}deg); transform-origin: center center;`
+		};
+	}
+
+	if (isHorizontal) {
+		return {
+			base: `top: ${pos}; left: 0; right: 0; height: 1px; transform: translateY(-50%);`,
+			hitzone: `top: ${pos}; left: 0; right: 0; height: 32px; transform: translateY(-50%);`
+		};
+	}
+
+	// vertical (default)
+	return {
+		base: `left: ${pos}; top: 0; bottom: 0; width: 1px; transform: translateX(-50%);`,
+		hitzone: `left: ${pos}; top: 0; bottom: 0; width: 32px; transform: translateX(-50%);`
+	};
+});
 </script>
 
-{#if orientation === 'vertical'}
+<div
+	class="divider-line pointer-events-none absolute z-10"
+	style={lineStyle.base}
+>
+	<div class="h-full w-full bg-white/40"></div>
+</div>
+{#if cursor}
 	<div
-		class="divider-line absolute top-0 bottom-0 z-10 pointer-events-none"
-		style="left: {position * 100}%; width: 1px; transform: translateX(-50%);"
-	>
-		<div class="h-full w-full bg-white/40"></div>
-	</div>
-	{#if cursor}
-		<div
-			class="absolute top-0 bottom-0 z-10 {cursor}"
-			style="left: {position * 100}%; width: 32px; transform: translateX(-50%);"
-		></div>
-	{/if}
-{:else if orientation === 'horizontal'}
-	<div
-		class="divider-line absolute left-0 right-0 z-10 pointer-events-none"
-		style="top: {position * 100}%; height: 1px; transform: translateY(-50%);"
-	>
-		<div class="h-full w-full bg-white/40"></div>
-	</div>
-	{#if cursor}
-		<div
-			class="absolute left-0 right-0 z-10 {cursor}"
-			style="top: {position * 100}%; height: 32px; transform: translateY(-50%);"
-		></div>
-	{/if}
-{:else}
-	<!-- Diagonal: a tall vertical line rotated to match the clip-path skew -->
-	<div
-		class="divider-line absolute z-10 pointer-events-none"
-		style="
-			left: {position * 100}%;
-			top: 50%;
-			width: 1px;
-			height: {diagonalHeight};
-			transform: translate(-50%, -50%) rotate({lineAngle}deg);
-			transform-origin: center center;
-		"
-	>
-		<div class="h-full w-full bg-white/40"></div>
-	</div>
-	{#if cursor}
-		<div
-			class="absolute z-10 {cursor}"
-			style="
-				left: {position * 100}%;
-				top: 50%;
-				width: 32px;
-				height: {diagonalHeight};
-				transform: translate(-50%, -50%) rotate({lineAngle}deg);
-				transform-origin: center center;
-			"
-		></div>
-	{/if}
+		class="absolute z-10 {cursor}"
+		style={lineStyle.hitzone}
+	></div>
 {/if}
