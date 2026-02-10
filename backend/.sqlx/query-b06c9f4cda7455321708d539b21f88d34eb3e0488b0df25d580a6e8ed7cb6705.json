@@ -13,7 +13,7 @@
         "Text",
         "Text",
         "Int8",
-        "Text",
+        "Jsonb",
         "Text",
         "Timestamptz"
       ]

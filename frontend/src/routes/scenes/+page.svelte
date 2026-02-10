@@ -1,6 +1,7 @@
 <script lang="ts">
 import SceneCard from '$lib/components/SceneCard.svelte';
 import { Button } from '$lib/components/ui/button';
+import { Input } from '$lib/components/ui/input';
 import { Search } from '@lucide/svelte';
 import { fade, fly, scale } from 'svelte/transition';
 import type { PageData } from './$types';
@@ -21,11 +22,13 @@ const filteredScenes = $derived.by(() => {
 const hasFilters = $derived(searchQuery !== '');
 </script>
 
-<div class="container mx-auto px-4 py-8">
+<svelte:head><title>Scenes - Glint</title></svelte:head>
+
+<div class="py-8">
 	<!-- Header -->
 	<div in:fly={{ y: -10, duration: 400 }} class="mb-8">
-		<h1 class="mb-2 text-4xl font-bold tracking-tight">Test Scenes</h1>
-		<p class="text-lg text-foreground/70 dark:text-muted-foreground">
+		<h1 class="mb-2 text-2xl font-semibold tracking-tight">Test Scenes</h1>
+		<p class="text-lg text-muted-foreground">
 			{scenes.length} standardized environments for consistent shader comparison
 		</p>
 	</div>
@@ -39,12 +42,12 @@ const hasFilters = $derived(searchQuery !== '');
 					class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
 					strokeWidth={2}
 				/>
-				<input
-					type="text"
-					placeholder="Search scenes..."
-					bind:value={searchQuery}
-					class="h-10 w-full rounded-lg border border-input bg-background pr-4 pl-10 text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none"
-				/>
+			<Input
+				type="text"
+				placeholder="Search scenes..."
+				bind:value={searchQuery}
+				class="pr-4 pl-10"
+			/>
 			</div>
 
 			{#if hasFilters}

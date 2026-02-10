@@ -6,13 +6,15 @@ import type { UpdateSceneMetadataRequest } from '$lib/api/endpoints/admin';
 import type { CaptureWithContext, Scene, WorldWithDetails } from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminDetailField } from '$lib/components/admin';
+import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
-import { ArrowLeft, RotateCcw, Trash2 } from '@lucide/svelte';
+import { StatusBadge } from '$lib/components/ui/status-badge';
+import { Alert } from '$lib/components/ui/alert';
+import { RotateCcw, Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -100,48 +102,32 @@ async function handleReactivate() {
 }
 </script>
 
+<svelte:head><title>{scene.name} - Glint</title></svelte:head>
+
 <div class="space-y-6">
 	<!-- Header -->
-	<header class="space-y-2">
-		<div class="flex items-center gap-2">
-		<a href="/admin/scenes" class="text-muted-foreground hover:text-foreground" aria-label="Back to scenes">
-			<ArrowLeft class="h-4 w-4" />
-		</a>
-			<h1 class="text-2xl font-semibold">{scene.name}</h1>
-			{#if scene.active}
-				<span
-					class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-300"
-				>
-					Active
-				</span>
-			{:else}
-				<span
-					class="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
-				>
-					Inactive
-				</span>
-			{/if}
-		</div>
-	</header>
+	<AdminDetailHeader
+		backHref="/admin/scenes"
+		backLabel="Back to scenes"
+		title={scene.name}
+	>
+		{#snippet trailing()}
+			<StatusBadge status={scene.active ? 'active' : 'inactive'}>{scene.active ? 'Active' : 'Inactive'}</StatusBadge>
+		{/snippet}
+	</AdminDetailHeader>
 
 	{#if !scene.active}
-		<div
-			class="flex items-center justify-between rounded-lg border border-yellow-500 bg-yellow-50 p-3 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300"
-		>
+		<Alert variant="warning" class="flex items-center justify-between">
 			<span>This scene is inactive and will not be included in captures.</span>
-		<Button variant="outline" size="sm" onclick={handleReactivate} disabled={actionLoading}>
-			<RotateCcw class="mr-1 h-3 w-3" />
-			{actionLoading ? 'Reactivating...' : 'Reactivate'}
-		</Button>
-		</div>
+			<Button variant="outline" size="sm" onclick={handleReactivate} disabled={actionLoading}>
+				<RotateCcw class="mr-1 h-3 w-3" />
+				{actionLoading ? 'Reactivating...' : 'Reactivate'}
+			</Button>
+		</Alert>
 	{/if}
 
 	{#if error}
-		<div
-			class="rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
-		>
-			{error}
-		</div>
+		<Alert variant="destructive">{error}</Alert>
 	{/if}
 
 	<!-- Edit Section -->

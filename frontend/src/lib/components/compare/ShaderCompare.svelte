@@ -17,7 +17,6 @@ interface Props {
 let { leftImage, rightImage, mode = 'slider', leftShader, rightShader }: Props = $props();
 
 let showLeft = $state(true);
-let mounted = $state(false);
 let sliderPosition = $state(50);
 
 // Luminance sampling state
@@ -110,7 +109,6 @@ function handleImageLoad(side: 'left' | 'right') {
 }
 
 onMount(() => {
-	mounted = true;
 	// Sample on mount in case images are already cached/loaded
 	requestAnimationFrame(sampleImages);
 });
@@ -132,7 +130,7 @@ function handleSliderChange(event: Event) {
 }
 </script>
 
-<div class="shader-compare" class:mounted>
+<div class="shader-compare">
 	<!-- Slider mode -->
 	<div class="mode-wrapper" class:active={mode === 'slider'}>
 		<div class="slider-wrapper">
@@ -230,10 +228,6 @@ function handleSliderChange(event: Event) {
 		border-radius: var(--radius);
 		overflow: hidden;
 		background: var(--muted);
-	}
-
-	.shader-compare.mounted {
-		opacity: 1;
 	}
 
 	/* Mode wrapper for CSS fade transitions - all modes overlap in same grid cell */

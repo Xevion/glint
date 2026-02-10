@@ -1,6 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import ShaderInfoOverlay from './ShaderInfoOverlay.svelte';
+import { themeStore } from '$lib/stores/theme.svelte';
 import { LUMINANCE, TOUCH, ZOOM } from './constants';
 import type { ElementBounds, ElementLuminances, ShaderDisplayInfo } from './types';
 
@@ -52,6 +53,9 @@ let sampleThrottleId: ReturnType<typeof setTimeout> | null = null;
 
 // Image load error state
 let loadError = $state<string | null>(null);
+
+// Resolved CSS color for canvas divider (CSS vars don't work in canvas JS)
+let primaryColor = 'white';
 
 // Zoom constraints
 const getMinZoom = () => calculateCoverZoom();
@@ -220,7 +224,7 @@ function draw() {
 	ctx.restore();
 
 	// Draw center divider
-	ctx.strokeStyle = 'hsl(var(--primary))';
+	ctx.strokeStyle = primaryColor;
 	ctx.lineWidth = 2;
 	ctx.beginPath();
 	ctx.moveTo(canvasWidth / 2, 0);
@@ -458,6 +462,15 @@ $effect(() => {
 		});
 });
 
+// Re-read --primary CSS variable when theme changes so the divider color stays in sync
+$effect(() => {
+	// Track theme changes
+	void themeStore.isDark;
+	primaryColor =
+		getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || 'white';
+	draw();
+});
+
 onMount(() => {
 	if (!canvas) return;
 	ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -534,8 +547,8 @@ onMount(() => {
 		top: 50%;
 		left: 50%;
 		transform: translate(-50%, -50%);
-		color: hsl(var(--destructive));
-		background: hsl(var(--background) / 0.9);
+		color: var(--destructive);
+		background: oklch(from var(--background) l c h / 0.9);
 		padding: 0.5rem 1rem;
 		border-radius: var(--radius);
 		font-size: 0.875rem;

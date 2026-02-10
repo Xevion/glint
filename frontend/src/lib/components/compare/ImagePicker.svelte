@@ -30,7 +30,7 @@ function selectImage(url: string) {
 
 	<Popover.Root bind:open>
 		<Popover.Trigger
-			class="inline-flex w-full items-center gap-3 rounded-md border border-input bg-background px-3 py-2 shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
+			class="inline-flex w-full items-center gap-3 rounded-md border border-input bg-background px-3 py-2 shadow-theme-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
 		>
 			<CaptureImage
 				src={value}
@@ -47,7 +47,7 @@ function selectImage(url: string) {
 		</Popover.Trigger>
 
 		<Popover.Content
-			class="z-50 max-h-[400px] w-[360px] overflow-y-auto rounded-md border border-border/60 bg-popover p-2 shadow-md"
+			class="z-50 max-h-[400px] w-[360px] overflow-y-auto rounded-md border border-border/60 bg-popover p-2 shadow-theme-sm"
 			sideOffset={8}
 			align="start"
 		>
@@ -72,7 +72,7 @@ function selectImage(url: string) {
 								containerClass="aspect-video rounded-sm"
 							/>
 							{#if selected}
-								<div class="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+								<div class="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-theme-sm">
 									<Check class="size-3" />
 								</div>
 							{/if}

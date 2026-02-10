@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO shader_versions (\n                id, shader_id, version, modrinth_version_id, curseforge_file_id,\n                download_url, file_hash, file_size, game_versions, release_channel,\n                upstream_published_at, created_at\n            )\n            SELECT\n                unnest($1::text[]), unnest($2::text[]), unnest($3::text[]),\n                unnest($4::text[]), unnest($5::int4[]),\n                unnest($6::text[]), unnest($7::text[]), unnest($8::int8[]),\n                unnest($9::jsonb[]), unnest($10::text[]),\n                unnest($11::timestamptz[]), now()\n            ON CONFLICT (shader_id, version) DO UPDATE SET\n                modrinth_version_id = COALESCE(EXCLUDED.modrinth_version_id, shader_versions.modrinth_version_id),\n                curseforge_file_id = COALESCE(EXCLUDED.curseforge_file_id, shader_versions.curseforge_file_id),\n                download_url = COALESCE(EXCLUDED.download_url, shader_versions.download_url),\n                file_hash = COALESCE(EXCLUDED.file_hash, shader_versions.file_hash),\n                file_size = COALESCE(EXCLUDED.file_size, shader_versions.file_size),\n                game_versions = COALESCE(EXCLUDED.game_versions, shader_versions.game_versions),\n                release_channel = COALESCE(EXCLUDED.release_channel, shader_versions.release_channel),\n                upstream_published_at = COALESCE(EXCLUDED.upstream_published_at, shader_versions.upstream_published_at)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Int4Array",
+        "TextArray",
+        "TextArray",
+        "Int8Array",
+        "JsonbArray",
+        "TextArray",
+        "TimestamptzArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c4a04195023273721a923fb2eb0ecf3ce1825fd679e8f60fa26988be29a50c2b"
+}

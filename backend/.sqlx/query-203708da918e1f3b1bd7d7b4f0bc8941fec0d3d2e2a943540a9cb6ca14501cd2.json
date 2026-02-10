@@ -1,0 +1,220 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                c.id,\n                c.scene_id,\n                s.slug as shader_slug,\n                s.name as shader_name,\n                sv.version as shader_version,\n                c.shader_version_id,\n                c.profile,\n                c.image_path,\n                c.image_url,\n                c.thumbhash,\n                c.captured_at,\n                c.resolution_width,\n                c.resolution_height,\n                c.file_size_bytes,\n                cri.run_id as \"run_id?: String\",\n                cr.status as \"run_status?: String\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,\n                sc.name as \"scene_name?: String\",\n                sc.slug as \"scene_slug?: String\",\n                c.status,\n                c.error_message,\n                c.video_url,\n                c.avg_fps,\n                c.min_fps,\n                c.max_fps,\n                c.frame_time_avg,\n                c.frame_time_p99,\n                c.minecraft_version,\n                c.iris_version,\n                c.gpu_model,\n                c.content_type,\n                c.world_version_id,\n                c.created_at,\n                c.updated_at\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id\n            LEFT JOIN capture_runs cr ON cri.run_id = cr.id\n            LEFT JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "scene_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "shader_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "shader_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "shader_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "shader_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "profile",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "image_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "image_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "thumbhash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "captured_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "resolution_width",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "resolution_height",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "file_size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 14,
+        "name": "run_id?: String",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "run_status?: String",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "shader_author",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "scene_name?: String",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "scene_slug?: String",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "video_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 22,
+        "name": "avg_fps",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 23,
+        "name": "min_fps",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 24,
+        "name": "max_fps",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 25,
+        "name": "frame_time_avg",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 26,
+        "name": "frame_time_p99",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 27,
+        "name": "minecraft_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 28,
+        "name": "iris_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 29,
+        "name": "gpu_model",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 30,
+        "name": "content_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 31,
+        "name": "world_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 32,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 33,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "203708da918e1f3b1bd7d7b4f0bc8941fec0d3d2e2a943540a9cb6ca14501cd2"
+}

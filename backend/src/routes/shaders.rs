@@ -75,7 +75,7 @@ async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shade
                 features: features_map.remove(id).unwrap_or_default(),
                 latest_version: version.map(|v| v.version.clone()),
                 game_versions: version.and_then(|v| v.game_versions.clone()),
-                thumbnail_url: thumb.map(|t| t.image_url.clone()),
+                image_url: thumb.map(|t| t.image_url.clone()),
                 thumbhash: thumb.and_then(|t| t.thumbhash.clone()),
                 shader,
             }

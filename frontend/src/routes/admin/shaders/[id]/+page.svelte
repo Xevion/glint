@@ -6,13 +6,16 @@ import type { UpdateShaderRequest } from '$lib/api/endpoints/admin';
 import type { CaptureWithContext, ShaderVersion, ShaderWithCaptures } from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminDetailField } from '$lib/components/admin';
+import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
-import { ArrowLeft, Trash2 } from '@lucide/svelte';
+import * as Table from '$lib/components/ui/table';
+import { Alert } from '$lib/components/ui/alert';
+import { formatGameVersions } from '$lib/utils/display';
+import { Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -100,14 +103,16 @@ async function confirmDelete() {
 }
 </script>
 
+<svelte:head><title>{shader.name} - Glint</title></svelte:head>
+
 <div class="space-y-6">
 	<!-- Header -->
-	<header class="space-y-2">
-		<div class="flex items-center gap-2">
-		<a href="/admin/shaders" class="text-muted-foreground hover:text-foreground" aria-label="Back to shaders">
-			<ArrowLeft class="h-4 w-4" />
-		</a>
-			<h1 class="text-2xl font-semibold">{shader.name}</h1>
+	<AdminDetailHeader
+		backHref="/admin/shaders"
+		backLabel="Back to shaders"
+		title={shader.name}
+	>
+		{#snippet trailing()}
 			{#if shader.icon_url}
 				<img
 					src={shader.icon_url}
@@ -115,15 +120,11 @@ async function confirmDelete() {
 					class="h-6 w-6 rounded"
 				/>
 			{/if}
-		</div>
-	</header>
+		{/snippet}
+	</AdminDetailHeader>
 
 	{#if error}
-		<div
-			class="rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
-		>
-			{error}
-		</div>
+		<Alert variant="destructive">{error}</Alert>
 	{/if}
 
 	<!-- Edit Section -->
@@ -203,34 +204,32 @@ async function confirmDelete() {
 		{#if versions.length === 0}
 			<p class="text-sm text-muted-foreground">No versions yet.</p>
 		{:else}
-			<div class="rounded-md border">
-				<table class="w-full text-sm">
-					<thead>
-						<tr class="border-b bg-muted/50">
-							<th class="px-4 py-2 text-left font-medium">Version</th>
-							<th class="px-4 py-2 text-left font-medium">Game Versions</th>
-							<th class="px-4 py-2 text-left font-medium">Channel</th>
-							<th class="px-4 py-2 text-left font-medium">Created</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each versions as version (version.id)}
-							<tr class="border-b last:border-0">
-								<td class="px-4 py-2 font-medium">{version.version}</td>
-								<td class="px-4 py-2 text-xs text-muted-foreground">
-									{version.game_versions ?? '-'}
-								</td>
-								<td class="px-4 py-2 text-xs capitalize">
-									{version.release_channel ?? '-'}
-								</td>
-								<td class="px-4 py-2">
-									<TimeAgo timestamp={version.created_at} />
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
+		<Table.Root class="border">
+			<Table.Header>
+				<Table.Row class="bg-muted/50">
+					<Table.Head class="px-4 py-2">Version</Table.Head>
+					<Table.Head class="px-4 py-2">Game Versions</Table.Head>
+					<Table.Head class="px-4 py-2">Channel</Table.Head>
+					<Table.Head class="px-4 py-2">Created</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				{#each versions as version (version.id)}
+					<Table.Row class="last:border-0">
+						<Table.Cell class="px-4 py-2 font-medium">{version.version}</Table.Cell>
+						<Table.Cell class="px-4 py-2 text-xs text-muted-foreground">
+							{formatGameVersions(version.game_versions)}
+						</Table.Cell>
+						<Table.Cell class="px-4 py-2 text-xs capitalize">
+							{version.release_channel ?? '-'}
+						</Table.Cell>
+						<Table.Cell class="px-4 py-2">
+							<TimeAgo timestamp={version.created_at} />
+						</Table.Cell>
+					</Table.Row>
+				{/each}
+			</Table.Body>
+		</Table.Root>
 		{/if}
 	</div>
 

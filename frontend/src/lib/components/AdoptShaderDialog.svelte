@@ -5,6 +5,7 @@ import { Button } from '$lib/components/ui/button';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
+import { Alert } from '$lib/components/ui/alert';
 import { ArrowLeft, Check, CircleAlert, Download, Info, LoaderCircle } from '@lucide/svelte';
 import type { Snippet } from 'svelte';
 
@@ -183,12 +184,10 @@ function formatNumber(n: number): string {
 					</div>
 				</div>
 			{:else}
-				<div
-					class="flex items-start gap-2 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
-				>
-					<CircleAlert class="mt-0.5 h-4 w-4 shrink-0" />
+				<Alert variant="destructive">
+					<CircleAlert class="h-4 w-4" />
 					<div>{error}</div>
-				</div>
+				</Alert>
 			{/if}
 		{/if}
 

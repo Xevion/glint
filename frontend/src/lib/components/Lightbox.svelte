@@ -1,9 +1,9 @@
 <script lang="ts">
-import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { Button } from '$lib/components/ui/button';
 import { cfImageUrl } from '$lib/utils/image';
+import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { ChevronLeft, ChevronRight, X } from '@lucide/svelte';
-import { fade, scale } from 'svelte/transition';
+import { fade, fly } from 'svelte/transition';
 
 interface CaptureItem {
 	id: string;
@@ -24,9 +24,26 @@ interface Props {
 
 let { captures, currentIndex, onClose, onNavigate }: Props = $props();
 
+// Track navigation direction for slide animation
+let direction = $state<'left' | 'right'>('left');
+let prevIndex: number = $state(0);
+$effect(() => {
+	// Runs on mount (syncing prevIndex) and on every navigation
+	if (currentIndex !== prevIndex) {
+		direction = currentIndex > prevIndex ? 'left' : 'right';
+		prevIndex = currentIndex;
+	}
+});
+
 const currentCapture = $derived(captures[currentIndex]);
 const hasPrev = $derived(currentIndex > 0);
 const hasNext = $derived(currentIndex < captures.length - 1);
+
+// Resolved image URL — single source, no srcset duplication
+const fullImageUrl = $derived(cfImageUrl(currentCapture?.image_url, 'full'));
+
+// Thumbhash placeholder for current image
+const placeholderUrl = $derived(decodeThumbhash(currentCapture?.thumbhash));
 
 // Zoom and pan state
 let zoomLevel = $state(1);
@@ -34,13 +51,22 @@ let panOffset = $state({ x: 0, y: 0 });
 let isDragging = $state(false);
 let dragStart = $state({ x: 0, y: 0 });
 let panStart = $state({ x: 0, y: 0 });
+let imageLoaded = $state(false);
+let imgEl = $state<HTMLImageElement | null>(null);
 
-// Reset zoom when navigating to a different image
+// Reset zoom and loaded state when navigating to a different image
 $effect(() => {
-	// Track currentIndex to reset on navigation
 	void currentIndex;
 	zoomLevel = 1;
 	panOffset = { x: 0, y: 0 };
+	imageLoaded = false;
+});
+
+// Handle images already cached by the browser
+$effect(() => {
+	if (imgEl && !imageLoaded && imgEl.complete && imgEl.naturalWidth > 0) {
+		imageLoaded = true;
+	}
 });
 
 // Preload adjacent images
@@ -153,7 +179,7 @@ function handlePointerUp() {
 		<Button
 			variant="ghost"
 			size="icon"
-			class="absolute left-4 z-10 text-white hover:bg-white/10"
+			class="absolute left-4 z-10 cursor-pointer text-white hover:bg-white/10"
 			onclick={() => onNavigate(currentIndex - 1)}
 		>
 			<ChevronLeft class="h-8 w-8" />
@@ -164,7 +190,7 @@ function handlePointerUp() {
 		<Button
 			variant="ghost"
 			size="icon"
-			class="absolute right-4 z-10 text-white hover:bg-white/10"
+			class="absolute right-4 z-10 cursor-pointer text-white hover:bg-white/10"
 			onclick={() => onNavigate(currentIndex + 1)}
 		>
 			<ChevronRight class="h-8 w-8" />
@@ -173,63 +199,81 @@ function handlePointerUp() {
 
 	<!-- Main image -->
 	{#if currentCapture?.image_url}
-		{#key currentCapture.id}
-			<div
-				transition:scale={{ duration: 200, start: 0.95 }}
-				class="relative max-h-[90vh] max-w-[90vw] overflow-hidden"
-				class:cursor-grab={zoomLevel > 1 && !isDragging}
-				class:cursor-grabbing={isDragging}
-				role="img"
-				tabindex="-1"
-				onwheel={handleWheel}
-				ondblclick={handleDblClick}
-				onpointerdown={handlePointerDown}
-				onpointermove={handlePointerMove}
-				onpointerup={handlePointerUp}
-				onpointercancel={handlePointerUp}
-			>
+		<div
+			class="relative h-[90vh] w-[90vw] select-none overflow-hidden"
+			class:cursor-grab={zoomLevel > 1 && !isDragging}
+			class:cursor-grabbing={isDragging}
+			style:touch-action="none"
+			role="img"
+			tabindex="-1"
+			onwheel={handleWheel}
+			ondblclick={handleDblClick}
+			onpointerdown={handlePointerDown}
+			onpointermove={handlePointerMove}
+			onpointerup={handlePointerUp}
+			onpointercancel={handlePointerUp}
+		>
+			{#key currentIndex}
 				<div
-					style="transform: scale({zoomLevel}) translate({panOffset.x}px, {panOffset.y}px); transition: transform {isDragging ? '0s' : '0.15s'} ease;"
+					in:fly={{ x: direction === 'left' ? 40 : -40, duration: 200, delay: 100 }}
+					out:fade={{ duration: 100 }}
+					class="absolute inset-0 flex items-center justify-center"
 				>
-					<CaptureImage
-						src={currentCapture.image_url}
-						thumbhash={currentCapture.thumbhash}
-						preset="full"
-						priority
-						alt="Capture fullscreen view"
-						class="max-h-[90vh] max-w-[90vw] select-none object-contain"
-						containerClass=""
-					/>
-				</div>
+					<div
+						style="transform: scale({zoomLevel}) translate({panOffset.x}px, {panOffset.y}px); transition: transform {isDragging ? '0s' : '0.15s'} ease;"
+					>
+						{#if placeholderUrl && !imageLoaded}
+							<img
+								src={placeholderUrl}
+								alt=""
+								class="max-h-[90vh] max-w-[90vw] object-contain"
+								aria-hidden="true"
+							/>
+						{/if}
+						<img
+							bind:this={imgEl}
+							src={fullImageUrl}
+							alt="Capture fullscreen view"
+							class="max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-300"
+							class:opacity-0={!imageLoaded}
+							class:absolute={!imageLoaded && placeholderUrl}
+							class:inset-0={!imageLoaded && placeholderUrl}
+							loading="eager"
+							decoding="async"
+							draggable="false"
+							onload={() => (imageLoaded = true)}
+						/>
+					</div>
 
-				<!-- Capture info overlay -->
-				<div
-					class="pointer-events-none absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/80 to-transparent p-4"
-				>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							{#if currentCapture.scene_name}
-								<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
-									{currentCapture.scene_name}
-								</span>
-							{/if}
-							{#if currentCapture.profile}
-								<span class="rounded bg-primary px-2 py-1 text-sm font-medium text-white">
-									{currentCapture.profile}
-								</span>
-							{/if}
-							{#if currentCapture.shader_version}
-								<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
-									v{currentCapture.shader_version}
-								</span>
-							{/if}
+					<!-- Capture info overlay -->
+					<div
+						class="pointer-events-none absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/80 to-transparent p-4"
+					>
+						<div class="flex items-center justify-between">
+							<div class="flex items-center gap-2">
+								{#if currentCapture.scene_name}
+									<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
+										{currentCapture.scene_name}
+									</span>
+								{/if}
+								{#if currentCapture.profile}
+									<span class="rounded bg-primary px-2 py-1 text-sm font-medium text-white">
+										{currentCapture.profile}
+									</span>
+								{/if}
+								{#if currentCapture.shader_version}
+									<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
+										v{currentCapture.shader_version}
+									</span>
+								{/if}
+							</div>
+							<span class="text-sm text-white/70">
+								{currentIndex + 1} / {captures.length}
+							</span>
 						</div>
-						<span class="text-sm text-white/70">
-							{currentIndex + 1} / {captures.length}
-						</span>
 					</div>
 				</div>
-			</div>
-		{/key}
+			{/key}
+		</div>
 	{/if}
 </div>

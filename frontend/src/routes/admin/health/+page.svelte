@@ -3,8 +3,10 @@ import { invalidateAll } from '$app/navigation';
 import type { CaptureTargetHealth, TargetHealth } from '$lib/bindings';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
+import * as Table from '$lib/components/ui/table';
 import * as Tabs from '$lib/components/ui/tabs';
 import * as Tooltip from '$lib/components/ui/tooltip';
+import { Alert } from '$lib/components/ui/alert';
 import { Activity, Grid3x3, RefreshCw } from '@lucide/svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { PageData } from './$types';
@@ -77,10 +79,10 @@ function worstStatus(targets: CaptureTargetHealth[]): TargetHealth {
 }
 
 const CELL_COLORS: Record<TargetHealth, string> = {
-	completed: 'bg-green-500/80 hover:bg-green-500',
-	stale: 'bg-yellow-500/80 hover:bg-yellow-500',
-	missing: 'bg-red-500/80 hover:bg-red-500',
-	failed: 'bg-zinc-400/60 hover:bg-zinc-400'
+	completed: 'bg-success/80 hover:bg-success',
+	stale: 'bg-warning/80 hover:bg-warning',
+	missing: 'bg-destructive/80 hover:bg-destructive',
+	failed: 'bg-muted-foreground/40 hover:bg-muted-foreground/60'
 };
 
 const STATUS_LABELS: Record<TargetHealth, string> = {
@@ -136,6 +138,8 @@ async function refresh() {
 }
 </script>
 
+<svelte:head><title>Health - Glint</title></svelte:head>
+
 <div class="space-y-4">
 	<header class="flex items-center justify-between">
 		<div class="flex items-baseline gap-3">
@@ -147,9 +151,7 @@ async function refresh() {
 	</header>
 
 	{#if health.error}
-		<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-			Error: {health.error}
-		</div>
+		<Alert variant="destructive">Error: {health.error}</Alert>
 	{/if}
 
 	<!-- Summary -->
@@ -184,37 +186,41 @@ async function refresh() {
 				<div class="flex gap-4">
 					<!-- Matrix Grid -->
 					<div class="min-w-0 flex-1 overflow-x-auto">
-						<Tooltip.Provider>
-							<table class="w-full border-collapse text-sm">
+						<Tooltip.Provider delayDuration={0} disableHoverableContent>
+							<table class="border-collapse text-sm">
 								<thead>
 									<tr>
-										<th class="sticky left-0 z-10 bg-background p-2 text-left text-xs font-medium text-muted-foreground">
-											Shader
+										<th class="sticky left-0 z-10 p-2 text-left text-xs font-medium text-muted-foreground">
 										</th>
 										{#each scenes as scene (scene.slug)}
-											<th class="p-1 text-center text-xs font-medium text-muted-foreground">
-												<span class="block max-w-16 truncate" title={scene.name}>
-													{scene.name}
-												</span>
+											<th class="h-28 w-9 p-0 align-bottom">
+												<div class="relative h-full w-full">
+													<span
+														class="absolute bottom-1 left-1/2 origin-bottom-left -rotate-55 whitespace-nowrap text-xs font-medium text-muted-foreground"
+														title={scene.name}
+													>
+														{scene.name}
+													</span>
+												</div>
 											</th>
 										{/each}
 									</tr>
 								</thead>
 								<tbody>
 									{#each shaders as shader (shader.slug)}
-										<tr class="border-t border-border/50">
-											<td class="sticky left-0 z-10 bg-background p-2">
-												<div class="flex flex-col">
-													<span class="max-w-40 truncate font-medium" title={shader.name}>
+										<tr class="h-9 border-t border-border/50">
+											<td class="sticky left-0 z-10 max-w-40 bg-background px-2 py-0">
+												<div class="flex h-9 flex-col justify-center overflow-hidden">
+													<span class="truncate text-xs font-medium" title={shader.name}>
 														{shader.name}
 													</span>
-													<span class="text-xs text-muted-foreground">{shader.version}</span>
+													<span class="truncate text-[10px] leading-tight text-muted-foreground">{shader.version}</span>
 												</div>
 											</td>
 											{#each scenes as scene (scene.slug)}
 												{@const targets = targetsByCell.get(`${shader.slug}:${scene.slug}`) ?? []}
 												{@const status = worstStatus(targets)}
-												<td class="p-1 text-center">
+												<td class="bg-background p-1 text-center">
 													<Tooltip.Root>
 														<Tooltip.Trigger
 															class="h-7 w-7 rounded transition-colors {CELL_COLORS[status]} {selectedCell?.shaderSlug === shader.slug && selectedCell?.sceneSlug === scene.slug ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''}"
@@ -271,9 +277,9 @@ async function refresh() {
 												No captures
 											{/if}
 											{#if target.failure_count > 0}
-												<span class="ml-2 text-red-500">
-													{target.failure_count} failures
-												</span>
+											<span class="ml-2 text-destructive">
+												{target.failure_count} failures
+											</span>
 											{/if}
 										</div>
 									</div>
@@ -289,32 +295,30 @@ async function refresh() {
 			{#if workQueue.length === 0}
 				<p class="text-muted-foreground">Work queue is empty. All targets are up to date.</p>
 			{:else}
-				<div class="rounded-lg border">
-					<table class="w-full text-sm">
-						<thead>
-							<tr class="border-b text-left text-xs font-medium text-muted-foreground">
-								<th class="p-3">#</th>
-								<th class="p-3">Shader</th>
-								<th class="p-3">Version</th>
-								<th class="p-3">Scene</th>
-								<th class="p-3">Profile</th>
-								<th class="p-3">World</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each workQueue as item, i (i)}
-								<tr class="border-b border-border/50 last:border-b-0">
-									<td class="p-3 text-muted-foreground">{i + 1}</td>
-									<td class="p-3 font-medium">{item.shader_name}</td>
-									<td class="p-3 text-muted-foreground">{item.version}</td>
-									<td class="p-3">{item.scene_name}</td>
-									<td class="p-3 text-muted-foreground">{item.profile ?? '—'}</td>
-									<td class="p-3 text-muted-foreground">{item.world_name}</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
+			<Table.Root class="border">
+				<Table.Header>
+					<Table.Row>
+						<Table.Head class="p-3">#</Table.Head>
+						<Table.Head class="p-3">Shader</Table.Head>
+						<Table.Head class="p-3">Version</Table.Head>
+						<Table.Head class="p-3">Scene</Table.Head>
+						<Table.Head class="p-3">Profile</Table.Head>
+						<Table.Head class="p-3">World</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each workQueue as item, i (i)}
+						<Table.Row class="last:border-b-0">
+							<Table.Cell class="p-3 text-muted-foreground">{i + 1}</Table.Cell>
+							<Table.Cell class="p-3 font-medium">{item.shader_name}</Table.Cell>
+							<Table.Cell class="p-3 text-muted-foreground">{item.version}</Table.Cell>
+							<Table.Cell class="p-3">{item.scene_name}</Table.Cell>
+							<Table.Cell class="p-3 text-muted-foreground">{item.profile ?? '—'}</Table.Cell>
+							<Table.Cell class="p-3 text-muted-foreground">{item.world_name}</Table.Cell>
+						</Table.Row>
+					{/each}
+				</Table.Body>
+			</Table.Root>
 			{/if}
 		</Tabs.Content>
 	</Tabs.Root>

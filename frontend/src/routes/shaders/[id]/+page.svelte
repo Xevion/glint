@@ -1,6 +1,7 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
 import type { ShaderWithCaptures } from '$lib/bindings';
+import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import * as Select from '$lib/components/ui/select';
@@ -43,17 +44,8 @@ const selectedVersion = $derived(
 	versions.find((v) => v.id === selectedVersionId) ?? versions[0] ?? null
 );
 
-// Parse profiles from selected version
-const profiles = $derived.by(() => {
-	const raw = selectedVersion?.supported_profiles;
-	if (!raw) return [];
-	try {
-		const parsed: unknown = JSON.parse(raw);
-		return Array.isArray(parsed) ? (parsed as string[]) : [];
-	} catch {
-		return [];
-	}
-});
+// Profiles from selected version
+const profiles = $derived(selectedVersion?.supported_profiles ?? []);
 
 // Hero: derived from user selection, falling back to first capture
 let selectedCaptureId = $state<string | null>(null);
@@ -93,34 +85,10 @@ function openLightbox(captureIndex: number) {
 }
 </script>
 
-{#snippet captureBadges(capture: typeof captures[number], size: 'sm' | 'xs')}
-	<div class="flex items-center gap-2">
-		{#if capture.scene_name}
-			<span
-				class="rounded bg-white/20 px-2 {size === 'sm' ? 'py-1 text-sm' : 'py-0.5 text-xs'} font-medium text-white"
-			>
-				{capture.scene_name}
-			</span>
-		{/if}
-		{#if capture.profile}
-			<span
-				class="rounded bg-primary px-2 {size === 'sm' ? 'py-1 text-sm' : 'py-0.5 text-xs'} font-medium text-white"
-			>
-				{capture.profile}
-			</span>
-		{/if}
-		{#if capture.shader_version}
-			<span
-				class="rounded bg-white/20 px-2 {size === 'sm' ? 'py-1 text-sm' : 'py-0.5 text-xs'} font-medium text-white"
-			>
-				{formatVersion(capture.shader_version)}
-			</span>
-		{/if}
-	</div>
-{/snippet}
+<svelte:head><title>{shader.name} - Glint</title></svelte:head>
 
 {#key shader.id}
-		<div class="container mx-auto px-4 py-8">
+		<div class="py-8">
 			<!-- Breadcrumb -->
 			<nav
 				aria-label="Breadcrumb"
@@ -149,7 +117,7 @@ function openLightbox(captureIndex: number) {
 						<div>
 							<h1 class="text-3xl font-bold text-foreground">{shader.name}</h1>
 							{#if shader.description}
-								<p class="mt-1 max-w-2xl text-sm text-foreground/70 dark:text-muted-foreground">
+								<p class="mt-1 max-w-2xl text-sm text-muted-foreground">
 									{shader.description}
 								</p>
 							{/if}
@@ -287,7 +255,13 @@ function openLightbox(captureIndex: number) {
 							class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
 						>
 							<div class="absolute right-0 bottom-0 left-0 p-4">
-								{@render captureBadges(heroCapture, 'sm')}
+								<CaptureBadges
+									sceneName={heroCapture.scene_name}
+									profile={heroCapture.profile}
+									version={heroCapture.shader_version}
+									formatVersion={formatVersion}
+									size="sm"
+								/>
 							</div>
 						</div>
 					</button>
@@ -312,7 +286,7 @@ function openLightbox(captureIndex: number) {
 							<button
 								type="button"
 								aria-label="View {capture.scene_name ?? 'capture'} in lightbox"
-								class="shadow-theme group relative cursor-pointer overflow-hidden rounded-lg border border-border transition-all hover:border-primary"
+								class="shadow-theme-sm group relative cursor-pointer overflow-hidden rounded-lg border border-border transition-all hover:border-primary"
 							onclick={() => {
 								selectedCaptureId = capture.id;
 								openLightbox(i);
@@ -328,14 +302,19 @@ function openLightbox(captureIndex: number) {
 									containerClass="aspect-video"
 								/>
 
-								<!-- Hover overlay -->
-								<div
-									class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-								>
-									<div class="absolute right-0 bottom-0 left-0 p-3">
-										{@render captureBadges(capture, 'xs')}
-									</div>
+							<!-- Hover overlay -->
+							<div
+								class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+							>
+								<div class="absolute right-0 bottom-0 left-0 p-3">
+									<CaptureBadges
+										sceneName={capture.scene_name}
+										profile={capture.profile}
+										version={capture.shader_version}
+										formatVersion={formatVersion}
+									/>
 								</div>
+							</div>
 							</button>
 						{/each}
 					</div>

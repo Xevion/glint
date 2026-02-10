@@ -3,6 +3,7 @@
 export type { AdoptPreviewAuthor } from "./AdoptPreviewAuthor";
 export type { AdoptPreviewResponse } from "./AdoptPreviewResponse";
 export type { Capture } from "./Capture";
+export type { CaptureDetail } from "./CaptureDetail";
 export type { CaptureHealthResponse } from "./CaptureHealthResponse";
 export type { CaptureHealthSummary } from "./CaptureHealthSummary";
 export type { CaptureRun } from "./CaptureRun";
@@ -43,5 +44,6 @@ export type { UserWithSessions } from "./UserWithSessions";
 export type { WorkItem } from "./WorkItem";
 export type { World } from "./World";
 export type { WorldListItem } from "./WorldListItem";
+export type { WorldPreviewCapture } from "./WorldPreviewCapture";
 export type { WorldVersion } from "./WorldVersion";
 export type { WorldWithDetails } from "./WorldWithDetails";

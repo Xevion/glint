@@ -1,7 +1,7 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
 import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
-import CaptureImage from '$lib/components/CaptureImage.svelte';
+import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Button } from '$lib/components/ui/button';
 import { formatBytes, formatDatetime } from '$lib/utils/format';
@@ -120,14 +120,16 @@ onDestroy(() => {
 });
 </script>
 
+<svelte:head><title>Admin - Glint</title></svelte:head>
+
 <div class="space-y-6">
 	<header class="flex items-center justify-between">
 		<div class="flex items-center gap-4">
 			<h1 class="text-2xl font-semibold">Dashboard</h1>
 			<div
 				class="flex h-3 w-3 items-center justify-center rounded-full"
-				class:bg-green-500={healthStatus === 'ok'}
-				class:bg-red-500={healthStatus === 'error'}
+			class:bg-success={healthStatus === 'ok'}
+			class:bg-destructive={healthStatus === 'error'}
 				title={healthStatus === 'ok'
 					? 'API healthy'
 					: `API error: ${errors.health || 'Unknown'}`}
@@ -188,13 +190,13 @@ onDestroy(() => {
 				<HeartPulse class="h-5 w-5 text-muted-foreground" />
 				<div class="flex flex-1 items-center gap-3 text-sm">
 					<span class="font-medium">Capture Health</span>
-					<span class="text-green-600 dark:text-green-400">{captureHealth.completed} completed</span>
-					{#if captureHealth.missing > 0}
-						<span class="text-red-600 dark:text-red-400">{captureHealth.missing} missing</span>
-					{/if}
-					{#if captureHealth.stale > 0}
-						<span class="text-yellow-600 dark:text-yellow-400">{captureHealth.stale} stale</span>
-					{/if}
+				<span class="text-success">{captureHealth.completed} completed</span>
+				{#if captureHealth.missing > 0}
+					<span class="text-destructive">{captureHealth.missing} missing</span>
+				{/if}
+				{#if captureHealth.stale > 0}
+					<span class="text-warning">{captureHealth.stale} stale</span>
+				{/if}
 					{#if captureHealth.failed > 0}
 						<span class="text-muted-foreground">{captureHealth.failed} failed</span>
 					{/if}
@@ -339,35 +341,35 @@ onDestroy(() => {
 			{#if recentCaptures.length === 0}
 				<p class="text-sm text-muted-foreground">No captures yet</p>
 			{:else}
-				<div class="space-y-2">
-					{#each recentCaptures as capture (capture.id)}
-						<div class="flex items-center gap-3 rounded border p-2 text-sm">
-							{#if capture.image_url}
-								<CaptureImage
-									src={capture.image_url}
-									thumbhash={capture.thumbhash}
-									preset="thumbnail"
-									alt="Capture"
-									class="h-full w-full object-cover"
-									containerClass="h-10 w-16 rounded"
-								/>
-							{:else}
-								<div class="flex h-10 w-16 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
-									N/A
+				<CaptureGridAdmin captures={recentCaptures}>
+					{#snippet footer(capture: CaptureWithContext)}
+						<div class="space-y-1 p-3">
+							<div class="flex items-center justify-between gap-2">
+								<span class="truncate font-medium text-sm">{capture.shader_name}</span>
+								{#if capture.scene_name}
+									<span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{capture.scene_name}</span>
+								{/if}
+							</div>
+							<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+								<span>{capture.shader_version}</span>
+								{#if capture.profile}
+									<span>&middot; {capture.profile}</span>
+								{/if}
+								{#if capture.resolution_width && capture.resolution_height}
+									<span>&middot; {capture.resolution_width}&times;{capture.resolution_height}</span>
+								{/if}
+								{#if capture.file_size_bytes}
+									<span>&middot; {formatBytes(capture.file_size_bytes)}</span>
+								{/if}
+							</div>
+							{#if capture.captured_at}
+								<div class="text-xs text-muted-foreground">
+									<TimeAgo timestamp={capture.captured_at} />
 								</div>
 							{/if}
-							<div class="min-w-0 flex-1">
-								<div class="truncate font-medium">{capture.shader_name}</div>
-								<div class="text-xs text-muted-foreground">
-									{capture.shader_version}
-									{#if capture.profile}
-										&middot; {capture.profile}
-									{/if}
-								</div>
-							</div>
 						</div>
-					{/each}
-				</div>
+					{/snippet}
+				</CaptureGridAdmin>
 			{/if}
 		</div>
 </div>

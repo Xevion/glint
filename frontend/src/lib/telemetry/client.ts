@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { afterNavigate } from '$app/navigation';
 import { browser, dev } from '$app/environment';
 import { env } from '$env/dynamic/public';
 import type { TelemetryEvent } from './events';
@@ -23,6 +24,9 @@ class TelemetryClient {
 			api_host: host,
 			ui_host: 'https://us.posthog.com',
 			defaults: '2025-11-30',
+			// Disable PostHog's history monkey-patching — it conflicts with
+			// SvelteKit's router. Page views are captured via afterNavigate below.
+			capture_pageview: false,
 			capture_pageleave: true,
 			autocapture: false,
 			persistence: 'localStorage'
@@ -34,6 +38,15 @@ class TelemetryClient {
 
 		this.enabled = true;
 		this.log('Telemetry initialized');
+	}
+
+	/** Wire up SvelteKit-native page view tracking. Call from root layout. */
+	trackPageViews(): void {
+		afterNavigate(() => {
+			if (this.enabled) {
+				posthog.capture('$pageview');
+			}
+		});
 	}
 
 	/** Capture a type-safe telemetry event. */

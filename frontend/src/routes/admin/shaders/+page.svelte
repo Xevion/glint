@@ -1,10 +1,10 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import type { Shader } from '$lib/bindings';
+import { AdminPageHeader } from '$lib/components/admin';
 import AdminTable from '$lib/components/AdminTable.svelte';
 import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
-import { Button } from '$lib/components/ui/button';
-import { RefreshCw } from '@lucide/svelte';
+import { Alert } from '$lib/components/ui/alert';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -26,24 +26,17 @@ async function refresh() {
 }
 </script>
 
+<svelte:head><title>Shaders - Glint</title></svelte:head>
+
 <div class="space-y-4">
-	<header class="flex items-center justify-between">
-		<div class="flex items-baseline gap-3">
-			<h1 class="text-2xl font-semibold">Shaders</h1>
-			<span class="text-lg text-muted-foreground">{shaders.length}</span>
-		</div>
-		<div class="flex items-center gap-2">
+	<AdminPageHeader title="Shaders" count={shaders.length} {refreshing} onrefresh={refresh}>
+		{#snippet actions()}
 			<AdoptShaderDialog onShaderAdopted={() => refresh()} />
-			<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
-				<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-			</Button>
-		</div>
-	</header>
+		{/snippet}
+	</AdminPageHeader>
 
 	{#if error}
-		<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-			Error: {error}
-		</div>
+		<Alert variant="destructive">Error: {error}</Alert>
 	{:else if shaders.length === 0}
 		<p class="text-muted-foreground">No shaders yet.</p>
 	{:else}

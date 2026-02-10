@@ -98,7 +98,6 @@ function presetToTransformOptions(preset: ImagePreset): ImageTransformOptions {
 
 interface ImageSourceLike {
 	image_url?: string | null;
-	thumbnail_url?: string | null;
 	thumbhash?: string | null;
 }
 
@@ -108,7 +107,7 @@ export function resolveImageSource(source: string | ImageSourceLike): {
 } {
 	if (typeof source === 'string') return { src: source, thumbhash: null };
 	return {
-		src: source.thumbnail_url ?? source.image_url ?? null,
+		src: source.image_url ?? null,
 		thumbhash: source.thumbhash ?? null
 	};
 }

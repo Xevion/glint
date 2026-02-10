@@ -3,8 +3,8 @@
 /**
  * ShaderVersion enriched with capture count for detail endpoints
  */
-export type ShaderVersionDetail = { capture_count: number, id: string, shader_id: string, version: string, modrinth_version_id: string | null, curseforge_file_id: number | null, download_url: string | null, file_hash: string | null, file_size: number | null, game_versions: string | null, release_channel: string | null, 
+export type ShaderVersionDetail = { capture_count: number, id: string, shader_id: string, version: string, modrinth_version_id: string | null, curseforge_file_id: number | null, download_url: string | null, file_hash: string | null, file_size: number | null, game_versions: Array<string> | null, release_channel: string | null, 
 /**
- * JSON array of profile names, discovered after first capture
+ * Array of profile names, discovered after first capture
  */
-supported_profiles: string | null, upstream_published_at: string | null, created_at: string, capture_failure_count: number, last_capture_error: string | null, };
+supported_profiles: Array<string> | null, upstream_published_at: string | null, created_at: string, capture_failure_count: number, last_capture_error: string | null, };

@@ -3,11 +3,12 @@ use std::collections::HashMap;
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use sqlx::FromRow;
 use tracing::{debug, instrument};
 
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
-use crate::models::{Capture, CaptureWithContext};
+use crate::models::{Capture, CaptureDetail, CaptureWithContext};
 
 pub struct ThumbnailInfo {
     pub image_url: String,
@@ -352,6 +353,208 @@ impl CaptureRepo {
             .await
             .context(format!("failed to get capture with context '{}'", id))?
             .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))
+    }
+
+    /// Full capture detail with technical metadata and related captures.
+    /// Combines the full `captures` row with context joins and fetches
+    /// three groups of related captures for cross-referencing.
+    #[instrument(skip(db), level = "debug")]
+    pub async fn get_detail(db: &DbPool, id: &str) -> AppResult<CaptureDetail> {
+        // Row type for the combined capture + context query
+        #[derive(FromRow)]
+        struct CaptureFullRow {
+            // Context fields
+            id: String,
+            scene_id: String,
+            shader_slug: String,
+            shader_name: String,
+            shader_version: String,
+            shader_version_id: String,
+            profile: Option<String>,
+            image_path: Option<String>,
+            image_url: Option<String>,
+            thumbhash: Option<String>,
+            captured_at: Option<DateTime<Utc>>,
+            resolution_width: Option<i32>,
+            resolution_height: Option<i32>,
+            file_size_bytes: Option<i64>,
+            run_id: Option<String>,
+            run_status: Option<String>,
+            shader_author: Option<String>,
+            scene_name: Option<String>,
+            scene_slug: Option<String>,
+            // Technical metadata
+            status: String,
+            error_message: Option<String>,
+            video_url: Option<String>,
+            avg_fps: Option<f64>,
+            min_fps: Option<f64>,
+            max_fps: Option<f64>,
+            frame_time_avg: Option<f64>,
+            frame_time_p99: Option<f64>,
+            minecraft_version: Option<String>,
+            iris_version: Option<String>,
+            gpu_model: Option<String>,
+            content_type: Option<String>,
+            world_version_id: Option<String>,
+            created_at: DateTime<Utc>,
+            updated_at: DateTime<Utc>,
+        }
+
+        let row = sqlx::query_as!(
+            CaptureFullRow,
+            r#"
+            SELECT
+                c.id,
+                c.scene_id,
+                s.slug as shader_slug,
+                s.name as shader_name,
+                sv.version as shader_version,
+                c.shader_version_id,
+                c.profile,
+                c.image_path,
+                c.image_url,
+                c.thumbhash,
+                c.captured_at,
+                c.resolution_width,
+                c.resolution_height,
+                c.file_size_bytes,
+                cri.run_id as "run_id?: String",
+                cr.status as "run_status?: String",
+                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,
+                sc.name as "scene_name?: String",
+                sc.slug as "scene_slug?: String",
+                c.status,
+                c.error_message,
+                c.video_url,
+                c.avg_fps,
+                c.min_fps,
+                c.max_fps,
+                c.frame_time_avg,
+                c.frame_time_p99,
+                c.minecraft_version,
+                c.iris_version,
+                c.gpu_model,
+                c.content_type,
+                c.world_version_id,
+                c.created_at,
+                c.updated_at
+            FROM captures c
+            JOIN shader_versions sv ON c.shader_version_id = sv.id
+            JOIN shaders s ON sv.shader_id = s.id
+            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
+            LEFT JOIN capture_runs cr ON cri.run_id = cr.id
+            LEFT JOIN scenes sc ON c.scene_id = sc.id
+            WHERE c.id = $1
+            "#,
+            id
+        )
+        .fetch_optional(db)
+        .await
+        .context(format!("failed to get capture detail '{}'", id))?
+        .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", id)))?;
+
+        // Fetch related captures in parallel
+        let scene_id = row.scene_id.clone();
+        let shader_version_id = row.shader_version_id.clone();
+        let capture_id = row.id.clone();
+        let run_id = row.run_id.clone();
+
+        // Same shader + same scene (different profiles/versions of same shader in same scene)
+        let same_shader_scene_fut = capture_ctx_query!(
+            r#"
+            WHERE c.scene_id = $1
+              AND sv.shader_id = (SELECT shader_id FROM shader_versions WHERE id = $2)
+              AND c.id != $3
+              AND c.status = 'completed'
+            ORDER BY c.created_at DESC
+            LIMIT 8
+            "#,
+            scene_id,
+            shader_version_id,
+            capture_id,
+        )
+        .fetch_all(db);
+
+        // Same scene, different shaders
+        let same_scene_fut = capture_ctx_query!(
+            r#"
+            WHERE c.scene_id = $1
+              AND sv.shader_id != (SELECT shader_id FROM shader_versions WHERE id = $2)
+              AND c.id != $3
+              AND c.status = 'completed'
+            ORDER BY c.created_at DESC
+            LIMIT 8
+            "#,
+            scene_id,
+            shader_version_id,
+            capture_id,
+        )
+        .fetch_all(db);
+
+        let (same_shader_scene, same_scene, same_run) = if let Some(ref rid) = run_id {
+            let same_run_fut = capture_ctx_query!(
+                r#"
+                WHERE cri.run_id = $1
+                  AND c.id != $2
+                  AND c.status = 'completed'
+                ORDER BY c.created_at DESC
+                LIMIT 8
+                "#,
+                rid,
+                capture_id,
+            )
+            .fetch_all(db);
+
+            let (ss, sc, sr) =
+                tokio::try_join!(same_shader_scene_fut, same_scene_fut, same_run_fut)
+                    .context("failed to fetch related captures")?;
+            (ss, sc, sr)
+        } else {
+            let (ss, sc) = tokio::try_join!(same_shader_scene_fut, same_scene_fut)
+                .context("failed to fetch related captures")?;
+            (ss, sc, Vec::new())
+        };
+
+        Ok(CaptureDetail {
+            id: row.id,
+            scene_id: row.scene_id,
+            shader_slug: row.shader_slug,
+            shader_name: row.shader_name,
+            shader_version: row.shader_version,
+            shader_version_id: row.shader_version_id,
+            profile: row.profile,
+            image_path: row.image_path,
+            image_url: row.image_url,
+            thumbhash: row.thumbhash,
+            captured_at: row.captured_at,
+            resolution_width: row.resolution_width,
+            resolution_height: row.resolution_height,
+            file_size_bytes: row.file_size_bytes,
+            run_id: row.run_id,
+            run_status: row.run_status,
+            shader_author: row.shader_author,
+            scene_name: row.scene_name,
+            scene_slug: row.scene_slug,
+            status: row.status,
+            error_message: row.error_message,
+            video_url: row.video_url,
+            avg_fps: row.avg_fps,
+            min_fps: row.min_fps,
+            max_fps: row.max_fps,
+            frame_time_avg: row.frame_time_avg,
+            frame_time_p99: row.frame_time_p99,
+            minecraft_version: row.minecraft_version,
+            iris_version: row.iris_version,
+            gpu_model: row.gpu_model,
+            content_type: row.content_type,
+            world_version_id: row.world_version_id,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            same_shader_scene,
+            same_scene,
+            same_run,
+        })
     }
 
     /// List captures with context, pagination, and filtering (admin)

@@ -5,6 +5,7 @@ import type { ShaderListItem } from '$lib/bindings';
 import { comparisonStore } from '$lib/stores/comparison.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { cn } from '$lib/utils';
+import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import {
 	formatDate,
 	formatGameVersions,
@@ -76,18 +77,18 @@ function handleCheckboxClick(e: MouseEvent) {
 	onmouseleave={() => (isHovered = false)}
 	class={cn(
 		'group relative flex flex-col overflow-hidden rounded-xl bg-card transition-all duration-300',
-		'border border-border shadow-sm',
+		'border border-border shadow-theme-sm',
 		'focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
 		hasAnySelection
 			? 'cursor-default'
-			: 'cursor-pointer hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg',
+			: 'cursor-pointer hover:-translate-y-1 hover:border-primary/50 hover:shadow-theme-lg',
 		className
 	)}
 >
 	<!-- Thumbnail Image -->
 	<div class="relative">
 		<CaptureImage
-			src={shader.thumbnail_url}
+			src={shader.image_url}
 			thumbhash={shader.thumbhash}
 			preset="card"
 			alt="{shader.name} preview"
@@ -97,9 +98,7 @@ function handleCheckboxClick(e: MouseEvent) {
 		/>
 
 		<!-- Gradient overlay -->
-		<div
-			class="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent"
-		></div>
+		<ImageOverlay />
 
 		<!-- Compare checkbox - only visible in selection mode -->
 		{#if selectionMode}

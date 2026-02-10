@@ -1,6 +1,7 @@
 <script lang="ts">
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import { Button } from '$lib/components/ui/button';
+import { Input } from '$lib/components/ui/input';
 import { Search } from '@lucide/svelte';
 import { fly, scale } from 'svelte/transition';
 import type { PageData } from './$types';
@@ -36,6 +37,8 @@ const filteredShaders = $derived.by(() => {
 const hasFilters = $derived(searchQuery !== '');
 </script>
 
+<svelte:head><title>Shaders - Glint</title></svelte:head>
+
 <div class="py-6">
 	<!-- Minimal inline header -->
 	<div in:fly={{ y: -10, duration: 400 }} class="mb-6 flex flex-wrap items-center gap-4">
@@ -52,19 +55,19 @@ const hasFilters = $derived(searchQuery !== '');
 					class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
 					strokeWidth={2}
 				/>
-				<input
-					type="text"
-					placeholder="Search..."
-					bind:value={searchQuery}
-					class="h-9 w-full rounded-lg border border-input bg-background/50 pr-3 pl-9 text-sm backdrop-blur-sm transition-all placeholder:text-muted-foreground focus:w-full focus:outline-none focus:ring-2 focus:ring-ring sm:w-48 sm:focus:w-64"
-				/>
+			<Input
+				type="text"
+				placeholder="Search..."
+				bind:value={searchQuery}
+				class="w-full bg-background/50 pr-3 pl-9 backdrop-blur-sm transition-all focus:w-full sm:w-48 sm:focus:w-64"
+			/>
 			</div>
 
 			<!-- Sort -->
-			<select
-				bind:value={sortBy}
-				class="h-9 rounded-lg border border-input bg-background/50 backdrop-blur-sm px-3 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
-			>
+		<select
+			bind:value={sortBy}
+			class="h-9 rounded-md border border-input bg-background/50 px-3 text-sm shadow-xs backdrop-blur-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+		>
 				<option value="updated">Recent</option>
 				<option value="name">A-Z</option>
 			</select>
@@ -85,7 +88,7 @@ const hasFilters = $derived(searchQuery !== '');
 
 	<!-- Shader Grid -->
 	{#if filteredShaders.length > 0}
-		<div class="grid grid-cols-1 gap-5 sm:[grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
+		<div class="grid grid-cols-1 gap-6 sm:[grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
 			{#each filteredShaders as shader, i (shader.id)}
 				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>
 					<ShaderCard {shader} />

@@ -1,17 +1,12 @@
-<script lang="ts">
-import { fly } from 'svelte/transition';
-</script>
+<svelte:head><title>Settings - Glint</title></svelte:head>
 
-<div class="container mx-auto px-4 py-8">
-	<div in:fly={{ y: -10, duration: 400 }} class="mb-8">
-		<h1 class="mb-2 text-3xl font-bold">Settings</h1>
+<div class="space-y-4">
+	<header>
+		<h1 class="text-2xl font-semibold">Settings</h1>
 		<p class="text-muted-foreground">Configure application settings and preferences</p>
-	</div>
+	</header>
 
-	<div
-		in:fly={{ y: 10, duration: 400, delay: 100 }}
-		class="rounded-xl border border-border bg-card p-6"
-	>
+	<div class="rounded-lg border border-border bg-card p-4">
 		<p class="text-sm text-muted-foreground">Settings interface coming soon in alpha development</p>
 	</div>
 </div>

@@ -12,7 +12,6 @@ interface Props {
 	preset?: ImagePreset;
 	sizes?: string;
 	priority?: boolean;
-	lightbox?: boolean;
 	class?: string;
 	containerClass?: string;
 	loading?: 'lazy' | 'eager';
@@ -27,7 +26,6 @@ let {
 	preset = 'card',
 	sizes,
 	priority = false,
-	lightbox = false,
 	class: className,
 	containerClass,
 	loading,
@@ -42,7 +40,6 @@ const resolvedLoading = $derived(loading ?? (priority ? 'eager' : 'lazy'));
 const resolvedDecoding = $derived(priority ? 'sync' : 'async');
 
 let loaded = $state(false);
-let lightboxOpen = $state(false);
 let imgEl = $state<HTMLImageElement | null>(null);
 
 // Reset loaded state only when src genuinely changes
@@ -60,52 +57,14 @@ $effect(() => {
 		loaded = true;
 	}
 });
-
-function handleLightboxKeydown(e: KeyboardEvent) {
-	if (e.key === 'Escape') {
-		lightboxOpen = false;
-	}
-}
 </script>
 
-<svelte:window onkeydown={lightbox && lightboxOpen ? handleLightboxKeydown : undefined} />
-
-{#if lightbox && lightboxOpen}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/90 backdrop-blur-sm"
-		onclick={() => (lightboxOpen = false)}
-		onkeydown={handleLightboxKeydown}
-	>
-		<img
-			src={cfImageUrl(src, 'full')}
-			{alt}
-			class="max-h-[90vh] max-w-[90vw] object-contain"
-			loading="eager"
-			decoding="async"
-		/>
-	</div>
-{/if}
-
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
 	class={cn('relative overflow-hidden', containerClass)}
 	style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
 	style:background-size="cover"
 	style:background-position="center"
 	style:aspect-ratio={aspectRatio ? String(aspectRatio) : undefined}
-	role={lightbox ? 'button' : undefined}
-	tabindex={lightbox ? 0 : undefined}
-	onclick={lightbox ? () => (lightboxOpen = true) : undefined}
-	onkeydown={lightbox
-		? (e) => {
-				if (e.key === 'Enter' || e.key === ' ') {
-					e.preventDefault();
-					lightboxOpen = true;
-				}
-			}
-		: undefined}
-	style:cursor={lightbox ? 'pointer' : undefined}
 >
 	{#if !placeholderUrl && !fallbackSrc}
 		<div class={cn('h-full w-full bg-muted', className)}></div>

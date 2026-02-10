@@ -141,7 +141,7 @@ const table = $derived(
 					{#each cardBodyColumns as col (col.id)}
 						<div class="flex items-center justify-between gap-2">
 							<span class="shrink-0 font-medium">{col.name}:</span>
-							<span class="truncate text-right">
+							<span class="text-right">
 								{#if col.component === 'time' && row[col.key]}
 									<TimeAgo timestamp={row[col.key]} />
 								{:else if cell}

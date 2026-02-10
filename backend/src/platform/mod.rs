@@ -122,7 +122,7 @@ pub struct PlatformVersion {
     pub download_url: Option<String>,
     pub file_hash: Option<String>,
     pub file_size: Option<i64>,
-    pub game_versions_json: Option<String>,
+    pub game_versions: Option<Vec<String>>,
     pub release_channel: Option<String>,
     pub published_at: Option<DateTime<Utc>>,
 }

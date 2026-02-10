@@ -24,6 +24,6 @@ export const handleError: HandleServerError = ({ error, event, status }) => {
 	}
 
 	return {
-		message: status === 404 ? 'Not Found' : 'Internal Error'
+		message: status === 404 ? 'Not Found' : 'An error occurred'
 	};
 };

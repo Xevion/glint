@@ -1,6 +1,6 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
-import { page } from '$app/stores';
+import { page } from '$app/state';
 import { Button } from '$lib/components/ui/button';
 import { fade, fly } from 'svelte/transition';
 
@@ -23,14 +23,16 @@ const statusMessages: Record<number, { title: string; description: string }> = {
 	}
 };
 
-$: status = $page.status;
-$: message = statusMessages[status] ?? {
-	title: 'Error',
-	description: $page.error?.message ?? 'An unexpected error occurred.'
-};
+let status = $derived(page.status);
+let message = $derived(
+	statusMessages[status] ?? {
+		title: 'Error',
+		description: page.error?.message ?? 'An unexpected error occurred.'
+	}
+);
 </script>
 
-<div class="container mx-auto px-4 py-16">
+<div class="py-16">
 	<div class="mx-auto max-w-2xl text-center">
 		<div in:fly={{ y: -20, duration: 400 }} class="mb-8">
 			<div class="text-[10rem] leading-none font-bold text-primary">{status}</div>
@@ -42,7 +44,7 @@ $: message = statusMessages[status] ?? {
 
 		<p
 			in:fade={{ duration: 300, delay: 200 }}
-			class="mb-12 text-xl text-foreground/70 dark:text-muted-foreground"
+			class="mb-12 text-xl text-muted-foreground"
 		>
 			{message.description}
 		</p>

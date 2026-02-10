@@ -104,14 +104,14 @@ function getContextItems(ctx: SidebarContext) {
 	<nav class="flex flex-col gap-0.5">
 		{#if context && context !== 'admin'}
 			<span
-				class="px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5"
+				class="px-2 text-[11px] font-medium uppercase tracking-wider text-sidebar-muted-foreground/60 mb-0.5"
 			>
 				{contextTitle[context]}
 			</span>
 			{#each getContextItems(context) as item (item.href)}
 				<a
 					href={item.href}
-					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
+					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline transition-colors text-sidebar-muted-foreground hover:text-foreground hover:bg-muted/50"
 				>
 					<item.icon size={15} strokeWidth={2} />
 					{item.label}
@@ -119,7 +119,7 @@ function getContextItems(ctx: SidebarContext) {
 			{/each}
 		{:else if context === 'admin'}
 			<span
-				class="px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5"
+				class="px-2 text-[11px] font-medium uppercase tracking-wider text-sidebar-muted-foreground/60 mb-0.5"
 			>
 				Admin
 			</span>
@@ -129,7 +129,7 @@ function getContextItems(ctx: SidebarContext) {
 					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline transition-colors
 						{isActive(item.href)
 						? 'text-foreground bg-muted font-medium'
-						: 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+						: 'text-sidebar-muted-foreground hover:text-foreground hover:bg-muted/50'}"
 				>
 					<item.icon size={15} strokeWidth={2} />
 					{item.label}
@@ -143,7 +143,7 @@ function getContextItems(ctx: SidebarContext) {
 		<nav class="flex flex-col gap-0.5 mt-4">
 			<div class="mx-2 mb-2 border-t border-border"></div>
 			<span
-				class="px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5"
+				class="px-2 text-[11px] font-medium uppercase tracking-wider text-sidebar-muted-foreground/60 mb-0.5"
 			>
 				Admin
 			</span>
@@ -153,7 +153,7 @@ function getContextItems(ctx: SidebarContext) {
 					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline transition-colors
 						{isActive(item.href)
 						? 'text-foreground bg-muted font-medium'
-						: 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+						: 'text-sidebar-muted-foreground hover:text-foreground hover:bg-muted/50'}"
 				>
 					<item.icon size={15} strokeWidth={2} />
 					{item.label}
@@ -174,7 +174,7 @@ function getContextItems(ctx: SidebarContext) {
 		<Button
 			variant="default"
 			size="icon"
-			class="h-12 w-12 rounded-full shadow-lg"
+			class="h-12 w-12 rounded-full shadow-theme-lg"
 			onclick={() => (mobileSheetOpen = true)}
 		>
 			<Menu size={20} />

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { page } from '$app/state';
-import { navbar } from '$lib/stores/navigation.svelte';
+import { navigationStore } from '$lib/stores/navigation.svelte';
 import { GitCompare, Home, Layers } from '@lucide/svelte';
 import ThemeToggle from './ThemeToggle.svelte';
 
@@ -18,8 +18,8 @@ function isActive(tabHref: string): boolean {
 /** Label expansion check using a deferred path that updates only after
  *  view transitions finish, so CSS transitions run on visible DOM. */
 function isLabelExpanded(tabHref: string): boolean {
-	if (tabHref === '/') return navbar.path === '/';
-	return navbar.path.startsWith(tabHref);
+	if (tabHref === '/') return navigationStore.path === '/';
+	return navigationStore.path.startsWith(tabHref);
 }
 
 // DOM refs
@@ -192,13 +192,13 @@ $effect(() => {
 
 <nav class="w-full flex items-center justify-between">
 	<div
-		class="relative flex items-center gap-1 rounded-lg bg-muted/50 backdrop-blur-md border border-white/10 dark:border-white/5 p-1"
+		class="relative flex items-center gap-1 rounded-lg bg-muted/50 backdrop-blur-md border border-border p-1"
 		bind:this={containerRef}
 	>
 			<!-- Sliding pill — animated via JS (RAF) to stay smooth even when
 			     heavy page transitions cause CSS transition skipping -->
 			<div
-				class="absolute top-1 bottom-1 left-0 rounded-md bg-background shadow-sm opacity-0 transition-opacity duration-150 will-change-[transform,width]"
+				class="absolute top-1 bottom-1 left-0 rounded-md bg-background shadow-theme-sm opacity-0 transition-opacity duration-150 will-change-[transform,width]"
 				bind:this={pillRef}
 			></div>
 

@@ -16,6 +16,8 @@ const shaders = $derived(data.shaders ?? []);
 const hasStats = $derived(shaders.length > 0 || captures.length > 0);
 </script>
 
+<svelte:head><title>Glint</title></svelte:head>
+
 <!-- Hero Section -->
 <div class="py-16 sm:py-24 text-center">
 	<h1

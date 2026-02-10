@@ -40,101 +40,96 @@
       },
       {
         "ordinal": 7,
-        "name": "thumbnail_url",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 8,
         "name": "resolution_width",
         "type_info": "Int4"
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "resolution_height",
         "type_info": "Int4"
       },
       {
-        "ordinal": 10,
+        "ordinal": 9,
         "name": "captured_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 11,
+        "ordinal": 10,
         "name": "avg_fps",
         "type_info": "Float8"
       },
       {
-        "ordinal": 12,
+        "ordinal": 11,
         "name": "min_fps",
         "type_info": "Float8"
       },
       {
-        "ordinal": 13,
+        "ordinal": 12,
         "name": "max_fps",
         "type_info": "Float8"
       },
       {
-        "ordinal": 14,
+        "ordinal": 13,
         "name": "frame_time_avg",
         "type_info": "Float8"
       },
       {
-        "ordinal": 15,
+        "ordinal": 14,
         "name": "frame_time_p99",
         "type_info": "Float8"
       },
       {
-        "ordinal": 16,
+        "ordinal": 15,
         "name": "minecraft_version",
         "type_info": "Text"
       },
       {
-        "ordinal": 17,
+        "ordinal": 16,
         "name": "iris_version",
         "type_info": "Text"
       },
       {
-        "ordinal": 18,
+        "ordinal": 17,
         "name": "gpu_model",
         "type_info": "Text"
       },
       {
-        "ordinal": 19,
+        "ordinal": 18,
         "name": "status",
         "type_info": "Text"
       },
       {
-        "ordinal": 20,
+        "ordinal": 19,
         "name": "error_message",
         "type_info": "Text"
       },
       {
-        "ordinal": 21,
+        "ordinal": 20,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 22,
+        "ordinal": 21,
         "name": "updated_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 23,
+        "ordinal": 22,
         "name": "thumbhash",
         "type_info": "Text"
       },
       {
-        "ordinal": 24,
+        "ordinal": 23,
         "name": "file_size_bytes",
         "type_info": "Int8"
       },
       {
-        "ordinal": 25,
+        "ordinal": 24,
         "name": "content_type",
         "type_info": "Text"
       },
       {
-        "ordinal": 26,
+        "ordinal": 25,
         "name": "world_version_id",
         "type_info": "Text"
       }
@@ -146,7 +141,6 @@
       false,
       false,
       false,
-      true,
       true,
       true,
       true,

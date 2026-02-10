@@ -1,9 +1,12 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import type { CaptureRun } from '$lib/bindings';
+import { AdminPageHeader } from '$lib/components/admin';
 import AdminTable from '$lib/components/AdminTable.svelte';
-import { Button } from '$lib/components/ui/button';
-import { RefreshCw } from '@lucide/svelte';
+import { formatDuration } from '$lib/utils/format';
+import { statusColorFallback, statusColors } from '$lib/utils/status';
+import * as Tooltip from '$lib/components/ui/tooltip';
+import { Alert } from '$lib/components/ui/alert';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -18,25 +21,6 @@ const columns = [
 	{ id: 'started_at', key: 'started_at', name: 'Started', component: 'time' as const }
 ];
 
-const statusColors: Record<string, string> = {
-	running: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-	completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-	partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-	failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-	timed_out: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
-};
-
-function formatDuration(run: CaptureRun): string {
-	if (!run.completed_at) return 'In progress';
-	const start = new Date(run.started_at).getTime();
-	const end = new Date(run.completed_at).getTime();
-	const seconds = Math.round((end - start) / 1000);
-	if (seconds < 60) return `${seconds}s`;
-	const minutes = Math.floor(seconds / 60);
-	const remaining = seconds % 60;
-	return `${minutes}m ${remaining}s`;
-}
-
 async function refresh() {
 	refreshing = true;
 	await invalidateAll();
@@ -44,21 +28,13 @@ async function refresh() {
 }
 </script>
 
+<svelte:head><title>Runs - Glint</title></svelte:head>
+
 <div class="space-y-4">
-	<header class="flex items-center justify-between">
-		<div class="flex items-baseline gap-3">
-			<h1 class="text-2xl font-semibold">Capture Runs</h1>
-			<span class="text-lg text-muted-foreground">{runs.length}</span>
-		</div>
-		<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
-			<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-		</Button>
-	</header>
+	<AdminPageHeader title="Capture Runs" count={runs.length} {refreshing} onrefresh={refresh} />
 
 	{#if data.error}
-		<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-			Error: {data.error}
-		</div>
+		<Alert variant="destructive">Error: {data.error}</Alert>
 	{:else if runs.length === 0}
 		<p class="text-muted-foreground">No capture runs yet.</p>
 	{:else}
@@ -71,29 +47,55 @@ async function refresh() {
 			{#snippet cell({ columnId, row }: { columnId: string; value: unknown; row: CaptureRun })}
 				{#if columnId === 'status'}
 					<span
-						class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[row.status] ?? 'bg-gray-100 text-gray-800'}"
+						class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[row.status] ?? statusColorFallback}"
 					>
 						{row.status}
 					</span>
 				{:else if columnId === 'agent'}
 					{row.agent_id ?? '—'}
-				{:else if columnId === 'progress'}
-					<div class="flex items-center gap-2">
-						<span>{row.completed_items}/{row.total_items}</span>
-						{#if row.failed_items > 0}
-							<span class="text-xs text-red-600 dark:text-red-400">
-								({row.failed_items} failed)
-							</span>
-						{/if}
-						{#if row.total_items > 0}
-							<div class="h-1.5 w-16 rounded-full bg-muted">
+			{:else if columnId === 'progress'}
+				{@const total = row.total_items}
+				{@const remaining = total - row.completed_items - row.failed_items - row.skipped_items}
+				{@const isTimedOut = row.status === 'timed_out'}
+			{#if total > 0}
+				<Tooltip.Provider delayDuration={0} disableHoverableContent>
+					<Tooltip.Root>
+						<Tooltip.Trigger class="flex h-2.5 w-28 overflow-hidden rounded-full bg-muted">
+							{#if row.completed_items > 0}
 								<div
-									class="h-full rounded-full {row.failed_items > 0 ? 'bg-yellow-500' : 'bg-green-500'}"
-									style="width: {(row.completed_items / row.total_items) * 100}%"
+									class="bg-success"
+									style="width: {(row.completed_items / total) * 100}%"
 								></div>
-							</div>
-						{/if}
-					</div>
+							{/if}
+							{#if row.failed_items > 0}
+								<div
+									class="bg-destructive"
+									style="width: {(row.failed_items / total) * 100}%"
+								></div>
+							{/if}
+							{#if row.skipped_items > 0}
+								<div
+									class="bg-muted-foreground/30"
+									style="width: {(row.skipped_items / total) * 100}%"
+								></div>
+							{/if}
+							{#if remaining > 0}
+								<div
+									class={isTimedOut ? 'bg-warning' : 'bg-info'}
+									style="width: {(remaining / total) * 100}%"
+								></div>
+							{/if}
+						</Tooltip.Trigger>
+						<Tooltip.Content>
+							<p class="text-xs">
+								{row.completed_items} completed, {row.failed_items} failed, {row.skipped_items} skipped, {remaining} remaining
+							</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
+				{:else}
+					<span class="text-muted-foreground">&mdash;</span>
+				{/if}
 				{:else if columnId === 'duration'}
 					{formatDuration(row)}
 				{/if}

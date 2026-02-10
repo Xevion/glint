@@ -9,7 +9,7 @@ use serde::Deserialize;
 use crate::{
     auth::AdminUser,
     error::{AppError, AppResult},
-    models::{Capture, CaptureWithContext, PaginatedCaptures},
+    models::{Capture, CaptureDetail, PaginatedCaptures},
     repo::CaptureRepo,
     state::AppState,
 };
@@ -76,14 +76,14 @@ async fn get_capture_public(
     Ok(Json(capture))
 }
 
-/// GET /api/captures/{id}/details - Get capture with context (admin)
+/// GET /api/captures/{id}/details - Get full capture detail with related captures (admin)
 async fn get_capture_details(
     _admin: AdminUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> AppResult<Json<CaptureWithContext>> {
-    let capture = CaptureRepo::get_with_context(state.db(), &id).await?;
-    Ok(Json(capture))
+) -> AppResult<Json<CaptureDetail>> {
+    let detail = CaptureRepo::get_detail(state.db(), &id).await?;
+    Ok(Json(detail))
 }
 
 /// DELETE /api/captures/{id} - Delete a capture (admin)

@@ -1,0 +1,126 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                c.id,\n                c.scene_id,\n                s.slug as shader_slug,\n                s.name as shader_name,\n                sv.version as shader_version,\n                c.profile,\n                c.image_path,\n                c.image_url,\n                c.thumbhash,\n                c.captured_at,\n                c.resolution_width,\n                c.resolution_height,\n                c.file_size_bytes,\n                cri.run_id as \"run_id?: String\",\n                cr.status as \"run_status?: String\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,\n                sc.name as \"scene_name?: String\",\n                sc.slug as \"scene_slug?: String\"\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id\n            LEFT JOIN capture_runs cr ON cri.run_id = cr.id\n            LEFT JOIN scenes sc ON c.scene_id = sc.id\n            \n            WHERE c.scene_id = $1\n              AND sv.shader_id = (SELECT shader_id FROM shader_versions WHERE id = $2)\n              AND c.id != $3\n              AND c.status = 'completed'\n            ORDER BY c.created_at DESC\n            LIMIT 8\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "scene_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "shader_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "shader_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "shader_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "profile",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "image_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "image_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "thumbhash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "captured_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "resolution_width",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "resolution_height",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "file_size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 13,
+        "name": "run_id?: String",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "run_status?: String",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "shader_author",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "scene_name?: String",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "scene_slug?: String",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "cb4e0e3a7c104ef619d6cd05006b0077de62c7b79d1c709bec5780f3f8ecbedf"
+}

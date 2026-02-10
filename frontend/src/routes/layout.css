@@ -22,6 +22,13 @@
 	--accent: oklch(0.967 0.001 286.375);
 	--accent-foreground: oklch(0.21 0.006 285.885);
 	--destructive: oklch(0.577 0.245 27.325);
+	--destructive-foreground: oklch(0.985 0 0);
+	--success: oklch(0.55 0.2 145);
+	--success-foreground: oklch(0.985 0 0);
+	--warning: oklch(0.75 0.18 75);
+	--warning-foreground: oklch(0.21 0.006 285.885);
+	--info: oklch(0.55 0.2 255);
+	--info-foreground: oklch(0.985 0 0);
 	--border: oklch(0.92 0.004 286.32);
 	--input: oklch(0.92 0.004 286.32);
 	--ring: oklch(0.705 0.015 286.067);
@@ -38,6 +45,7 @@
 	--sidebar-accent-foreground: oklch(0.21 0.006 285.885);
 	--sidebar-border: oklch(0.92 0.004 286.32);
 	--sidebar-ring: oklch(0.705 0.015 286.067);
+	--sidebar-muted-foreground: oklch(0.4 0.01 286);
 	--scrollbar-thumb: rgba(0, 0, 0, 0.25);
 	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
 }
@@ -58,6 +66,13 @@
 	--accent: oklch(0.274 0.006 286.033);
 	--accent-foreground: oklch(0.985 0 0);
 	--destructive: oklch(0.704 0.191 22.216);
+	--destructive-foreground: oklch(0.985 0 0);
+	--success: oklch(0.65 0.2 145);
+	--success-foreground: oklch(0.985 0 0);
+	--warning: oklch(0.78 0.15 75);
+	--warning-foreground: oklch(0.21 0.006 285.885);
+	--info: oklch(0.65 0.18 255);
+	--info-foreground: oklch(0.985 0 0);
 	--border: oklch(1 0 0 / 10%);
 	--input: oklch(1 0 0 / 15%);
 	--ring: oklch(0.552 0.016 285.938);
@@ -74,6 +89,7 @@
 	--sidebar-accent-foreground: oklch(0.985 0 0);
 	--sidebar-border: oklch(1 0 0 / 10%);
 	--sidebar-ring: oklch(0.552 0.016 285.938);
+	--sidebar-muted-foreground: oklch(0.75 0.015 286);
 	--scrollbar-thumb: rgba(255, 255, 255, 0.3);
 	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
 }
@@ -102,6 +118,13 @@
 	--color-accent: var(--accent);
 	--color-accent-foreground: var(--accent-foreground);
 	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-success: var(--success);
+	--color-success-foreground: var(--success-foreground);
+	--color-warning: var(--warning);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-info: var(--info);
+	--color-info-foreground: var(--info-foreground);
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
@@ -118,6 +141,7 @@
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+	--color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
 }
 
 @layer base {

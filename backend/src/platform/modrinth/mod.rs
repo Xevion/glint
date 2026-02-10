@@ -157,7 +157,11 @@ impl ModrinthClient {
                     download_url: primary_file.map(|f| f.url.clone()),
                     file_hash: primary_file.map(|f| f.hashes.sha1.clone()),
                     file_size: primary_file.map(|f| f.size as i64),
-                    game_versions_json: serde_json::to_string(&v.game_versions).ok(),
+                    game_versions: if v.game_versions.is_empty() {
+                        None
+                    } else {
+                        Some(v.game_versions)
+                    },
                     release_channel: Some(format!("{:?}", v.version_type).to_lowercase()),
                     published_at: Some(v.date_published),
                 }

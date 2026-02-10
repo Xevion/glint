@@ -11,7 +11,7 @@ class NavbarState {
 	path = $state(typeof window !== 'undefined' ? window.location.pathname : '/');
 }
 
-export const navbar = new NavbarState();
+export const navigationStore = new NavbarState();
 
 /** Route order for determining slide direction */
 const ROUTE_ORDER = ['/', '/shaders', '/scenes', '/compare', '/admin', '/admin/settings'];
@@ -45,7 +45,7 @@ export function initNavigation() {
 	// Guard against SSR - this should only run in the browser
 	if (typeof window === 'undefined') return;
 
-	navbar.path = window.location.pathname;
+	navigationStore.path = window.location.pathname;
 
 	beforeNavigate(({ from, to }) => {
 		if (!from?.url || !to?.url) return;
@@ -64,7 +64,7 @@ export function initNavigation() {
 
 		if (!document.startViewTransition || !isPageChange) {
 			void navigation.complete.then(() => {
-				navbar.path = window.location.pathname;
+				navigationStore.path = window.location.pathname;
 			});
 			return;
 		}
@@ -75,10 +75,10 @@ export function initNavigation() {
 				await navigation.complete;
 			});
 
-			// Update navbar path only after the view transition finishes and the
+			// Update path only after the view transition finishes and the
 			// real DOM is visible again, so CSS transitions can actually run.
 			void vt.finished.finally(() => {
-				navbar.path = window.location.pathname;
+				navigationStore.path = window.location.pathname;
 			});
 		});
 	});

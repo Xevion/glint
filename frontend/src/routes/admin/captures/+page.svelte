@@ -4,9 +4,11 @@ import { page as pageStore } from '$app/state';
 import type { CaptureWithContext } from '$lib/bindings';
 import AdminTable from '$lib/components/AdminTable.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
+import { AdminPageHeader } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
 import { formatBytes } from '$lib/utils/format';
-import { RefreshCw } from '@lucide/svelte';
+import { statusColorFallback, statusColors } from '$lib/utils/status';
+import { Alert } from '$lib/components/ui/alert';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -19,14 +21,6 @@ let shaders = $derived(data.shaders);
 let scenes = $derived(data.scenes);
 let refreshing = $state(false);
 let error = $derived(data.error);
-
-const statusColors: Record<string, string> = {
-	running: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-	completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-	partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-	failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-	timed_out: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
-};
 
 function navigateToPage(p: number) {
 	const url = new URL(pageStore.url);
@@ -70,21 +64,15 @@ async function refresh() {
 }
 </script>
 
+<svelte:head><title>Captures - Glint</title></svelte:head>
+
 <div class="space-y-4">
-	<header class="flex items-center justify-between">
-		<div class="flex items-baseline gap-3">
-			<h1 class="text-2xl font-semibold">Captures</h1>
-			<span class="text-lg text-muted-foreground">{totalCount}</span>
-		</div>
-		<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
-			<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-		</Button>
-	</header>
+	<AdminPageHeader title="Captures" count={totalCount} {refreshing} onrefresh={refresh} />
 
 	<!-- Filter bar -->
 	<div class="flex flex-wrap items-center gap-3">
 		<select
-			class="rounded border bg-background px-2 py-1.5 text-sm"
+			class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
 			value={data.filters.shader ?? ''}
 			onchange={(e) => setFilter('shader', e.currentTarget.value)}
 		>
@@ -95,7 +83,7 @@ async function refresh() {
 		</select>
 
 		<select
-			class="rounded border bg-background px-2 py-1.5 text-sm"
+			class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
 			value={data.filters.scene ?? ''}
 			onchange={(e) => setFilter('scene', e.currentTarget.value)}
 		>
@@ -106,7 +94,7 @@ async function refresh() {
 		</select>
 
 		<select
-			class="rounded border bg-background px-2 py-1.5 text-sm"
+			class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
 			value={data.filters.status ?? ''}
 			onchange={(e) => setFilter('status', e.currentTarget.value)}
 		>
@@ -117,7 +105,7 @@ async function refresh() {
 
 		{#if data.filters.runId}
 			<span class="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs">
-				Run: {data.filters.runId.slice(0, 8)}...
+				Run: {data.filters.runId}
 				<button class="hover:text-foreground" onclick={() => setFilter('run_id', '')}>x</button
 				>
 			</span>
@@ -125,9 +113,7 @@ async function refresh() {
 	</div>
 
 	{#if error}
-		<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-			Error: {error}
-		</div>
+		<Alert variant="destructive">Error: {error}</Alert>
 	{:else if captures.length === 0}
 		<p class="text-muted-foreground">No captures yet.</p>
 	{:else}
@@ -184,7 +170,7 @@ async function refresh() {
 							<span
 								class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
 									row.run_status ?? ''
-								] ?? 'bg-gray-100 text-gray-800'}"
+								] ?? statusColorFallback}"
 							>
 								{row.run_status ?? '?'}
 							</span>
@@ -226,11 +212,11 @@ async function refresh() {
 					Next
 				</Button>
 			</div>
-			<select
-				class="rounded border bg-background px-2 py-1 text-sm"
-				value={pageSize}
-				onchange={(e) => changePageSize(Number(e.currentTarget.value))}
-			>
+		<select
+			class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+			value={pageSize}
+			onchange={(e) => changePageSize(Number(e.currentTarget.value))}
+		>
 				<option value={25}>25 per page</option>
 				<option value={50}>50 per page</option>
 				<option value={100}>100 per page</option>

@@ -4,11 +4,12 @@ import { api } from '$lib/api';
 import type { User, UserWithSessions } from '$lib/bindings';
 import AdminTable from '$lib/components/AdminTable.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminDetailField, AdminSlideOver } from '$lib/components/admin';
+import { AdminDetailField, AdminPageHeader, AdminSlideOver } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
-import { RefreshCw, Trash2 } from '@lucide/svelte';
+import { Alert } from '$lib/components/ui/alert';
+import { Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -21,9 +22,9 @@ let showDeleteSessionsConfirm = $state(false);
 const ROLES = ['user', 'admin', 'agent'] as const;
 
 const roleColors: Record<string, string> = {
-	admin: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-	agent: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-	user: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+	admin: 'bg-destructive/15 text-destructive',
+	agent: 'bg-info/15 text-info',
+	user: 'bg-muted text-muted-foreground'
 };
 
 const columns = [
@@ -88,21 +89,13 @@ function handleRowClick(user: User) {
 }
 </script>
 
+<svelte:head><title>Users - Glint</title></svelte:head>
+
 <div class="space-y-4">
-	<header class="flex items-center justify-between">
-		<div class="flex items-baseline gap-3">
-			<h1 class="text-2xl font-semibold">Users</h1>
-			<span class="text-lg text-muted-foreground">{users.length}</span>
-		</div>
-		<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
-			<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-		</Button>
-	</header>
+	<AdminPageHeader title="Users" count={users.length} {refreshing} onrefresh={refresh} />
 
 	{#if error}
-		<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-			Error: {error}
-		</div>
+		<Alert variant="destructive">Error: {error}</Alert>
 	{:else if users.length === 0}
 		<p class="text-muted-foreground">No users yet.</p>
 	{:else}

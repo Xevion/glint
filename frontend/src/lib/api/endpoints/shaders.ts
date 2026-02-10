@@ -13,7 +13,7 @@ export class ShaderEndpoints extends ApiClient {
 	 * List all shaders with enrichment data
 	 */
 	list(): Promise<Result<ShaderListItem[], ApiError>> {
-		return super.get<ShaderListItem[]>('/api/shaders');
+		return this.get<ShaderListItem[]>('/api/shaders');
 	}
 
 	/**
@@ -28,6 +28,6 @@ export class ShaderEndpoints extends ApiClient {
 		if (params?.profile) searchParams.set('profile', params.profile);
 		const query = searchParams.toString();
 		const url = `/api/shaders/${encodeURIComponent(idOrSlug)}${query ? `?${query}` : ''}`;
-		return super.get<ShaderWithCaptures>(url);
+		return this.get<ShaderWithCaptures>(url);
 	}
 }

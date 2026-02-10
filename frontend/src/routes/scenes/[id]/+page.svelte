@@ -1,6 +1,7 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
 import type { CaptureWithContext, SceneWithCaptures } from '$lib/bindings';
+import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import CaptureGallery from '$lib/components/CaptureGallery.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
@@ -55,9 +56,11 @@ const timeLabel = $derived.by(() => {
 });
 </script>
 
+<svelte:head><title>{scene.name} - Glint</title></svelte:head>
+
 {#if scene}
 	{#key scene.id}
-		<div class="container mx-auto px-4 py-8">
+		<div class="py-8">
 			<!-- Breadcrumb -->
 			<nav
 				in:fly|local={{ y: -10, duration: 400 }}
@@ -192,23 +195,13 @@ const timeLabel = $derived.by(() => {
 			onclick={(capture: CaptureWithContext) => (selectedCapture = capture)}
 			alt={(capture: CaptureWithContext) => `${capture.shader_name} render`}
 		>
-			{#snippet overlay(capture: CaptureWithContext)}
-				<div class="mb-1 font-bold text-white">{capture.shader_name}</div>
-				<div class="flex items-center gap-2">
-					{#if capture.profile}
-						<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">
-							{capture.profile}
-						</span>
-					{/if}
-					{#if capture.shader_version}
-						<span
-							class="rounded bg-white/20 px-2 py-0.5 text-xs font-bold text-white"
-						>
-							v{capture.shader_version}
-						</span>
-					{/if}
-				</div>
-			{/snippet}
+		{#snippet overlay(capture: CaptureWithContext)}
+			<CaptureBadges
+				shaderName={capture.shader_name}
+				profile={capture.profile}
+				version={capture.shader_version}
+			/>
+		{/snippet}
 		</CaptureGallery>
 		</div>
 	{/key}

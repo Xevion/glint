@@ -13,6 +13,7 @@ import {
 	validateFileSize
 } from '$lib/utils/compression';
 import { calculateSHA256 } from '$lib/utils/hash';
+import { Alert } from '$lib/components/ui/alert';
 import { FileArchive, Folder, Plus, Upload } from '@lucide/svelte';
 
 interface Props {
@@ -498,15 +499,13 @@ function getStepDescription(currentStep: Step): string {
 					</p>
 				</div>
 			{:else if step === 'error'}
-				<div
-					class="space-y-2 rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive"
-				>
+				<Alert variant="destructive" class="space-y-2">
 					<p class="font-semibold">Upload Failed</p>
 					<p class="text-sm">{error ?? 'An unknown error occurred'}</p>
 					<p class="text-xs text-destructive/80">
 						Please check your input and try again, or contact support if the issue persists.
 					</p>
-				</div>
+				</Alert>
 			{/if}
 		</div>
 

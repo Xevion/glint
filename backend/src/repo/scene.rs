@@ -31,6 +31,9 @@ struct SceneWithWorldRow {
     created_at: DateTime<Utc>,
     world_name: Option<String>,
     world_slug: Option<String>,
+    image_url: Option<String>,
+    thumbhash: Option<String>,
+    capture_count: Option<i64>,
 }
 
 impl From<SceneWithWorldRow> for SceneWithWorld {
@@ -58,6 +61,9 @@ impl From<SceneWithWorldRow> for SceneWithWorld {
                 created_at: row.created_at,
             },
             world_name: row.world_name,
+            image_url: row.image_url,
+            thumbhash: row.thumbhash,
+            capture_count: row.capture_count.unwrap_or(0),
             world_slug: row.world_slug,
         }
     }
@@ -302,21 +308,55 @@ impl SceneRepo {
         Ok(result.rows_affected() > 0)
     }
 
-    /// List all scenes (including inactive) for admin dashboard
+    /// List all scenes (including inactive) for admin dashboard.
+    ///
+    /// Includes a preview thumbnail per scene, preferring the vanilla shader's
+    /// latest capture, then falling back to the most-downloaded shader's capture.
     #[instrument(skip(executor), level = "debug")]
     pub async fn list_all(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<SceneWithWorld>> {
         let rows = sqlx::query_as!(
             SceneWithWorldRow,
             r#"
+            WITH scene_captures_ranked AS (
+                SELECT
+                    c.scene_id,
+                    c.image_url,
+                    c.thumbhash,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY c.scene_id
+                        ORDER BY
+                            -- Prefer vanilla shader (slug = 'vanilla')
+                            CASE WHEN sh.slug = 'vanilla' THEN 0 ELSE 1 END,
+                            -- Then by most downloaded shader
+                            COALESCE(sh.upstream_downloads, 0) DESC,
+                            -- Then most recent capture
+                            c.captured_at DESC NULLS LAST
+                    ) AS rn
+                FROM captures c
+                JOIN shader_versions sv ON sv.id = c.shader_version_id
+                JOIN shaders sh ON sh.id = sv.shader_id
+                WHERE c.status = 'completed' AND c.image_url IS NOT NULL
+            ),
+            scene_counts AS (
+                SELECT scene_id, COUNT(*) AS capture_count
+                FROM captures
+                WHERE status = 'completed'
+                GROUP BY scene_id
+            )
             SELECT
                 sc.id, sc.name, sc.slug, sc.description, sc.world_id,
                 sc.x, sc.y, sc.z, sc.pitch, sc.yaw,
                 sc.dimension, sc.time_of_day_ticks, sc.weather, sc.weather_intensity,
                 sc.moon_phase, sc.biome, sc.definition_json, sc.active, sc.created_at,
                 w.name as world_name,
-                w.slug as world_slug
+                w.slug as world_slug,
+                cr.image_url,
+                cr.thumbhash,
+                cnt.capture_count
             FROM scenes sc
             LEFT JOIN worlds w ON sc.world_id = w.id
+            LEFT JOIN scene_captures_ranked cr ON cr.scene_id = sc.id AND cr.rn = 1
+            LEFT JOIN scene_counts cnt ON cnt.scene_id = sc.id
             ORDER BY sc.name
             "#
         )

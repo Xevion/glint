@@ -36,7 +36,7 @@
       {
         "ordinal": 6,
         "name": "supported_profiles",
-        "type_info": "Text"
+        "type_info": "Jsonb"
       },
       {
         "ordinal": 7,
@@ -56,7 +56,7 @@
       {
         "ordinal": 10,
         "name": "game_versions",
-        "type_info": "Text"
+        "type_info": "Jsonb"
       },
       {
         "ordinal": 11,

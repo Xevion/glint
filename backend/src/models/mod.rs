@@ -89,10 +89,12 @@ pub struct ShaderVersion {
     pub download_url: Option<String>,
     pub file_hash: Option<String>,
     pub file_size: Option<i64>,
-    pub game_versions: Option<String>,
+    #[ts(type = "Array<string> | null")]
+    pub game_versions: Option<serde_json::Value>,
     pub release_channel: Option<String>,
-    /// JSON array of profile names, discovered after first capture
-    pub supported_profiles: Option<String>,
+    /// Array of profile names, discovered after first capture
+    #[ts(type = "Array<string> | null")]
+    pub supported_profiles: Option<serde_json::Value>,
     #[ts(type = "string | null")]
     pub upstream_published_at: Option<DateTime<Utc>>,
     #[ts(type = "string")]
@@ -136,7 +138,6 @@ pub struct Capture {
     pub image_url: Option<String>,
     pub image_path: Option<String>,
     pub video_url: Option<String>,
-    pub thumbnail_url: Option<String>,
     pub avg_fps: Option<f64>,
     pub min_fps: Option<f64>,
     pub max_fps: Option<f64>,
@@ -328,8 +329,9 @@ pub struct ShaderListItem {
     pub categories: Vec<Category>,
     pub features: Vec<Feature>,
     pub latest_version: Option<String>,
-    pub game_versions: Option<String>,
-    pub thumbnail_url: Option<String>,
+    #[ts(type = "Array<string> | null")]
+    pub game_versions: Option<serde_json::Value>,
+    pub image_url: Option<String>,
     pub thumbhash: Option<String>,
 }
 
@@ -339,7 +341,7 @@ pub struct SceneListItem {
     #[serde(flatten)]
     pub scene: Scene,
     pub tags: Vec<Tag>,
-    pub thumbnail_url: Option<String>,
+    pub image_url: Option<String>,
     pub thumbhash: Option<String>,
     pub capture_count: i64,
 }
@@ -407,13 +409,75 @@ pub struct CaptureWithContext {
     pub scene_slug: Option<String>,
 }
 
-/// World summary for list endpoints (no scenes loaded)
+/// Full capture details for admin detail view, including technical metadata
+/// and related captures for cross-referencing.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct CaptureDetail {
+    // Core identity + context (same as CaptureWithContext)
+    pub id: String,
+    pub scene_id: String,
+    pub shader_slug: String,
+    pub shader_name: String,
+    pub shader_version: String,
+    pub shader_version_id: String,
+    pub profile: Option<String>,
+    pub image_path: Option<String>,
+    pub image_url: Option<String>,
+    pub thumbhash: Option<String>,
+    #[ts(type = "string | null")]
+    pub captured_at: Option<DateTime<Utc>>,
+    pub resolution_width: Option<i32>,
+    pub resolution_height: Option<i32>,
+    pub file_size_bytes: Option<i64>,
+    pub run_id: Option<String>,
+    pub run_status: Option<String>,
+    pub shader_author: Option<String>,
+    pub scene_name: Option<String>,
+    pub scene_slug: Option<String>,
+    // Technical metadata (from Capture model)
+    pub status: String,
+    pub error_message: Option<String>,
+    pub video_url: Option<String>,
+    pub avg_fps: Option<f64>,
+    pub min_fps: Option<f64>,
+    pub max_fps: Option<f64>,
+    pub frame_time_avg: Option<f64>,
+    pub frame_time_p99: Option<f64>,
+    pub minecraft_version: Option<String>,
+    pub iris_version: Option<String>,
+    pub gpu_model: Option<String>,
+    pub content_type: Option<String>,
+    pub world_version_id: Option<String>,
+    #[ts(type = "string")]
+    pub created_at: DateTime<Utc>,
+    #[ts(type = "string")]
+    pub updated_at: DateTime<Utc>,
+    // Related captures
+    pub same_shader_scene: Vec<CaptureWithContext>,
+    pub same_scene: Vec<CaptureWithContext>,
+    pub same_run: Vec<CaptureWithContext>,
+}
+
+/// Preview thumbnail for a world (from its first available capture)
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct WorldPreviewCapture {
+    pub image_url: Option<String>,
+    pub thumbhash: Option<String>,
+}
+
+/// World summary for list endpoints with aggregate counts
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
 pub struct WorldListItem {
     #[serde(flatten)]
     pub world: World,
     pub latest_version: Option<WorldVersion>,
+    pub scene_count: i64,
+    pub version_count: i64,
+    pub capture_count: i64,
+    pub preview: Option<WorldPreviewCapture>,
 }
 
 /// World with its associated scenes and latest version
@@ -667,6 +731,9 @@ pub struct SceneWithWorld {
     pub scene: Scene,
     pub world_name: Option<String>,
     pub world_slug: Option<String>,
+    pub image_url: Option<String>,
+    pub thumbhash: Option<String>,
+    pub capture_count: i64,
 }
 
 // Platform search types

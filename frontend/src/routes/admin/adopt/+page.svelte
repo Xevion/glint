@@ -6,7 +6,9 @@ import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
+import * as Table from '$lib/components/ui/table';
 import * as Tabs from '$lib/components/ui/tabs';
+import { Alert } from '$lib/components/ui/alert';
 import { cn } from '$lib/utils';
 import {
 	Check,
@@ -156,6 +158,8 @@ function formatNumber(n: number): string {
 }
 </script>
 
+<svelte:head><title>Adopt Shader - Glint</title></svelte:head>
+
 <div class="space-y-4">
 	<header>
 		<h1 class="text-2xl font-semibold">Adopt Shaders</h1>
@@ -212,12 +216,10 @@ function formatNumber(n: number): string {
 	{/if}
 
 	{#if error}
-		<div
-			class="flex items-start gap-2 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
-		>
-			<CircleAlert class="mt-0.5 h-4 w-4 shrink-0" />
+		<Alert variant="destructive">
+			<CircleAlert class="h-4 w-4" />
 			<div>{error}</div>
-		</div>
+		</Alert>
 	{/if}
 
 	{#if loading}
@@ -250,117 +252,115 @@ function formatNumber(n: number): string {
 		</div>
 
 		<!-- Desktop table -->
-		<div class="hidden rounded-md border md:block">
-			<table class="w-full text-sm">
-				<thead>
-					<tr class="border-b bg-muted/50">
-						<th class="w-10 p-3 text-left font-medium"></th>
-						<th class="p-3 text-left font-medium">Name</th>
-						<th class="p-3 text-left font-medium">Platform</th>
-						<th class="p-3 text-left font-medium">Author</th>
-						<th class="p-3 text-right font-medium">Downloads</th>
-						<th class="p-3 text-right font-medium">Updated</th>
-						<th class="w-24 p-3 text-right font-medium"></th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each results as result (result.platform + ':' + result.platform_id)}
-						<tr
-							class={cn(
-								'border-b transition-colors last:border-b-0 hover:bg-muted/30',
-								result.adopted && 'bg-emerald-50 dark:bg-emerald-950/20'
-							)}
-						>
-							<td class="p-3">
-								{#if result.icon_url}
-									<img
-										src={result.icon_url}
-										alt=""
-										class="h-8 w-8 rounded object-cover"
-									/>
-								{:else}
-									<div
-										class="flex h-8 w-8 items-center justify-center rounded bg-muted"
-									>
-										<Download class="h-4 w-4 text-muted-foreground" />
-									</div>
-								{/if}
-							</td>
-							<td class="p-3">
-								<div class="flex items-center gap-2">
-									<a
-										href={result.platform_url}
-										target="_blank"
-										rel="noopener noreferrer"
-										class="font-medium hover:underline"
-										onclick={(e: MouseEvent) => e.stopPropagation()}
-									>
-										{result.name}
-										<ExternalLink
-											class="ml-1 inline h-3 w-3 text-muted-foreground"
-										/>
-									</a>
-									{#if result.adopted}
-										<Badge
-											variant="secondary"
-											class="gap-1 text-emerald-700 dark:text-emerald-400"
-										>
-											<Check class="h-3 w-3" />
-											Adopted
-										</Badge>
-									{/if}
-								</div>
-								<div class="line-clamp-1 text-xs text-muted-foreground">
-									{result.description}
-								</div>
-							</td>
-							<td class="p-3">
-								<span
-									class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-										{result.platform === 'modrinth'
-										? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-										: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'}"
+		<Table.Root class="hidden border md:block">
+			<Table.Header>
+				<Table.Row class="bg-muted/50">
+					<Table.Head class="w-10 p-3"></Table.Head>
+					<Table.Head class="p-3">Name</Table.Head>
+					<Table.Head class="p-3">Platform</Table.Head>
+					<Table.Head class="p-3">Author</Table.Head>
+					<Table.Head class="p-3 text-right">Downloads</Table.Head>
+					<Table.Head class="p-3 text-right">Updated</Table.Head>
+					<Table.Head class="w-24 p-3 text-right"></Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				{#each results as result (result.platform + ':' + result.platform_id)}
+					<Table.Row
+						class={cn(
+							'transition-colors last:border-b-0 hover:bg-muted/30',
+							result.adopted && 'bg-success/10'
+						)}
+					>
+						<Table.Cell class="p-3">
+							{#if result.icon_url}
+								<img
+									src={result.icon_url}
+									alt=""
+									class="h-8 w-8 rounded object-cover"
+								/>
+							{:else}
+								<div
+									class="flex h-8 w-8 items-center justify-center rounded bg-muted"
 								>
-									{result.platform === 'modrinth' ? 'Modrinth' : 'CurseForge'}
-								</span>
-							</td>
-							<td class="p-3 text-muted-foreground">{result.author}</td>
-							<td class="p-3 text-right tabular-nums">
-								{formatNumber(result.downloads)}
-							</td>
-							<td class="p-3 text-right text-muted-foreground">
-								{#if result.updated_at}
-									<TimeAgo timestamp={result.updated_at} />
-								{:else}
-									<span>-</span>
-								{/if}
-							</td>
-							<td class="p-3 text-right">
+									<Download class="h-4 w-4 text-muted-foreground" />
+								</div>
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="p-3">
+							<div class="flex items-center gap-2">
+								<a
+									href={result.platform_url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="font-medium hover:underline"
+									onclick={(e: MouseEvent) => e.stopPropagation()}
+								>
+									{result.name}
+									<ExternalLink
+										class="ml-1 inline h-3 w-3 text-muted-foreground"
+									/>
+								</a>
 								{#if result.adopted}
-									<Button
-										size="sm"
-										variant="outline"
-										href="/shaders/{result.adopted.slug}"
-										class="gap-1"
-									>
-										<ExternalLink class="h-3.5 w-3.5" />
-										View
-									</Button>
-								{:else}
-									<Button
-										size="sm"
-										variant="outline"
-										onclick={() => adoptFromResult(result)}
-									>
-										Adopt
-									</Button>
-								{/if}
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
+								<Badge
+									variant="secondary"
+									class="gap-1 text-success"
+								>
+									<Check class="h-3 w-3" />
+									Adopted
+								</Badge>
+							{/if}
+						</div>
+						<div class="line-clamp-1 text-xs text-muted-foreground">
+							{result.description}
+						</div>
+					</Table.Cell>
+					<Table.Cell class="p-3">
+						<span
+							class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+								{result.platform === 'modrinth'
+								? 'bg-success/15 text-success'
+								: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'}"
+							>
+								{result.platform === 'modrinth' ? 'Modrinth' : 'CurseForge'}
+							</span>
+						</Table.Cell>
+						<Table.Cell class="p-3 text-muted-foreground">{result.author}</Table.Cell>
+						<Table.Cell class="p-3 text-right tabular-nums">
+							{formatNumber(result.downloads)}
+						</Table.Cell>
+						<Table.Cell class="p-3 text-right text-muted-foreground">
+							{#if result.updated_at}
+								<TimeAgo timestamp={result.updated_at} />
+							{:else}
+								<span>-</span>
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="p-3 text-right">
+							{#if result.adopted}
+								<Button
+									size="sm"
+									variant="outline"
+									href="/shaders/{result.adopted.slug}"
+									class="gap-1"
+								>
+									<ExternalLink class="h-3.5 w-3.5" />
+									View
+								</Button>
+							{:else}
+								<Button
+									size="sm"
+									variant="outline"
+									onclick={() => adoptFromResult(result)}
+								>
+									Adopt
+								</Button>
+							{/if}
+						</Table.Cell>
+					</Table.Row>
+				{/each}
+			</Table.Body>
+		</Table.Root>
 
 		<!-- Mobile cards -->
 		<div class="space-y-2 md:hidden">
@@ -368,7 +368,7 @@ function formatNumber(n: number): string {
 				<div
 					class={cn(
 						'space-y-2 rounded-lg border p-3',
-						result.adopted && 'border-emerald-200 dark:border-emerald-800/40'
+						result.adopted && 'border-success/40'
 					)}
 				>
 					<div class="flex items-start gap-3">
@@ -392,28 +392,28 @@ function formatNumber(n: number): string {
 										class="ml-1 inline h-3 w-3 text-muted-foreground"
 									/>
 								</a>
-								{#if result.adopted}
-									<Badge
-										variant="secondary"
-										class="gap-1 text-emerald-700 dark:text-emerald-400"
-									>
-										<Check class="h-3 w-3" />
-										Adopted
-									</Badge>
-								{/if}
-							</div>
-							<div class="line-clamp-1 text-xs text-muted-foreground">
-								{result.description}
-							</div>
+							{#if result.adopted}
+								<Badge
+									variant="secondary"
+									class="gap-1 text-success"
+								>
+									<Check class="h-3 w-3" />
+									Adopted
+								</Badge>
+							{/if}
+						</div>
+						<div class="line-clamp-1 text-xs text-muted-foreground">
+							{result.description}
 						</div>
 					</div>
-					<div class="flex items-center justify-between text-xs">
-						<div class="flex items-center gap-2">
-							<span
-								class="inline-flex items-center rounded-full px-2 py-0.5 font-medium
-									{result.platform === 'modrinth'
-									? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-									: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'}"
+				</div>
+				<div class="flex items-center justify-between text-xs">
+					<div class="flex items-center gap-2">
+						<span
+							class="inline-flex items-center rounded-full px-2 py-0.5 font-medium
+								{result.platform === 'modrinth'
+								? 'bg-success/15 text-success'
+								: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'}"
 							>
 								{result.platform === 'modrinth' ? 'Modrinth' : 'CurseForge'}
 							</span>

@@ -133,10 +133,6 @@ object GlintComponents {
         return content
     }
 
-    // ============================================
-    // List Item Components
-    // ============================================
-
     /**
      * Creates a small icon button (20px square) for list item actions.
      */
@@ -315,10 +311,6 @@ object GlintComponents {
         }
     }
 
-    // ============================================
-    // Tab Components
-    // ============================================
-
     /**
      * Creates a tab button for the tab bar.
      */
@@ -366,10 +358,6 @@ object GlintComponents {
 
         return tab
     }
-
-    // ============================================
-    // Card Components
-    // ============================================
 
     /**
      * Creates a world card for the master grid.

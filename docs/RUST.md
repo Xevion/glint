@@ -83,6 +83,7 @@ Optional services return `Option<&T>` — handlers check availability before use
 - **Migrations** run automatically on startup via `sqlx::migrate!()`
 - Prefer `query_as!` for SELECT (maps to structs), `query!` for mutations
 - Use `Option<T>` for nullable columns
+- **Never store JSON arrays as TEXT** — use JSONB columns with `Json<Vec<T>>` in Rust so the API sends proper typed arrays, not stringified JSON that frontend must parse. This prevents the entire class of bugs where templates render raw `["a","b","c"]` strings.
 
 ## Serialization
 

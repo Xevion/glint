@@ -67,19 +67,27 @@ export function getCurseforgeUrl(curseforgeId: string | null): string | null {
 }
 
 /**
+ * Capitalize each word in a string (Title Case).
+ */
+function toTitleCase(str: string): string {
+	return str.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
  * Convert Minecraft biome ID to display name.
- * Strips 'minecraft:' prefix and replaces underscores with spaces.
+ * Strips 'minecraft:' prefix, replaces underscores with spaces, and capitalizes.
  */
 export function getBiomeDisplayName(biome: string | null): string {
 	if (!biome) return 'Unknown';
-	return biome.replace('minecraft:', '').replace(/_/g, ' ');
+	return toTitleCase(biome.replace('minecraft:', '').replace(/_/g, ' '));
 }
 
 /**
  * Convert Minecraft dimension ID to display name.
+ * Strips 'minecraft:' prefix, replaces underscores with spaces, and capitalizes.
  */
 export function getDimensionDisplayName(dimension: string): string {
-	return dimension.replace('minecraft:', '').replace(/_/g, ' ');
+	return toTitleCase(dimension.replace('minecraft:', '').replace(/_/g, ' '));
 }
 
 /**
@@ -90,20 +98,14 @@ export function getWeatherDisplayName(weather: string): string {
 }
 
 /**
- * Parse a JSON-encoded game versions string into a comma-separated display string.
- * Returns an em dash if null/undefined/empty or unparseable.
+ * Format a game versions array into a comma-separated display string.
+ * Returns an em dash if null/undefined/empty.
+ * Shows "first - last" range if more than 5 versions.
  */
-export function formatGameVersions(raw: string | null | undefined): string {
-	if (!raw) return '\u2014';
-	try {
-		const parsed: unknown = JSON.parse(raw);
-		if (!Array.isArray(parsed) || parsed.length === 0) return raw;
-		const versions = parsed as string[];
-		if (versions.length <= 5) return versions.join(', ');
-		return `${versions[0]} \u2013 ${versions[versions.length - 1]}`;
-	} catch {
-		return raw;
-	}
+export function formatGameVersions(versions: string[] | null | undefined): string {
+	if (!versions || versions.length === 0) return '\u2014';
+	if (versions.length <= 5) return versions.join(', ');
+	return `${versions[0]} \u2013 ${versions[versions.length - 1]}`;
 }
 
 /**
@@ -113,15 +115,4 @@ export function formatGameVersions(raw: string | null | undefined): string {
  */
 export function formatVersion(version: string): string {
 	return /^\d/.test(version) ? `v${version}` : version;
-}
-
-/**
- * Format bytes to human-readable size with KiB/MiB/GiB units.
- */
-export function formatBytes(bytes: number): string {
-	if (bytes === 0) return '0 B';
-	const k = 1024;
-	const sizes = ['B', 'KiB', 'MiB', 'GiB'];
-	const i = Math.floor(Math.log(bytes) / Math.log(k));
-	return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }

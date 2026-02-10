@@ -40,11 +40,11 @@ export interface UploadProgress {
 }
 
 export class WorldsEndpoints extends ApiClient {
-	async list(): Promise<Result<WorldListItem[], ApiError>> {
+	list(): Promise<Result<WorldListItem[], ApiError>> {
 		return this.get<WorldListItem[]>('/api/worlds');
 	}
 
-	async createWorldUpload(
+	createWorldUpload(
 		request: CreateWorldUploadRequest
 	): Promise<Result<CreateWorldUploadResponse, ApiError>> {
 		return this.post<CreateWorldUploadResponse>('/api/worlds', request);
@@ -104,14 +104,14 @@ export class WorldsEndpoints extends ApiClient {
 		});
 	}
 
-	async completeWorldUpload(
+	completeWorldUpload(
 		slug: string,
 		request: CompleteWorldUploadRequest
 	): Promise<Result<World, ApiError>> {
 		return this.post<World>(`/api/worlds/${encodeURIComponent(slug)}/complete`, request);
 	}
 
-	async createWorldVersionUpload(
+	createWorldVersionUpload(
 		worldId: string,
 		request: CreateWorldVersionUploadRequest
 	): Promise<Result<CreateWorldVersionUploadResponse, ApiError>> {
@@ -121,7 +121,7 @@ export class WorldsEndpoints extends ApiClient {
 		);
 	}
 
-	async completeWorldVersionUpload(
+	completeWorldVersionUpload(
 		worldId: string,
 		request: CompleteWorldVersionUploadRequest
 	): Promise<Result<WorldVersion, ApiError>> {

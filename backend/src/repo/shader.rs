@@ -24,9 +24,9 @@ struct ShaderVersionWithCount {
     download_url: Option<String>,
     file_hash: Option<String>,
     file_size: Option<i64>,
-    game_versions: Option<String>,
+    game_versions: Option<serde_json::Value>,
     release_channel: Option<String>,
-    supported_profiles: Option<String>,
+    supported_profiles: Option<serde_json::Value>,
     upstream_published_at: Option<chrono::DateTime<chrono::Utc>>,
     created_at: chrono::DateTime<chrono::Utc>,
     capture_failure_count: i32,
@@ -612,15 +612,17 @@ impl ShaderVersionRepo {
         .map_err(Into::into)
     }
 
-    #[instrument(skip(executor, profiles_json), level = "debug")]
+    #[instrument(skip(executor, profiles), level = "debug")]
     pub async fn update_supported_profiles(
         executor: impl sqlx::PgExecutor<'_>,
         id: &str,
-        profiles_json: &str,
+        profiles: &[String],
     ) -> AppResult<()> {
+        let json_value =
+            serde_json::to_value(profiles).expect("Vec<String> serialization cannot fail");
         sqlx::query!(
             "UPDATE shader_versions SET supported_profiles = $1 WHERE id = $2",
-            profiles_json,
+            json_value,
             id
         )
         .execute(executor)
@@ -758,7 +760,7 @@ impl ShaderVersionRepo {
             version.download_url,
             version.file_hash,
             version.file_size,
-            version.game_versions_json,
+            version.game_versions.as_ref().map(|gv| serde_json::to_value(gv).expect("Vec<String> serialization cannot fail")),
             version.release_channel,
             version.published_at,
         )
@@ -808,9 +810,13 @@ impl ShaderVersionRepo {
         let file_hashes: Vec<Option<&str>> =
             versions.iter().map(|v| v.file_hash.as_deref()).collect();
         let file_sizes: Vec<Option<i64>> = versions.iter().map(|v| v.file_size).collect();
-        let game_versions: Vec<Option<&str>> = versions
+        let game_versions: Vec<Option<serde_json::Value>> = versions
             .iter()
-            .map(|v| v.game_versions_json.as_deref())
+            .map(|v| {
+                v.game_versions.as_ref().map(|gv| {
+                    serde_json::to_value(gv).expect("Vec<String> serialization cannot fail")
+                })
+            })
             .collect();
         let release_channels: Vec<Option<&str>> = versions
             .iter()
@@ -830,7 +836,7 @@ impl ShaderVersionRepo {
                 unnest($1::text[]), unnest($2::text[]), unnest($3::text[]),
                 unnest($4::text[]), unnest($5::int4[]),
                 unnest($6::text[]), unnest($7::text[]), unnest($8::int8[]),
-                unnest($9::text[]), unnest($10::text[]),
+                unnest($9::jsonb[]), unnest($10::text[]),
                 unnest($11::timestamptz[]), now()
             ON CONFLICT (shader_id, version) DO UPDATE SET
                 modrinth_version_id = COALESCE(EXCLUDED.modrinth_version_id, shader_versions.modrinth_version_id),
@@ -850,7 +856,7 @@ impl ShaderVersionRepo {
             &download_urls as &[Option<&str>],
             &file_hashes as &[Option<&str>],
             &file_sizes as &[Option<i64>],
-            &game_versions as &[Option<&str>],
+            &game_versions as &[Option<serde_json::Value>],
             &release_channels as &[Option<&str>],
             &published_ats as &[Option<chrono::DateTime<chrono::Utc>>],
         )

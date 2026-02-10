@@ -1,11 +1,13 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import type { WorldListItem } from '$lib/bindings';
-import AdminTable from '$lib/components/AdminTable.svelte';
+import { AdminPageHeader } from '$lib/components/admin';
+import CaptureImage from '$lib/components/CaptureImage.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import WorldUploadDialog from '$lib/components/WorldUploadDialog.svelte';
-import { Button } from '$lib/components/ui/button';
-import { formatBytes } from '$lib/utils/display';
-import { RefreshCw } from '@lucide/svelte';
+import { formatBytes } from '$lib/utils/format';
+import { Alert } from '$lib/components/ui/alert';
+import { Camera, Globe, HardDrive, Layers, MapPin } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -13,59 +15,116 @@ let worlds = $derived(data.worlds);
 let refreshing = $state(false);
 let error = $derived(data.error);
 
-const columns = [
-	{ id: 'name', key: 'name', name: 'Name' },
-	{ id: 'slug', key: 'slug', name: 'Slug' },
-	{ id: 'minecraft_version', key: 'minecraft_version', name: 'MC Version' },
-	{ id: 'size', key: 'size_bytes', name: 'Size' },
-	{ id: 'created_at', key: 'created_at', name: 'Created', component: 'time' as const }
-];
-
 async function refresh() {
 	refreshing = true;
 	await invalidateAll();
 	refreshing = false;
 }
+
+function sizeBytes(world: WorldListItem): number | null {
+	return world.latest_version?.size_bytes ?? null;
+}
+
+function lastUploadAt(world: WorldListItem): string | null {
+	return world.latest_version?.created_at ?? null;
+}
 </script>
 
+<svelte:head><title>Worlds - Glint</title></svelte:head>
+
 <div class="space-y-4">
-	<header class="flex items-center justify-between">
-		<div class="flex items-baseline gap-3">
-			<h1 class="text-2xl font-semibold">Worlds</h1>
-			<span class="text-lg text-muted-foreground">{worlds.length}</span>
-		</div>
-		<div class="flex items-center gap-2">
-			<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
-				<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-			</Button>
+	<AdminPageHeader title="Worlds" count={worlds.length} {refreshing} onrefresh={refresh}>
+		{#snippet actions()}
 			<WorldUploadDialog onWorldCreated={refresh} />
-		</div>
-	</header>
+		{/snippet}
+	</AdminPageHeader>
 
 	{#if error}
-		<div class="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-			Error: {error}
-		</div>
+		<Alert variant="destructive">Error: {error}</Alert>
 	{:else if worlds.length === 0}
 		<p class="text-muted-foreground">No worlds uploaded yet.</p>
 	{:else}
-		<AdminTable
-			data={worlds}
-			{columns}
-			onRowClick={(world: WorldListItem) => goto(`/admin/worlds/${world.id}`)}
-			getRowId={(w: WorldListItem) => w.id}
-		>
-			{#snippet cell({ columnId, value })}
-				{#if columnId === 'name'}
-					<span class="font-medium">{value}</span>
-				{:else if columnId === 'minecraft_version'}
-					<code class="rounded bg-muted px-1.5 py-0.5 text-xs">{value}</code>
-				{:else if columnId === 'size'}
-					{value ? formatBytes(value as number) : '-'}
-				{:else}
-					{value ?? '-'}
-				{/if}
-			{/snippet}
-		</AdminTable>
+		<div class="flex flex-col overflow-hidden rounded-lg border border-border">
+			{#each worlds as world (world.id)}
+				<button
+					type="button"
+					class="group flex w-full cursor-pointer gap-4 border-b border-border bg-card p-4 text-left transition-colors last:border-b-0 hover:bg-muted/50"
+					onclick={() => goto(`/admin/worlds/${world.id}`)}
+				>
+					<!-- Preview thumbnail -->
+					<div class="hidden shrink-0 sm:block">
+						{#if world.preview?.image_url ?? world.preview?.thumbhash}
+							<CaptureImage
+								src={world.preview?.image_url}
+								thumbhash={world.preview?.thumbhash}
+								alt="{world.name} preview"
+								preset="card"
+								class="h-full w-full rounded-md object-cover"
+								containerClass="h-20 w-32 overflow-hidden rounded-md"
+							/>
+						{:else}
+							<div
+								class="flex h-20 w-32 items-center justify-center rounded-md bg-muted"
+							>
+								<Globe class="h-8 w-8 text-muted-foreground/40" />
+							</div>
+						{/if}
+					</div>
+
+					<!-- Content -->
+					<div class="flex min-w-0 flex-1 flex-col gap-1.5">
+						<!-- Title row -->
+						<div class="flex items-center gap-2">
+							<span class="truncate text-sm font-semibold">{world.name}</span>
+							<code
+								class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+								>{world.slug}</code
+							>
+							<code
+								class="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary"
+								>{world.minecraft_version}</code
+							>
+						</div>
+
+						<!-- Description -->
+						{#if world.description}
+							<p class="line-clamp-1 text-xs text-muted-foreground">
+								{world.description}
+							</p>
+						{/if}
+
+						<!-- Stats row -->
+						<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+							<span class="inline-flex items-center gap-1" title="Scenes">
+								<MapPin class="h-3 w-3" />
+								{world.scene_count} scene{world.scene_count !== 1 ? 's' : ''}
+							</span>
+							<span class="inline-flex items-center gap-1" title="Versions">
+								<Layers class="h-3 w-3" />
+								{world.version_count} version{world.version_count !== 1 ? 's' : ''}
+							</span>
+							<span class="inline-flex items-center gap-1" title="Captures">
+								<Camera class="h-3 w-3" />
+								{world.capture_count} capture{world.capture_count !== 1 ? 's' : ''}
+							</span>
+							{#if sizeBytes(world)}
+								<span class="inline-flex items-center gap-1" title="Latest version size">
+									<HardDrive class="h-3 w-3" />
+									{formatBytes(sizeBytes(world)!)}
+								</span>
+							{/if}
+						</div>
+
+						<!-- Timestamps -->
+						<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground/70">
+							<span>Updated <TimeAgo timestamp={world.updated_at} /></span>
+							{#if lastUploadAt(world)}
+								<span>Last upload <TimeAgo timestamp={lastUploadAt(world)!} /></span>
+							{/if}
+						</div>
+					</div>
+				</button>
+			{/each}
+		</div>
 	{/if}
 </div>

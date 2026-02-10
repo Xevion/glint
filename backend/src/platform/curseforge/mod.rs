@@ -221,7 +221,11 @@ impl CurseForgeClient<Authenticated> {
                     download_url: f.download_url,
                     file_hash: sha1_hash,
                     file_size: Some(f.file_length as i64),
-                    game_versions_json: serde_json::to_string(&f.game_versions).ok(),
+                    game_versions: if f.game_versions.is_empty() {
+                        None
+                    } else {
+                        Some(f.game_versions)
+                    },
                     release_channel: Some(format!("{:?}", f.release_type).to_lowercase()),
                     published_at: None,
                 }

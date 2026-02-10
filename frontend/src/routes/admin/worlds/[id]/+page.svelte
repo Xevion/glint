@@ -6,14 +6,16 @@ import type { UpdateWorldRequest } from '$lib/api/endpoints/admin';
 import type { Scene, WorldVersion, WorldWithDetails } from '$lib/bindings';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import WorldUploadDialog from '$lib/components/WorldUploadDialog.svelte';
-import { AdminDetailField } from '$lib/components/admin';
+import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
-import { formatBytes } from '$lib/utils/display';
-import { ArrowLeft, ChevronDown, ChevronRight, Trash2 } from '@lucide/svelte';
+import { formatBytes } from '$lib/utils/format';
+import { StatusBadge } from '$lib/components/ui/status-badge';
+import { Alert } from '$lib/components/ui/alert';
+import { ChevronDown, ChevronRight, Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -104,24 +106,22 @@ async function loadVersions() {
 }
 </script>
 
+<svelte:head><title>{world.name} - Glint</title></svelte:head>
+
 <div class="space-y-6">
 	<!-- Header -->
-	<header class="space-y-2">
-		<div class="flex items-center gap-2">
-		<a href="/admin/worlds" class="text-muted-foreground hover:text-foreground" aria-label="Back to worlds">
-			<ArrowLeft class="h-4 w-4" />
-		</a>
-			<h1 class="text-2xl font-semibold">{world.name}</h1>
+	<AdminDetailHeader
+		backHref="/admin/worlds"
+		backLabel="Back to worlds"
+		title={world.name}
+	>
+		{#snippet trailing()}
 			<code class="rounded bg-muted px-1.5 py-0.5 text-xs">{world.minecraft_version}</code>
-		</div>
-	</header>
+		{/snippet}
+	</AdminDetailHeader>
 
 	{#if error}
-		<div
-			class="rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
-		>
-			{error}
-		</div>
+		<Alert variant="destructive">{error}</Alert>
 	{/if}
 
 	<!-- Edit Section -->
@@ -227,7 +227,7 @@ async function loadVersions() {
 										{version.size_bytes != null ? formatBytes(version.size_bytes) : '—'}
 										{#if version.file_hash}
 											&middot;
-											<code class="text-xs">{version.file_hash.slice(0, 16)}...</code>
+											<code class="text-xs">{version.file_hash}</code>
 										{/if}
 									</div>
 								</div>
@@ -258,19 +258,7 @@ async function loadVersions() {
 								<span class="capitalize">{scene.weather}</span>
 							</div>
 						</div>
-						{#if scene.active}
-							<span
-								class="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800 dark:bg-green-900 dark:text-green-300"
-							>
-								Active
-							</span>
-						{:else}
-							<span
-								class="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
-							>
-								Inactive
-							</span>
-						{/if}
+					<StatusBadge status={scene.active ? 'active' : 'inactive'}>{scene.active ? 'Active' : 'Inactive'}</StatusBadge>
 					</a>
 				{/each}
 			</div>

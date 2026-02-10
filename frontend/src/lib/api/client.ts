@@ -22,7 +22,9 @@ export class ApiClient {
 
 		try {
 			const headers = new Headers(options?.headers);
-			headers.set('Content-Type', 'application/json');
+			if (options?.body) {
+				headers.set('Content-Type', 'application/json');
+			}
 
 			const response = await this.fetchFn(url, {
 				...options,

@@ -127,10 +127,6 @@ class GlintMainScreen(
         }
     }
 
-    // ============================================
-    // Tab Bar
-    // ============================================
-
     private fun switchTab(tab: Tab) {
         if (currentTab == tab) return
         currentTab = tab
@@ -170,10 +166,6 @@ class GlintMainScreen(
         )
     }
 
-    // ============================================
-    // Master Content (dispatches by tab)
-    // ============================================
-
     override fun buildMasterContent(master: FlowLayout) {
         when (currentTab) {
             Tab.WORLDS -> buildWorldsMaster(master)
@@ -189,10 +181,6 @@ class GlintMainScreen(
             Tab.CONFIG -> buildConfigDetail(detail)
         }
     }
-
-    // ============================================
-    // Worlds Tab — Master
-    // ============================================
 
     private fun buildWorldsMaster(master: FlowLayout) {
         if (loading) {
@@ -261,10 +249,6 @@ class GlintMainScreen(
             }
         master.child(addButton as Component)
     }
-
-    // ============================================
-    // Worlds Tab — Detail
-    // ============================================
 
     private fun buildWorldsDetail(detail: FlowLayout) {
         val selectedWorld = worldData.find { it.id == selectedWorldId }
@@ -460,10 +444,6 @@ class GlintMainScreen(
         }
     }
 
-    // ============================================
-    // Shaders Tab (Stub)
-    // ============================================
-
     private fun buildShadersMaster(master: FlowLayout) {
         master.horizontalAlignment(HorizontalAlignment.CENTER)
         master.verticalAlignment(VerticalAlignment.CENTER)
@@ -494,10 +474,6 @@ class GlintMainScreen(
                 .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
         )
     }
-
-    // ============================================
-    // Config Tab
-    // ============================================
 
     private var connectionTestResult: String? = null
     private var connectionTesting = false
@@ -773,10 +749,6 @@ class GlintMainScreen(
         }
     }
 
-    // ============================================
-    // Scene Cards
-    // ============================================
-
     private fun buildSceneCard(
         scene: Scene,
         world: WorldEntry,
@@ -876,10 +848,6 @@ class GlintMainScreen(
         }
     }
 
-    // ============================================
-    // Status Bar
-    // ============================================
-
     override fun buildStatusBar(status: FlowLayout) {
         val latestEntry = StatusLog.recent(1).firstOrNull()
 
@@ -915,10 +883,6 @@ class GlintMainScreen(
             } as Component,
         )
     }
-
-    // ============================================
-    // Actions
-    // ============================================
 
     private fun selectWorld(worldId: String) {
         selectedWorldId = worldId
@@ -1209,10 +1173,6 @@ class GlintMainScreen(
         )
     }
 
-    // ============================================
-    // World Version Update
-    // ============================================
-
     private fun updateWorldVersion(world: WorldEntry) {
         val config = ApiConfig.load()
         if (!config.isValid()) {
@@ -1282,10 +1242,6 @@ class GlintMainScreen(
 
         minecraft?.setScreen(progressDialog)
     }
-
-    // ============================================
-    // World Upload
-    // ============================================
 
     private fun uploadWorld(world: WorldEntry) {
         val config = ApiConfig.load()
@@ -1444,10 +1400,6 @@ class GlintMainScreen(
             },
         )
     }
-
-    // ============================================
-    // World Data Loading
-    // ============================================
 
     fun refreshWorlds() {
         loading = true

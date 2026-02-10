@@ -9,6 +9,7 @@ import {
 	type ShaderDisplayInfo
 } from '$lib/components/compare';
 import { Button } from '$lib/components/ui/button';
+import { Alert } from '$lib/components/ui/alert';
 import { ArrowLeftRight, Columns3, SplitSquareHorizontal, ToggleLeft } from '@lucide/svelte';
 import { goto } from '$app/navigation';
 import { fade, fly } from 'svelte/transition';
@@ -72,7 +73,9 @@ const modes: { value: CompareMode; label: string; icon: typeof Columns3 }[] = [
 ];
 </script>
 
-<div class="container mx-auto px-4 py-8">
+<svelte:head><title>Compare - Glint</title></svelte:head>
+
+<div class="py-8">
 	<div class="mx-auto max-w-4xl">
 		<!-- Header -->
 		<div in:fly={{ y: -10, duration: 400 }} class="mb-6">
@@ -85,11 +88,11 @@ const modes: { value: CompareMode; label: string; icon: typeof Columns3 }[] = [
 		<!-- Scene selector + mode selector -->
 		<div in:fly={{ y: 10, duration: 400, delay: 50 }} class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 			{#if data.scenes.length > 0}
-				<select
-					class="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-					value={data.selectedSceneSlug}
-					onchange={(e) => selectScene(e.currentTarget.value)}
-				>
+			<select
+				class="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+				value={data.selectedSceneSlug}
+				onchange={(e) => selectScene(e.currentTarget.value)}
+			>
 					{#each data.scenes as scene (scene.slug)}
 						<option value={scene.slug}>
 							{scene.name} ({scene.capture_count})
@@ -114,9 +117,9 @@ const modes: { value: CompareMode; label: string; icon: typeof Columns3 }[] = [
 		</div>
 
 		{#if data.error}
-			<div class="mb-6 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+			<Alert variant="destructive" class="mb-6">
 				Failed to load captures: {data.error}
-			</div>
+			</Alert>
 		{/if}
 
 		{#if images.length >= 2 && leftImage && rightImage}

@@ -4,11 +4,13 @@ import { resolve } from '$app/paths';
 import type { SceneListItem } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { cn } from '$lib/utils';
+import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import {
 	getBiomeDisplayName,
 	getDimensionDisplayName,
 	getWeatherDisplayName
 } from '$lib/utils/display';
+import { StatusBadge } from '$lib/components/ui/status-badge';
 import { ArrowRight, Sun } from '@lucide/svelte';
 
 interface Props {
@@ -48,16 +50,16 @@ function handleKeyDown(e: KeyboardEvent) {
 	onkeydown={handleKeyDown}
 	class={cn(
 		'group relative flex flex-col overflow-hidden rounded-xl bg-card transition-all duration-300',
-		'border border-border shadow-sm',
+		'border border-border shadow-theme-sm',
 		'focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
-		'cursor-pointer hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg',
+		'cursor-pointer hover:-translate-y-1 hover:border-primary/50 hover:shadow-theme-lg',
 		className
 	)}
 >
 	<!-- Thumbnail Image -->
 	<div class="relative">
 		<CaptureImage
-			src={scene.thumbnail_url}
+			src={scene.image_url}
 			thumbhash={scene.thumbhash}
 			preset="card"
 			alt="{scene.name} scene preview"
@@ -67,14 +69,12 @@ function handleKeyDown(e: KeyboardEvent) {
 		/>
 
 		<!-- Gradient overlay -->
-		<div
-			class="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent"
-		></div>
+		<ImageOverlay />
 
 		<!-- Time badge - top left -->
 		<div class="absolute top-3 left-3 flex">
 			<span
-				class="inline-flex items-center gap-1.5 rounded-md bg-blue-500/80 px-2 py-1 text-xs font-medium text-white capitalize shadow-sm backdrop-blur-sm"
+				class="inline-flex items-center gap-1.5 rounded-md bg-blue-500/80 px-2 py-1 text-xs font-medium text-white capitalize shadow-theme-sm backdrop-blur-sm"
 			>
 				<Sun class="h-3 w-3" strokeWidth={2} />
 				{timeOfDay}
@@ -97,13 +97,11 @@ function handleKeyDown(e: KeyboardEvent) {
 				{scene.name}
 			</a>
 			<div class="flex items-center gap-2">
-				{#if scene.biome}
-					<span
-						class="inline-flex items-center rounded-md bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-500/20 dark:text-green-400"
-					>
-						{getBiomeDisplayName(scene.biome)}
-					</span>
-				{/if}
+			{#if scene.biome}
+				<StatusBadge status="active">
+					{getBiomeDisplayName(scene.biome)}
+				</StatusBadge>
+			{/if}
 				<span
 					class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
 				>

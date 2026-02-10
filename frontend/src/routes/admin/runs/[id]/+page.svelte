@@ -3,6 +3,9 @@ import { invalidateAll } from '$app/navigation';
 import type { CaptureRun, CaptureRunItemWithContext } from '$lib/bindings';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Button } from '$lib/components/ui/button';
+import * as Table from '$lib/components/ui/table';
+import { formatDuration } from '$lib/utils/format';
+import { statusColorFallback, statusColors } from '$lib/utils/status';
 import { ArrowLeft, ExternalLink, RefreshCw } from '@lucide/svelte';
 import type { PageData } from './$types';
 
@@ -11,27 +14,6 @@ let run: CaptureRun = $derived(data.run);
 let items: CaptureRunItemWithContext[] = $derived(data.items);
 let refreshing = $state(false);
 let expandedItem = $state<string | null>(null);
-
-const statusColors: Record<string, string> = {
-	running: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-	completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-	partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-	failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-	timed_out: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-	pending: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-	skipped: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-};
-
-function formatDuration(run: CaptureRun): string {
-	if (!run.completed_at) return 'In progress';
-	const start = new Date(run.started_at).getTime();
-	const end = new Date(run.completed_at).getTime();
-	const seconds = Math.round((end - start) / 1000);
-	if (seconds < 60) return `${seconds}s`;
-	const minutes = Math.floor(seconds / 60);
-	const remaining = seconds % 60;
-	return `${minutes}m ${remaining}s`;
-}
 
 function formatMs(ms: number | null): string {
 	if (ms == null) return '\u2014';
@@ -51,15 +33,13 @@ async function refresh() {
 
 const statCards = $derived([
 	{ label: 'Total', value: run.total_items, color: 'text-foreground' },
-	{
-		label: 'Completed',
-		value: run.completed_items,
-		color: 'text-green-600 dark:text-green-400'
-	},
-	{ label: 'Failed', value: run.failed_items, color: 'text-red-600 dark:text-red-400' },
-	{ label: 'Skipped', value: run.skipped_items, color: 'text-gray-500' }
+	{ label: 'Completed', value: run.completed_items, color: 'text-success' },
+	{ label: 'Failed', value: run.failed_items, color: 'text-destructive' },
+	{ label: 'Skipped', value: run.skipped_items, color: 'text-muted-foreground' }
 ]);
 </script>
+
+<svelte:head><title>Run Details - Glint</title></svelte:head>
 
 <div class="space-y-6">
 	<!-- Header -->
@@ -70,9 +50,9 @@ const statCards = $derived([
 		</a>
 			<h1 class="text-2xl font-semibold">Capture Run</h1>
 			<span
-				class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
-					run.status
-				] ?? ''}"
+class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
+				run.status
+			] ?? statusColorFallback}"
 			>
 				{run.status}
 			</span>
@@ -115,37 +95,36 @@ const statCards = $derived([
 	</div>
 
 	<!-- Items Table -->
-	<div class="rounded-md border">
-		<table class="w-full text-sm">
-			<thead>
-				<tr class="border-b bg-muted/50">
-					<th class="px-4 py-2 text-left font-medium">Status</th>
-					<th class="px-4 py-2 text-left font-medium">Shader</th>
-					<th class="px-4 py-2 text-left font-medium">Scene</th>
-					<th class="px-4 py-2 text-left font-medium">Profile</th>
-					<th class="px-4 py-2 text-left font-medium">Duration</th>
-					<th class="px-4 py-2 text-left font-medium">Error</th>
-					<th class="px-4 py-2 text-left font-medium">Capture</th>
-				</tr>
-			</thead>
-			<tbody>
+	<Table.Root class="border">
+		<Table.Header>
+				<Table.Row class="bg-muted/50">
+					<Table.Head class="px-4 py-2">Status</Table.Head>
+					<Table.Head class="px-4 py-2">Shader</Table.Head>
+					<Table.Head class="px-4 py-2">Scene</Table.Head>
+					<Table.Head class="px-4 py-2">Profile</Table.Head>
+					<Table.Head class="px-4 py-2">Duration</Table.Head>
+					<Table.Head class="px-4 py-2">Error</Table.Head>
+					<Table.Head class="px-4 py-2">Capture</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
 				{#each items as item (item.id)}
-					<tr
+					<Table.Row
 						class="border-b transition-colors hover:bg-muted/50 {item.status === 'failed'
 							? 'cursor-pointer'
 							: ''}"
 						onclick={() => item.status === 'failed' && toggleExpand(item.id)}
 					>
-						<td class="px-4 py-2">
+						<Table.Cell class="px-4 py-2">
 							<span
-								class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
-									item.status
-								] ?? ''}"
+class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
+								item.status
+							] ?? statusColorFallback}"
 							>
 								{item.status}
 							</span>
-						</td>
-						<td class="px-4 py-2">
+						</Table.Cell>
+						<Table.Cell class="px-4 py-2">
 							<div>
 								<a
 									href="/shaders/{item.shader_slug}"
@@ -155,29 +134,29 @@ const statCards = $derived([
 								</a>
 								<div class="text-xs text-muted-foreground">{item.shader_version}</div>
 							</div>
-						</td>
-						<td class="px-4 py-2">{item.scene_name}</td>
-						<td class="px-4 py-2">{item.profile ?? '\u2014'}</td>
-						<td class="px-4 py-2">{formatMs(item.duration_ms)}</td>
-						<td class="max-w-48 truncate px-4 py-2" title={item.error_message ?? ''}>
-							{item.error_message ?? '\u2014'}
-						</td>
-						<td class="px-4 py-2">
+						</Table.Cell>
+						<Table.Cell class="px-4 py-2">{item.scene_name}</Table.Cell>
+						<Table.Cell class="px-4 py-2">{item.profile ?? '\u2014'}</Table.Cell>
+						<Table.Cell class="px-4 py-2">{formatMs(item.duration_ms)}</Table.Cell>
+					<Table.Cell class="max-w-sm px-4 py-2" title={item.error_message ?? ''}>
+						<span class="line-clamp-2">{item.error_message ?? '\u2014'}</span>
+					</Table.Cell>
+						<Table.Cell class="px-4 py-2">
 							{#if item.capture_id}
-								<a
-									href="/admin/captures?selected={item.capture_id}"
-									class="text-xs text-primary hover:underline"
-								>
-									View
-								</a>
+							<a
+								href="/admin/captures/{item.capture_id}"
+								class="text-xs text-primary hover:underline"
+							>
+								View
+							</a>
 							{:else}
 								&mdash;
 							{/if}
-						</td>
-					</tr>
+						</Table.Cell>
+					</Table.Row>
 					{#if expandedItem === item.id && item.status === 'failed'}
-						<tr>
-							<td colspan="7" class="bg-muted/30 px-4 py-3">
+						<Table.Row>
+							<Table.Cell colspan={7} class="bg-muted/30 px-4 py-3">
 								<div class="space-y-2">
 									{#if item.error_message}
 										<div>
@@ -193,11 +172,10 @@ const statCards = $derived([
 										</div>
 									{/if}
 								</div>
-							</td>
-						</tr>
+							</Table.Cell>
+						</Table.Row>
 					{/if}
 				{/each}
-			</tbody>
-		</table>
-	</div>
+			</Table.Body>
+	</Table.Root>
 </div>
