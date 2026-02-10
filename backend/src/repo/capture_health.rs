@@ -162,8 +162,8 @@ impl CaptureHealthRepo {
                     WHEN bc.freshness != 'fresh' THEN 'stale'
                     ELSE 'completed'
                 END AS "status!: TargetHealth",
-                COALESCE(bc.world_version_id IS DISTINCT FROM lwv.id, FALSE) AS "world_outdated!",
-                COALESCE(bc.scene_version_id IS DISTINCT FROM lsv.id, FALSE) AS "scene_outdated!"
+                COALESCE(bc.world_version_id IS NOT NULL AND bc.world_version_id IS DISTINCT FROM lwv.id, FALSE) AS "world_outdated!",
+                COALESCE(bc.scene_version_id IS NOT NULL AND bc.scene_version_id IS DISTINCT FROM lsv.id, FALSE) AS "scene_outdated!"
             FROM capture_target_matrix tm
             JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id
             JOIN shaders sh ON sh.id = sv.shader_id

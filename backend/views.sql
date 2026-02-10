@@ -97,8 +97,8 @@ SELECT
               AND c2.status IN ('completed', 'uploading')
               AND c2.captured_at > c.captured_at
         ) THEN 'superseded'
-        WHEN c.world_version_id IS DISTINCT FROM lwv.id
-          OR c.scene_version_id IS DISTINCT FROM lsv.id
+        WHEN (c.world_version_id IS NOT NULL AND c.world_version_id IS DISTINCT FROM lwv.id)
+          OR (c.scene_version_id IS NOT NULL AND c.scene_version_id IS DISTINCT FROM lsv.id)
         THEN 'stale'
         ELSE 'fresh'
     END AS freshness

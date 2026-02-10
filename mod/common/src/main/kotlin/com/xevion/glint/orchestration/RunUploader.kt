@@ -20,8 +20,8 @@ import kotlin.time.Duration.Companion.minutes
 /** Resolved item metadata from the work→run item mapping. */
 data class RunItemInfo(
     val itemId: String,
-    val worldVersionId: String?,
-    val sceneVersionId: String?,
+    val worldVersionId: String,
+    val sceneVersionId: String,
 )
 
 /**
@@ -227,8 +227,8 @@ class RunUploader(
      */
     private fun executeUpload(
         itemId: String,
-        worldVersionId: String?,
-        sceneVersionId: String?,
+        worldVersionId: String,
+        sceneVersionId: String,
         event: CaptureTakenEvent,
     ) {
         log.debug("Claiming item") { "item_id" to itemId }

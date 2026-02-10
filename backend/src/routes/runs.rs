@@ -72,9 +72,9 @@ pub struct ClaimItemRequest {
     pub resolution_height: i32,
     pub captured_at: chrono::DateTime<chrono::Utc>,
     /// World version this capture was taken against (from WorkItem)
-    pub world_version_id: Option<String>,
+    pub world_version_id: String,
     /// Scene version this capture was taken against (from WorkItem)
-    pub scene_version_id: Option<String>,
+    pub scene_version_id: String,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -273,8 +273,8 @@ async fn claim_item(
         Some(request.resolution_width),
         Some(request.resolution_height),
         Some(request.captured_at),
-        request.world_version_id.as_deref(),
-        request.scene_version_id.as_deref(),
+        Some(&request.world_version_id),
+        Some(&request.scene_version_id),
         CaptureStatus::Uploading,
     )
     .await?;
