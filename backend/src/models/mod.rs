@@ -352,12 +352,21 @@ pub struct ShaderWithVersions {
     pub versions: Vec<ShaderVersion>,
 }
 
+/// ShaderVersion enriched with capture count for detail endpoints
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct ShaderVersionDetail {
+    #[serde(flatten)]
+    pub version: ShaderVersion,
+    pub capture_count: i64,
+}
+
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
 pub struct ShaderWithCaptures {
     #[serde(flatten)]
     pub shader: Shader,
-    pub versions: Vec<ShaderVersion>,
+    pub versions: Vec<ShaderVersionDetail>,
     pub captures: Vec<CaptureWithContext>,
 }
 

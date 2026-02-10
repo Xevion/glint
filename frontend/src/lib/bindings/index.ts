@@ -33,6 +33,7 @@ export type { ShaderSearchResponse } from "./ShaderSearchResponse";
 export type { ShaderSearchResult } from "./ShaderSearchResult";
 export type { ShaderSearchSort } from "./ShaderSearchSort";
 export type { ShaderVersion } from "./ShaderVersion";
+export type { ShaderVersionDetail } from "./ShaderVersionDetail";
 export type { ShaderWithCaptures } from "./ShaderWithCaptures";
 export type { ShaderWithVersions } from "./ShaderWithVersions";
 export type { Tag } from "./Tag";

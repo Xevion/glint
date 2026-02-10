@@ -3,6 +3,11 @@ import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
 
+export interface GetShaderParams {
+	versionId?: string;
+	profile?: string;
+}
+
 export class ShaderEndpoints extends ApiClient {
 	/**
 	 * List all shaders with enrichment data
@@ -14,7 +19,15 @@ export class ShaderEndpoints extends ApiClient {
 	/**
 	 * Get a single shader by ID or slug, with versions and captures
 	 */
-	getShader(idOrSlug: string): Promise<Result<ShaderWithCaptures, ApiError>> {
-		return super.get<ShaderWithCaptures>(`/api/shaders/${encodeURIComponent(idOrSlug)}`);
+	getShader(
+		idOrSlug: string,
+		params?: GetShaderParams
+	): Promise<Result<ShaderWithCaptures, ApiError>> {
+		const searchParams = new URLSearchParams();
+		if (params?.versionId) searchParams.set('version_id', params.versionId);
+		if (params?.profile) searchParams.set('profile', params.profile);
+		const query = searchParams.toString();
+		const url = `/api/shaders/${encodeURIComponent(idOrSlug)}${query ? `?${query}` : ''}`;
+		return super.get<ShaderWithCaptures>(url);
 	}
 }

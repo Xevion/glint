@@ -112,3 +112,16 @@ export function resolveImageSource(source: string | ImageSourceLike): {
 		thumbhash: source.thumbhash ?? null
 	};
 }
+
+/**
+ * Preload a full-resolution image in the background.
+ * Returns the Image element for optional cleanup.
+ */
+export function preloadImage(src: string | null | undefined): HTMLImageElement | null {
+	if (!src) return null;
+	const url = cfImageUrl(src, 'full');
+	if (!url) return null;
+	const img = new Image();
+	img.src = url;
+	return img;
+}

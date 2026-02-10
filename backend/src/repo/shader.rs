@@ -9,9 +9,30 @@ use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
 use crate::models::{
     CaptureWithContext, CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderAdopted,
-    ShaderVersion, UpdateShaderRequest,
+    ShaderVersion, ShaderVersionDetail, UpdateShaderRequest,
 };
 use crate::platform::{Platform, PlatformMetadata, PlatformVersion};
+
+/// Intermediate row type for the version+count query (SELECT sv.*, COUNT(...))
+#[derive(sqlx::FromRow)]
+struct ShaderVersionWithCount {
+    id: String,
+    shader_id: String,
+    version: String,
+    modrinth_version_id: Option<String>,
+    curseforge_file_id: Option<i32>,
+    download_url: Option<String>,
+    file_hash: Option<String>,
+    file_size: Option<i64>,
+    game_versions: Option<String>,
+    release_channel: Option<String>,
+    supported_profiles: Option<String>,
+    upstream_published_at: Option<chrono::DateTime<chrono::Utc>>,
+    created_at: chrono::DateTime<chrono::Utc>,
+    capture_failure_count: i32,
+    last_capture_error: Option<String>,
+    capture_count: i64,
+}
 
 pub struct ShaderRepo;
 
@@ -378,6 +399,80 @@ impl ShaderRepo {
         debug!(count = captures.len(), "Fetched captures for shader");
         Ok(captures)
     }
+
+    /// Fetch captures with shader/version context, filtered by optional version and profile
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn get_captures_with_context_filtered(
+        executor: impl sqlx::PgExecutor<'_>,
+        shader_id: &str,
+        version_id: Option<&str>,
+        profile: Option<&str>,
+    ) -> AppResult<Vec<CaptureWithContext>> {
+        let captures = match (version_id, profile) {
+            (Some(vid), Some(prof)) => {
+                capture_ctx_query!(
+                    distinct: "c.scene_id",
+                    r#"
+                    WHERE s.id = $1 AND c.status = 'completed' AND sv.id = $2 AND c.profile = $3
+                    ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
+                    "#,
+                    shader_id,
+                    vid,
+                    prof
+                )
+                .fetch_all(executor)
+                .await
+            }
+            (Some(vid), None) => {
+                capture_ctx_query!(
+                    distinct: "c.scene_id",
+                    r#"
+                    WHERE s.id = $1 AND c.status = 'completed' AND sv.id = $2
+                    ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
+                    "#,
+                    shader_id,
+                    vid
+                )
+                .fetch_all(executor)
+                .await
+            }
+            (None, Some(prof)) => {
+                capture_ctx_query!(
+                    distinct: "c.scene_id",
+                    r#"
+                    WHERE s.id = $1 AND c.status = 'completed' AND c.profile = $2
+                    ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
+                    "#,
+                    shader_id,
+                    prof
+                )
+                .fetch_all(executor)
+                .await
+            }
+            (None, None) => {
+                capture_ctx_query!(
+                    distinct: "c.scene_id",
+                    r#"
+                    WHERE s.id = $1 AND c.status = 'completed'
+                    ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
+                    "#,
+                    shader_id
+                )
+                .fetch_all(executor)
+                .await
+            }
+        }
+        .context(format!(
+            "failed to get filtered captures for shader '{}'",
+            shader_id
+        ))?;
+
+        debug!(
+            count = captures.len(),
+            "Fetched filtered captures for shader"
+        );
+        Ok(captures)
+    }
 }
 
 pub struct ShaderVersionRepo;
@@ -401,6 +496,58 @@ impl ShaderVersionRepo {
         ))?;
         debug!(count = versions.len(), "Listed shader versions");
         Ok(versions)
+    }
+
+    /// List versions with per-version completed capture counts (for detail endpoints)
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_by_shader_with_counts(
+        executor: impl sqlx::PgExecutor<'_>,
+        shader_id: &str,
+    ) -> AppResult<Vec<ShaderVersionDetail>> {
+        let rows = sqlx::query_as!(
+            ShaderVersionWithCount,
+            r#"
+            SELECT
+                sv.*,
+                COUNT(c.id) FILTER (WHERE c.status = 'completed') as "capture_count!: i64"
+            FROM shader_versions sv
+            LEFT JOIN captures c ON c.shader_version_id = sv.id
+            WHERE sv.shader_id = $1
+            GROUP BY sv.id
+            ORDER BY sv.upstream_published_at DESC NULLS LAST, sv.created_at DESC
+            "#,
+            shader_id
+        )
+        .fetch_all(executor)
+        .await
+        .context(format!(
+            "failed to list versions with counts for shader '{}'",
+            shader_id
+        ))?;
+        debug!(count = rows.len(), "Listed shader versions with counts");
+        Ok(rows
+            .into_iter()
+            .map(|r| ShaderVersionDetail {
+                version: ShaderVersion {
+                    id: r.id,
+                    shader_id: r.shader_id,
+                    version: r.version,
+                    modrinth_version_id: r.modrinth_version_id,
+                    curseforge_file_id: r.curseforge_file_id,
+                    download_url: r.download_url,
+                    file_hash: r.file_hash,
+                    file_size: r.file_size,
+                    game_versions: r.game_versions,
+                    release_channel: r.release_channel,
+                    supported_profiles: r.supported_profiles,
+                    upstream_published_at: r.upstream_published_at,
+                    created_at: r.created_at,
+                    capture_failure_count: r.capture_failure_count,
+                    last_capture_error: r.last_capture_error,
+                },
+                capture_count: r.capture_count,
+            })
+            .collect())
     }
 
     #[instrument(skip(executor), level = "debug")]

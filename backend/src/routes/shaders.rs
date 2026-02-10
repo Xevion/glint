@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::{get, post},
 };
+use serde::Deserialize;
 use tracing::info;
 use uuid::Uuid;
 
@@ -84,14 +85,33 @@ async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shade
     Ok(Json(items))
 }
 
+#[derive(Debug, Deserialize)]
+struct ShaderDetailQuery {
+    version_id: Option<String>,
+    profile: Option<String>,
+}
+
 /// GET /api/shaders/{id} - Get shader by ID or slug with versions and captures (public)
 async fn get_shader(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    Query(query): Query<ShaderDetailQuery>,
 ) -> AppResult<Json<ShaderWithCaptures>> {
     let shader = ShaderRepo::get(state.db(), &id).await?;
-    let versions = ShaderVersionRepo::list_by_shader(state.db(), &shader.id).await?;
-    let captures = ShaderRepo::get_captures_with_context(state.db(), &shader.id).await?;
+    let versions = ShaderVersionRepo::list_by_shader_with_counts(state.db(), &shader.id).await?;
+
+    // Default to latest version when no version_id is specified
+    let effective_version_id = query
+        .version_id
+        .or_else(|| versions.first().map(|v| v.version.id.clone()));
+
+    let captures = ShaderRepo::get_captures_with_context_filtered(
+        state.db(),
+        &shader.id,
+        effective_version_id.as_deref(),
+        query.profile.as_deref(),
+    )
+    .await?;
 
     Ok(Json(ShaderWithCaptures {
         shader,
