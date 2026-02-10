@@ -17,7 +17,19 @@ const shaders = $derived(data.shaders ?? []);
 const featuredPairs = $derived(data.featuredPairs ?? []);
 const hasStats = $derived(shaders.length > 0 || captures.length > 0);
 const hasFeaturedPairs = $derived(featuredPairs.length > 0);
+
+const sceneCount = $derived(new Set(captures.map((c) => c.scene_id)).size);
 </script>
+
+{#snippet statsBar()}
+	<div class="inline-flex items-center gap-6 rounded-full bg-muted/50 backdrop-blur-sm px-6 py-2 text-sm">
+		<span><strong class="text-foreground">{shaders.length}</strong> <span class="text-muted-foreground">Shaders</span></span>
+		<span class="text-muted-foreground/30">|</span>
+		<span><strong class="text-foreground">{sceneCount}</strong> <span class="text-muted-foreground">Scenes</span></span>
+		<span class="text-muted-foreground/30">|</span>
+		<span><strong class="text-foreground">{captures.length}</strong> <span class="text-muted-foreground">Captures</span></span>
+	</div>
+{/snippet}
 
 <svelte:head><title>Glint</title></svelte:head>
 
@@ -28,16 +40,19 @@ const hasFeaturedPairs = $derived(featuredPairs.length > 0);
 		<div class="relative">
 			<HeroSlider pairs={featuredPairs} />
 
-			<!-- Overlay: title + CTAs positioned on top of the slider -->
-			<div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-30">
+			<!-- Desktop overlay: scrim + centered text (hidden on mobile) -->
+			<div
+				class="pointer-events-none absolute inset-0 z-30 hidden sm:flex flex-col items-center justify-center"
+				style="background: radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 40%, transparent 70%);"
+			>
 				<h1
-					class="text-4xl font-bold tracking-tight text-white drop-shadow-lg sm:text-5xl lg:text-6xl"
+					class="text-5xl font-bold tracking-tight text-white drop-shadow-lg lg:text-6xl"
 					style="text-shadow: 0 2px 12px rgba(0,0,0,0.5);"
 				>
 					Glint
 				</h1>
 				<p
-					class="mt-2 text-lg text-white/90 drop-shadow-md sm:text-xl"
+					class="mt-2 text-xl text-white/90 drop-shadow-md"
 					style="text-shadow: 0 1px 8px rgba(0,0,0,0.5);"
 				>
 					Shader Preview Catalog for Minecraft
@@ -49,19 +64,23 @@ const hasFeaturedPairs = $derived(featuredPairs.length > 0);
 			</div>
 		</div>
 
+		<!-- Mobile hero text (below slider, not overlaid) -->
+		<div class="mt-4 text-center sm:hidden">
+			<h1 class="text-3xl font-bold tracking-tight">Glint</h1>
+			<p class="mt-1 text-base text-muted-foreground">Shader Preview Catalog for Minecraft</p>
+			<div class="mt-4 flex justify-center gap-3">
+				<Button href={resolve('/shaders', {})} size="default">Browse Shaders</Button>
+				<Button href={resolve('/compare', {})} variant="outline" size="default">Compare</Button>
+			</div>
+		</div>
+
 		<!-- Stats (below hero) -->
 		{#if hasStats}
 			<div
 				in:fly={{ y: 10, duration: 400, delay: 200 }}
 				class="mt-6 flex justify-center"
 			>
-				<div class="inline-flex items-center gap-6 rounded-full bg-muted/50 backdrop-blur-sm px-6 py-2 text-sm">
-					<span><strong class="text-foreground">{shaders.length}</strong> <span class="text-muted-foreground">Shaders</span></span>
-					<span class="text-muted-foreground/30">|</span>
-					<span><strong class="text-foreground">{new Set(captures.map((c) => c.scene_id)).size}</strong> <span class="text-muted-foreground">Scenes</span></span>
-					<span class="text-muted-foreground/30">|</span>
-					<span><strong class="text-foreground">{captures.length}</strong> <span class="text-muted-foreground">Captures</span></span>
-				</div>
+				{@render statsBar()}
 			</div>
 		{/if}
 	</div>
@@ -89,13 +108,9 @@ const hasFeaturedPairs = $derived(featuredPairs.length > 0);
 		{#if hasStats}
 			<div
 				in:fly={{ y: 10, duration: 400, delay: 300 }}
-				class="mt-12 inline-flex items-center gap-6 rounded-full bg-muted/50 backdrop-blur-sm px-6 py-2 text-sm"
+				class="mt-12"
 			>
-				<span><strong class="text-foreground">{shaders.length}</strong> <span class="text-muted-foreground">Shaders</span></span>
-				<span class="text-muted-foreground/30">|</span>
-				<span><strong class="text-foreground">{new Set(captures.map((c) => c.scene_id)).size}</strong> <span class="text-muted-foreground">Scenes</span></span>
-				<span class="text-muted-foreground/30">|</span>
-				<span><strong class="text-foreground">{captures.length}</strong> <span class="text-muted-foreground">Captures</span></span>
+				{@render statsBar()}
 			</div>
 		{/if}
 	</div>

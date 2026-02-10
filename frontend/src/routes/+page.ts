@@ -11,36 +11,24 @@ export const load: PageLoad = async ({ fetch }) => {
 		api.featured.list()
 	]);
 
-	const errors: string[] = [];
-
 	const captures = capturesResult.match({
 		Ok: (captures): Capture[] => captures,
-		Err: (err) => {
-			errors.push(err.message);
-			return [] as Capture[];
-		}
+		Err: () => [] as Capture[]
 	});
 
 	const shaders = shadersResult.match({
 		Ok: (shaders): ShaderListItem[] => shaders,
-		Err: (err) => {
-			errors.push(err.message);
-			return [] as ShaderListItem[];
-		}
+		Err: () => [] as ShaderListItem[]
 	});
 
 	const featuredPairs = featuredResult.match({
 		Ok: (pairs): FeaturedPair[] => pairs,
-		Err: (err) => {
-			errors.push(err.message);
-			return [] as FeaturedPair[];
-		}
+		Err: () => [] as FeaturedPair[]
 	});
 
 	return {
 		captures,
 		shaders,
-		featuredPairs,
-		error: errors.length > 0 ? errors.join('; ') : undefined
+		featuredPairs
 	};
 };

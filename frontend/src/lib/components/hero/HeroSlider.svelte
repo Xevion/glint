@@ -1,11 +1,12 @@
 <script lang="ts">
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { onMount } from 'svelte';
 import { browser } from '$app/environment';
 import type { FeaturedPair } from '$lib/bindings';
 import ComparisonSlider from './ComparisonSlider.svelte';
-import type { Orientation } from './DividerHandle.svelte';
+import { SKEW_DEG, type Orientation } from './types';
 import { preloadImage } from '$lib/utils/image';
+import PauseIcon from '@lucide/svelte/icons/pause';
+import PlayIcon from '@lucide/svelte/icons/play';
 
 interface Props {
 	pairs: FeaturedPair[];
@@ -15,30 +16,76 @@ let { pairs }: Props = $props();
 
 // --- Constants ---
 const REST_DURATION = 5000;
-const SWEEP_DURATION = 1000;
+const SHOWCASE_DURATION = 1200;
+const SWEEP_DURATION = 800;
 const SWAP_DELAY = 50;
 const RESUME_AFTER_DRAG = 3000;
-const EASING = 'cubic-bezier(0.4, 0, 0.15, 1)';
+
+const SHOWCASE_NEAR = 0.2;
+const SHOWCASE_FAR = 0.8;
 
 // --- Orientation cycle ---
 const ORIENTATIONS: Orientation[] = ['vertical', 'horizontal', 'diagonal'];
 
-// --- State ---
-type TransitionState = 'resting' | 'sweep-out' | 'swapping' | 'sweep-in';
+// --- Image pool ---
+// Flatten pairs into individual image entries that we rotate through independently
+// per side. Left slot draws from left images, right slot from right images.
+interface ImageEntry {
+	url: string;
+	thumbhash: string | null;
+	label: string;
+}
 
-let currentIndex = $state(0);
+const leftImages = $derived<ImageEntry[]>(
+	pairs.map((p) => ({
+		url: p.left_image_url,
+		thumbhash: p.left_thumbhash ?? null,
+		label: p.left_shader_name
+	}))
+);
+const rightImages = $derived<ImageEntry[]>(
+	pairs.map((p) => ({
+		url: p.right_image_url,
+		thumbhash: p.right_thumbhash ?? null,
+		label: p.right_shader_name
+	}))
+);
+
+// --- State ---
+type TransitionState =
+	| 'resting'
+	| 'showcase-a'
+	| 'showcase-b'
+	| 'sweep-out'
+	| 'swapping'
+	| 'sweep-in';
+
 let transitionState = $state<TransitionState>('resting');
 let dividerPosition = $state(0.5);
 let orientation = $state<Orientation>('vertical');
 let orientationIndex = $state(0);
 let isUserDragging = $state(false);
+let isPaused = $state(false);
 let reducedMotion = $state(false);
+
+// Monotonically increasing counter — bumped on any interruption (drag, pause, dot click).
+// In-flight transitions compare their captured generation to reject stale continuations.
+let generation = 0;
+
+// Independent indices into each image pool
+let leftIndex = $state(0);
+let rightIndex = $state(0);
+
+// Which side gets swapped next (alternates each cycle)
+let swapSide = $state<'left' | 'right'>('left');
 
 // Timer IDs
 let cycleTimer: ReturnType<typeof setTimeout> | null = null;
 let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+let swapTimer: ReturnType<typeof setTimeout> | null = null;
+let tweenRaf: number | null = null;
 
-// The pair currently being displayed (left/right images may be from different pairs during swap)
+// Display state for each slot
 let displayLeftImage = $state('');
 let displayLeftThumbhash = $state<string | null>(null);
 let displayLeftLabel = $state('');
@@ -46,110 +93,203 @@ let displayRightImage = $state('');
 let displayRightThumbhash = $state<string | null>(null);
 let displayRightLabel = $state('');
 
-// Whether we sweep left-to-right or right-to-left (alternates for visual variety)
-let sweepDirection = $state<'left' | 'right'>('right');
-
-// Transition CSS for the divider position
-let dividerTransition = $state('');
-
 const hasPairs = $derived(pairs.length > 0);
 const hasMultiplePairs = $derived(pairs.length > 1);
+const isAnimating = $derived(transitionState !== 'resting');
 
-// Initialize display from current pair
-function syncDisplay(pair: FeaturedPair) {
-	displayLeftImage = pair.left_image_url;
-	displayLeftThumbhash = pair.left_thumbhash;
-	displayLeftLabel = `${pair.left_shader_name} — ${pair.left_scene_name}`;
-	displayRightImage = pair.right_image_url;
-	displayRightThumbhash = pair.right_thumbhash;
-	displayRightLabel = `${pair.right_shader_name} — ${pair.right_scene_name}`;
+// Dot indicators: tracks the last pair explicitly synced (via init or dot click).
+// leftIndex/rightIndex diverge during alternating swaps, so neither alone is meaningful.
+let activePairIndex = $state(0);
+
+// --- Easing ---
+
+function easeInOutCubic(t: number): number {
+	return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// --- Tween engine ---
+
+function tweenTo(target: number, duration: number): Promise<void> {
+	return new Promise((resolve, reject) => {
+		cancelTween();
+
+		const start = dividerPosition;
+		const delta = target - start;
+		if (Math.abs(delta) < 0.001) {
+			dividerPosition = target;
+			resolve();
+			return;
+		}
+
+		const startTime = performance.now();
+		let cancelled = false;
+
+		function tick(now: number) {
+			if (cancelled) {
+				reject(new Error('cancelled'));
+				return;
+			}
+
+			const elapsed = now - startTime;
+			const progress = Math.min(1, elapsed / duration);
+			const eased = easeInOutCubic(progress);
+
+			dividerPosition = start + delta * eased;
+
+			if (progress < 1) {
+				tweenRaf = requestAnimationFrame(tick);
+			} else {
+				dividerPosition = target;
+				tweenRaf = null;
+				resolve();
+			}
+		}
+
+		tweenRaf = requestAnimationFrame(tick);
+
+		cancelTween = () => {
+			if (tweenRaf !== null) {
+				cancelAnimationFrame(tweenRaf);
+				tweenRaf = null;
+			}
+			cancelled = true;
+			cancelTween = cancelTweenNoop;
+		};
+	});
+}
+
+function cancelTweenNoop() {
+	if (tweenRaf !== null) {
+		cancelAnimationFrame(tweenRaf);
+		tweenRaf = null;
+	}
+}
+let cancelTween = cancelTweenNoop;
+
+// --- Display sync ---
+
+function syncLeftFromIndex(idx: number) {
+	const entry = leftImages[idx];
+	displayLeftImage = entry.url;
+	displayLeftThumbhash = entry.thumbhash;
+	displayLeftLabel = entry.label;
+}
+
+function syncRightFromIndex(idx: number) {
+	const entry = rightImages[idx];
+	displayRightImage = entry.url;
+	displayRightThumbhash = entry.thumbhash;
+	displayRightLabel = entry.label;
 }
 
 // --- Transition state machine ---
 
 function startCycle() {
 	clearTimers();
-	if (!hasMultiplePairs || reducedMotion || isUserDragging) return;
+	if (!hasMultiplePairs || reducedMotion || isUserDragging || isPaused) return;
 
 	cycleTimer = setTimeout(() => {
-		beginTransition();
+		void beginTransition();
 	}, REST_DURATION);
 }
 
-function beginTransition() {
+/** Wait for a duration, rejecting if the generation has been bumped. */
+function generationDelay(ms: number, gen: number): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const id = setTimeout(() => {
+			if (generation !== gen) {
+				reject(new Error('cancelled'));
+			} else {
+				resolve();
+			}
+		}, ms);
+		// If the generation bumps before the timeout fires, the next
+		// cancelTween() + clearTimers() will handle cleanup. We also
+		// store the timeout so clearTimers can cancel it.
+		swapTimer = id;
+	});
+}
+
+async function beginTransition() {
 	if (!hasMultiplePairs || reducedMotion) return;
 
-	transitionState = 'sweep-out';
+	const gen = generation;
 
-	// Pick next orientation
+	// Determine sweep direction based on which side we're swapping:
+	// To hide the LEFT image, sweep divider to 0% (left edge).
+	//   The clip-path clips the right image to show from dividerPos rightward,
+	//   so at 0% the right image covers everything and left is hidden.
+	// To hide the RIGHT image, sweep divider to 100% (right edge).
+	//   At 100% the right image is fully clipped away, left covers everything.
+	const hidingLeft = swapSide === 'left';
+
+	// Diagonal clip-paths need to overshoot the edge so the angled split
+	// clears the viewport entirely. The polygon offsets by SKEW_DEG% from
+	// the position, so we push past the edge by that amount.
+	const overshoot = orientation === 'diagonal' ? SKEW_DEG / 100 : 0;
+	const edgeTarget = hidingLeft ? 0 - overshoot : 1 + overshoot;
+
+	// Showcase sweep goes toward the side we'll eventually hide, then the opposite
+	const nearTarget = hidingLeft ? SHOWCASE_NEAR : SHOWCASE_FAR;
+	const farTarget = hidingLeft ? SHOWCASE_FAR : SHOWCASE_NEAR;
+
+	// Pick next orientation (applied on sweep-in)
 	orientationIndex = (orientationIndex + 1) % ORIENTATIONS.length;
-	// We keep the current orientation during sweep-out, change on sweep-in
-	// Actually — change orientation between pairs for visual variety
-	const nextOrientation = ORIENTATIONS[orientationIndex];
+	const nextOrientation: Orientation = ORIENTATIONS[orientationIndex] ?? 'vertical';
 
-	// Alternate sweep direction
-	sweepDirection = sweepDirection === 'right' ? 'left' : 'right';
+	try {
+		// Phase 1: Showcase sweep A (center → toward the swap side)
+		transitionState = 'showcase-a';
+		await tweenTo(nearTarget, SHOWCASE_DURATION);
+		if (generation !== gen) return;
 
-	// Sweep the divider to one edge (hiding one image completely)
-	const targetPos = sweepDirection === 'right' ? 1 : 0;
+		// Phase 2: Showcase sweep B (across to the other side)
+		transitionState = 'showcase-b';
+		await tweenTo(farTarget, SHOWCASE_DURATION);
+		if (generation !== gen) return;
 
-	dividerTransition = `${SWEEP_DURATION}ms ${EASING}`;
+		// Phase 3: Sweep to edge (hides the target side)
+		transitionState = 'sweep-out';
+		await tweenTo(edgeTarget, SWEEP_DURATION);
+		if (generation !== gen) return;
 
-	// Use requestAnimationFrame to ensure the transition property is applied before changing position
-	requestAnimationFrame(() => {
-		dividerPosition = targetPos;
-	});
-
-	// After sweep completes, swap the hidden image
-	setTimeout(() => {
+		// Phase 4: Swap the hidden image only
 		transitionState = 'swapping';
-		dividerTransition = '';
 
-		// Advance to next pair
-		const nextIndex = (currentIndex + 1) % pairs.length;
-		const nextPair = pairs[nextIndex];
-
-		// Swap the image that's now hidden behind the divider
-		if (sweepDirection === 'right') {
-			// Divider swept right — right image is fully visible, left is hidden
-			// Swap the left image to next pair's left
-			displayLeftImage = nextPair.left_image_url;
-			displayLeftThumbhash = nextPair.left_thumbhash;
-			displayLeftLabel = `${nextPair.left_shader_name} — ${nextPair.left_scene_name}`;
-			// Also update right to next pair's right (it's showing but will be swapped visually)
-			displayRightImage = nextPair.right_image_url;
-			displayRightThumbhash = nextPair.right_thumbhash;
-			displayRightLabel = `${nextPair.right_shader_name} — ${nextPair.right_scene_name}`;
+		if (hidingLeft) {
+			leftIndex = (leftIndex + 1) % leftImages.length;
+			syncLeftFromIndex(leftIndex);
 		} else {
-			// Divider swept left — left image is fully visible, right is hidden
-			displayRightImage = nextPair.right_image_url;
-			displayRightThumbhash = nextPair.right_thumbhash;
-			displayRightLabel = `${nextPair.right_shader_name} — ${nextPair.right_scene_name}`;
-			displayLeftImage = nextPair.left_image_url;
-			displayLeftThumbhash = nextPair.left_thumbhash;
-			displayLeftLabel = `${nextPair.left_shader_name} — ${nextPair.left_scene_name}`;
+			rightIndex = (rightIndex + 1) % rightImages.length;
+			syncRightFromIndex(rightIndex);
 		}
 
-		currentIndex = nextIndex;
+		// Alternate for next cycle
+		swapSide = swapSide === 'left' ? 'right' : 'left';
 
-		// Brief pause, then sweep back
-		setTimeout(() => {
-			transitionState = 'sweep-in';
-			orientation = nextOrientation;
+		// Brief pause for image swap to render (cancellable via generation)
+		await generationDelay(SWAP_DELAY, gen);
+		if (generation !== gen) return;
 
-			dividerTransition = `${SWEEP_DURATION}ms ${EASING}`;
-			requestAnimationFrame(() => {
-				dividerPosition = 0.5;
-			});
+		// Phase 5: Sweep back to center with new orientation
+		transitionState = 'sweep-in';
+		orientation = nextOrientation;
 
-			// After sweep-in completes, rest
-			setTimeout(() => {
-				transitionState = 'resting';
-				dividerTransition = '';
-				startCycle();
-			}, SWEEP_DURATION);
-		}, SWAP_DELAY);
-	}, SWEEP_DURATION);
+		// Jump to the correct overshoot for the new orientation before sweeping in.
+		// If the new orientation is diagonal, the divider must start further out so
+		// the angled split enters from fully off-screen.
+		const inOvershoot = nextOrientation === 'diagonal' ? SKEW_DEG / 100 : 0;
+		dividerPosition = hidingLeft ? 0 - inOvershoot : 1 + inOvershoot;
+
+		await tweenTo(0.5, SWEEP_DURATION);
+		if (generation !== gen) return;
+
+		// Done — rest
+		transitionState = 'resting';
+		startCycle();
+	} catch {
+		// Tween cancelled (user started dragging or paused)
+	}
 }
 
 function clearTimers() {
@@ -161,6 +301,10 @@ function clearTimers() {
 		clearTimeout(resumeTimer);
 		resumeTimer = null;
 	}
+	if (swapTimer) {
+		clearTimeout(swapTimer);
+		swapTimer = null;
+	}
 }
 
 // --- User interaction ---
@@ -171,39 +315,63 @@ function handleDrag(pos: number) {
 
 function handleDragStart() {
 	isUserDragging = true;
+	generation++;
 	clearTimers();
-	dividerTransition = '';
-	// If mid-transition, snap to wherever we are
+	cancelTween();
 	transitionState = 'resting';
 }
 
 function handleDragEnd() {
 	isUserDragging = false;
-	// Resume auto-cycle after timeout
+	if (isPaused) return;
 	resumeTimer = setTimeout(() => {
 		startCycle();
 	}, RESUME_AFTER_DRAG);
 }
 
 function handleDotClick(index: number) {
-	if (index === currentIndex) return;
+	if (index === activePairIndex) return;
+	generation++;
 	clearTimers();
+	cancelTween();
 	transitionState = 'resting';
-	dividerTransition = '';
-	currentIndex = index;
+	leftIndex = index;
+	rightIndex = index;
+	activePairIndex = index;
 	dividerPosition = 0.5;
-	syncDisplay(pairs[index]);
+	syncLeftFromIndex(index);
+	syncRightFromIndex(index);
 	startCycle();
 }
 
-// Preload next pair's images during rest
-$effect(() => {
-	if (transitionState === 'resting' && hasMultiplePairs && browser) {
-		const nextIndex = (currentIndex + 1) % pairs.length;
-		const nextPair = pairs[nextIndex];
-		preloadImage(nextPair.left_image_url);
-		preloadImage(nextPair.right_image_url);
+function togglePause() {
+	isPaused = !isPaused;
+	if (isPaused) {
+		generation++;
+		clearTimers();
+		cancelTween();
+		transitionState = 'resting';
+		dividerPosition = 0.5;
+	} else {
+		startCycle();
 	}
+}
+
+// Preload the next image for whichever side will be swapped next (using 'hero' preset to match display)
+$effect(() => {
+	let img: HTMLImageElement | null = null;
+	if (transitionState === 'resting' && hasMultiplePairs && browser) {
+		if (swapSide === 'left') {
+			const nextIdx = (leftIndex + 1) % leftImages.length;
+			img = preloadImage(leftImages[nextIdx].url);
+		} else {
+			const nextIdx = (rightIndex + 1) % rightImages.length;
+			img = preloadImage(rightImages[nextIdx].url);
+		}
+	}
+	return () => {
+		if (img) img.src = '';
+	};
 });
 
 // Detect prefers-reduced-motion
@@ -215,8 +383,8 @@ onMount(() => {
 		reducedMotion = e.matches;
 		if (e.matches) {
 			clearTimers();
+			cancelTween();
 			transitionState = 'resting';
-			dividerTransition = '';
 			dividerPosition = 0.5;
 		} else {
 			startCycle();
@@ -224,30 +392,21 @@ onMount(() => {
 	};
 	mq.addEventListener('change', handler);
 
-	// Initialize display
+	// Initialize display from first pair
 	if (hasPairs) {
-		syncDisplay(pairs[0]);
+		syncLeftFromIndex(0);
+		syncRightFromIndex(0);
 	}
 
-	// Start the cycle
 	if (hasMultiplePairs && !reducedMotion) {
 		startCycle();
 	}
 
 	return () => {
 		clearTimers();
+		cancelTween();
 		mq.removeEventListener('change', handler);
 	};
-});
-
-// Divider wrapper style: transition + custom property in one string
-const wrapperStyle = $derived.by(() => {
-	const parts: string[] = [];
-	if (dividerTransition) {
-		parts.push(`transition: all ${dividerTransition}`);
-	}
-	parts.push(`--divider-pos: ${dividerPosition}`);
-	return parts.join('; ');
 });
 </script>
 
@@ -258,36 +417,46 @@ const wrapperStyle = $derived.by(() => {
 		aria-label="Shader comparison showcase"
 		aria-roledescription="carousel"
 	>
-		<!-- Comparison slider wrapper — applies transition to divider position via CSS custom property -->
-		<div class="relative" style={wrapperStyle}>
-			<ComparisonSlider
-				leftImage={displayLeftImage}
-				rightImage={displayRightImage}
-				leftThumbhash={displayLeftThumbhash}
-				rightThumbhash={displayRightThumbhash}
-				leftLabel={displayLeftLabel}
-				rightLabel={displayRightLabel}
-				{dividerPosition}
-				{orientation}
-				disabled={transitionState !== 'resting'}
-				onDrag={handleDrag}
-				onDragStart={handleDragStart}
-				onDragEnd={handleDragEnd}
-			/>
-		</div>
+		<ComparisonSlider
+			leftImage={displayLeftImage}
+			rightImage={displayRightImage}
+			leftThumbhash={displayLeftThumbhash}
+			rightThumbhash={displayRightThumbhash}
+			leftLabel={displayLeftLabel}
+			rightLabel={displayRightLabel}
+			{dividerPosition}
+			{orientation}
+			disabled={isAnimating}
+			{isAnimating}
+			onDrag={handleDrag}
+			onDragStart={handleDragStart}
+			onDragEnd={handleDragEnd}
+		/>
 
-		<!-- Dot indicators -->
+		<!-- Carousel controls -->
 		{#if hasMultiplePairs}
-			<div class="mt-4 flex justify-center gap-2" role="tablist" aria-label="Select comparison pair">
-				{#each pairs as _, i (i)}
-					<button
-						class="h-2 rounded-full transition-all duration-300 {i === currentIndex ? 'w-6 bg-white' : 'w-2 bg-white/40'}"
-						role="tab"
-						aria-selected={i === currentIndex}
-						aria-label="Pair {i + 1}"
-						onclick={() => handleDotClick(i)}
-					></button>
-				{/each}
+			<div class="mt-4 flex items-center justify-center gap-3">
+				<div class="flex gap-2" role="group" aria-label="Select comparison pair">
+					{#each pairs as _, i (i)}
+						<button
+							class="h-2 rounded-full transition-all duration-300 {i === activePairIndex ? 'w-6 bg-white' : 'w-2 bg-white/40'}"
+							aria-current={i === activePairIndex ? 'true' : undefined}
+							aria-label="Pair {i + 1}"
+							onclick={() => handleDotClick(i)}
+						></button>
+					{/each}
+				</div>
+				<button
+					class="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30"
+					aria-label={isPaused ? 'Play carousel' : 'Pause carousel'}
+					onclick={togglePause}
+				>
+					{#if isPaused}
+						<PlayIcon size={12} />
+					{:else}
+						<PauseIcon size={12} />
+					{/if}
+				</button>
 			</div>
 		{/if}
 	</div>

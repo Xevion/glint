@@ -113,12 +113,15 @@ export function resolveImageSource(source: string | ImageSourceLike): {
 }
 
 /**
- * Preload a full-resolution image in the background.
+ * Preload an image in the background at the given preset (defaults to 'hero').
  * Returns the Image element for optional cleanup.
  */
-export function preloadImage(src: string | null | undefined): HTMLImageElement | null {
+export function preloadImage(
+	src: string | null | undefined,
+	preset: ImagePreset = 'hero'
+): HTMLImageElement | null {
 	if (!src) return null;
-	const url = cfImageUrl(src, 'full');
+	const url = cfImageUrl(src, preset);
 	if (!url) return null;
 	const img = new Image();
 	img.src = url;

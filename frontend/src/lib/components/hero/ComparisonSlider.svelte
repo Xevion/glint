@@ -1,6 +1,6 @@
 <script lang="ts">
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import DividerHandle, { type Orientation } from './DividerHandle.svelte';
+import DividerLine from './DividerLine.svelte';
+import { SKEW_DEG, type Orientation } from './types';
 import { cfImageSrcset, cfImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 
@@ -15,6 +15,8 @@ interface Props {
 	dividerPosition?: number;
 	orientation?: Orientation;
 	disabled?: boolean;
+	/** Whether the parent is currently animating (enables will-change hint on clip-path) */
+	isAnimating?: boolean;
 	onDrag?: (position: number) => void;
 	onDragStart?: () => void;
 	onDragEnd?: () => void;
@@ -30,125 +32,247 @@ let {
 	dividerPosition = 0.5,
 	orientation = 'vertical',
 	disabled = false,
+	isAnimating = false,
 	onDrag,
 	onDragStart,
 	onDragEnd
 }: Props = $props();
 
+let containerEl: HTMLDivElement | undefined = $state();
+let isDragging = $state(false);
 let leftLoaded = $state(false);
 let rightLoaded = $state(false);
 
 const leftPlaceholder = $derived(decodeThumbhash(leftThumbhash));
 const rightPlaceholder = $derived(decodeThumbhash(rightThumbhash));
 
+const leftSrc = $derived(cfImageUrl(leftImage, { width: 1280, format: 'auto' }));
+const rightSrc = $derived(cfImageUrl(rightImage, { width: 1280, format: 'auto' }));
 const leftSrcset = $derived(cfImageSrcset(leftImage, 'hero'));
 const rightSrcset = $derived(cfImageSrcset(rightImage, 'hero'));
-const leftFallback = $derived(cfImageUrl(leftImage, { width: 1280, format: 'auto' }));
-const rightFallback = $derived(cfImageUrl(rightImage, { width: 1280, format: 'auto' }));
 
-// Reset loaded state when images change
-let prevLeft: string | undefined;
-let prevRight: string | undefined;
+// Reset loaded state when images change — each effect tracks one prop
 $effect(() => {
-	if (leftImage !== prevLeft) {
-		prevLeft = leftImage;
-		leftLoaded = false;
-	}
-	if (rightImage !== prevRight) {
-		prevRight = rightImage;
-		rightLoaded = false;
-	}
+	void leftImage; // subscribe to trigger on change
+	leftLoaded = false;
+});
+$effect(() => {
+	void rightImage; // subscribe to trigger on change
+	rightLoaded = false;
 });
 
+// --- Pointer interaction (on the whole container) ---
+
+function getPositionFromEvent(clientX: number, clientY: number): number {
+	if (!containerEl) return dividerPosition;
+	const rect = containerEl.getBoundingClientRect();
+
+	if (orientation === 'vertical' || orientation === 'diagonal') {
+		return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+	} else {
+		return Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+	}
+}
+
+function handlePointerDown(e: PointerEvent) {
+	if (disabled) return;
+	e.preventDefault();
+	isDragging = true;
+	containerEl?.setPointerCapture(e.pointerId);
+	onDragStart?.();
+
+	// Jump divider to click position immediately
+	const pos = getPositionFromEvent(e.clientX, e.clientY);
+	onDrag?.(pos);
+}
+
+function handlePointerMove(e: PointerEvent) {
+	if (!isDragging || disabled) return;
+	e.preventDefault();
+	const pos = getPositionFromEvent(e.clientX, e.clientY);
+	onDrag?.(pos);
+}
+
+function handlePointerUp(e: PointerEvent) {
+	if (!isDragging) return;
+	isDragging = false;
+	containerEl?.releasePointerCapture(e.pointerId);
+	onDragEnd?.();
+}
+
+// --- Keyboard interaction (WAI-ARIA slider pattern) ---
+
+const STEP_SMALL = 0.01;
+const STEP_LARGE = 0.1;
+
+function handleKeydown(e: KeyboardEvent) {
+	if (disabled) return;
+
+	let delta: number | undefined;
+
+	switch (e.key) {
+		case 'ArrowRight':
+		case 'ArrowUp':
+			delta = STEP_SMALL;
+			break;
+		case 'ArrowLeft':
+		case 'ArrowDown':
+			delta = -STEP_SMALL;
+			break;
+		case 'PageUp':
+			delta = STEP_LARGE;
+			break;
+		case 'PageDown':
+			delta = -STEP_LARGE;
+			break;
+		case 'Home':
+			delta = -dividerPosition;
+			break;
+		case 'End':
+			delta = 1 - dividerPosition;
+			break;
+		default:
+			return;
+	}
+
+	e.preventDefault();
+	const newPos = Math.max(0, Math.min(1, dividerPosition + delta));
+	onDrag?.(newPos);
+}
+
 /**
- * Compute the CSS clip-path for the "right" (top) image.
- * The right image is clipped to only show the portion after the divider.
+ * Compute CSS clip-paths for left and right image layers.
+ * The left layer shows the portion before the divider, the right layer after.
  */
-const clipPath = $derived.by(() => {
+const clipPaths = $derived.by(() => {
 	const pos = dividerPosition * 100;
 
 	if (orientation === 'vertical') {
-		// Right image shows from divider to right edge
-		return `inset(0 0 0 ${pos}%)`;
+		return {
+			left: `inset(0 ${100 - pos}% 0 0)`,
+			right: `inset(0 0 0 ${pos}%)`
+		};
 	} else if (orientation === 'horizontal') {
-		// Right image shows from divider to bottom edge
-		return `inset(${pos}% 0 0 0)`;
+		return {
+			left: `inset(0 0 ${100 - pos}% 0)`,
+			right: `inset(${pos}% 0 0 0)`
+		};
 	} else {
-		// Diagonal: angled wipe
-		const skew = 8; // degrees of angle
-		const left = pos - skew;
-		const right = pos + skew;
-		return `polygon(${right}% 0%, 100% 0%, 100% 100%, ${left}% 100%)`;
+		const l = pos - SKEW_DEG;
+		const r = pos + SKEW_DEG;
+		return {
+			left: `polygon(0% 0%, ${r}% 0%, ${l}% 100%, 0% 100%)`,
+			right: `polygon(${r}% 0%, 100% 0%, 100% 100%, ${l}% 100%)`
+		};
 	}
 });
+
+const cursorClass = $derived.by(() => {
+	if (disabled) return '';
+	if (orientation === 'horizontal') return 'cursor-ns-resize';
+	return 'cursor-ew-resize';
+});
+
+/** Allow scrolling on the axis perpendicular to the drag direction */
+const touchAction = $derived(orientation === 'horizontal' ? 'pan-x' : 'pan-y');
+
+const willChangeClip = $derived(isAnimating || isDragging);
 </script>
 
-<div class="comparison-slider relative w-full overflow-hidden rounded-xl" style="aspect-ratio: 16/9;">
-	<!-- Left (base) image -->
-	<div class="absolute inset-0">
-		{#if leftPlaceholder}
+{#snippet imageSlot(
+	src: string | null,
+	srcset: string | null,
+	placeholder: string | null,
+	loaded: boolean,
+	onLoad: () => void,
+	alt: string,
+	label: string | undefined,
+	side: 'left' | 'right',
+	clipPath: string
+)}
+	<div
+		class="absolute inset-0"
+		class:will-change-[clip-path]={willChangeClip}
+		style:clip-path={clipPath}
+	>
+		{#if placeholder}
 			<div
 				class="absolute inset-0 bg-cover bg-center transition-opacity duration-300"
-				class:opacity-0={leftLoaded}
-				style:background-image="url({leftPlaceholder})"
+				class:opacity-0={loaded}
+				style:background-image="url({placeholder})"
 			></div>
 		{/if}
-		{#if leftFallback}
-			<img
-				src={leftFallback}
-				srcset={leftSrcset}
-				sizes="(min-width: 1024px) 66vw, 100vw"
-				alt={leftLabel ?? 'Left comparison'}
-				class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
-				class:opacity-0={!leftLoaded}
-				loading="eager"
-				decoding="async"
-				onload={() => (leftLoaded = true)}
-			/>
-		{/if}
-		{#if leftLabel}
-			<div class="absolute bottom-4 left-4 z-20 rounded-md bg-black/60 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
-				{leftLabel}
+		<img
+			src={src}
+			srcset={srcset}
+			sizes="(min-width: 1024px) 66vw, 100vw"
+			{alt}
+			class="pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+			class:opacity-0={!loaded}
+			loading="eager"
+			decoding="async"
+			fetchpriority="high"
+			draggable="false"
+			onload={onLoad}
+		/>
+		{#if label}
+			<div
+				class="absolute z-20 rounded-md bg-black/60 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm pointer-events-none"
+				class:left-4={side === 'left'}
+				class:right-4={side === 'right'}
+				class:bottom-4={orientation !== (side === 'left' ? 'horizontal' : 'diagonal')}
+				class:top-4={orientation === (side === 'left' ? 'horizontal' : 'diagonal')}
+			>
+				{label}
 			</div>
 		{/if}
 	</div>
+{/snippet}
 
-	<!-- Right (clipped) image -->
-	<div class="absolute inset-0 will-change-[clip-path]" style:clip-path={clipPath}>
-		{#if rightPlaceholder}
-			<div
-				class="absolute inset-0 bg-cover bg-center transition-opacity duration-300"
-				class:opacity-0={rightLoaded}
-				style:background-image="url({rightPlaceholder})"
-			></div>
-		{/if}
-		{#if rightFallback}
-			<img
-				src={rightFallback}
-				srcset={rightSrcset}
-				sizes="(min-width: 1024px) 66vw, 100vw"
-				alt={rightLabel ?? 'Right comparison'}
-				class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
-				class:opacity-0={!rightLoaded}
-				loading="eager"
-				decoding="async"
-				onload={() => (rightLoaded = true)}
-			/>
-		{/if}
-		{#if rightLabel}
-			<div class="absolute bottom-4 right-4 z-20 rounded-md bg-black/60 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
-				{rightLabel}
-			</div>
-		{/if}
-	</div>
+<div
+	bind:this={containerEl}
+	class="comparison-slider relative w-full overflow-hidden rounded-xl select-none aspect-video max-sm:aspect-[4/3] max-sm:min-h-[280px] {cursorClass}"
+	style:touch-action={touchAction}
+	role="slider"
+	aria-orientation={orientation === 'horizontal' ? 'vertical' : 'horizontal'}
+	aria-valuenow={Math.round(dividerPosition * 100)}
+	aria-valuemin={0}
+	aria-valuemax={100}
+	aria-label="Comparison divider"
+	tabindex={disabled ? -1 : 0}
+	onpointerdown={handlePointerDown}
+	onpointermove={handlePointerMove}
+	onpointerup={handlePointerUp}
+	onpointercancel={handlePointerUp}
+	onkeydown={handleKeydown}
+>
+	{@render imageSlot(
+		leftSrc,
+		leftSrcset,
+		leftPlaceholder,
+		leftLoaded,
+		() => (leftLoaded = true),
+		leftLabel ?? 'Left comparison',
+		leftLabel,
+		'left',
+		clipPaths.left
+	)}
 
-	<!-- Divider -->
-	<DividerHandle
+	{@render imageSlot(
+		rightSrc,
+		rightSrcset,
+		rightPlaceholder,
+		rightLoaded,
+		() => (rightLoaded = true),
+		rightLabel ?? 'Right comparison',
+		rightLabel,
+		'right',
+		clipPaths.right
+	)}
+
+	<!-- Divider line (visual only, no interaction) -->
+	<DividerLine
 		position={dividerPosition}
 		{orientation}
-		{disabled}
-		{onDrag}
-		{onDragStart}
-		{onDragEnd}
 	/>
 </div>
