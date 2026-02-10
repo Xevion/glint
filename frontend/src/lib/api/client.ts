@@ -42,6 +42,11 @@ export class ApiClient {
 				return Result.err(ApiError.fromResponse(response, body));
 			}
 
+			// Handle empty responses (204 No Content, etc.)
+			if (response.status === 204 || response.headers.get('content-length') === '0') {
+				return Result.ok(null as T);
+			}
+
 			// Parse successful response
 			try {
 				const data = (await response.json()) as T;
