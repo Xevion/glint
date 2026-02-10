@@ -16,6 +16,7 @@ import {
 	Tooltip
 } from 'layerchart';
 import { scaleTime, scaleLinear } from 'd3-scale';
+import RefreshButton from '$lib/components/RefreshButton.svelte';
 import {
 	Activity,
 	ArrowRight,
@@ -26,7 +27,6 @@ import {
 	Mountain,
 	Pause,
 	Play,
-	RefreshCw,
 	Sparkles,
 	Users
 } from '@lucide/svelte';
@@ -87,7 +87,7 @@ const statCards = $derived<StatCard[]>([
 
 async function refresh() {
 	refreshing = true;
-	await invalidateAll();
+	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
 	lastRefreshed = new Date();
 	refreshing = false;
 }
@@ -158,9 +158,7 @@ onDestroy(() => {
 						<Play class="h-4 w-4" />
 					{/if}
 				</Button>
-				<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
-					<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-				</Button>
+				<RefreshButton {refreshing} onclick={refresh} />
 			</div>
 		</div>
 	</header>

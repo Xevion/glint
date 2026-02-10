@@ -1,7 +1,6 @@
 <script lang="ts">
 import type { Snippet } from 'svelte';
-import { Button } from '$lib/components/ui/button';
-import { RefreshCw } from '@lucide/svelte';
+import RefreshButton from '$lib/components/RefreshButton.svelte';
 
 interface Props {
 	title: string;
@@ -25,9 +24,7 @@ let { title, count, refreshing = false, onrefresh, actions }: Props = $props();
 			{@render actions()}
 		{/if}
 		{#if onrefresh}
-			<Button variant="outline" size="icon" onclick={onrefresh} disabled={refreshing}>
-				<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-			</Button>
+			<RefreshButton {refreshing} onclick={onrefresh} />
 		{/if}
 	</div>
 </header>

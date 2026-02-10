@@ -19,7 +19,7 @@ const filteredScenes = $derived(showInactive ? scenes : scenes.filter((s) => s.a
 
 async function refresh() {
 	refreshing = true;
-	await invalidateAll();
+	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
 	refreshing = false;
 }
 

@@ -2,11 +2,11 @@
 import { invalidateAll } from '$app/navigation';
 import type { CaptureRun, CaptureRunItemWithContext } from '$lib/bindings';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { Button } from '$lib/components/ui/button';
+import RefreshButton from '$lib/components/RefreshButton.svelte';
 import * as Table from '$lib/components/ui/table';
 import { formatDuration } from '$lib/utils/format';
 import { statusColorFallback, statusColors } from '$lib/utils/status';
-import { ArrowLeft, ExternalLink, RefreshCw } from '@lucide/svelte';
+import { ArrowLeft, ExternalLink } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
@@ -27,7 +27,7 @@ function toggleExpand(id: string) {
 
 async function refresh() {
 	refreshing = true;
-	await invalidateAll();
+	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
 	refreshing = false;
 }
 
@@ -57,9 +57,7 @@ class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {st
 				{run.status}
 			</span>
 			<div class="ml-auto">
-				<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
-					<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-				</Button>
+				<RefreshButton {refreshing} onclick={refresh} />
 			</div>
 		</div>
 		<div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">

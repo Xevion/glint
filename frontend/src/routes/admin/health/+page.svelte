@@ -2,12 +2,12 @@
 import { invalidateAll } from '$app/navigation';
 import type { CaptureTargetHealth, TargetHealth } from '$lib/bindings';
 import { Badge } from '$lib/components/ui/badge';
-import { Button } from '$lib/components/ui/button';
+import RefreshButton from '$lib/components/RefreshButton.svelte';
 import * as Table from '$lib/components/ui/table';
 import * as Tabs from '$lib/components/ui/tabs';
 import * as Tooltip from '$lib/components/ui/tooltip';
 import { Alert } from '$lib/components/ui/alert';
-import { Activity, Grid3x3, RefreshCw } from '@lucide/svelte';
+import { Activity, Grid3x3 } from '@lucide/svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { PageData } from './$types';
 
@@ -133,7 +133,7 @@ function formatTime(iso: string | null): string {
 
 async function refresh() {
 	refreshing = true;
-	await invalidateAll();
+	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
 	refreshing = false;
 }
 </script>
@@ -145,9 +145,7 @@ async function refresh() {
 		<div class="flex items-baseline gap-3">
 			<h1 class="text-2xl font-semibold">Capture Health</h1>
 		</div>
-		<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
-			<RefreshCw class={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-		</Button>
+		<RefreshButton {refreshing} onclick={refresh} />
 	</header>
 
 	{#if health.error}

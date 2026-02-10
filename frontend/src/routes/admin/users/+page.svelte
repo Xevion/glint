@@ -38,7 +38,7 @@ const columns = [
 async function refresh() {
 	refreshing = true;
 	error = null;
-	await invalidateAll();
+	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
 	refreshing = false;
 }
 
