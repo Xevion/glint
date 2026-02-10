@@ -741,7 +741,29 @@ data class UpdateSceneRequest(
 )
 
 /**
+ * Version data nested inside API scene responses.
+ */
+@Serializable
+data class ApiSceneVersion(
+    val id: String,
+    @SerialName("scene_id") val sceneId: String,
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val pitch: Double,
+    val yaw: Double,
+    @SerialName("time_of_day_ticks") val timeOfDayTicks: Int,
+    val weather: String,
+    @SerialName("weather_intensity") val weatherIntensity: Double,
+    @SerialName("moon_phase") val moonPhase: Int?,
+    val biome: String?,
+    @SerialName("created_at") val createdAt: String,
+)
+
+/**
  * Scene object returned by the backend API.
+ * Matches the backend's SceneWithVersion / SceneListItem shape:
+ * flattened Scene fields + nested version.
  */
 @Serializable
 data class ApiScene(
@@ -750,19 +772,11 @@ data class ApiScene(
     val slug: String,
     val description: String?,
     @SerialName("world_id") val worldId: String,
-    val x: Double,
-    val y: Double,
-    val z: Double,
-    val pitch: Double,
-    val yaw: Double,
     val dimension: String,
-    @SerialName("time_of_day_ticks") val timeOfDayTicks: Int,
-    val weather: String,
-    @SerialName("weather_intensity") val weatherIntensity: Double,
-    @SerialName("moon_phase") val moonPhase: Int?,
-    val biome: String?,
+    @SerialName("parent_scene_id") val parentSceneId: String? = null,
     val active: Boolean,
     @SerialName("created_at") val createdAt: String,
+    val version: ApiSceneVersion,
 )
 
 /**

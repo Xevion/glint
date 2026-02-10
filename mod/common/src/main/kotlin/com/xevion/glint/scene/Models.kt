@@ -2,7 +2,12 @@ package com.xevion.glint.scene
 
 import com.xevion.glint.capture.Camera
 import com.xevion.glint.capture.Position
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * A collection of scenes for a single world.
@@ -202,7 +207,7 @@ enum class CloudMode {
     FANCY,
 }
 
-@Serializable
+@Serializable(with = WeatherSerializer::class)
 enum class Weather {
     CLEAR,
     RAIN,
@@ -220,6 +225,18 @@ enum class Weather {
                 else -> CLEAR
             }
     }
+}
+
+/** Serializes Weather as lowercase, deserializes case-insensitively. */
+object WeatherSerializer : KSerializer<Weather> {
+    override val descriptor = PrimitiveSerialDescriptor("Weather", PrimitiveKind.STRING)
+
+    override fun serialize(
+        encoder: Encoder,
+        value: Weather,
+    ) = encoder.encodeString(value.name.lowercase())
+
+    override fun deserialize(decoder: Decoder): Weather = Weather.fromString(decoder.decodeString())
 }
 
 /**

@@ -226,17 +226,18 @@ object SceneSyncManager {
         local: Scene,
         remote: ApiScene,
     ): Boolean {
+        val v = remote.version
         if (local.dimension != remote.dimension) return true
-        if (local.timeOfDay != remote.timeOfDayTicks) return true
-        if (local.weather.toMinecraftString() != remote.weather) return true
-        if (abs(local.weatherIntensity.toDouble() - remote.weatherIntensity) > FLOAT_EPSILON) return true
-        if (local.moonPhase != remote.moonPhase) return true
-        if (local.biome != remote.biome) return true
-        if (abs(local.position.x - remote.x) > FLOAT_EPSILON) return true
-        if (abs(local.position.y - remote.y) > FLOAT_EPSILON) return true
-        if (abs(local.position.z - remote.z) > FLOAT_EPSILON) return true
-        if (abs(local.camera.pitch.toDouble() - remote.pitch) > FLOAT_EPSILON) return true
-        if (abs(local.camera.yaw.toDouble() - remote.yaw) > FLOAT_EPSILON) return true
+        if (local.timeOfDay != v.timeOfDayTicks) return true
+        if (local.weather.toMinecraftString() != v.weather) return true
+        if (abs(local.weatherIntensity.toDouble() - v.weatherIntensity) > FLOAT_EPSILON) return true
+        if (local.moonPhase != v.moonPhase) return true
+        if (local.biome != v.biome) return true
+        if (abs(local.position.x - v.x) > FLOAT_EPSILON) return true
+        if (abs(local.position.y - v.y) > FLOAT_EPSILON) return true
+        if (abs(local.position.z - v.z) > FLOAT_EPSILON) return true
+        if (abs(local.camera.pitch.toDouble() - v.pitch) > FLOAT_EPSILON) return true
+        if (abs(local.camera.yaw.toDouble() - v.yaw) > FLOAT_EPSILON) return true
         return false
     }
 
@@ -251,13 +252,13 @@ fun ApiScene.toLocalScene(): Scene =
         name = name,
         description = description,
         dimension = dimension,
-        position = Position(x = x, y = y, z = z),
-        camera = Camera(yaw = yaw.toFloat(), pitch = pitch.toFloat()),
-        timeOfDay = timeOfDayTicks,
-        weather = Weather.fromString(weather),
-        weatherIntensity = weatherIntensity.toFloat(),
-        moonPhase = moonPhase,
-        biome = biome,
+        position = Position(x = version.x, y = version.y, z = version.z),
+        camera = Camera(yaw = version.yaw.toFloat(), pitch = version.pitch.toFloat()),
+        timeOfDay = version.timeOfDayTicks,
+        weather = Weather.fromString(version.weather),
+        weatherIntensity = version.weatherIntensity.toFloat(),
+        moonPhase = version.moonPhase,
+        biome = version.biome,
     )
 
 data class SceneDiff(
