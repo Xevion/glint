@@ -6,7 +6,7 @@ export interface ImageTransformOptions {
 	format?: 'auto' | 'avif' | 'webp' | 'jpeg';
 }
 
-export const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920] as const;
+export const IMAGE_WIDTHS = [160, 320, 640, 960, 1280, 1920] as const;
 
 export const IMAGE_PRESETS = {
 	thumbnail: {

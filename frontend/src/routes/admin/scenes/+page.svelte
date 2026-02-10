@@ -71,7 +71,7 @@ function formatDimension(dim: string): string {
 								src={scene.image_url}
 								thumbhash={scene.thumbhash}
 								alt="{scene.name} preview"
-								preset="card"
+								preset="thumbnail"
 								class="h-full w-full rounded-md object-cover"
 								containerClass="h-20 w-32 overflow-hidden rounded-md"
 							/>

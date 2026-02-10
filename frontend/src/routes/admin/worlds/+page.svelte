@@ -58,7 +58,7 @@ function lastUploadAt(world: WorldListItem): string | null {
 								src={world.preview?.image_url}
 								thumbhash={world.preview?.thumbhash}
 								alt="{world.name} preview"
-								preset="card"
+								preset="thumbnail"
 								class="h-full w-full rounded-md object-cover"
 								containerClass="h-20 w-32 overflow-hidden rounded-md"
 							/>
