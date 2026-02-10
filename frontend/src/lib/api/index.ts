@@ -3,6 +3,7 @@ import { AdminEndpoints } from './endpoints/admin';
 import { AdoptEndpoints } from './endpoints/adopt';
 import { CaptureEndpoints } from './endpoints/captures';
 import { DeviceEndpoints } from './endpoints/device';
+import { FeaturedEndpoints } from './endpoints/featured';
 import { RunEndpoints } from './endpoints/runs';
 import { SceneEndpoints } from './endpoints/scenes';
 import { ShaderEndpoints } from './endpoints/shaders';
@@ -31,7 +32,8 @@ export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
 		adopt: new AdoptEndpoints(url, fetchFn),
 		worlds: new WorldsEndpoints(url, fetchFn),
 		device: new DeviceEndpoints(url, fetchFn),
-		runs: new RunEndpoints(url, fetchFn)
+		runs: new RunEndpoints(url, fetchFn),
+		featured: new FeaturedEndpoints(url, fetchFn)
 	};
 }
 

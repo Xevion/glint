@@ -21,6 +21,7 @@ export type { DeviceConfirmResponse } from "./DeviceConfirmResponse";
 export type { DeviceTokenError } from "./DeviceTokenError";
 export type { DeviceTokenResponse } from "./DeviceTokenResponse";
 export type { Feature } from "./Feature";
+export type { FeaturedPair } from "./FeaturedPair";
 export type { PaginatedCaptures } from "./PaginatedCaptures";
 export type { Scene } from "./Scene";
 export type { SceneListItem } from "./SceneListItem";

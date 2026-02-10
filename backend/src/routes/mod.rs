@@ -3,6 +3,7 @@ mod auth;
 mod capture_health;
 mod captures;
 mod device;
+mod featured;
 mod runs;
 mod scenes;
 mod sessions;
@@ -37,6 +38,7 @@ fn api_router() -> Router<AppState> {
         .nest("/device", device::router())
         .nest("/runs", runs::router())
         .nest("/work", work::router())
+        .nest("/featured", featured::router())
         .nest("/admin/capture-health", capture_health::router())
         .nest("/admin/storage", storage::router())
         .merge(runs::failure_router())

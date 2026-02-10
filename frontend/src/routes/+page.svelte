@@ -1,5 +1,6 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
+import HeroSlider from '$lib/components/hero/HeroSlider.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { fade, fly } from 'svelte/transition';
@@ -13,45 +14,92 @@ const featuredShaders = $derived((data.shaders ?? []).slice(0, 6));
 // Stats
 const captures = $derived(data.captures ?? []);
 const shaders = $derived(data.shaders ?? []);
+const featuredPairs = $derived(data.featuredPairs ?? []);
 const hasStats = $derived(shaders.length > 0 || captures.length > 0);
+const hasFeaturedPairs = $derived(featuredPairs.length > 0);
 </script>
 
 <svelte:head><title>Glint</title></svelte:head>
 
 <!-- Hero Section -->
-<div class="py-16 sm:py-24 text-center">
-	<h1
-		in:fly={{ y: -20, duration: 500 }}
-		class="text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl"
-	>
-		Glint
-	</h1>
-	<p
-		in:fly={{ y: -10, duration: 500, delay: 100 }}
-		class="mt-4 text-xl text-muted-foreground sm:text-2xl"
-	>
-		Shader Preview Catalog for Minecraft
-	</p>
+{#if hasFeaturedPairs}
+	<div in:fade={{ duration: 400 }} class="py-8 sm:py-12">
+		<!-- Hero slider with overlay text -->
+		<div class="relative">
+			<HeroSlider pairs={featuredPairs} />
 
-	<div in:fade={{ duration: 400, delay: 200 }} class="mt-10 flex justify-center gap-4">
-		<Button href={resolve('/shaders', {})} size="lg">Browse Shaders</Button>
-		<Button href={resolve('/compare', {})} variant="outline" size="lg">Compare</Button>
-	</div>
-
-	<!-- Stats (inline with hero) -->
-	{#if hasStats}
-		<div
-			in:fly={{ y: 10, duration: 400, delay: 300 }}
-			class="mt-12 inline-flex items-center gap-6 rounded-full bg-muted/50 backdrop-blur-sm px-6 py-2 text-sm"
-		>
-			<span><strong class="text-foreground">{shaders.length}</strong> <span class="text-muted-foreground">Shaders</span></span>
-			<span class="text-muted-foreground/30">|</span>
-			<span><strong class="text-foreground">{new Set(captures.map((c) => c.scene_id)).size}</strong> <span class="text-muted-foreground">Scenes</span></span>
-			<span class="text-muted-foreground/30">|</span>
-			<span><strong class="text-foreground">{captures.length}</strong> <span class="text-muted-foreground">Captures</span></span>
+			<!-- Overlay: title + CTAs positioned on top of the slider -->
+			<div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-30">
+				<h1
+					class="text-4xl font-bold tracking-tight text-white drop-shadow-lg sm:text-5xl lg:text-6xl"
+					style="text-shadow: 0 2px 12px rgba(0,0,0,0.5);"
+				>
+					Glint
+				</h1>
+				<p
+					class="mt-2 text-lg text-white/90 drop-shadow-md sm:text-xl"
+					style="text-shadow: 0 1px 8px rgba(0,0,0,0.5);"
+				>
+					Shader Preview Catalog for Minecraft
+				</p>
+				<div class="pointer-events-auto mt-6 flex gap-4">
+					<Button href={resolve('/shaders', {})} size="lg" class="shadow-lg">Browse Shaders</Button>
+					<Button href={resolve('/compare', {})} variant="outline" size="lg" class="border-white/50 bg-black/30 text-white shadow-lg backdrop-blur-sm hover:bg-black/50">Compare</Button>
+				</div>
+			</div>
 		</div>
-	{/if}
-</div>
+
+		<!-- Stats (below hero) -->
+		{#if hasStats}
+			<div
+				in:fly={{ y: 10, duration: 400, delay: 200 }}
+				class="mt-6 flex justify-center"
+			>
+				<div class="inline-flex items-center gap-6 rounded-full bg-muted/50 backdrop-blur-sm px-6 py-2 text-sm">
+					<span><strong class="text-foreground">{shaders.length}</strong> <span class="text-muted-foreground">Shaders</span></span>
+					<span class="text-muted-foreground/30">|</span>
+					<span><strong class="text-foreground">{new Set(captures.map((c) => c.scene_id)).size}</strong> <span class="text-muted-foreground">Scenes</span></span>
+					<span class="text-muted-foreground/30">|</span>
+					<span><strong class="text-foreground">{captures.length}</strong> <span class="text-muted-foreground">Captures</span></span>
+				</div>
+			</div>
+		{/if}
+	</div>
+{:else}
+	<!-- Fallback: text-only hero when no featured pairs available -->
+	<div class="py-16 sm:py-24 text-center">
+		<h1
+			in:fly={{ y: -20, duration: 500 }}
+			class="text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl"
+		>
+			Glint
+		</h1>
+		<p
+			in:fly={{ y: -10, duration: 500, delay: 100 }}
+			class="mt-4 text-xl text-muted-foreground sm:text-2xl"
+		>
+			Shader Preview Catalog for Minecraft
+		</p>
+
+		<div in:fade={{ duration: 400, delay: 200 }} class="mt-10 flex justify-center gap-4">
+			<Button href={resolve('/shaders', {})} size="lg">Browse Shaders</Button>
+			<Button href={resolve('/compare', {})} variant="outline" size="lg">Compare</Button>
+		</div>
+
+		{#if hasStats}
+			<div
+				in:fly={{ y: 10, duration: 400, delay: 300 }}
+				class="mt-12 inline-flex items-center gap-6 rounded-full bg-muted/50 backdrop-blur-sm px-6 py-2 text-sm"
+			>
+				<span><strong class="text-foreground">{shaders.length}</strong> <span class="text-muted-foreground">Shaders</span></span>
+				<span class="text-muted-foreground/30">|</span>
+				<span><strong class="text-foreground">{new Set(captures.map((c) => c.scene_id)).size}</strong> <span class="text-muted-foreground">Scenes</span></span>
+				<span class="text-muted-foreground/30">|</span>
+				<span><strong class="text-foreground">{captures.length}</strong> <span class="text-muted-foreground">Captures</span></span>
+			</div>
+		{/if}
+	</div>
+{/if}
 
 <!-- Featured Shaders -->
 {#if featuredShaders.length > 0}

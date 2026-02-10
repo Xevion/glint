@@ -1,13 +1,14 @@
 import { createApiClient } from '$lib/api';
-import type { Capture, ShaderListItem } from '$lib/bindings';
+import type { Capture, FeaturedPair, ShaderListItem } from '$lib/bindings';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => {
 	const api = createApiClient(fetch);
 
-	const [capturesResult, shadersResult] = await Promise.all([
+	const [capturesResult, shadersResult, featuredResult] = await Promise.all([
 		api.captures.list(),
-		api.shaders.list()
+		api.shaders.list(),
+		api.featured.list()
 	]);
 
 	const errors: string[] = [];
@@ -28,9 +29,18 @@ export const load: PageLoad = async ({ fetch }) => {
 		}
 	});
 
+	const featuredPairs = featuredResult.match({
+		Ok: (pairs): FeaturedPair[] => pairs,
+		Err: (err) => {
+			errors.push(err.message);
+			return [] as FeaturedPair[];
+		}
+	});
+
 	return {
 		captures,
 		shaders,
+		featuredPairs,
 		error: errors.length > 0 ? errors.join('; ') : undefined
 	};
 };
