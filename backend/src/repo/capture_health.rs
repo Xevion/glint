@@ -74,6 +74,7 @@ struct CaptureHealthRow {
     capture_failure_count: i32,
     last_capture_at: Option<DateTime<Utc>>,
     world_version_stale: Option<bool>,
+    scene_version_stale: Option<bool>,
     has_capture: bool,
 }
 
@@ -98,6 +99,12 @@ impl CaptureHealthRepo {
                     id, world_id
                 FROM world_versions
                 ORDER BY world_id, created_at DESC
+            ),
+            latest_scene_versions AS (
+                SELECT DISTINCT ON (scene_id)
+                    id, scene_id
+                FROM scene_versions
+                ORDER BY scene_id, created_at DESC
             ),
             target_matrix AS (
                 -- Branch 1: shader versions WITH profiles
@@ -134,7 +141,8 @@ impl CaptureHealthRepo {
                     c.scene_id,
                     c.profile,
                     c.captured_at,
-                    c.world_version_id
+                    c.world_version_id,
+                    c.scene_version_id
                 FROM captures c
                 WHERE c.status IN ('completed', 'uploading')
                 ORDER BY c.shader_version_id, c.scene_id, c.profile, c.captured_at DESC
@@ -156,12 +164,18 @@ impl CaptureHealthRepo {
                     WHEN bc.world_version_id IS NOT DISTINCT FROM lwv.id THEN FALSE
                     ELSE TRUE
                 END AS "world_version_stale?: bool",
+                CASE
+                    WHEN bc.captured_at IS NULL THEN NULL
+                    WHEN bc.scene_version_id IS NOT DISTINCT FROM lsv.id THEN FALSE
+                    ELSE TRUE
+                END AS "scene_version_stale?: bool",
                 (bc.captured_at IS NOT NULL) AS "has_capture!"
             FROM target_matrix tm
             JOIN latest_versions sv ON sv.id = tm.shader_version_id
             JOIN shaders sh ON sh.id = sv.shader_id
             JOIN scenes sc ON sc.id = tm.scene_id
             LEFT JOIN latest_world_versions lwv ON lwv.world_id = sc.world_id
+            LEFT JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id
             LEFT JOIN best_captures bc
                 ON bc.shader_version_id = tm.shader_version_id
                 AND bc.scene_id = tm.scene_id
@@ -179,7 +193,9 @@ impl CaptureHealthRepo {
                     TargetHealth::Failed
                 } else if !row.has_capture {
                     TargetHealth::Missing
-                } else if row.world_version_stale.unwrap_or(false) {
+                } else if row.world_version_stale.unwrap_or(false)
+                    || row.scene_version_stale.unwrap_or(false)
+                {
                     TargetHealth::Stale
                 } else {
                     TargetHealth::Completed

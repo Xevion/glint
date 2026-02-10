@@ -8,16 +8,6 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// Scene information for a capture run
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct SceneInfo {
-    pub id: String,
-    pub slug: String,
-    pub name: String,
-    pub world_id: String,
-    pub definition_json: String,
-}
-
 /// World information for a capture run
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WorldInfo {
@@ -163,6 +153,6 @@ pub struct Position {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Camera {
-    pub yaw: f32,
-    pub pitch: f32,
+    pub yaw: f64,
+    pub pitch: f64,
 }

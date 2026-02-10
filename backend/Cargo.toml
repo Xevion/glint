@@ -38,3 +38,4 @@ image = { version = "0.25.9", default-features = false, features = ["avif-native
 base64 = "0.22.1"
 posthog-rs = "0.4.0"
 tower = { version = "0.5.3", features = ["util"] }
+validator = { version = "0.20.0", features = ["derive"] }

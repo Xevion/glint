@@ -39,15 +39,19 @@ const capturesByShader = $derived.by(() => {
 
 // Weather display helper
 const weatherLabel = $derived.by(() => {
-	if (scene.weather === 'clear') return 'Clear';
-	if (scene.weather === 'rain') return `Rain (${Math.round(scene.weather_intensity * 100)}%)`;
-	if (scene.weather === 'thunder') return `Thunder (${Math.round(scene.weather_intensity * 100)}%)`;
-	return scene.weather;
+	const v = scene.version;
+	if (!v) return null;
+	if (v.weather === 'clear') return 'Clear';
+	if (v.weather === 'rain') return `Rain (${Math.round(v.weather_intensity * 100)}%)`;
+	if (v.weather === 'thunder') return `Thunder (${Math.round(v.weather_intensity * 100)}%)`;
+	return v.weather;
 });
 
 // Time display helper
 const timeLabel = $derived.by(() => {
-	const ticks = scene.time_of_day_ticks;
+	const v = scene.version;
+	if (!v) return null;
+	const ticks = v.time_of_day_ticks;
 	const hours = Math.floor(ticks / 1000);
 	if (hours < 6) return 'Night';
 	if (hours < 12) return 'Morning';
@@ -164,17 +168,23 @@ const timeLabel = $derived.by(() => {
 							<p class="mb-4 text-sm text-muted-foreground">{scene.description}</p>
 						{/if}
 
-						<!-- Environment -->
+					<!-- Environment -->
+					{#if timeLabel != null || weatherLabel != null}
 						<div class="mb-4 space-y-2">
-							<div class="flex items-center justify-between text-sm">
-								<span class="text-muted-foreground">Time</span>
-								<span class="font-medium text-foreground">{timeLabel}</span>
-							</div>
-							<div class="flex items-center justify-between text-sm">
-								<span class="text-muted-foreground">Weather</span>
-								<span class="font-medium text-foreground">{weatherLabel}</span>
-							</div>
+							{#if timeLabel}
+								<div class="flex items-center justify-between text-sm">
+									<span class="text-muted-foreground">Time</span>
+									<span class="font-medium text-foreground">{timeLabel}</span>
+								</div>
+							{/if}
+							{#if weatherLabel}
+								<div class="flex items-center justify-between text-sm">
+									<span class="text-muted-foreground">Weather</span>
+									<span class="font-medium text-foreground">{weatherLabel}</span>
+								</div>
+							{/if}
 						</div>
+					{/if}
 
 						<!-- Stats -->
 						<div class="border-t border-border pt-4">

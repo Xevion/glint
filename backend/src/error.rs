@@ -7,6 +7,7 @@ use serde_json::json;
 use tracing::error;
 
 use crate::platform::PlatformError;
+use validator::ValidationErrors;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
@@ -50,6 +51,12 @@ impl From<sqlx::Error> for AppError {
 impl From<anyhow::Error> for AppError {
     fn from(e: anyhow::Error) -> Self {
         AppError::Internal(e)
+    }
+}
+
+impl From<ValidationErrors> for AppError {
+    fn from(e: ValidationErrors) -> Self {
+        AppError::BadRequest(format!("Validation failed: {}", e))
     }
 }
 

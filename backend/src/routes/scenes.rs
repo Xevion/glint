@@ -7,15 +7,16 @@ use axum::{
     routing::{delete, get, put},
 };
 use serde::Deserialize;
+use validator::Validate;
 
 use crate::{
     auth::AdminUser,
     error::{AppError, AppResult},
     models::{
-        CreateSceneRequest, Scene, SceneListItem, SceneWithCaptures, SceneWithWorld,
-        UpdateSceneMetadataRequest, UpdateSceneRequest,
+        CreateSceneRequest, Scene, SceneListItem, SceneWithCaptures, SceneWithVersion,
+        SceneWithWorld, UpdateSceneMetadataRequest, UpdateSceneRequest,
     },
-    repo::{CaptureRepo, SceneRepo, TagRepo, WorldRepo},
+    repo::{CaptureRepo, SceneRepo, SceneVersionRepo, TagRepo, WorldRepo},
     state::AppState,
 };
 
@@ -63,20 +64,28 @@ async fn list_scenes_public(
         tags_map.entry(sid).or_default().push(tag);
     }
 
-    let items = scenes
+    // Fetch latest version for each scene (single batch query)
+    let scene_ids: Vec<String> = scenes.iter().map(|s| s.id.clone()).collect();
+    let mut version_map = SceneVersionRepo::get_latest_batch(db, &scene_ids).await?;
+
+    let items: Vec<SceneListItem> = scenes
         .into_iter()
         .map(|scene| {
             let id = &scene.id;
             let thumb = thumbnails.get(id);
-            SceneListItem {
+            let version = version_map.remove(id).ok_or_else(|| {
+                AppError::Internal(anyhow::anyhow!("scene '{}' has no version", id))
+            })?;
+            Ok(SceneListItem {
                 tags: tags_map.remove(id).unwrap_or_default(),
                 image_url: thumb.map(|t| t.image_url.clone()),
                 thumbhash: thumb.and_then(|t| t.thumbhash.clone()),
                 capture_count: counts.get(id).copied().unwrap_or(0),
+                version,
                 scene,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, AppError>>()?;
 
     Ok(Json(items))
 }
@@ -119,14 +128,19 @@ async fn get_scene_by_slug(
     // Build response with captures for each scene
     let mut results = Vec::new();
     for scene in scenes {
-        let world = WorldRepo::find_by_id(state.db(), &scene.world_id).await?;
-        let captures = CaptureRepo::list_with_context_for_scene(state.db(), &scene.id).await?;
+        let (world, version, captures) = tokio::try_join!(
+            WorldRepo::find_by_id(state.db(), &scene.world_id),
+            SceneVersionRepo::get_latest(state.db(), &scene.id),
+            CaptureRepo::list_with_context_for_scene(state.db(), &scene.id),
+        )?;
 
-        let mut scene = scene;
-        scene.definition_json = Some(scene.build_definition_json());
+        let version = version.ok_or_else(|| {
+            AppError::Internal(anyhow::anyhow!("scene '{}' has no version", scene.id))
+        })?;
 
         results.push(SceneWithCaptures {
             scene,
+            version,
             world,
             captures,
         });
@@ -135,14 +149,17 @@ async fn get_scene_by_slug(
     Ok(Json(results))
 }
 
-/// GET /api/scenes/{id} - Get scene by ID (admin)
+/// GET /api/scenes/{id} - Get scene by ID with latest version (admin)
 async fn get_scene_by_id(
     _admin: AdminUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> AppResult<Json<Scene>> {
+) -> AppResult<Json<SceneWithVersion>> {
     let scene = SceneRepo::get_by_id(state.db(), &id).await?;
-    Ok(Json(scene))
+    let version = SceneVersionRepo::get_latest(state.db(), &id)
+        .await?
+        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("scene '{}' has no version", id)))?;
+    Ok(Json(SceneWithVersion { scene, version }))
 }
 
 /// POST /api/scenes - Create a new scene (admin)
@@ -150,7 +167,9 @@ async fn create_scene(
     _admin: AdminUser,
     State(state): State<AppState>,
     Json(request): Json<CreateSceneRequest>,
-) -> AppResult<(StatusCode, Json<Scene>)> {
+) -> AppResult<(StatusCode, Json<SceneWithVersion>)> {
+    request.validate()?;
+
     // Verify world exists
     if !WorldRepo::exists_by_id(state.db(), &request.world_id).await? {
         return Err(AppError::NotFound("World not found".into()));
@@ -165,9 +184,12 @@ async fn create_scene(
     }
 
     let id = uuid::Uuid::new_v4().to_string();
-    let scene = SceneRepo::create(state.db(), &id, &request).await?;
+    let (scene, version) = SceneRepo::create(state.db(), &id, &request).await?;
 
-    Ok((StatusCode::CREATED, Json(scene)))
+    Ok((
+        StatusCode::CREATED,
+        Json(SceneWithVersion { scene, version }),
+    ))
 }
 
 /// PUT /api/scenes/by-slug/{slug} - Update scene by slug (admin)
@@ -181,14 +203,19 @@ async fn update_scene(
     State(state): State<AppState>,
     Path(slug): Path<String>,
     Json(request): Json<UpdateSceneRequest>,
-) -> AppResult<Json<Scene>> {
+) -> AppResult<Json<SceneWithVersion>> {
+    request.validate()?;
+
     // Find scene (world-scoped, active only)
     let scene = SceneRepo::get_by_slug_and_world(state.db(), &slug, &request.world_id).await?;
 
-    // Update scene
-    let updated = SceneRepo::update(state.db(), &scene.id, &request).await?;
+    // Create new version (and cascade to derivatives)
+    let (updated, version) = SceneRepo::update(state.db(), &scene.id, &request).await?;
 
-    Ok(Json(updated))
+    Ok(Json(SceneWithVersion {
+        scene: updated,
+        version,
+    }))
 }
 
 /// PUT /api/scenes/{id} - Update scene metadata by ID (admin)

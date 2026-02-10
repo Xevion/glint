@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO scenes (\n                id, name, slug, world_id, x, y, z, pitch, yaw,\n                dimension, time_of_day_ticks, weather, weather_intensity, moon_phase, biome,\n                active, created_at\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, TRUE, now())\n            RETURNING *\n            ",
+  "query": "\n            INSERT INTO scene_versions (id, scene_id, x, y, z, pitch, yaw, time_of_day_ticks, weather, weather_intensity, moon_phase, biome, created_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())\n            RETURNING *\n            ",
   "describe": {
     "columns": [
       {
@@ -10,91 +10,61 @@
       },
       {
         "ordinal": 1,
-        "name": "name",
+        "name": "scene_id",
         "type_info": "Text"
       },
       {
         "ordinal": 2,
-        "name": "slug",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 3,
-        "name": "description",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 4,
-        "name": "world_id",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 5,
         "name": "x",
         "type_info": "Float8"
       },
       {
-        "ordinal": 6,
+        "ordinal": 3,
         "name": "y",
         "type_info": "Float8"
       },
       {
-        "ordinal": 7,
+        "ordinal": 4,
         "name": "z",
         "type_info": "Float8"
       },
       {
-        "ordinal": 8,
+        "ordinal": 5,
         "name": "pitch",
         "type_info": "Float8"
       },
       {
-        "ordinal": 9,
+        "ordinal": 6,
         "name": "yaw",
         "type_info": "Float8"
       },
       {
-        "ordinal": 10,
-        "name": "dimension",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 11,
+        "ordinal": 7,
         "name": "time_of_day_ticks",
         "type_info": "Int4"
       },
       {
-        "ordinal": 12,
+        "ordinal": 8,
         "name": "weather",
         "type_info": "Text"
       },
       {
-        "ordinal": 13,
+        "ordinal": 9,
         "name": "weather_intensity",
         "type_info": "Float8"
       },
       {
-        "ordinal": 14,
+        "ordinal": 10,
         "name": "moon_phase",
         "type_info": "Int4"
       },
       {
-        "ordinal": 15,
+        "ordinal": 11,
         "name": "biome",
         "type_info": "Text"
       },
       {
-        "ordinal": 16,
-        "name": "definition_json",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 17,
-        "name": "active",
-        "type_info": "Bool"
-      },
-      {
-        "ordinal": 18,
+        "ordinal": 12,
         "name": "created_at",
         "type_info": "Timestamptz"
       }
@@ -103,14 +73,11 @@
       "Left": [
         "Text",
         "Text",
-        "Text",
-        "Text",
         "Float8",
         "Float8",
         "Float8",
         "Float8",
         "Float8",
-        "Text",
         "Int4",
         "Text",
         "Float8",
@@ -122,10 +89,6 @@
       false,
       false,
       false,
-      true,
-      false,
-      false,
-      false,
       false,
       false,
       false,
@@ -135,10 +98,8 @@
       false,
       true,
       true,
-      true,
-      false,
       false
     ]
   },
-  "hash": "d08a1fefc0dbf2836d82339e033ed7fe96f593881b4f142a61f19af60e74f14f"
+  "hash": "d2134f0c476989c94ba35b464391e0b13b325e14f90435e70719141b23b9bf26"
 }

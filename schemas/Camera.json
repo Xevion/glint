@@ -5,11 +5,11 @@
   "properties": {
     "pitch": {
       "type": "number",
-      "format": "float"
+      "format": "double"
     },
     "yaw": {
       "type": "number",
-      "format": "float"
+      "format": "double"
     }
   },
   "required": [

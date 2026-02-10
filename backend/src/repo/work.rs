@@ -21,7 +21,17 @@ pub struct WorkItem {
     pub scene_id: String,
     pub scene_slug: String,
     pub scene_name: String,
-    pub scene_definition_json: String,
+    pub scene_dimension: String,
+    pub scene_x: f64,
+    pub scene_y: f64,
+    pub scene_z: f64,
+    pub scene_yaw: f64,
+    pub scene_pitch: f64,
+    pub scene_time_of_day_ticks: i32,
+    pub scene_weather: String,
+    pub scene_weather_intensity: f64,
+    pub scene_moon_phase: Option<i32>,
+    pub scene_biome: Option<String>,
     pub world_id: String,
     pub world_slug: String,
     pub world_name: String,
@@ -29,6 +39,7 @@ pub struct WorkItem {
     pub world_file_hash: Option<String>,
     pub world_size_bytes: Option<i64>,
     pub world_version_id: Option<String>,
+    pub scene_version_id: Option<String>,
     pub profile: Option<String>,
 }
 
@@ -72,6 +83,13 @@ impl WorkRepo {
                 FROM world_versions
                 ORDER BY world_id, created_at DESC
             ),
+            latest_scene_versions AS (
+                SELECT DISTINCT ON (scene_id)
+                    id, scene_id, x, y, z, pitch, yaw,
+                    time_of_day_ticks, weather, weather_intensity, moon_phase, biome
+                FROM scene_versions
+                ORDER BY scene_id, created_at DESC, id DESC
+            ),
             -- Pre-compute which shader_versions already have completed captures.
             -- Used in ORDER BY to prioritize uncaptured shaders.
             has_captures AS (
@@ -100,11 +118,14 @@ impl WorkRepo {
                   AND ($2 OR NOT EXISTS (
                     SELECT 1 FROM captures c
                     LEFT JOIN latest_world_versions lwv ON lwv.world_id = s.world_id
+                    LEFT JOIN latest_scene_versions lsv2 ON lsv2.scene_id = s.id
                     WHERE c.shader_version_id = sv.id
                       AND c.scene_id = s.id
                       AND c.profile = p.profile
                       AND c.status IN ('completed', 'uploading')
                       AND c.world_version_id IS NOT DISTINCT FROM lwv.id
+                      AND c.scene_version_id IS NOT NULL
+                      AND c.scene_version_id = lsv2.id
                   ))
 
                 UNION ALL
@@ -123,11 +144,14 @@ impl WorkRepo {
                   AND ($2 OR NOT EXISTS (
                     SELECT 1 FROM captures c
                     LEFT JOIN latest_world_versions lwv ON lwv.world_id = s.world_id
+                    LEFT JOIN latest_scene_versions lsv2 ON lsv2.scene_id = s.id
                     WHERE c.shader_version_id = sv.id
                       AND c.scene_id = s.id
                       AND c.profile IS NULL
                       AND c.status IN ('completed', 'uploading')
                       AND c.world_version_id IS NOT DISTINCT FROM lwv.id
+                      AND c.scene_version_id IS NOT NULL
+                      AND c.scene_version_id = lsv2.id
                   ))
             )
             SELECT
@@ -141,19 +165,17 @@ impl WorkRepo {
                 n.scene_id AS "scene_id!",
                 sc.slug AS "scene_slug!",
                 sc.name AS "scene_name!",
-                COALESCE(
-                    NULLIF(sc.definition_json, '{}'),
-                    jsonb_build_object(
-                        'id', sc.slug,
-                        'name', sc.name,
-                        'position', jsonb_build_object('x', sc.x, 'y', sc.y, 'z', sc.z),
-                        'camera', jsonb_build_object('yaw', sc.yaw, 'pitch', sc.pitch),
-                        'timeOfDay', sc.time_of_day_ticks,
-                        'dimension', sc.dimension,
-                        'weather', UPPER(sc.weather),
-                        'weatherIntensity', sc.weather_intensity
-                    )::text
-                ) AS "scene_definition_json!",
+                sc.dimension AS "scene_dimension!",
+                lsv.x AS "scene_x!",
+                lsv.y AS "scene_y!",
+                lsv.z AS "scene_z!",
+                lsv.yaw AS "scene_yaw!",
+                lsv.pitch AS "scene_pitch!",
+                lsv.time_of_day_ticks AS "scene_time_of_day_ticks!",
+                lsv.weather AS "scene_weather!",
+                lsv.weather_intensity AS "scene_weather_intensity!",
+                lsv.moon_phase AS scene_moon_phase,
+                lsv.biome AS scene_biome,
                 w.id AS "world_id!",
                 w.slug AS "world_slug!",
                 w.name AS "world_name!",
@@ -161,6 +183,7 @@ impl WorkRepo {
                 lwv.file_hash AS world_file_hash,
                 lwv.size_bytes AS world_size_bytes,
                 lwv.id AS world_version_id,
+                lsv.id AS scene_version_id,
                 n.profile
             FROM needed n
             JOIN shader_versions sv ON sv.id = n.shader_version_id
@@ -168,6 +191,7 @@ impl WorkRepo {
             JOIN scenes sc ON sc.id = n.scene_id
             JOIN worlds w ON w.id = n.world_id
             LEFT JOIN latest_world_versions lwv ON lwv.world_id = w.id
+            JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id
             LEFT JOIN has_captures hc ON hc.shader_version_id = n.shader_version_id
             WHERE ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))
               AND ($4::text IS NULL OR sc.slug = ANY(string_to_array($4, ',')))

@@ -253,10 +253,9 @@ async function loadVersions() {
 					>
 						<div>
 							<div class="font-medium">{scene.name}</div>
-							<div class="text-xs text-muted-foreground">
-								{scene.dimension.split(':').pop()} &middot;
-								<span class="capitalize">{scene.weather}</span>
-							</div>
+						<div class="text-xs text-muted-foreground">
+							{scene.dimension.split(':').pop()}
+						</div>
 						</div>
 					<StatusBadge status={scene.active ? 'active' : 'inactive'}>{scene.active ? 'Active' : 'Inactive'}</StatusBadge>
 					</a>

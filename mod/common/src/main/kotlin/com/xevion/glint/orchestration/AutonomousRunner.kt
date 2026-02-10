@@ -178,7 +178,7 @@ class AutonomousRunner(
                 runItems.associate { item ->
                     val key = Triple(item.shaderVersionId, item.sceneId, item.profile)
                     val workItem = workItemsByKey[key]
-                    key to RunItemInfo(item.id, workItem?.worldVersionId)
+                    key to RunItemInfo(item.id, workItem?.worldVersionId, workItem?.sceneVersionId)
                 }
 
             runUploader = RunUploader(apiUrl, apiToken, runId, itemLookup)

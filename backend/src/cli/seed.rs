@@ -12,6 +12,9 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
         .execute(pool)
         .await?;
     sqlx::query!("DELETE FROM captures").execute(pool).await?;
+    sqlx::query!("DELETE FROM scene_versions")
+        .execute(pool)
+        .await?;
     sqlx::query!("DELETE FROM scenes").execute(pool).await?;
     sqlx::query!("DELETE FROM shader_versions WHERE id != 'vanilla-1.21.4'")
         .execute(pool)
@@ -38,7 +41,7 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
 
     println!("  Seeded 1 world");
 
-    // Seed sample scenes
+    // Seed sample scenes (identity + config tuples)
     let scenes = vec![
         (
             "scene-001",
@@ -46,15 +49,16 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
             "village-sunset",
             "Village at sunset with warm lighting",
             "world-001",
-            100.5,
-            64.0,
-            200.5,
-            -15.0,
-            90.0,
             "minecraft:overworld",
+            // version config
+            100.5_f64,
+            64.0_f64,
+            200.5_f64,
+            -15.0_f64,
+            90.0_f64,
             12000_i32, // Sunset
             "clear",
-            0.0,
+            0.0_f64,
             "minecraft:plains",
         ),
         (
@@ -63,15 +67,15 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
             "mountain-noon",
             "Mountain vista at midday",
             "world-001",
-            -50.0,
-            120.0,
-            -80.0,
-            -30.0,
-            180.0,
             "minecraft:overworld",
+            -50.0_f64,
+            120.0_f64,
+            -80.0_f64,
+            -30.0_f64,
+            180.0_f64,
             6000_i32, // Noon
             "clear",
-            0.0,
+            0.0_f64,
             "minecraft:mountains",
         ),
         (
@@ -80,15 +84,15 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
             "nether-portal",
             "Active nether portal with particles",
             "world-001",
-            0.0,
-            70.0,
-            0.0,
-            0.0,
-            0.0,
             "minecraft:the_nether",
-            6000_i32, // Noon (not applicable in Nether)
+            0.0_f64,
+            70.0_f64,
+            0.0_f64,
+            0.0_f64,
+            0.0_f64,
+            6000_i32,
             "clear",
-            0.0,
+            0.0_f64,
             "minecraft:nether_wastes",
         ),
     ];
@@ -99,12 +103,12 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
         slug,
         desc,
         world_id,
+        dimension,
         x,
         y,
         z,
         pitch,
         yaw,
-        dimension,
         time,
         weather,
         intensity,
@@ -113,20 +117,32 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
     {
         sqlx::query!(
             r#"
-            INSERT INTO scenes (id, name, slug, description, world_id, x, y, z, pitch, yaw, dimension, time_of_day_ticks, weather, weather_intensity, biome)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            INSERT INTO scenes (id, name, slug, description, world_id, dimension)
+            VALUES ($1, $2, $3, $4, $5, $6)
             "#,
             *id,
             *name,
             *slug,
             *desc as &str,
             *world_id,
+            *dimension,
+        )
+        .execute(pool)
+        .await?;
+
+        let version_id = uuid::Uuid::new_v4().to_string();
+        sqlx::query!(
+            r#"
+            INSERT INTO scene_versions (id, scene_id, x, y, z, pitch, yaw, time_of_day_ticks, weather, weather_intensity, biome)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            "#,
+            version_id,
+            *id,
             *x,
             *y,
             *z,
             *pitch,
             *yaw,
-            *dimension,
             *time,
             *weather,
             *intensity,

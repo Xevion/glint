@@ -1,0 +1,94 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT ON (scene_id) *\n            FROM scene_versions\n            WHERE scene_id = ANY($1)\n            ORDER BY scene_id, created_at DESC, id DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "scene_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "x",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 3,
+        "name": "y",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "z",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "pitch",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 6,
+        "name": "yaw",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "time_of_day_ticks",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "weather",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "weather_intensity",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 10,
+        "name": "moon_phase",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "biome",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "8b9f9429dfe5b7293bf93e758d36b462b6d058d5c8d9a819788fe6a4114d949e"
+}

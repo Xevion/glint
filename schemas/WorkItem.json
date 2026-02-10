@@ -22,17 +22,67 @@
         "null"
       ]
     },
-    "scene_definition_json": {
+    "scene_biome": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scene_dimension": {
       "type": "string"
     },
     "scene_id": {
       "type": "string"
     },
+    "scene_moon_phase": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
     "scene_name": {
       "type": "string"
     },
+    "scene_pitch": {
+      "type": "number",
+      "format": "double"
+    },
     "scene_slug": {
       "type": "string"
+    },
+    "scene_time_of_day_ticks": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "scene_version_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scene_weather": {
+      "type": "string"
+    },
+    "scene_weather_intensity": {
+      "type": "number",
+      "format": "double"
+    },
+    "scene_x": {
+      "type": "number",
+      "format": "double"
+    },
+    "scene_y": {
+      "type": "number",
+      "format": "double"
+    },
+    "scene_yaw": {
+      "type": "number",
+      "format": "double"
+    },
+    "scene_z": {
+      "type": "number",
+      "format": "double"
     },
     "shader_id": {
       "type": "string"
@@ -93,7 +143,15 @@
     "scene_id",
     "scene_slug",
     "scene_name",
-    "scene_definition_json",
+    "scene_dimension",
+    "scene_x",
+    "scene_y",
+    "scene_z",
+    "scene_yaw",
+    "scene_pitch",
+    "scene_time_of_day_ticks",
+    "scene_weather",
+    "scene_weather_intensity",
     "world_id",
     "world_slug",
     "world_name"

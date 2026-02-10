@@ -1,34 +1,41 @@
+use std::collections::HashMap;
+
 use anyhow::Context;
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, warn};
 
 use crate::error::{AppError, AppResult};
 use chrono::{DateTime, Utc};
 
 use crate::models::{
-    CreateSceneRequest, Scene, SceneWithWorld, UpdateSceneMetadataRequest, UpdateSceneRequest,
+    CreateSceneRequest, Scene, SceneVersion, SceneWithWorld, UpdateSceneMetadataRequest,
+    UpdateSceneRequest,
 };
 
-/// Helper struct for joined scene/world query
+/// Helper struct for joined scene/world query (includes latest version via lateral join)
 struct SceneWithWorldRow {
     id: String,
     name: String,
     slug: String,
     description: Option<String>,
     world_id: String,
-    x: f64,
-    y: f64,
-    z: f64,
-    pitch: f64,
-    yaw: f64,
     dimension: String,
-    time_of_day_ticks: i32,
-    weather: String,
-    weather_intensity: f64,
-    moon_phase: Option<i32>,
-    biome: Option<String>,
-    definition_json: Option<String>,
+    parent_scene_id: Option<String>,
     active: bool,
     created_at: DateTime<Utc>,
+    // Latest version fields (nullable — scene might have no versions yet)
+    version_id: Option<String>,
+    version_x: Option<f64>,
+    version_y: Option<f64>,
+    version_z: Option<f64>,
+    version_pitch: Option<f64>,
+    version_yaw: Option<f64>,
+    version_time_of_day_ticks: Option<i32>,
+    version_weather: Option<String>,
+    version_weather_intensity: Option<f64>,
+    version_moon_phase: Option<i32>,
+    version_biome: Option<String>,
+    version_created_at: Option<DateTime<Utc>>,
+    // World + enrichment
     world_name: Option<String>,
     world_slug: Option<String>,
     image_url: Option<String>,
@@ -38,6 +45,24 @@ struct SceneWithWorldRow {
 
 impl From<SceneWithWorldRow> for SceneWithWorld {
     fn from(row: SceneWithWorldRow) -> Self {
+        let version = row
+            .version_id
+            .map(|vid| SceneVersion {
+                id: vid,
+                scene_id: row.id.clone(),
+                x: row.version_x.unwrap_or(0.0),
+                y: row.version_y.unwrap_or(0.0),
+                z: row.version_z.unwrap_or(0.0),
+                pitch: row.version_pitch.unwrap_or(0.0),
+                yaw: row.version_yaw.unwrap_or(0.0),
+                time_of_day_ticks: row.version_time_of_day_ticks.unwrap_or(0),
+                weather: row.version_weather.unwrap_or_default(),
+                weather_intensity: row.version_weather_intensity.unwrap_or(0.0),
+                moon_phase: row.version_moon_phase,
+                biome: row.version_biome,
+                created_at: row.version_created_at.unwrap_or(row.created_at),
+            })
+            .expect("scene must have at least one version (post-migration invariant)");
         Self {
             scene: Scene {
                 id: row.id,
@@ -45,21 +70,12 @@ impl From<SceneWithWorldRow> for SceneWithWorld {
                 slug: row.slug,
                 description: row.description,
                 world_id: row.world_id,
-                x: row.x,
-                y: row.y,
-                z: row.z,
-                pitch: row.pitch,
-                yaw: row.yaw,
                 dimension: row.dimension,
-                time_of_day_ticks: row.time_of_day_ticks,
-                weather: row.weather,
-                weather_intensity: row.weather_intensity,
-                moon_phase: row.moon_phase,
-                biome: row.biome,
-                definition_json: row.definition_json,
+                parent_scene_id: row.parent_scene_id,
                 active: row.active,
                 created_at: row.created_at,
             },
+            version,
             world_name: row.world_name,
             image_url: row.image_url,
             thumbhash: row.thumbhash,
@@ -198,78 +214,165 @@ impl SceneRepo {
         Ok(result.is_some())
     }
 
-    #[instrument(skip(executor, req), level = "debug")]
+    /// Create a scene and its initial version in a single transaction.
+    /// Returns both the scene and its initial version.
+    #[instrument(skip(pool, req), level = "debug")]
     pub async fn create(
-        executor: impl sqlx::PgExecutor<'_>,
+        pool: &crate::db::DbPool,
         id: &str,
         req: &CreateSceneRequest,
-    ) -> AppResult<Scene> {
-        sqlx::query_as!(
+    ) -> AppResult<(Scene, SceneVersion)> {
+        let mut tx = pool.begin().await.context("failed to begin transaction")?;
+
+        // Enforce max derivative depth of 1 (no grandchildren: A→B is ok, A→B→C is not)
+        if let Some(parent_id) = &req.parent_scene_id {
+            let parent_has_parent = sqlx::query_scalar!(
+                "SELECT parent_scene_id FROM scenes WHERE id = $1",
+                parent_id
+            )
+            .fetch_optional(&mut *tx)
+            .await
+            .context("failed to check parent scene")?
+            .flatten();
+
+            if parent_has_parent.is_some() {
+                return Err(AppError::BadRequest(
+                    "Cannot create a derivative of a derivative scene".into(),
+                ));
+            }
+        }
+
+        let scene = sqlx::query_as!(
             Scene,
             r#"
-            INSERT INTO scenes (
-                id, name, slug, world_id, x, y, z, pitch, yaw,
-                dimension, time_of_day_ticks, weather, weather_intensity, moon_phase, biome,
-                active, created_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, TRUE, now())
+            INSERT INTO scenes (id, name, slug, world_id, dimension, parent_scene_id, active, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, TRUE, now())
             RETURNING *
             "#,
             id,
             req.name,
             req.slug,
             req.world_id,
-            req.position.x,
-            req.position.y,
-            req.position.z,
-            req.camera.pitch,
-            req.camera.yaw,
             req.dimension,
-            req.time_of_day,
-            req.weather,
-            req.weather_intensity,
-            req.moon_phase,
-            req.biome
+            req.parent_scene_id,
         )
-        .fetch_one(executor)
+        .fetch_one(&mut *tx)
         .await
-        .context(format!("failed to create scene '{}'", req.slug))
-        .map_err(Into::into)
+        .context(format!("failed to create scene '{}'", req.slug))?;
+
+        let version_id = uuid::Uuid::new_v4().to_string();
+        let version = SceneVersionRepo::create_inner(&mut *tx, &version_id, &scene.id, req).await?;
+
+        tx.commit()
+            .await
+            .context("failed to commit scene creation")?;
+        Ok((scene, version))
     }
 
-    #[instrument(skip(executor, req), level = "debug")]
+    /// Update a scene by creating a new scene_version with the new config.
+    /// Also cascades to derivatives: any scene with parent_scene_id = id
+    /// gets a new version with the same config.
+    #[instrument(skip(pool, req), level = "debug")]
     pub async fn update(
-        executor: impl sqlx::PgExecutor<'_>,
+        pool: &crate::db::DbPool,
         id: &str,
         req: &UpdateSceneRequest,
-    ) -> AppResult<Scene> {
-        sqlx::query_as!(
-            Scene,
+    ) -> AppResult<(Scene, SceneVersion)> {
+        let mut tx = pool.begin().await.context("failed to begin transaction")?;
+
+        // Fetch scene (dimension is immutable — set at creation, never updated)
+        let scene = sqlx::query_as!(Scene, r#"SELECT * FROM scenes WHERE id = $1"#, id)
+            .fetch_one(&mut *tx)
+            .await
+            .context(format!("failed to find scene '{}'", id))?;
+
+        // Create new version
+        let version_id = uuid::Uuid::new_v4().to_string();
+        let version = sqlx::query_as!(
+            SceneVersion,
             r#"
-            UPDATE scenes
-            SET x = $1, y = $2, z = $3, pitch = $4, yaw = $5,
-                dimension = $6, time_of_day_ticks = $7, weather = $8,
-                weather_intensity = $9, moon_phase = $10, biome = $11
-            WHERE id = $12
+            INSERT INTO scene_versions (id, scene_id, x, y, z, pitch, yaw, time_of_day_ticks, weather, weather_intensity, moon_phase, biome, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
             RETURNING *
             "#,
+            version_id,
+            id,
             req.position.x,
             req.position.y,
             req.position.z,
             req.camera.pitch,
             req.camera.yaw,
-            req.dimension,
             req.time_of_day,
             req.weather,
             req.weather_intensity,
             req.moon_phase,
             req.biome,
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .context(format!("failed to create scene version for '{}'", id))?;
+
+        // Cascade to derivative scenes (children with parent_scene_id = id)
+        let derivatives: Vec<String> = sqlx::query_scalar!(
+            "SELECT id FROM scenes WHERE parent_scene_id = $1 AND active = TRUE",
             id
         )
-        .fetch_one(executor)
+        .fetch_all(&mut *tx)
         .await
-        .context(format!("failed to update scene '{}'", id))
-        .map_err(Into::into)
+        .context("failed to list derivative scenes")?;
+
+        // For each derivative, create a new version that inherits position/camera
+        // from the parent but preserves the derivative's own environment overrides
+        // (time_of_day, weather, etc.) from its latest version.
+        for child_id in &derivatives {
+            let child_version_id = uuid::Uuid::new_v4().to_string();
+            let result = sqlx::query!(
+                r#"
+                INSERT INTO scene_versions (id, scene_id, x, y, z, pitch, yaw, time_of_day_ticks, weather, weather_intensity, moon_phase, biome, created_at)
+                SELECT $1, $2, $3, $4, $5, $6, $7,
+                    child_v.time_of_day_ticks,
+                    child_v.weather,
+                    child_v.weather_intensity,
+                    child_v.moon_phase,
+                    child_v.biome,
+                    now()
+                FROM (
+                    SELECT * FROM scene_versions
+                    WHERE scene_id = $2
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 1
+                ) child_v
+                "#,
+                child_version_id,
+                child_id,
+                req.position.x,
+                req.position.y,
+                req.position.z,
+                req.camera.pitch,
+                req.camera.yaw,
+            )
+            .execute(&mut *tx)
+            .await
+            .context(format!("failed to cascade version to derivative '{}'", child_id))?;
+
+            if result.rows_affected() == 0 {
+                warn!(
+                    parent_id = id,
+                    child_id = child_id.as_str(),
+                    "Derivative cascade skipped: child scene has no existing versions"
+                );
+            }
+        }
+
+        if !derivatives.is_empty() {
+            debug!(
+                count = derivatives.len(),
+                "Cascaded version to derivative scenes"
+            );
+        }
+
+        tx.commit().await.context("failed to commit scene update")?;
+        Ok((scene, version))
     }
 
     /// Disable a scene (soft delete)
@@ -325,11 +428,8 @@ impl SceneRepo {
                     ROW_NUMBER() OVER (
                         PARTITION BY c.scene_id
                         ORDER BY
-                            -- Prefer vanilla shader (slug = 'vanilla')
                             CASE WHEN sh.slug = 'vanilla' THEN 0 ELSE 1 END,
-                            -- Then by most downloaded shader
                             COALESCE(sh.upstream_downloads, 0) DESC,
-                            -- Then most recent capture
                             c.captured_at DESC NULLS LAST
                     ) AS rn
                 FROM captures c
@@ -345,15 +445,31 @@ impl SceneRepo {
             )
             SELECT
                 sc.id, sc.name, sc.slug, sc.description, sc.world_id,
-                sc.x, sc.y, sc.z, sc.pitch, sc.yaw,
-                sc.dimension, sc.time_of_day_ticks, sc.weather, sc.weather_intensity,
-                sc.moon_phase, sc.biome, sc.definition_json, sc.active, sc.created_at,
+                sc.dimension, sc.parent_scene_id, sc.active, sc.created_at,
+                lsv.id AS version_id,
+                lsv.x AS version_x,
+                lsv.y AS version_y,
+                lsv.z AS version_z,
+                lsv.pitch AS version_pitch,
+                lsv.yaw AS version_yaw,
+                lsv.time_of_day_ticks AS version_time_of_day_ticks,
+                lsv.weather AS version_weather,
+                lsv.weather_intensity AS version_weather_intensity,
+                lsv.moon_phase AS version_moon_phase,
+                lsv.biome AS version_biome,
+                lsv.created_at AS version_created_at,
                 w.name as world_name,
                 w.slug as world_slug,
                 cr.image_url,
                 cr.thumbhash,
                 cnt.capture_count
             FROM scenes sc
+            LEFT JOIN LATERAL (
+                SELECT * FROM scene_versions sv2
+                WHERE sv2.scene_id = sc.id
+                ORDER BY sv2.created_at DESC, sv2.id DESC
+                LIMIT 1
+            ) lsv ON TRUE
             LEFT JOIN worlds w ON sc.world_id = w.id
             LEFT JOIN scene_captures_ranked cr ON cr.scene_id = sc.id AND cr.rn = 1
             LEFT JOIN scene_counts cnt ON cnt.scene_id = sc.id
@@ -427,5 +543,93 @@ impl SceneRepo {
         .context(format!("failed to disable scene '{}'", id))?;
 
         Ok(result.rows_affected() > 0)
+    }
+}
+
+pub struct SceneVersionRepo;
+
+impl SceneVersionRepo {
+    /// Get the latest version for a scene
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn get_latest(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_id: &str,
+    ) -> AppResult<Option<SceneVersion>> {
+        sqlx::query_as!(
+            SceneVersion,
+            r#"
+            SELECT * FROM scene_versions
+            WHERE scene_id = $1
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            "#,
+            scene_id
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!(
+            "failed to get latest scene version for '{}'",
+            scene_id
+        ))
+        .map_err(Into::into)
+    }
+
+    /// Batch-fetch the latest version for each of the given scene IDs.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn get_latest_batch(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_ids: &[String],
+    ) -> AppResult<HashMap<String, SceneVersion>> {
+        let rows = sqlx::query_as!(
+            SceneVersion,
+            r#"
+            SELECT DISTINCT ON (scene_id) *
+            FROM scene_versions
+            WHERE scene_id = ANY($1)
+            ORDER BY scene_id, created_at DESC, id DESC
+            "#,
+            scene_ids
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to batch-fetch latest scene versions")?;
+
+        Ok(rows.into_iter().map(|v| (v.scene_id.clone(), v)).collect())
+    }
+
+    /// Internal helper: insert a new scene_version row from a CreateSceneRequest.
+    pub(crate) async fn create_inner(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+        scene_id: &str,
+        req: &CreateSceneRequest,
+    ) -> AppResult<SceneVersion> {
+        sqlx::query_as!(
+            SceneVersion,
+            r#"
+            INSERT INTO scene_versions (id, scene_id, x, y, z, pitch, yaw, time_of_day_ticks, weather, weather_intensity, moon_phase, biome, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
+            RETURNING *
+            "#,
+            id,
+            scene_id,
+            req.position.x,
+            req.position.y,
+            req.position.z,
+            req.camera.pitch,
+            req.camera.yaw,
+            req.time_of_day,
+            req.weather,
+            req.weather_intensity,
+            req.moon_phase,
+            req.biome,
+        )
+        .fetch_one(executor)
+        .await
+        .context(format!(
+            "failed to create scene version for '{}'",
+            scene_id
+        ))
+        .map_err(Into::into)
     }
 }

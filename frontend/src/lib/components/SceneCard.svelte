@@ -29,7 +29,7 @@ function getTimeOfDay(ticks: number): string {
 	return 'night';
 }
 
-const timeOfDay = $derived(getTimeOfDay(scene.time_of_day_ticks));
+const timeOfDay = $derived(getTimeOfDay(scene.version.time_of_day_ticks));
 
 function handleCardClick() {
 	void goto(resolve('/scenes/[id]', { id: scene.slug }), { invalidateAll: true });
@@ -97,11 +97,11 @@ function handleKeyDown(e: KeyboardEvent) {
 				{scene.name}
 			</a>
 			<div class="flex items-center gap-2">
-			{#if scene.biome}
-				<StatusBadge status="active">
-					{getBiomeDisplayName(scene.biome)}
-				</StatusBadge>
-			{/if}
+		{#if scene.version.biome}
+			<StatusBadge status="active">
+				{getBiomeDisplayName(scene.version.biome)}
+			</StatusBadge>
+		{/if}
 				<span
 					class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
 				>
@@ -122,8 +122,8 @@ function handleKeyDown(e: KeyboardEvent) {
 		<!-- Footer -->
 		<div class="mt-auto flex items-center justify-between border-t border-border pt-3">
 			<div class="flex items-center gap-2 text-xs text-muted-foreground">
-				<span>{getWeatherDisplayName(scene.weather)}</span>
-				<span>•</span>
+			<span>{getWeatherDisplayName(scene.version.weather)}</span>
+			<span>•</span>
 				<span>{scene.capture_count} capture{scene.capture_count !== 1 ? 's' : ''}</span>
 			</div>
 			<span

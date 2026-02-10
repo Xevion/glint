@@ -122,10 +122,10 @@ function formatDimension(dim: string): string {
 								<MapPin class="h-3 w-3" />
 								{formatDimension(scene.dimension)}
 							</span>
-							<span class="inline-flex items-center gap-1" title="Weather">
-								<CloudSun class="h-3 w-3" />
-								<span class="capitalize">{scene.weather}</span>
-							</span>
+						<span class="inline-flex items-center gap-1" title="Weather">
+							<CloudSun class="h-3 w-3" />
+							<span class="capitalize">{scene.version.weather}</span>
+						</span>
 							<span class="inline-flex items-center gap-1" title="Captures">
 								<Camera class="h-3 w-3" />
 								{scene.capture_count} capture{scene.capture_count !== 1 ? 's' : ''}

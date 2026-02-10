@@ -16,7 +16,17 @@ data class WorkItem(
     @SerialName("scene_id") val sceneId: String,
     @SerialName("scene_slug") val sceneSlug: String,
     @SerialName("scene_name") val sceneName: String,
-    @SerialName("scene_definition_json") val sceneDefinitionJson: String,
+    @SerialName("scene_dimension") val sceneDimension: String,
+    @SerialName("scene_x") val sceneX: Double,
+    @SerialName("scene_y") val sceneY: Double,
+    @SerialName("scene_z") val sceneZ: Double,
+    @SerialName("scene_yaw") val sceneYaw: Double,
+    @SerialName("scene_pitch") val scenePitch: Double,
+    @SerialName("scene_time_of_day_ticks") val sceneTimeOfDayTicks: Int,
+    @SerialName("scene_weather") val sceneWeather: String,
+    @SerialName("scene_weather_intensity") val sceneWeatherIntensity: Double,
+    @SerialName("scene_moon_phase") val sceneMoonPhase: Int? = null,
+    @SerialName("scene_biome") val sceneBiome: String? = null,
     @SerialName("world_id") val worldId: String,
     @SerialName("world_slug") val worldSlug: String,
     @SerialName("world_name") val worldName: String,
@@ -24,6 +34,7 @@ data class WorkItem(
     @SerialName("world_file_hash") val worldFileHash: String? = null,
     @SerialName("world_size_bytes") val worldSizeBytes: Long? = null,
     @SerialName("world_version_id") val worldVersionId: String? = null,
+    @SerialName("scene_version_id") val sceneVersionId: String? = null,
     val profile: String? = null,
 )
 
@@ -114,6 +125,7 @@ data class ClaimItemRequest(
     @SerialName("resolution_height") val resolutionHeight: Int,
     @SerialName("captured_at") val capturedAt: String,
     @SerialName("world_version_id") val worldVersionId: String? = null,
+    @SerialName("scene_version_id") val sceneVersionId: String? = null,
 )
 
 /** Response from claiming a run item. */
@@ -127,7 +139,7 @@ data class ClaimItemResponse(
 /** Request to confirm an upload has completed. */
 @Serializable
 data class ConfirmUploadRequest(
-    @SerialName("screenshot_path") val screenshotPath: String? = null,
+    @SerialName("image_path") val imagePath: String? = null,
 )
 
 /** Request to report a persistent shader failure. */

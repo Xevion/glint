@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM scene_versions",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "dceb3b3a2ad2f074086e9ef05b89fe488ca9bc83b0e1681dc9fb9b07e9980383"
+}

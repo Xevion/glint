@@ -218,13 +218,15 @@ impl CaptureRepo {
         resolution_height: Option<i32>,
         captured_at: Option<DateTime<Utc>>,
         world_version_id: Option<&str>,
+        scene_version_id: Option<&str>,
     ) -> AppResult<()> {
         sqlx::query!(
             r#"
             INSERT INTO captures (
                 id, shader_version_id, scene_id, profile, image_path, image_url,
-                resolution_width, resolution_height, world_version_id, status, created_at, updated_at, captured_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed', $10, $10, $10)
+                resolution_width, resolution_height, world_version_id, scene_version_id,
+                status, created_at, updated_at, captured_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11, $11, $11)
             "#,
             id,
             shader_version_id,
@@ -235,6 +237,7 @@ impl CaptureRepo {
             resolution_width,
             resolution_height,
             world_version_id,
+            scene_version_id,
             captured_at
         )
         .execute(executor)
@@ -262,13 +265,15 @@ impl CaptureRepo {
         resolution_height: Option<i32>,
         captured_at: Option<DateTime<Utc>>,
         world_version_id: Option<&str>,
+        scene_version_id: Option<&str>,
     ) -> AppResult<()> {
         sqlx::query!(
             r#"
             INSERT INTO captures (
                 id, shader_version_id, scene_id, profile, image_url,
-                resolution_width, resolution_height, world_version_id, status, created_at, updated_at, captured_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'uploading', $9, $9, $9)
+                resolution_width, resolution_height, world_version_id, scene_version_id,
+                status, created_at, updated_at, captured_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'uploading', $10, $10, $10)
             "#,
             id,
             shader_version_id,
@@ -278,6 +283,7 @@ impl CaptureRepo {
             resolution_width,
             resolution_height,
             world_version_id,
+            scene_version_id,
             captured_at
         )
         .execute(executor)
@@ -403,6 +409,7 @@ impl CaptureRepo {
             gpu_model: Option<String>,
             content_type: Option<String>,
             world_version_id: Option<String>,
+            scene_version_id: Option<String>,
             created_at: DateTime<Utc>,
             updated_at: DateTime<Utc>,
         }
@@ -443,6 +450,7 @@ impl CaptureRepo {
                 c.gpu_model,
                 c.content_type,
                 c.world_version_id,
+                c.scene_version_id,
                 c.created_at,
                 c.updated_at
             FROM captures c
@@ -555,6 +563,7 @@ impl CaptureRepo {
             gpu_model: row.gpu_model,
             content_type: row.content_type,
             world_version_id: row.world_version_id,
+            scene_version_id: row.scene_version_id,
             created_at: row.created_at,
             updated_at: row.updated_at,
             same_shader_scene,

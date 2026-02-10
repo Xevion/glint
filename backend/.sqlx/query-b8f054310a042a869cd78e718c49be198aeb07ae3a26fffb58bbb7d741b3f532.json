@@ -1,0 +1,199 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH latest_versions AS (\n                SELECT DISTINCT ON (shader_id)\n                    id, shader_id, supported_profiles, capture_failure_count,\n                    version, download_url, file_hash, upstream_published_at\n                FROM shader_versions\n                ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC\n            ),\n            latest_world_versions AS (\n                SELECT DISTINCT ON (world_id)\n                    id, world_id, file_url, file_hash, size_bytes\n                FROM world_versions\n                ORDER BY world_id, created_at DESC\n            ),\n            latest_scene_versions AS (\n                SELECT DISTINCT ON (scene_id)\n                    id, scene_id, x, y, z, pitch, yaw,\n                    time_of_day_ticks, weather, weather_intensity, moon_phase, biome\n                FROM scene_versions\n                ORDER BY scene_id, created_at DESC, id DESC\n            ),\n            -- Pre-compute which shader_versions already have completed captures.\n            -- Used in ORDER BY to prioritize uncaptured shaders.\n            has_captures AS (\n                SELECT DISTINCT shader_version_id\n                FROM captures\n                WHERE status = 'completed'\n            ),\n            needed AS (\n                -- Branch 1: shader versions WITH profiles\n                SELECT\n                    sv.id AS shader_version_id,\n                    s.id AS scene_id,\n                    s.world_id,\n                    p.profile AS profile\n                FROM latest_versions sv\n                CROSS JOIN scenes s\n                CROSS JOIN LATERAL jsonb_array_elements_text(\n                    CASE\n                        WHEN sv.supported_profiles IS NOT NULL AND sv.supported_profiles != '[]'\n                        THEN sv.supported_profiles::jsonb\n                        ELSE '[]'::jsonb\n                    END\n                ) AS p(profile)\n                WHERE s.active = TRUE\n                  AND ($2 OR sv.capture_failure_count < 3)\n                  AND ($2 OR NOT EXISTS (\n                    SELECT 1 FROM captures c\n                    LEFT JOIN latest_world_versions lwv ON lwv.world_id = s.world_id\n                    LEFT JOIN latest_scene_versions lsv2 ON lsv2.scene_id = s.id\n                    WHERE c.shader_version_id = sv.id\n                      AND c.scene_id = s.id\n                      AND c.profile = p.profile\n                      AND c.status IN ('completed', 'uploading')\n                      AND c.world_version_id IS NOT DISTINCT FROM lwv.id\n                      AND c.scene_version_id IS NOT NULL\n                      AND c.scene_version_id = lsv2.id\n                  ))\n\n                UNION ALL\n\n                -- Branch 2: shader versions WITHOUT profiles\n                SELECT\n                    sv.id AS shader_version_id,\n                    s.id AS scene_id,\n                    s.world_id,\n                    NULL AS profile\n                FROM latest_versions sv\n                CROSS JOIN scenes s\n                WHERE s.active = TRUE\n                  AND ($2 OR sv.capture_failure_count < 3)\n                  AND (sv.supported_profiles IS NULL OR sv.supported_profiles = '[]')\n                  AND ($2 OR NOT EXISTS (\n                    SELECT 1 FROM captures c\n                    LEFT JOIN latest_world_versions lwv ON lwv.world_id = s.world_id\n                    LEFT JOIN latest_scene_versions lsv2 ON lsv2.scene_id = s.id\n                    WHERE c.shader_version_id = sv.id\n                      AND c.scene_id = s.id\n                      AND c.profile IS NULL\n                      AND c.status IN ('completed', 'uploading')\n                      AND c.world_version_id IS NOT DISTINCT FROM lwv.id\n                      AND c.scene_version_id IS NOT NULL\n                      AND c.scene_version_id = lsv2.id\n                  ))\n            )\n            SELECT\n                n.shader_version_id AS \"shader_version_id!\",\n                sh.id AS \"shader_id!\",\n                sh.slug AS \"shader_slug!\",\n                sh.name AS \"shader_name!\",\n                sv.version AS \"version!\",\n                sv.download_url,\n                sv.file_hash,\n                n.scene_id AS \"scene_id!\",\n                sc.slug AS \"scene_slug!\",\n                sc.name AS \"scene_name!\",\n                sc.dimension AS \"scene_dimension!\",\n                lsv.x AS \"scene_x!\",\n                lsv.y AS \"scene_y!\",\n                lsv.z AS \"scene_z!\",\n                lsv.yaw AS \"scene_yaw!\",\n                lsv.pitch AS \"scene_pitch!\",\n                lsv.time_of_day_ticks AS \"scene_time_of_day_ticks!\",\n                lsv.weather AS \"scene_weather!\",\n                lsv.weather_intensity AS \"scene_weather_intensity!\",\n                lsv.moon_phase AS scene_moon_phase,\n                lsv.biome AS scene_biome,\n                w.id AS \"world_id!\",\n                w.slug AS \"world_slug!\",\n                w.name AS \"world_name!\",\n                lwv.file_url AS world_file_url,\n                lwv.file_hash AS world_file_hash,\n                lwv.size_bytes AS world_size_bytes,\n                lwv.id AS world_version_id,\n                lsv.id AS scene_version_id,\n                n.profile\n            FROM needed n\n            JOIN shader_versions sv ON sv.id = n.shader_version_id\n            JOIN shaders sh ON sh.id = sv.shader_id\n            JOIN scenes sc ON sc.id = n.scene_id\n            JOIN worlds w ON w.id = n.world_id\n            LEFT JOIN latest_world_versions lwv ON lwv.world_id = w.id\n            JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id\n            LEFT JOIN has_captures hc ON hc.shader_version_id = n.shader_version_id\n            WHERE ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))\n              AND ($4::text IS NULL OR sc.slug = ANY(string_to_array($4, ',')))\n            ORDER BY\n                hc.shader_version_id IS NOT NULL ASC,\n                COALESCE(sh.upstream_downloads, 0) DESC,\n                sv.upstream_published_at DESC NULLS LAST,\n                sh.name ASC,\n                sc.name ASC,\n                n.profile NULLS LAST\n            LIMIT $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_version_id!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_id!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "shader_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "shader_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "version!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "download_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "scene_id!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "scene_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "scene_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "scene_dimension!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "scene_x!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 12,
+        "name": "scene_y!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 13,
+        "name": "scene_z!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 14,
+        "name": "scene_yaw!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 15,
+        "name": "scene_pitch!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 16,
+        "name": "scene_time_of_day_ticks!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 17,
+        "name": "scene_weather!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "scene_weather_intensity!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 19,
+        "name": "scene_moon_phase",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 20,
+        "name": "scene_biome",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "world_id!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 22,
+        "name": "world_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 23,
+        "name": "world_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 24,
+        "name": "world_file_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 25,
+        "name": "world_file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 26,
+        "name": "world_size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 27,
+        "name": "world_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 28,
+        "name": "scene_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 29,
+        "name": "profile",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Bool",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "b8f054310a042a869cd78e718c49be198aeb07ae3a26fffb58bbb7d741b3f532"
+}

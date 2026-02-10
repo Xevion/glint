@@ -132,6 +132,11 @@
         "ordinal": 25,
         "name": "world_version_id",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 26,
+        "name": "scene_version_id",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -162,6 +167,7 @@
       true,
       false,
       false,
+      true,
       true,
       true,
       true,

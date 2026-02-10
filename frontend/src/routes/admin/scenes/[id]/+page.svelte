@@ -3,7 +3,7 @@ import { goto, invalidateAll } from '$app/navigation';
 import { untrack } from 'svelte';
 import { api } from '$lib/api';
 import type { UpdateSceneMetadataRequest } from '$lib/api/endpoints/admin';
-import type { CaptureWithContext, Scene, WorldWithDetails } from '$lib/bindings';
+import type { CaptureWithContext, SceneWithVersion, WorldWithDetails } from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
@@ -18,7 +18,7 @@ import { RotateCcw, Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();
-let scene: Scene = $derived(data.scene);
+let scene: SceneWithVersion = $derived(data.scene);
 let world: WorldWithDetails | null = $derived(data.world);
 let captures: CaptureWithContext[] = $derived(data.captures);
 let captureCount: number = $derived(data.captureCount);
@@ -166,40 +166,40 @@ async function handleReactivate() {
 				{world?.name ?? scene.world_id}
 			</a>
 		</AdminDetailField>
-			<AdminDetailField label="Position">
-				<code class="text-xs">
-					{scene.x.toFixed(1)}, {scene.y.toFixed(1)}, {scene.z.toFixed(1)}
-				</code>
-			</AdminDetailField>
-			<AdminDetailField label="Camera">
-				<code class="text-xs">
-					Yaw: {scene.yaw.toFixed(1)}, Pitch: {scene.pitch.toFixed(1)}
-				</code>
-			</AdminDetailField>
-			<AdminDetailField label="Dimension">
-				{scene.dimension}
-			</AdminDetailField>
-			<AdminDetailField label="Time of Day">
-				{scene.time_of_day_ticks} ticks
-			</AdminDetailField>
-			<AdminDetailField label="Weather">
-				<span class="capitalize">{scene.weather}</span>
-				{#if scene.weather_intensity > 0}
-					<span class="text-muted-foreground">
-						(intensity: {scene.weather_intensity.toFixed(2)})
-					</span>
-				{/if}
-			</AdminDetailField>
-			{#if scene.biome}
-				<AdminDetailField label="Biome">
-					{scene.biome}
-				</AdminDetailField>
+		<AdminDetailField label="Position">
+			<code class="text-xs">
+				{scene.version.x.toFixed(1)}, {scene.version.y.toFixed(1)}, {scene.version.z.toFixed(1)}
+			</code>
+		</AdminDetailField>
+		<AdminDetailField label="Camera">
+			<code class="text-xs">
+				Yaw: {scene.version.yaw.toFixed(1)}, Pitch: {scene.version.pitch.toFixed(1)}
+			</code>
+		</AdminDetailField>
+		<AdminDetailField label="Dimension">
+			{scene.dimension}
+		</AdminDetailField>
+		<AdminDetailField label="Time of Day">
+			{scene.version.time_of_day_ticks} ticks
+		</AdminDetailField>
+		<AdminDetailField label="Weather">
+			<span class="capitalize">{scene.version.weather}</span>
+			{#if scene.version.weather_intensity > 0}
+				<span class="text-muted-foreground">
+					(intensity: {scene.version.weather_intensity.toFixed(2)})
+				</span>
 			{/if}
-			{#if scene.moon_phase !== null}
-				<AdminDetailField label="Moon Phase">
-					{scene.moon_phase}
-				</AdminDetailField>
-			{/if}
+		</AdminDetailField>
+		{#if scene.version.biome}
+			<AdminDetailField label="Biome">
+				{scene.version.biome}
+			</AdminDetailField>
+		{/if}
+		{#if scene.version.moon_phase !== null}
+			<AdminDetailField label="Moon Phase">
+				{scene.version.moon_phase}
+			</AdminDetailField>
+		{/if}
 			<AdminDetailField label="Created">
 				<TimeAgo timestamp={scene.created_at} />
 			</AdminDetailField>

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                c.id,\n                c.scene_id,\n                s.slug as shader_slug,\n                s.name as shader_name,\n                sv.version as shader_version,\n                c.shader_version_id,\n                c.profile,\n                c.image_path,\n                c.image_url,\n                c.thumbhash,\n                c.captured_at,\n                c.resolution_width,\n                c.resolution_height,\n                c.file_size_bytes,\n                cri.run_id as \"run_id?: String\",\n                cr.status as \"run_status?: String\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,\n                sc.name as \"scene_name?: String\",\n                sc.slug as \"scene_slug?: String\",\n                c.status,\n                c.error_message,\n                c.video_url,\n                c.avg_fps,\n                c.min_fps,\n                c.max_fps,\n                c.frame_time_avg,\n                c.frame_time_p99,\n                c.minecraft_version,\n                c.iris_version,\n                c.gpu_model,\n                c.content_type,\n                c.world_version_id,\n                c.created_at,\n                c.updated_at\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id\n            LEFT JOIN capture_runs cr ON cri.run_id = cr.id\n            LEFT JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.id = $1\n            ",
+  "query": "\n            SELECT\n                c.id,\n                c.scene_id,\n                s.slug as shader_slug,\n                s.name as shader_name,\n                sv.version as shader_version,\n                c.shader_version_id,\n                c.profile,\n                c.image_path,\n                c.image_url,\n                c.thumbhash,\n                c.captured_at,\n                c.resolution_width,\n                c.resolution_height,\n                c.file_size_bytes,\n                cri.run_id as \"run_id?: String\",\n                cr.status as \"run_status?: String\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = s.id LIMIT 1) as shader_author,\n                sc.name as \"scene_name?: String\",\n                sc.slug as \"scene_slug?: String\",\n                c.status,\n                c.error_message,\n                c.video_url,\n                c.avg_fps,\n                c.min_fps,\n                c.max_fps,\n                c.frame_time_avg,\n                c.frame_time_p99,\n                c.minecraft_version,\n                c.iris_version,\n                c.gpu_model,\n                c.content_type,\n                c.world_version_id,\n                c.scene_version_id,\n                c.created_at,\n                c.updated_at\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            LEFT JOIN capture_run_items cri ON cri.capture_id = c.id\n            LEFT JOIN capture_runs cr ON cri.run_id = cr.id\n            LEFT JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -165,11 +165,16 @@
       },
       {
         "ordinal": 32,
+        "name": "scene_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 33,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 33,
+        "ordinal": 34,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -212,9 +217,10 @@
       true,
       true,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "203708da918e1f3b1bd7d7b4f0bc8941fec0d3d2e2a943540a9cb6ca14501cd2"
+  "hash": "7d51b3d1d871de5f931e1c12ee5b06ddb7e91b81080c17d6320b69b18bbb3d42"
 }

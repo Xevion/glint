@@ -6,8 +6,8 @@ import com.xevion.glint.scene.SceneManager
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import net.minecraft.client.Minecraft
 import java.io.File
 
@@ -232,24 +232,25 @@ class AssetPreparer(
             val sceneElements =
                 items
                     .distinctBy { it.sceneId }
-                    .mapNotNull { item ->
-                        try {
-                            val parsed = json.parseToJsonElement(item.sceneDefinitionJson)
-                            buildJsonObject {
-                                for ((key, value) in parsed.jsonObject) {
-                                    if (key == "id") {
-                                        put("id", item.sceneId)
-                                    } else {
-                                        put(key, value)
-                                    }
-                                }
+                    .map { item ->
+                        buildJsonObject {
+                            put("id", item.sceneId)
+                            put("name", item.sceneName)
+                            putJsonObject("position") {
+                                put("x", item.sceneX)
+                                put("y", item.sceneY)
+                                put("z", item.sceneZ)
                             }
-                        } catch (e: Exception) {
-                            log.warn("Failed to parse scene definition") {
-                                "scene_id" to item.sceneId
-                                "error" to e.message
+                            putJsonObject("camera") {
+                                put("yaw", item.sceneYaw)
+                                put("pitch", item.scenePitch)
                             }
-                            null
+                            put("timeOfDay", item.sceneTimeOfDayTicks)
+                            put("dimension", item.sceneDimension)
+                            put("weather", item.sceneWeather)
+                            put("weatherIntensity", item.sceneWeatherIntensity)
+                            if (item.sceneBiome != null) put("biome", item.sceneBiome)
+                            if (item.sceneMoonPhase != null) put("moonPhase", item.sceneMoonPhase)
                         }
                     }
 

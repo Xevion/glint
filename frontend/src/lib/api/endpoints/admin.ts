@@ -3,6 +3,7 @@ import type {
 	CaptureHealthResponse,
 	PaginatedCaptures,
 	Scene,
+	SceneWithVersion,
 	SceneWithWorld,
 	Shader,
 	ShaderWithCaptures,
@@ -95,8 +96,8 @@ export class AdminEndpoints extends ApiClient {
 		return this.get<SceneWithWorld[]>('/api/scenes/all');
 	}
 
-	getScene(id: string): Promise<Result<Scene, ApiError>> {
-		return this.get<Scene>(`/api/scenes/${encodeURIComponent(id)}`);
+	getScene(id: string): Promise<Result<SceneWithVersion, ApiError>> {
+		return this.get<SceneWithVersion>(`/api/scenes/${encodeURIComponent(id)}`);
 	}
 
 	updateScene(id: string, request: UpdateSceneMetadataRequest): Promise<Result<Scene, ApiError>> {
