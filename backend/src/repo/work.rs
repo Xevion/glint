@@ -1,8 +1,10 @@
 use anyhow::Context;
 use schemars::JsonSchema;
+use sqlx::Executor;
 use tracing::{debug, instrument};
 use ts_rs::TS;
 
+use crate::db::DbPool;
 use crate::error::AppResult;
 
 /// A single work item: one (shader_version, scene, profile) triple to capture
@@ -33,19 +35,31 @@ pub struct WorkItem {
 pub struct WorkRepo;
 
 impl WorkRepo {
-    #[instrument(skip(executor), level = "debug")]
+    /// Compute the list of (shader_version, scene, profile) triples that still
+    /// need captures. JIT compilation is disabled for this query because the
+    /// planner's inflated cost estimate (cross-join fanout) triggers LLVM JIT
+    /// that takes ~750ms on a query that executes in <30ms.
+    #[instrument(skip(pool), level = "debug")]
     pub async fn get_work_items(
-        executor: impl sqlx::PgExecutor<'_>,
+        pool: &DbPool,
         limit: i64,
         force: bool,
         shaders_filter: Option<String>,
         scenes_filter: Option<String>,
     ) -> AppResult<Vec<WorkItem>> {
+        let mut tx = pool.begin().await.context("failed to begin transaction")?;
+
+        // Disable JIT for this transaction — the query's estimated cost is
+        // inflated by cross-join cardinality, causing Postgres to spend ~750ms
+        // on LLVM compilation for a query that runs in <30ms.
+        tx.execute("SET LOCAL jit = off")
+            .await
+            .context("failed to disable JIT")?;
+
         let items = sqlx::query_as!(
             WorkItem,
             r#"
             WITH latest_versions AS (
-                -- Only consider the most recent version per shader
                 SELECT DISTINCT ON (shader_id)
                     id, shader_id, supported_profiles, capture_failure_count,
                     version, download_url, file_hash, upstream_published_at
@@ -58,11 +72,19 @@ impl WorkRepo {
                 FROM world_versions
                 ORDER BY world_id, created_at DESC
             ),
+            -- Pre-compute which shader_versions already have completed captures.
+            -- Used in ORDER BY to prioritize uncaptured shaders.
+            has_captures AS (
+                SELECT DISTINCT shader_version_id
+                FROM captures
+                WHERE status = 'completed'
+            ),
             needed AS (
                 -- Branch 1: shader versions WITH profiles
                 SELECT
                     sv.id AS shader_version_id,
                     s.id AS scene_id,
+                    s.world_id,
                     p.profile AS profile
                 FROM latest_versions sv
                 CROSS JOIN scenes s
@@ -77,8 +99,7 @@ impl WorkRepo {
                   AND ($2 OR sv.capture_failure_count < 3)
                   AND ($2 OR NOT EXISTS (
                     SELECT 1 FROM captures c
-                    JOIN scenes cs ON cs.id = c.scene_id
-                    LEFT JOIN latest_world_versions lwv ON lwv.world_id = cs.world_id
+                    LEFT JOIN latest_world_versions lwv ON lwv.world_id = s.world_id
                     WHERE c.shader_version_id = sv.id
                       AND c.scene_id = s.id
                       AND c.profile = p.profile
@@ -92,6 +113,7 @@ impl WorkRepo {
                 SELECT
                     sv.id AS shader_version_id,
                     s.id AS scene_id,
+                    s.world_id,
                     NULL AS profile
                 FROM latest_versions sv
                 CROSS JOIN scenes s
@@ -100,8 +122,7 @@ impl WorkRepo {
                   AND (sv.supported_profiles IS NULL OR sv.supported_profiles = '[]')
                   AND ($2 OR NOT EXISTS (
                     SELECT 1 FROM captures c
-                    JOIN scenes cs ON cs.id = c.scene_id
-                    LEFT JOIN latest_world_versions lwv ON lwv.world_id = cs.world_id
+                    LEFT JOIN latest_world_versions lwv ON lwv.world_id = s.world_id
                     WHERE c.shader_version_id = sv.id
                       AND c.scene_id = s.id
                       AND c.profile IS NULL
@@ -145,22 +166,16 @@ impl WorkRepo {
             JOIN shader_versions sv ON sv.id = n.shader_version_id
             JOIN shaders sh ON sh.id = sv.shader_id
             JOIN scenes sc ON sc.id = n.scene_id
-            JOIN worlds w ON w.id = sc.world_id
+            JOIN worlds w ON w.id = n.world_id
             LEFT JOIN latest_world_versions lwv ON lwv.world_id = w.id
+            LEFT JOIN has_captures hc ON hc.shader_version_id = n.shader_version_id
             WHERE ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))
               AND ($4::text IS NULL OR sc.slug = ANY(string_to_array($4, ',')))
             ORDER BY
-                -- Shader-level priority: shaders without any captures first
-                EXISTS(
-                    SELECT 1 FROM captures c2
-                    WHERE c2.shader_version_id = n.shader_version_id
-                      AND c2.status = 'completed'
-                ) ASC,
-                -- Then by popularity and recency
+                hc.shader_version_id IS NOT NULL ASC,
                 COALESCE(sh.upstream_downloads, 0) DESC,
                 sv.upstream_published_at DESC NULLS LAST,
                 sh.name ASC,
-                -- Within a shader: group scenes together
                 sc.name ASC,
                 n.profile NULLS LAST
             LIMIT $1
@@ -170,9 +185,11 @@ impl WorkRepo {
             shaders_filter as Option<String>,
             scenes_filter as Option<String>,
         )
-        .fetch_all(executor)
+        .fetch_all(&mut *tx)
         .await
         .context("failed to fetch work items")?;
+
+        tx.commit().await.context("failed to commit transaction")?;
 
         debug!(count = items.len(), "Fetched work items");
         Ok(items)
