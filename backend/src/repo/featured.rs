@@ -13,6 +13,8 @@ struct CandidateRow {
     thumbhash: Option<String>,
     shader_name: String,
     shader_slug: String,
+    shader_author: Option<String>,
+    shader_version: String,
     scene_name: String,
     scene_id: String,
 }
@@ -32,6 +34,8 @@ impl FeaturedRepo {
                 c.thumbhash,
                 sh.name as shader_name,
                 sh.slug as shader_slug,
+                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = sh.id LIMIT 1) as shader_author,
+                sv.version as shader_version,
                 sc.name as scene_name,
                 sc.id as scene_id
             FROM captures c
@@ -104,10 +108,16 @@ fn make_pair(left: &CandidateRow, right: &CandidateRow) -> FeaturedPair {
         left_image_url: left.image_url.clone(),
         left_thumbhash: left.thumbhash.clone(),
         left_shader_name: left.shader_name.clone(),
+        left_shader_slug: left.shader_slug.clone(),
+        left_shader_author: left.shader_author.clone(),
+        left_shader_version: left.shader_version.clone(),
         left_scene_name: left.scene_name.clone(),
         right_image_url: right.image_url.clone(),
         right_thumbhash: right.thumbhash.clone(),
         right_shader_name: right.shader_name.clone(),
+        right_shader_slug: right.shader_slug.clone(),
+        right_shader_author: right.shader_author.clone(),
+        right_shader_version: right.shader_version.clone(),
         right_scene_name: right.scene_name.clone(),
     }
 }

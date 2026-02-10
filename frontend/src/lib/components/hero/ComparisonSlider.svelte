@@ -1,16 +1,24 @@
 <script lang="ts">
+import { resolve } from '$app/paths';
 import DividerLine from './DividerLine.svelte';
 import { SKEW_DEG, type Orientation } from './types';
 import { cfImageSrcset, cfImageUrl } from '$lib/utils/image';
+import { formatVersion } from '$lib/utils/display';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 
 interface Props {
 	leftImage: string;
 	rightImage: string;
-	leftThumbhash?: string | null;
-	rightThumbhash?: string | null;
-	leftLabel?: string;
-	rightLabel?: string;
+	leftThumbhash: string | null;
+	rightThumbhash: string | null;
+	leftLabel: string;
+	rightLabel: string;
+	leftSlug: string;
+	rightSlug: string;
+	leftAuthor: string | null;
+	rightAuthor: string | null;
+	leftVersion: string;
+	rightVersion: string;
 	/** Divider position 0-1 (externally controlled) */
 	dividerPosition?: number;
 	orientation?: Orientation;
@@ -25,10 +33,16 @@ interface Props {
 let {
 	leftImage,
 	rightImage,
-	leftThumbhash = null,
-	rightThumbhash = null,
+	leftThumbhash,
+	rightThumbhash,
 	leftLabel,
 	rightLabel,
+	leftSlug,
+	rightSlug,
+	leftAuthor,
+	rightAuthor,
+	leftVersion,
+	rightVersion,
 	dividerPosition = 0.5,
 	orientation = 'vertical',
 	disabled = false,
@@ -76,6 +90,11 @@ function getPositionFromEvent(clientX: number, clientY: number): number {
 
 function handlePointerDown(e: PointerEvent) {
 	if (disabled) return;
+
+	// Let clicks on interactive elements (links, buttons) pass through
+	const target = e.target as HTMLElement;
+	if (target.closest('a, button')) return;
+
 	e.preventDefault();
 	isDragging = true;
 	containerEl?.setPointerCapture(e.pointerId);
@@ -167,11 +186,10 @@ const clipPaths = $derived.by(() => {
 	}
 });
 
-const cursorClass = $derived.by(() => {
-	if (disabled) return '';
-	if (orientation === 'horizontal') return 'cursor-ns-resize';
-	return 'cursor-ew-resize';
-});
+/** Cursor for the divider handle zone */
+const handleCursor = $derived(
+	orientation === 'horizontal' ? 'cursor-ns-resize' : 'cursor-ew-resize'
+);
 
 /** Allow scrolling on the axis perpendicular to the drag direction */
 const touchAction = $derived(orientation === 'horizontal' ? 'pan-x' : 'pan-y');
@@ -186,7 +204,10 @@ const willChangeClip = $derived(isAnimating || isDragging);
 	loaded: boolean,
 	onLoad: () => void,
 	alt: string,
-	label: string | undefined,
+	label: string,
+	slug: string,
+	author: string | null,
+	version: string,
 	side: 'left' | 'right',
 	clipPath: string
 )}
@@ -216,22 +237,26 @@ const willChangeClip = $derived(isAnimating || isDragging);
 			onload={onLoad}
 		/>
 		{#if label}
-			<div
-				class="absolute z-20 rounded-md bg-black/60 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm pointer-events-none"
-				class:left-4={side === 'left'}
-				class:right-4={side === 'right'}
-				class:bottom-4={orientation !== (side === 'left' ? 'horizontal' : 'diagonal')}
-				class:top-4={orientation === (side === 'left' ? 'horizontal' : 'diagonal')}
+			{@const href = resolve('/shaders/[id]', { id: slug })}
+			{@const detail = author && version ? `by ${author}, ${formatVersion(version)}` : version ? formatVersion(version) : author ? `by ${author}` : undefined}
+			<a
+				{href}
+				class="pointer-events-auto absolute z-20 block rounded-md border border-white/15 bg-black/60 px-3 py-1.5 backdrop-blur-sm transition-all hover:border-white/30 hover:bg-black/70
+					{side === 'left' ? 'left-4' : 'right-4'}
+					{orientation === (side === 'left' ? 'horizontal' : 'diagonal') ? 'top-4' : 'bottom-4'}"
 			>
-				{label}
-			</div>
+				<span class="text-sm font-medium text-white">{label}</span>
+				{#if detail}
+					<div class="hidden text-xs text-white/70 md:block">{detail}</div>
+				{/if}
+			</a>
 		{/if}
 	</div>
 {/snippet}
 
 <div
 	bind:this={containerEl}
-	class="comparison-slider relative w-full overflow-hidden rounded-xl select-none aspect-video max-sm:aspect-[4/3] max-sm:min-h-[280px] {cursorClass}"
+	class="comparison-slider relative w-full overflow-hidden rounded-xl select-none aspect-video max-sm:aspect-[4/3] max-sm:min-h-[280px]"
 	style:touch-action={touchAction}
 	role="slider"
 	aria-orientation={orientation === 'horizontal' ? 'vertical' : 'horizontal'}
@@ -254,6 +279,9 @@ const willChangeClip = $derived(isAnimating || isDragging);
 		() => (leftLoaded = true),
 		leftLabel ?? 'Left comparison',
 		leftLabel,
+		leftSlug,
+		leftAuthor,
+		leftVersion,
 		'left',
 		clipPaths.left
 	)}
@@ -266,13 +294,17 @@ const willChangeClip = $derived(isAnimating || isDragging);
 		() => (rightLoaded = true),
 		rightLabel ?? 'Right comparison',
 		rightLabel,
+		rightSlug,
+		rightAuthor,
+		rightVersion,
 		'right',
 		clipPaths.right
 	)}
 
-	<!-- Divider line (visual only, no interaction) -->
+	<!-- Divider line with wider cursor zone -->
 	<DividerLine
 		position={dividerPosition}
 		{orientation}
+		cursor={disabled ? undefined : handleCursor}
 	/>
 </div>

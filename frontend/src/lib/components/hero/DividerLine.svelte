@@ -7,9 +7,11 @@ interface Props {
 	orientation: Orientation;
 	/** Container aspect ratio (width/height), used to compute diagonal angle */
 	aspectRatio?: number;
+	/** Tailwind cursor class for the handle zone (e.g. 'cursor-ew-resize'). Omit to hide the zone. */
+	cursor?: string;
 }
 
-let { position, orientation, aspectRatio = 16 / 9 }: Props = $props();
+let { position, orientation, aspectRatio = 16 / 9, cursor }: Props = $props();
 
 /**
  * Compute the angle (in degrees) the divider line should be drawn at.
@@ -37,6 +39,12 @@ const diagonalHeight = $derived.by(() => {
 	>
 		<div class="h-full w-full bg-white/40"></div>
 	</div>
+	{#if cursor}
+		<div
+			class="absolute top-0 bottom-0 z-10 {cursor}"
+			style="left: {position * 100}%; width: 32px; transform: translateX(-50%);"
+		></div>
+	{/if}
 {:else if orientation === 'horizontal'}
 	<div
 		class="divider-line absolute left-0 right-0 z-10 pointer-events-none"
@@ -44,6 +52,12 @@ const diagonalHeight = $derived.by(() => {
 	>
 		<div class="h-full w-full bg-white/40"></div>
 	</div>
+	{#if cursor}
+		<div
+			class="absolute left-0 right-0 z-10 {cursor}"
+			style="top: {position * 100}%; height: 32px; transform: translateY(-50%);"
+		></div>
+	{/if}
 {:else}
 	<!-- Diagonal: a tall vertical line rotated to match the clip-path skew -->
 	<div
@@ -59,4 +73,17 @@ const diagonalHeight = $derived.by(() => {
 	>
 		<div class="h-full w-full bg-white/40"></div>
 	</div>
+	{#if cursor}
+		<div
+			class="absolute z-10 {cursor}"
+			style="
+				left: {position * 100}%;
+				top: 50%;
+				width: 32px;
+				height: {diagonalHeight};
+				transform: translate(-50%, -50%) rotate({lineAngle}deg);
+				transform-origin: center center;
+			"
+		></div>
+	{/if}
 {/if}

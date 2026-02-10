@@ -42,7 +42,7 @@ const sceneCount = $derived(new Set(captures.map((c) => c.scene_id)).size);
 
 			<!-- Desktop overlay: scrim + centered text (hidden on mobile) -->
 			<div
-				class="pointer-events-none absolute inset-0 z-30 hidden sm:flex flex-col items-center justify-center"
+				class="pointer-events-none absolute inset-0 z-30 hidden select-none sm:flex flex-col items-center justify-center"
 				style="background: radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 40%, transparent 70%);"
 			>
 				<h1

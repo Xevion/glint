@@ -34,20 +34,29 @@ interface ImageEntry {
 	url: string;
 	thumbhash: string | null;
 	label: string;
+	slug: string;
+	author: string | null;
+	version: string;
 }
 
 const leftImages = $derived<ImageEntry[]>(
 	pairs.map((p) => ({
 		url: p.left_image_url,
 		thumbhash: p.left_thumbhash ?? null,
-		label: p.left_shader_name
+		label: p.left_shader_name,
+		slug: p.left_shader_slug,
+		author: p.left_shader_author,
+		version: p.left_shader_version
 	}))
 );
 const rightImages = $derived<ImageEntry[]>(
 	pairs.map((p) => ({
 		url: p.right_image_url,
 		thumbhash: p.right_thumbhash ?? null,
-		label: p.right_shader_name
+		label: p.right_shader_name,
+		slug: p.right_shader_slug,
+		author: p.right_shader_author,
+		version: p.right_shader_version
 	}))
 );
 
@@ -66,6 +75,7 @@ let orientation = $state<Orientation>('vertical');
 let orientationIndex = $state(0);
 let isUserDragging = $state(false);
 let isPaused = $state(false);
+let isHovered = $state(false);
 let reducedMotion = $state(false);
 
 // Monotonically increasing counter — bumped on any interruption (drag, pause, dot click).
@@ -89,9 +99,15 @@ let tweenRaf: number | null = null;
 let displayLeftImage = $state('');
 let displayLeftThumbhash = $state<string | null>(null);
 let displayLeftLabel = $state('');
+let displayLeftSlug = $state('');
+let displayLeftAuthor = $state<string | null>(null);
+let displayLeftVersion = $state('');
 let displayRightImage = $state('');
 let displayRightThumbhash = $state<string | null>(null);
 let displayRightLabel = $state('');
+let displayRightSlug = $state('');
+let displayRightAuthor = $state<string | null>(null);
+let displayRightVersion = $state('');
 
 const hasPairs = $derived(pairs.length > 0);
 const hasMultiplePairs = $derived(pairs.length > 1);
@@ -173,6 +189,9 @@ function syncLeftFromIndex(idx: number) {
 	displayLeftImage = entry.url;
 	displayLeftThumbhash = entry.thumbhash;
 	displayLeftLabel = entry.label;
+	displayLeftSlug = entry.slug;
+	displayLeftAuthor = entry.author;
+	displayLeftVersion = entry.version;
 }
 
 function syncRightFromIndex(idx: number) {
@@ -180,13 +199,16 @@ function syncRightFromIndex(idx: number) {
 	displayRightImage = entry.url;
 	displayRightThumbhash = entry.thumbhash;
 	displayRightLabel = entry.label;
+	displayRightSlug = entry.slug;
+	displayRightAuthor = entry.author;
+	displayRightVersion = entry.version;
 }
 
 // --- Transition state machine ---
 
 function startCycle() {
 	clearTimers();
-	if (!hasMultiplePairs || reducedMotion || isUserDragging || isPaused) return;
+	if (!hasMultiplePairs || reducedMotion || isUserDragging || isPaused || isHovered) return;
 
 	cycleTimer = setTimeout(() => {
 		void beginTransition();
@@ -357,6 +379,23 @@ function togglePause() {
 	}
 }
 
+function handleHoverEnter() {
+	isHovered = true;
+	// Cancel the rest timer so no new transition starts, but let any
+	// in-flight transition finish naturally (it checks isHovered on completion).
+	if (cycleTimer) {
+		clearTimeout(cycleTimer);
+		cycleTimer = null;
+	}
+}
+
+function handleHoverLeave() {
+	isHovered = false;
+	if (!isPaused && !isUserDragging && transitionState === 'resting') {
+		startCycle();
+	}
+}
+
 // Preload the next image for whichever side will be swapped next (using 'hero' preset to match display)
 $effect(() => {
 	let img: HTMLImageElement | null = null;
@@ -416,6 +455,8 @@ onMount(() => {
 		role="region"
 		aria-label="Shader comparison showcase"
 		aria-roledescription="carousel"
+		onmouseenter={handleHoverEnter}
+		onmouseleave={handleHoverLeave}
 	>
 		<ComparisonSlider
 			leftImage={displayLeftImage}
@@ -424,6 +465,12 @@ onMount(() => {
 			rightThumbhash={displayRightThumbhash}
 			leftLabel={displayLeftLabel}
 			rightLabel={displayRightLabel}
+			leftSlug={displayLeftSlug}
+			rightSlug={displayRightSlug}
+			leftAuthor={displayLeftAuthor}
+			rightAuthor={displayRightAuthor}
+			leftVersion={displayLeftVersion}
+			rightVersion={displayRightVersion}
 			{dividerPosition}
 			{orientation}
 			disabled={isAnimating}
