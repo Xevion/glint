@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use anyhow::Context;
 use tracing::{debug, instrument};
-use uuid::Uuid;
 
 use crate::db::DbPool;
 use crate::error::{AppResult, OptionNotFoundExt, SqlxResultExt};
@@ -23,14 +22,20 @@ impl ShaderRepo {
         Ok(shaders)
     }
 
-    /// Resolve a shader by UUID or slug. If the input parses as a UUID, looks up
-    /// by ID; otherwise falls back to slug.
+    /// Resolve a shader by ID or slug. Inputs longer than `ID_LENGTH` can only
+    /// be slugs; shorter ones could be either, so we check both in one query.
     #[instrument(skip(db), level = "debug")]
     pub async fn get(db: &DbPool, id_or_slug: &str) -> AppResult<Shader> {
-        if Uuid::try_parse(id_or_slug).is_ok() {
-            Self::find_by_id(db, id_or_slug)
-                .await?
-                .or_not_found("Shader", id_or_slug)
+        if id_or_slug.len() <= crate::id::ID_LENGTH {
+            sqlx::query_as!(
+                Shader,
+                "SELECT * FROM shaders WHERE id = $1 OR slug = $1",
+                id_or_slug
+            )
+            .fetch_optional(db)
+            .await
+            .context(format!("failed to find shader '{}'", id_or_slug))?
+            .or_not_found("Shader", id_or_slug)
         } else {
             Self::find_by_slug(db, id_or_slug)
                 .await?

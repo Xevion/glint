@@ -7,10 +7,29 @@
 //! serialization (serde), database interaction (sqlx), TypeScript binding
 //! generation (ts-rs), JSON schema (schemars), and standard Rust traits.
 
+use nanoid::nanoid;
+
+/// Length of generated IDs (10 chars ≈ 42 bits of entropy with the 56-char alphabet).
+pub const ID_LENGTH: usize = 10;
+
+/// Unambiguous alphabet: A-Z minus {I,O}, a-z minus {l,o}, digits minus {0,1}.
+pub const ID_ALPHABET: [char; 56] = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'U',
+    'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'm', 'n', 'p',
+    'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '2', '3', '4', '5', '6', '7', '8', '9',
+];
+
+/// Generate a new random ID string.
+pub fn generate_id() -> String {
+    nanoid!(ID_LENGTH, &ID_ALPHABET)
+}
+
 /// Define a newtype ID wrapping `String` with all necessary trait impls.
 ///
 /// Generates: Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize,
 /// Display, AsRef<str>, From<String>, sqlx Type/Encode/Decode, TS, JsonSchema.
+///
+/// Also generates a `generate()` constructor that creates a new random ID.
 macro_rules! define_id {
     ($name:ident) => {
         #[derive(
@@ -78,6 +97,13 @@ macro_rules! define_id {
                 value: sqlx::postgres::PgValueRef<'r>,
             ) -> Result<Self, sqlx::error::BoxDynError> {
                 <String as sqlx::Decode<sqlx::Postgres>>::decode(value).map(Self)
+            }
+        }
+
+        impl $name {
+            /// Generate a new random ID.
+            pub fn generate() -> Self {
+                Self($crate::id::generate_id())
             }
         }
     };

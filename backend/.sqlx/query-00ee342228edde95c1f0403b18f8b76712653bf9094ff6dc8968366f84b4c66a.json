@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM shader_versions WHERE shader_id NOT IN (SELECT id FROM shaders WHERE slug = 'vanilla')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "00ee342228edde95c1f0403b18f8b76712653bf9094ff6dc8968366f84b4c66a"
+}

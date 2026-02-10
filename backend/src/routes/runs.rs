@@ -4,20 +4,12 @@ use axum::{
     http::StatusCode,
     routing::{get, post},
 };
-use nanoid::nanoid;
 use serde::Deserialize;
 use tracing::{debug, info};
 
-const ID_LENGTH: usize = 10;
-// Unambiguous alphabet: A-Z minus {I,O}, a-z minus {l,o}, digits minus {0,1}
-const ID_ALPHABET: [char; 56] = [
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'U',
-    'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'm', 'n', 'p',
-    'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '2', '3', '4', '5', '6', '7', '8', '9',
-];
-
 use crate::auth::AuthUser;
 use crate::error::{AppError, AppResult};
+use crate::id::generate_id;
 use crate::models::{CaptureRun, CaptureRunItemWithContext, CaptureStatus};
 use crate::repo::{CaptureRepo, CaptureRunRepo, ShaderVersionRepo};
 use crate::state::AppState;
@@ -127,7 +119,7 @@ async fn create_run(
     State(state): State<AppState>,
     Json(request): Json<CreateRunRequest>,
 ) -> AppResult<(StatusCode, Json<CaptureRun>)> {
-    let run_id = nanoid!(ID_LENGTH, &ID_ALPHABET);
+    let run_id = generate_id();
     let total_items = request.items.len() as i32;
 
     let run = CaptureRunRepo::create(
@@ -144,7 +136,7 @@ async fn create_run(
         .iter()
         .map(|item| {
             (
-                nanoid!(ID_LENGTH, &ID_ALPHABET),
+                generate_id(),
                 run_id.clone(),
                 item.shader_version_id.clone(),
                 item.scene_id.clone(),
@@ -252,7 +244,7 @@ async fn claim_item(
 
     let shader_id = ShaderVersionRepo::get_shader_id(db, item.shader_version_id.as_ref()).await?;
 
-    let capture_id = nanoid!(ID_LENGTH, &ID_ALPHABET);
+    let capture_id = generate_id();
     let r2_key = format!(
         "captures/{}/{}/{}.webp",
         shader_id, item.scene_id, capture_id
@@ -393,7 +385,7 @@ async fn get_upload_url(
     State(state): State<AppState>,
     Json(request): Json<UploadUrlRequest>,
 ) -> AppResult<Json<UploadUrlResponse>> {
-    let capture_id = nanoid!(ID_LENGTH, &ID_ALPHABET);
+    let capture_id = generate_id();
     let r2_key = format!(
         "captures/{}/{}/{}.webp",
         request.shader_id, request.scene_id, capture_id

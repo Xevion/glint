@@ -243,7 +243,7 @@ impl SceneRepo {
         .await
         .context(format!("failed to create scene '{}'", req.slug))?;
 
-        let version_id = uuid::Uuid::new_v4().to_string();
+        let version_id = crate::id::generate_id();
         let version =
             SceneVersionRepo::create_inner(&mut *tx, &version_id, scene.id.as_ref(), req).await?;
 
@@ -271,7 +271,7 @@ impl SceneRepo {
             .context(format!("failed to find scene '{}'", id))?;
 
         // Create new version
-        let version_id = uuid::Uuid::new_v4().to_string();
+        let version_id = crate::id::generate_id();
         let version = sqlx::query_as!(
             SceneVersion,
             r#"
@@ -309,7 +309,7 @@ impl SceneRepo {
         // from the parent but preserves the derivative's own environment overrides
         // (time_of_day, weather, etc.) from its latest version.
         for child_id in &derivatives {
-            let child_version_id = uuid::Uuid::new_v4().to_string();
+            let child_version_id = crate::id::generate_id();
             let result = sqlx::query!(
                 r#"
                 INSERT INTO scene_versions (id, scene_id, x, y, z, pitch, yaw, time_of_day_ticks, weather, weather_intensity, moon_phase, biome, created_at)

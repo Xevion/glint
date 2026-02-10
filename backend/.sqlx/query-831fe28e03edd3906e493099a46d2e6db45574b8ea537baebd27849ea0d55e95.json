@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM shaders WHERE slug != 'vanilla'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "831fe28e03edd3906e493099a46d2e6db45574b8ea537baebd27849ea0d55e95"
+}

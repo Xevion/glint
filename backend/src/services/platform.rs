@@ -1,5 +1,4 @@
 use tracing::{info, instrument};
-use uuid::Uuid;
 
 use crate::{
     db::DbTransaction,
@@ -93,7 +92,7 @@ impl PlatformService {
             )));
         }
 
-        let shader_id = Uuid::new_v4().to_string();
+        let shader_id = crate::id::generate_id();
         let slug = data.metadata.slug.clone();
         let version_count = versions.len();
         let author_count = data.authors.len();

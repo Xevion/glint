@@ -1,19 +1,9 @@
 use std::collections::HashMap;
 
-use axum::{
-    Json, Router,
-    extract::{Path, Query, State},
-    http::StatusCode,
-    routing::{get, post},
-};
-use serde::Deserialize;
-use tracing::info;
-use uuid::Uuid;
-
 use crate::{
     auth::AdminUser,
     error::{AppError, AppResult},
-    id::ShaderVersionId,
+    id::{self, ShaderVersionId},
     models::{
         CaptureStatus, CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderListItem,
         ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
@@ -24,6 +14,14 @@ use crate::{
     },
     state::AppState,
 };
+use axum::{
+    Json, Router,
+    extract::{Path, Query, State},
+    http::StatusCode,
+    routing::{get, post},
+};
+use serde::Deserialize;
+use tracing::info;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -138,7 +136,7 @@ async fn create_shader(
     State(state): State<AppState>,
     Json(request): Json<CreateShaderRequest>,
 ) -> AppResult<(StatusCode, Json<Shader>)> {
-    let id = Uuid::new_v4().to_string();
+    let id = id::generate_id();
     let shader = ShaderRepo::create(state.db(), &id, &request).await?;
     info!(shader_id = %shader.id, slug = %shader.slug, "Shader created");
     Ok((StatusCode::CREATED, Json(shader)))
@@ -155,7 +153,7 @@ async fn create_shader_version(
         return Err(AppError::NotFound("Shader not found".into()));
     }
 
-    let id = Uuid::new_v4().to_string();
+    let id = id::generate_id();
     let version = ShaderVersionRepo::create(state.db(), &id, &shader_id, &request).await?;
 
     Ok((StatusCode::CREATED, Json(version)))

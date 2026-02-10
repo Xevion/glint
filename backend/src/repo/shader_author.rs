@@ -1,6 +1,5 @@
 use anyhow::Context;
 use tracing::{debug, instrument};
-use uuid::Uuid;
 
 use crate::error::AppResult;
 use crate::models::ShaderAuthor;
@@ -84,7 +83,7 @@ impl ShaderAuthorRepo {
             return Ok(());
         }
 
-        let ids: Vec<String> = authors.iter().map(|_| Uuid::new_v4().to_string()).collect();
+        let ids: Vec<String> = authors.iter().map(|_| crate::id::generate_id()).collect();
         let shader_ids: Vec<&str> = vec![shader_id; authors.len()];
         let names: Vec<&str> = authors.iter().map(|a| a.name.as_str()).collect();
         let urls: Vec<Option<&str>> = authors.iter().map(|a| a.url.as_deref()).collect();

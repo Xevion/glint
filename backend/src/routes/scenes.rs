@@ -201,7 +201,7 @@ async fn create_scene(
         )));
     }
 
-    let id = uuid::Uuid::new_v4().to_string();
+    let id = crate::id::generate_id();
     let (scene, version) = SceneRepo::create(state.db(), &id, &request).await?;
 
     Ok((

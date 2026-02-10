@@ -16,10 +16,10 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
         .execute(pool)
         .await?;
     sqlx::query!("DELETE FROM scenes").execute(pool).await?;
-    sqlx::query!("DELETE FROM shader_versions WHERE id != 'vanilla-1.21.4'")
+    sqlx::query!("DELETE FROM shader_versions WHERE shader_id NOT IN (SELECT id FROM shaders WHERE slug = 'vanilla')")
         .execute(pool)
         .await?;
-    sqlx::query!("DELETE FROM shaders WHERE id != 'vanilla'")
+    sqlx::query!("DELETE FROM shaders WHERE slug != 'vanilla'")
         .execute(pool)
         .await?;
     sqlx::query!("DELETE FROM worlds").execute(pool).await?;
@@ -130,7 +130,7 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
         .execute(pool)
         .await?;
 
-        let version_id = uuid::Uuid::new_v4().to_string();
+        let version_id = crate::id::generate_id();
         sqlx::query!(
             r#"
             INSERT INTO scene_versions (id, scene_id, x, y, z, pitch, yaw, time_of_day_ticks, weather, weather_intensity, biome)

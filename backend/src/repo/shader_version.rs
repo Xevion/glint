@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use anyhow::Context;
 use tracing::{debug, instrument};
-use uuid::Uuid;
 
 use crate::error::{AppResult, OptionNotFoundExt};
 use crate::id::{ShaderId, ShaderVersionId};
@@ -278,7 +277,7 @@ impl ShaderVersionRepo {
         shader_id: &str,
         version: &PlatformVersion,
     ) -> AppResult<()> {
-        let version_id = Uuid::new_v4().to_string();
+        let version_id = crate::id::generate_id();
         sqlx::query!(
             r#"
             INSERT INTO shader_versions (
@@ -338,10 +337,7 @@ impl ShaderVersionRepo {
             .filter(|v| seen.insert(&v.version_number))
             .collect();
 
-        let ids: Vec<String> = versions
-            .iter()
-            .map(|_| Uuid::new_v4().to_string())
-            .collect();
+        let ids: Vec<String> = versions.iter().map(|_| crate::id::generate_id()).collect();
         let shader_ids: Vec<&str> = vec![shader_id; versions.len()];
         let version_numbers: Vec<&str> =
             versions.iter().map(|v| v.version_number.as_str()).collect();

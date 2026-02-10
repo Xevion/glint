@@ -1,15 +1,3 @@
-use anyhow::Context;
-use aws_sdk_s3::Client as S3Client;
-use axum::{
-    Json, Router,
-    extract::{Path, State},
-    http::StatusCode,
-    routing::{get, post},
-};
-use chrono::Utc;
-use tracing::{debug, error, info, warn};
-use uuid::Uuid;
-
 use crate::{
     auth::AdminUser,
     config::R2Config,
@@ -22,6 +10,16 @@ use crate::{
     repo::{PendingUploadRepo, SceneRepo, WorldRepo, WorldVersionRepo},
     state::AppState,
 };
+use anyhow::Context;
+use aws_sdk_s3::Client as S3Client;
+use axum::{
+    Json, Router,
+    extract::{Path, State},
+    http::StatusCode,
+    routing::{get, post},
+};
+use chrono::Utc;
+use tracing::{debug, error, info, warn};
 
 /// Presigned URL expiry time (5 minutes)
 const PRESIGN_EXPIRY_SECS: u64 = 300;
@@ -65,7 +63,7 @@ async fn generate_presigned_upload(
     bucket: &str,
     file_hash: &str,
 ) -> AppResult<PresignedUpload> {
-    let upload_id = Uuid::new_v4().to_string();
+    let upload_id = crate::id::generate_id();
     let upload_key = format!("_uploads/{}.zip", upload_id);
     let expires_at = Utc::now() + chrono::Duration::seconds(PRESIGN_EXPIRY_SECS as i64);
 
@@ -153,7 +151,7 @@ async fn finalize_staged_upload(
     }
 
     // Move file to versioned location
-    let version_id = Uuid::new_v4().to_string();
+    let version_id = crate::id::generate_id();
     let final_key = format!("worlds/{}/{}.zip", world_slug, version_id);
 
     let copy_source = format!("{}/{}", bucket, pending.upload_key);
@@ -422,7 +420,7 @@ async fn complete_world_upload(
     // Create world + version + cleanup pending record in a single transaction
     let mut tx = state.begin_tx().await?;
 
-    let world_id = Uuid::new_v4().to_string();
+    let world_id = crate::id::generate_id();
     let world_result = WorldRepo::create(
         &mut *tx,
         &world_id,
