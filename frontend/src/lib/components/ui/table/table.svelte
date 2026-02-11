@@ -10,7 +10,7 @@ let {
 }: WithElementRef<HTMLTableAttributes> = $props();
 </script>
 
-<div data-slot="table-container" class={cn("relative w-full overflow-hidden rounded-md", className)}>
+<div data-slot="table-container" class={cn("relative w-full overflow-x-auto rounded-md", className)}>
 	<table
 		bind:this={ref}
 		data-slot="table"

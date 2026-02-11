@@ -6,6 +6,7 @@ import { Button } from '$lib/components/ui/button';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
+import { formatNumber } from '$lib/utils/display';
 import { ArrowLeft, Check, CircleAlert, Download, Info, LoaderCircle } from '@lucide/svelte';
 import type { Snippet } from 'svelte';
 
@@ -16,8 +17,8 @@ interface Props {
 	onShaderAdopted?: (shader: Shader) => void;
 	/** If provided, skip URL input and go straight to preview when opened */
 	initialUrl?: string;
-	/** Optional trigger snippet; if omitted, renders default "Adopt Shader" button */
-	trigger?: Snippet;
+	/** Optional trigger snippet (receives dialog trigger props to spread onto your element) */
+	trigger?: Snippet<[{ props: Record<string, unknown> }]>;
 	/** Bindable open state for external control */
 	open?: boolean;
 }
@@ -129,18 +130,15 @@ function handleKeydown(e: KeyboardEvent) {
 		void handlePreview();
 	}
 }
-
-function formatNumber(n: number): string {
-	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-	if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-	return n.toLocaleString();
-}
 </script>
 
 <Dialog.Root {open} onOpenChange={handleOpenChange}>
 	{#if trigger}
 		<Dialog.Trigger>
-			{@render trigger()}
+			{#snippet child({ props })}
+				<!-- eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- bits-ui child props are untyped -->
+				{@render trigger({ props })}
+			{/snippet}
 		</Dialog.Trigger>
 	{:else}
 		<Dialog.Trigger>
