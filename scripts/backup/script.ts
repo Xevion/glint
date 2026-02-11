@@ -175,6 +175,13 @@ async function verifyUpload(client: S3Client, bucket: string, key: string, expec
 	console.log(`verified: ${key} (${humanBytes(remoteSize)})`);
 }
 
+// Force-exit if the script hangs for any reason (e.g. S3 client keeping sockets alive).
+// .unref() ensures this timer doesn't itself prevent a clean exit.
+setTimeout(() => {
+	console.error("timed out after 5 minutes, forcing exit");
+	process.exit(2);
+}, 5 * 60 * 1000).unref();
+
 async function main(): Promise<void> {
 	const raw = await pgDump();
 	const compressed = await compress(raw);
@@ -196,6 +203,7 @@ async function main(): Promise<void> {
 	await uploadToR2(client, r2.bucket, key, compressed);
 	await verifyUpload(client, r2.bucket, key, compressed.length);
 
+	client.destroy();
 	console.log("backup complete");
 }
 
