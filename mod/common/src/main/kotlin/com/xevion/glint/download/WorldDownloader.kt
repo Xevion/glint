@@ -230,11 +230,20 @@ object WorldDownloader {
         targetDir: File,
     ) {
         try {
+            val canonicalTarget = targetDir.canonicalPath + File.separator
+
             ZipInputStream(zipFile.inputStream()).use { zis ->
                 var entry = zis.nextEntry
 
                 while (entry != null) {
                     val file = File(targetDir, entry.name)
+                    val canonicalFile = file.canonicalPath
+
+                    if (!canonicalFile.startsWith(canonicalTarget)) {
+                        throw SecurityException(
+                            "Zip entry '${entry.name}' resolves outside target directory",
+                        )
+                    }
 
                     if (entry.isDirectory) {
                         file.mkdirs()
@@ -251,6 +260,8 @@ object WorldDownloader {
             }
 
             log.info("Extracted world") { "path" to targetDir.absolutePath }
+        } catch (e: SecurityException) {
+            throw WorldDownloadException.ExtractionFailed(e)
         } catch (e: Exception) {
             throw WorldDownloadException.ExtractionFailed(e)
         }
