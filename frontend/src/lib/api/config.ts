@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { env } from '$env/dynamic/public';
 
 /**
  * Get the API base URL for the current context.
@@ -11,6 +12,6 @@ export function getApiUrl(): string {
 		return '';
 	}
 
-	// SSR: use public env var for backend origin (accessible in universal load functions)
-	return import.meta.env?.PUBLIC_BACKEND_URL ?? 'http://localhost:8080';
+	// SSR: use dynamic public env for runtime resolution (import.meta.env is empty in built output)
+	return env.PUBLIC_BACKEND_URL ?? 'http://localhost:8080';
 }

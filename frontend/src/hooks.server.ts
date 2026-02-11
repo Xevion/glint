@@ -60,6 +60,10 @@ const posthogHost = env.POSTHOG_HOST;
 const posthog = posthogKey && posthogHost ? new PostHog(posthogKey, { host: posthogHost }) : null;
 
 export const handleError: HandleServerError = ({ error, event, status }) => {
+	if (status !== 404) {
+		console.error(`[SSR ${status}] ${event.request.method} ${event.url.pathname}`, error);
+	}
+
 	if (posthog && status !== 404) {
 		const requestId = event.request.headers.get('x-request-id') ?? 'unknown';
 		posthog.captureException(error, requestId, {
