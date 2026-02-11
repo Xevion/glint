@@ -8,6 +8,6 @@ export class FeaturedEndpoints extends ApiClient {
 	 * Get random popular shader pairs for the homepage hero
 	 */
 	list(): Promise<Result<FeaturedPair[], ApiError>> {
-		return super.get<FeaturedPair[]>('/api/featured');
+		return this.get<FeaturedPair[]>('/api/featured');
 	}
 }

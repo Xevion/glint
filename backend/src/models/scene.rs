@@ -167,7 +167,8 @@ pub struct UpdateSceneRequest {
     pub biome: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, TS)]
+#[ts(export, optional_fields)]
 pub struct UpdateSceneMetadataRequest {
     pub name: Option<String>,
     pub description: Option<String>,

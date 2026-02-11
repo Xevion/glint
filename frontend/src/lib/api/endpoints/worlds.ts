@@ -1,27 +1,17 @@
-import type { UploadResponse, World, WorldListItem, WorldVersion } from '$lib/bindings';
+import type {
+	CompleteUploadRequest,
+	CreateWorldUploadRequest,
+	CreateWorldVersionUploadRequest,
+	UploadResponse,
+	World,
+	WorldListItem,
+	WorldVersion
+} from '$lib/bindings';
 import { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import { ApiError, ApiErrorType } from '../errors';
 
 export type { UploadResponse };
-
-export interface CreateWorldVersionUploadRequest {
-	file_hash: string;
-	file_size_bytes: number;
-}
-
-export interface CreateWorldUploadRequest {
-	name: string;
-	slug: string;
-	description?: string;
-	minecraft_version: string;
-	file_hash: string;
-	file_size_bytes: number;
-}
-
-export interface CompleteUploadRequest {
-	upload_id: string;
-}
 
 export interface UploadProgress {
 	loaded: number;

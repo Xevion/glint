@@ -84,7 +84,8 @@ pub struct WorldWithDetails {
 }
 
 /// Request to initiate a world upload (returns presigned URL)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, TS)]
+#[ts(export, optional_fields)]
 pub struct CreateWorldUploadRequest {
     pub name: String,
     pub slug: String,
@@ -106,7 +107,8 @@ pub struct UploadResponse {
 }
 
 /// Request to initiate a new version upload for an existing world
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct CreateWorldVersionUploadRequest {
     /// SHA256 hash with algorithm prefix (e.g., "sha256:abc123...")
     pub file_hash: String,
@@ -114,7 +116,8 @@ pub struct CreateWorldVersionUploadRequest {
 }
 
 /// Request to complete an upload (world creation or version)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct CompleteUploadRequest {
     pub upload_id: String,
 }
@@ -128,7 +131,8 @@ pub struct CreateWorldRequest<'a> {
     pub minecraft_version: &'a str,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, TS)]
+#[ts(export, optional_fields)]
 pub struct UpdateWorldRequest {
     pub name: Option<String>,
     pub description: Option<String>,

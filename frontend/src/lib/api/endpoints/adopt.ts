@@ -15,7 +15,7 @@ export class AdoptEndpoints extends ApiClient {
 		offset?: number,
 		sort?: ShaderSearchSort
 	): Promise<Result<ShaderSearchResponse, ApiError>> {
-		return super.post<ShaderSearchResponse>('/api/shaders/search', {
+		return this.post<ShaderSearchResponse>('/api/shaders/search', {
 			query: query ?? undefined,
 			limit,
 			offset,
@@ -24,10 +24,10 @@ export class AdoptEndpoints extends ApiClient {
 	}
 
 	preview(url: string): Promise<Result<AdoptPreviewResponse, ApiError>> {
-		return super.post<AdoptPreviewResponse>('/api/shaders/adopt/preview', { url });
+		return this.post<AdoptPreviewResponse>('/api/shaders/adopt/preview', { url });
 	}
 
 	adopt(url: string): Promise<Result<Shader, ApiError>> {
-		return super.post<Shader>('/api/shaders/adopt', { url });
+		return this.post<Shader>('/api/shaders/adopt', { url });
 	}
 }

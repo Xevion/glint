@@ -1,3 +1,5 @@
+import type { CaptureFreshness } from '$lib/bindings';
+
 /** Tailwind class strings for status badge colors using semantic tokens. */
 export const statusColors: Record<string, string> = {
 	running: 'bg-info/15 text-info',
@@ -11,3 +13,10 @@ export const statusColors: Record<string, string> = {
 
 /** Fallback classes for unknown statuses. */
 export const statusColorFallback = 'bg-muted text-muted-foreground';
+
+/** Tailwind class strings for capture freshness badges. */
+export const freshnessColors: Record<CaptureFreshness, string> = {
+	fresh: 'bg-success/15 text-success',
+	stale: 'bg-warning/15 text-warning',
+	superseded: 'bg-muted text-muted-foreground'
+};

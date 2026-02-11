@@ -8,13 +8,13 @@ export class CaptureEndpoints extends ApiClient {
 	 * List completed captures (public)
 	 */
 	list(): Promise<Result<Capture[], ApiError>> {
-		return super.get<Capture[]>('/api/captures');
+		return this.get<Capture[]>('/api/captures');
 	}
 
 	/**
 	 * Get a single capture by ID (public)
 	 */
 	getById(id: string): Promise<Result<Capture, ApiError>> {
-		return super.get<Capture>(`/api/captures/${encodeURIComponent(id)}`);
+		return this.get<Capture>(`/api/captures/${encodeURIComponent(id)}`);
 	}
 }

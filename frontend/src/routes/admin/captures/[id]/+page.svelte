@@ -13,7 +13,7 @@ import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Tabs from '$lib/components/ui/tabs';
 import { formatBytes } from '$lib/utils/format';
 import { preloadImage } from '$lib/utils/image';
-import { statusColorFallback, statusColors } from '$lib/utils/status';
+import { freshnessColors, statusColorFallback, statusColors } from '$lib/utils/status';
 import { Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
@@ -126,12 +126,6 @@ function formatMs(value: number | null): string {
 	if (value == null) return '\u2014';
 	return `${value.toFixed(2)}ms`;
 }
-
-const freshnessColors = {
-	fresh: 'bg-success/15 text-success',
-	stale: 'bg-warning/15 text-warning',
-	superseded: 'bg-muted text-muted-foreground'
-} as const;
 </script>
 
 <svelte:head><title>Capture Details - Glint</title></svelte:head>
@@ -400,8 +394,7 @@ const freshnessColors = {
 									{/if}
 								</div>
 								{#if c.freshness !== 'fresh'}
-									{@const freshnessColors3 = { stale: 'bg-warning/15 text-warning', superseded: 'bg-muted text-muted-foreground', fresh: '' }}
-									<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors3[c.freshness]}">
+								<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[c.freshness]}">
 										{c.freshness}
 									</span>
 								{/if}

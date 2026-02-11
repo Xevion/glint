@@ -1,9 +1,14 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import { api } from '$lib/api';
-import type { UpdateSceneMetadataRequest } from '$lib/api/endpoints/admin';
-import type { CaptureWithContext, SceneWithVersion, WorldWithDetails } from '$lib/bindings';
+import type {
+	CaptureWithContext,
+	SceneWithVersion,
+	UpdateSceneMetadataRequest,
+	WorldWithDetails
+} from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
+import { freshnessColors } from '$lib/utils/status';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
@@ -231,11 +236,10 @@ async function handleReactivate() {
 				<div class="flex items-center justify-between">
 					<div class="text-sm font-medium">{capture.shader_name}</div>
 					{#if capture.freshness !== 'fresh'}
-						{@const colors = { stale: 'bg-warning/15 text-warning', superseded: 'bg-muted text-muted-foreground', fresh: '' }}
-						<span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium {colors[capture.freshness]}">
-							{capture.freshness}
-						</span>
-					{/if}
+					<span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[capture.freshness]}">
+						{capture.freshness}
+					</span>
+				{/if}
 				</div>
 				<div class="text-xs text-muted-foreground">
 					{capture.shader_version}

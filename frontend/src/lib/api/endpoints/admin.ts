@@ -7,6 +7,11 @@ import type {
 	SceneWithWorld,
 	Shader,
 	ShaderWithCaptures,
+	StorageBucket,
+	StorageStats,
+	UpdateSceneMetadataRequest,
+	UpdateShaderRequest,
+	UpdateWorldRequest,
 	User,
 	UserWithSessions,
 	WorkItem,
@@ -16,42 +21,6 @@ import type {
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
-
-export interface UpdateShaderRequest {
-	name?: string;
-	description?: string;
-	modrinth_id?: string;
-	curseforge_id?: string;
-	website_url?: string;
-}
-
-export interface UpdateWorldRequest {
-	name?: string;
-	description?: string;
-}
-
-export interface UpdateSceneMetadataRequest {
-	name?: string;
-	description?: string;
-}
-
-export interface UpdateUserRoleRequest {
-	role: string;
-}
-
-export interface StorageStats {
-	total_bytes: number;
-	capture_count: number;
-	avg_bytes: number;
-	missing_count: number;
-}
-
-export interface StorageBucket {
-	date: number; // unix timestamp in seconds
-	cumulative_bytes: number;
-	cumulative_count: number;
-	bucket_bytes: number;
-}
 
 export class AdminEndpoints extends ApiClient {
 	// ============== Shaders ==============

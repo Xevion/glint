@@ -50,7 +50,7 @@ const darkBackgrounds = $derived(
 
 // Calculate the displayed height of each wallpaper section based on scale
 // Use first background's dimensions or defaults
-const sectionHeight = $derived(() => {
+const sectionHeight = $derived.by(() => {
 	const ref = backgrounds[0];
 	const w = ref?.width ?? DEFAULT_WIDTH;
 	const h = ref?.height ?? DEFAULT_HEIGHT;
@@ -59,10 +59,9 @@ const sectionHeight = $derived(() => {
 });
 
 // Calculate how many wallpaper sections we need
-const sectionsNeeded = $derived(() => {
-	const height = sectionHeight();
-	if (height <= 0) return 3;
-	return Math.max(3, Math.ceil(containerHeight / height) + 1);
+const sectionsNeeded = $derived.by(() => {
+	if (sectionHeight <= 0) return 3;
+	return Math.max(3, Math.ceil(containerHeight / sectionHeight) + 1);
 });
 
 function getImageUrl(bg: Background): string {
@@ -98,14 +97,12 @@ function getBackgroundsForSections(bgs: Background[], count: number): Background
 	return result;
 }
 
-const lightSections = $derived(getBackgroundsForSections(lightShuffled, sectionsNeeded()));
-const darkSections = $derived(getBackgroundsForSections(darkShuffled, sectionsNeeded()));
+const lightSections = $derived(getBackgroundsForSections(lightShuffled, sectionsNeeded));
+const darkSections = $derived(getBackgroundsForSections(darkShuffled, sectionsNeeded));
 
 let imagesLoaded = $state(false);
 
-const backgroundSize = $derived(() => {
-	return `${scale * 100}%`;
-});
+const backgroundSize = $derived(`${scale * 100}%`);
 
 onMount(() => {
 	lightShuffled = shuffleArray(lightBackgrounds);
@@ -190,7 +187,7 @@ onMount(() => {
 	};
 });
 
-const lightFilterStyle = $derived(() => {
+const lightFilterStyle = $derived.by(() => {
 	const filters: string[] = [];
 	if (blur > 0) filters.push(`blur(${blur}px)`);
 	if (lightBrightness !== 1.0) filters.push(`brightness(${lightBrightness})`);
@@ -204,7 +201,7 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 	<!-- Light theme thumbhash placeholders (shown immediately while images load) -->
 	{#if mounted && !imagesLoaded}
 		{#each lightSections as bg, i (i)}
-			{@const top = i * sectionHeight()}
+			{@const top = i * sectionHeight}
 			{@const isFirst = i === 0}
 			{@const isLast = i === lightSections.length - 1}
 			{@const thumbhashUrl = getThumbhashBackground(bg)}
@@ -212,10 +209,10 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 				<div
 					class="wallpaper-section wallpaper-light"
 					style:top="{top}px"
-					style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
+					style:height="{sectionHeight + (isLast ? 0 : blendHeight)}px"
 					style:background-image="url({thumbhashUrl})"
 					style:background-size="cover"
-					style:filter={lightFilterStyle() ?? undefined}
+					style:filter={lightFilterStyle ?? undefined}
 					style:--blend-height="{blendHeight}px"
 					class:has-fade-top={!isFirst}
 					class:has-fade-bottom={!isLast}
@@ -223,7 +220,7 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 			{/if}
 		{/each}
 		{#each darkSections as bg, i (i)}
-			{@const top = i * sectionHeight()}
+			{@const top = i * sectionHeight}
 			{@const isFirst = i === 0}
 			{@const isLast = i === darkSections.length - 1}
 			{@const thumbhashUrl = getThumbhashBackground(bg)}
@@ -231,7 +228,7 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 				<div
 					class="wallpaper-section wallpaper-dark"
 					style:top="{top}px"
-					style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
+					style:height="{sectionHeight + (isLast ? 0 : blendHeight)}px"
 					style:background-image="url({thumbhashUrl})"
 					style:background-size="cover"
 					style:filter={darkFilterStyle ?? undefined}
@@ -246,17 +243,17 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 	<!-- Light theme wallpapers -->
 	{#if mounted && imagesLoaded}
 		{#each lightSections as bg, i (i)}
-			{@const top = i * sectionHeight()}
+			{@const top = i * sectionHeight}
 			{@const isFirst = i === 0}
 			{@const isLast = i === lightSections.length - 1}
 			<div
 				class="wallpaper-section wallpaper-light"
 				class:animate-in={!initialAnimationDone}
 				style:top="{top}px"
-				style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
+				style:height="{sectionHeight + (isLast ? 0 : blendHeight)}px"
 				style:background-image="url({getImageUrl(bg)})"
-				style:background-size={backgroundSize()}
-				style:filter={lightFilterStyle() ?? undefined}
+				style:background-size={backgroundSize}
+				style:filter={lightFilterStyle ?? undefined}
 				style:--blend-height="{blendHeight}px"
 				class:has-fade-top={!isFirst}
 				class:has-fade-bottom={!isLast}
@@ -267,16 +264,16 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 	<!-- Dark theme wallpapers -->
 	{#if mounted && imagesLoaded}
 		{#each darkSections as bg, i (i)}
-			{@const top = i * sectionHeight()}
+			{@const top = i * sectionHeight}
 			{@const isFirst = i === 0}
 			{@const isLast = i === darkSections.length - 1}
 			<div
 				class="wallpaper-section wallpaper-dark"
 				class:animate-in={!initialAnimationDone}
 				style:top="{top}px"
-				style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
+				style:height="{sectionHeight + (isLast ? 0 : blendHeight)}px"
 				style:background-image="url({getImageUrl(bg)})"
-				style:background-size={backgroundSize()}
+				style:background-size={backgroundSize}
 				style:filter={darkFilterStyle ?? undefined}
 				style:--blend-height="{blendHeight}px"
 				class:has-fade-top={!isFirst}

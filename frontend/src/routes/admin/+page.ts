@@ -1,6 +1,10 @@
 import { createApiClient } from '$lib/api';
-import type { StorageBucket, StorageStats } from '$lib/api/endpoints/admin';
-import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
+import type {
+	CaptureHealthSummary,
+	CaptureWithContext,
+	StorageBucket,
+	StorageStats
+} from '$lib/bindings';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => {

@@ -8,7 +8,7 @@ import { AdminPageHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { formatBytes } from '$lib/utils/format';
-import { statusColorFallback, statusColors } from '$lib/utils/status';
+import { freshnessColors, statusColorFallback, statusColors } from '$lib/utils/status';
 import type { PageData } from './$types';
 
 interface Props {
@@ -164,13 +164,8 @@ async function refresh() {
 						: '-'}
 			{:else if columnId === 'file_size'}
 			{value ? formatBytes(value as number) : '-'}
-			{:else if columnId === 'freshness'}
-				{@const colors = {
-					fresh: 'bg-success/15 text-success',
-					stale: 'bg-warning/15 text-warning',
-					superseded: 'bg-muted text-muted-foreground',
-				}}
-				<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {colors[row.freshness]}">
+		{:else if columnId === 'freshness'}
+			<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[row.freshness]}">
 					{row.freshness}
 				</span>
 		{:else if columnId === 'run'}

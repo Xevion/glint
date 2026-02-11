@@ -198,7 +198,8 @@ pub struct CreateShaderVersionRequest {
     pub file_hash: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, TS)]
+#[ts(export, optional_fields)]
 pub struct UpdateShaderRequest {
     pub name: Option<String>,
     pub slug: Option<String>,

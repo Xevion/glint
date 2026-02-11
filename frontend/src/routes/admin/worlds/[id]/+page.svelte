@@ -1,7 +1,7 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import { api } from '$lib/api';
-import type { UpdateWorldRequest } from '$lib/api/endpoints/admin';
+import type { UpdateWorldRequest } from '$lib/bindings';
 import type { Scene, WorldVersion, WorldWithDetails } from '$lib/bindings';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import WorldUploadDialog from '$lib/components/WorldUploadDialog.svelte';

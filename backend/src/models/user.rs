@@ -87,7 +87,8 @@ pub struct SessionInfo {
     pub expires_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct UpdateUserRoleRequest {
     pub role: Role,
 }
