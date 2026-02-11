@@ -11,18 +11,34 @@ interface Props {
 	description?: string;
 	/** Raw image URL (from R2/CDN). Will be transformed to 1200x630 for OG. */
 	image?: string | null;
+	/**
+	 * Path to a composite OG image endpoint (e.g. "/og/shader/bsl/og.png").
+	 * When set, this takes precedence over the `image` prop.
+	 * Resolved to an absolute URL using the current page origin.
+	 */
+	ogImagePath?: string | null;
 	/** Override og:type (defaults to "website"). */
 	type?: string;
 }
 
-let { title, bare = false, description, image, type: ogType = 'website' }: Props = $props();
+let {
+	title,
+	bare = false,
+	description,
+	image,
+	ogImagePath,
+	type: ogType = 'website'
+}: Props = $props();
 
 const fullTitle = $derived(bare ? title : `${title} - Glint`);
 const currentUrl = $derived(page.url.href);
 
-const ogImageUrl = $derived(
-	cfImageUrl(image, { width: 1200, height: 630, fit: 'cover', quality: 85, format: 'jpeg' })
-);
+const ogImageUrl = $derived.by(() => {
+	// Composite OG image path takes precedence
+	if (ogImagePath) return `${page.url.origin}${ogImagePath}`;
+	// Fall back to Cloudflare-transformed raw image
+	return cfImageUrl(image, { width: 1200, height: 630, fit: 'cover', quality: 85, format: 'jpeg' });
+});
 </script>
 
 <svelte:head>

@@ -42,6 +42,7 @@ const ogImage = $derived(featuredPairs[0]?.right_image_url ?? captures[0]?.image
 	bare
 	description="Shader Preview Catalog for Minecraft. Browse, compare, and discover shaders visually."
 	image={ogImage}
+	ogImagePath="/og/home/og.png"
 />
 
 <!-- Hero Section -->

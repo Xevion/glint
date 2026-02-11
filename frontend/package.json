@@ -69,6 +69,10 @@
 	},
 	"dependencies": {
 		"@careswitch/svelte-data-table": "^0.6.3",
+		"@fontsource/geist-sans": "^5.2.5",
+		"@fontsource/inter": "^5.2.8",
+		"@resvg/resvg-js": "^2.6.2",
+		"@xevion/satori-html": "^0.4.1",
 		"class-variance-authority": "^0.7.1",
 		"d3-scale": "^4.0.2",
 		"d3-shape": "^3.2.0",
@@ -79,6 +83,8 @@
 		"overlayscrollbars-svelte": "^0.5.5",
 		"posthog-js": "^1.342.1",
 		"posthog-node": "^5.24.11",
+		"satori": "^0.19.2",
+		"sharp": "^0.34.5",
 		"svelte-relative-time": "^0.0.6",
 		"thumbhash": "^0.1.1",
 		"true-myth": "^9.3.1"

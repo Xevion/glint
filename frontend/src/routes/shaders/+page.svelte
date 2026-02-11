@@ -47,6 +47,7 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 	title="Shaders"
 	description="Browse and compare Minecraft shaders. See how each shader transforms your game with side-by-side screenshots."
 	image={ogImage}
+	ogImagePath="/og/shaders/og.png"
 />
 
 <div class="py-6">

@@ -100,6 +100,7 @@ const ogDescription = $derived.by(() => {
 	title={shader.name}
 	description={ogDescription}
 	image={ogImage}
+	ogImagePath={`/og/shader/${shader.slug}/og.png`}
 />
 
 {#key shader.id}

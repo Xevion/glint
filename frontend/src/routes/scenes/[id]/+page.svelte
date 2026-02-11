@@ -74,6 +74,7 @@ const ogDescription = $derived.by(() => {
 	title={scene.name}
 	description={ogDescription}
 	image={ogImage}
+	ogImagePath={`/og/scene/${scene.slug}/og.png`}
 />
 
 {#if scene}
