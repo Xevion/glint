@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use tracing::debug;
 
@@ -15,7 +17,11 @@ pub async fn apply_views(pool: &DbPool) -> anyhow::Result<()> {
 
 pub async fn init_pool(database_url: &str) -> anyhow::Result<DbPool> {
     let pool = PgPoolOptions::new()
-        .max_connections(5)
+        .max_connections(20)
+        .min_connections(2)
+        .idle_timeout(Duration::from_secs(300))
+        .max_lifetime(Duration::from_secs(1800))
+        .acquire_timeout(Duration::from_secs(5))
         .connect(database_url)
         .await?;
 
