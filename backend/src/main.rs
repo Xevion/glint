@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use axum::http::{HeaderValue, Method, header};
 use clap::Parser;
 use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::cors::CorsLayer;
 use tracing::{debug, info, warn};
 
 use glint::{cli, config::Config, db, platform, routes, services, state::AppState};
@@ -209,7 +209,7 @@ async fn main() -> anyhow::Result<()> {
     let app = routes::router(state)
         .layer(analytics_layer)
         .layer(cors)
-        .layer(TraceLayer::new_for_http());
+        .layer(glint::middleware::request_id::RequestIdLayer);
 
     // Start server
     let addr: SocketAddr = format!("{}:{}", config.host, config.port)
