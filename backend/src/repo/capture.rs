@@ -742,7 +742,11 @@ impl CaptureRepo {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Get the most recent completed non-outdated thumbnail per shader (active scenes only)
+    /// Get a deterministic-random completed thumbnail per shader (active scenes only).
+    ///
+    /// Uses `md5(shader_id || capture_id)` for ordering so the pick is stable
+    /// across requests yet spread across available captures rather than always
+    /// picking the most recent one.
     #[instrument(skip(executor), level = "debug")]
     pub async fn batch_thumbnails_by_shader(
         executor: impl sqlx::PgExecutor<'_>,
@@ -763,7 +767,7 @@ impl CaptureRepo {
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             JOIN scenes sc ON c.scene_id = sc.id
             WHERE c.status = 'completed' AND c.image_url IS NOT NULL AND sc.active = TRUE
-            ORDER BY sv.shader_id, c.captured_at DESC NULLS LAST
+            ORDER BY sv.shader_id, md5(sv.shader_id || c.id)
             "#
         )
         .fetch_all(executor)

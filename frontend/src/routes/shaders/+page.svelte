@@ -11,7 +11,7 @@ const shaders = $derived(data.shaders);
 
 // Filter state
 let searchQuery = $state('');
-let sortBy = $state<'name' | 'updated'>('updated');
+let sortBy = $state<'popular' | 'name' | 'updated'>('popular');
 
 const filteredShaders = $derived.by(() => {
 	let result = shaders.filter((shader: (typeof shaders)[0]) => {
@@ -22,6 +22,8 @@ const filteredShaders = $derived.by(() => {
 	// Sort
 	result = [...result].sort((a, b) => {
 		switch (sortBy) {
+			case 'popular':
+				return (b.upstream_downloads ?? 0) - (a.upstream_downloads ?? 0);
 			case 'name':
 				return a.name.localeCompare(b.name);
 			case 'updated':
@@ -68,6 +70,7 @@ const hasFilters = $derived(searchQuery !== '');
 			bind:value={sortBy}
 			class="h-9 rounded-md border border-input bg-background/50 px-3 text-sm shadow-xs backdrop-blur-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
 		>
+				<option value="popular">Popular</option>
 				<option value="updated">Recent</option>
 				<option value="name">A-Z</option>
 			</select>
