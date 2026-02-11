@@ -119,6 +119,35 @@ migrate-create name:
 db-seed:
     cargo run --manifest-path backend/Cargo.toml --quiet -- seed
 
+# === R2 / S3 ===
+
+# Run aws s3 commands against the R2 bucket.
+# Usage: just r2 ls worlds/ | just r2 cp R2/worlds/a.zip R2/worlds/b.zip
+# Shorthand: R2 or R2/ expands to s3://<bucket> or s3://<bucket>/
+r2 *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -f .env ] && set -a && source .env && set +a
+    export AWS_ACCESS_KEY_ID="$GLINT_R2_ACCESS_KEY_ID"
+    export AWS_SECRET_ACCESS_KEY="$GLINT_R2_SECRET_ACCESS_KEY"
+    export AWS_ENDPOINT_URL="https://${GLINT_R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+    bucket="s3://${GLINT_R2_BUCKET}"
+    # Allow shorthand: R2 or R2/ expands to s3://<bucket> or s3://<bucket>/
+    args=()
+    for arg in "$@"; do
+        if [[ "$arg" == "R2" ]]; then
+            args+=("$bucket")
+        elif [[ "$arg" == R2/* ]]; then
+            args+=("${bucket}/${arg#R2/}")
+        else
+            args+=("$arg")
+        fi
+    done
+    exec aws s3 "${args[@]}"
+
+# Alias: just s3 → just r2
+alias s3 := r2
+
 # === Utilities ===
 
 # Regenerate TypeScript bindings from Rust types
