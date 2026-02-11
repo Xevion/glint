@@ -1,11 +1,10 @@
 /**
- * Generate the barrel (index.ts) file for TypeScript bindings and format them.
+ * Generate the barrel (index.ts) file for TypeScript bindings.
  *
  * Usage: bun scripts/bindings-barrel.ts
  */
 
-import { readdirSync, writeFileSync } from "fs";
-import { runPiped } from "./lib/proc";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "fs";
 
 const BINDINGS_DIR = "frontend/src/lib/bindings";
 
@@ -14,14 +13,18 @@ const types = readdirSync(BINDINGS_DIR)
   .map((f) => f.replace(/\.ts$/, ""))
   .sort();
 
-writeFileSync(
-  `${BINDINGS_DIR}/index.ts`,
+const barrelContent =
   "// Auto-generated barrel file — do not edit manually.\n" +
-    "// Regenerate with: cd backend && cargo test export_bindings\n" +
-    types.map((t) => `export type { ${t} } from "./${t}";`).join("\n") +
-    "\n",
-);
+  "// Regenerate with: cd backend && cargo test export_bindings\n" +
+  types.map((t) => `export type { ${t} } from "./${t}";`).join("\n") +
+  "\n";
 
-runPiped(["bun", "run", "--cwd", "frontend", "format", "src/lib/bindings/"]);
+const barrelPath = `${BINDINGS_DIR}/index.ts`;
+const existing = existsSync(barrelPath) ? readFileSync(barrelPath, "utf-8") : null;
 
-console.log(`✓ Generated barrel file (${types.length} types)`);
+if (existing !== barrelContent) {
+  writeFileSync(barrelPath, barrelContent);
+  console.log(`✓ Generated barrel file (${types.length} types)`);
+} else {
+  console.log(`✓ Barrel file unchanged (${types.length} types)`);
+}

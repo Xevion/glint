@@ -42,10 +42,10 @@ export interface CollectResult {
  * run(["cargo", "build", "--release"]);
  * run(["bun", "run", "test"]);
  */
-export function run(cmd: string[], options?: { cwd?: string }): void {
+export function run(cmd: string[], options?: { cwd?: string; env?: Record<string, string> }): void {
 	const proc = Bun.spawnSync(cmd, {
 		stdio: ["ignore", "inherit", "inherit"],
-		env: baseEnv,
+		env: options?.env ? { ...baseEnv, ...options.env } : baseEnv,
 		cwd: options?.cwd,
 	});
 	if (proc.exitCode !== 0) process.exit(proc.exitCode);
@@ -67,7 +67,7 @@ export function run(cmd: string[], options?: { cwd?: string }): void {
  *   const modified = stdout.split("\n").filter(l => l.startsWith(" M"));
  * }
  */
-export function runPiped(cmd: string[], options?: { cwd?: string }): {
+export function runPiped(cmd: string[], options?: { cwd?: string; env?: Record<string, string> }): {
 	exitCode: number;
 	stdout: string;
 	stderr: string;
@@ -75,7 +75,7 @@ export function runPiped(cmd: string[], options?: { cwd?: string }): {
 	const proc = Bun.spawnSync(cmd, {
 		stdout: "pipe",
 		stderr: "pipe",
-		env: baseEnv,
+		env: options?.env ? { ...baseEnv, ...options.env } : baseEnv,
 		cwd: options?.cwd,
 	});
 	return {

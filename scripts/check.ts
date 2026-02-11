@@ -4,7 +4,9 @@
  * Usage: bun scripts/check.ts [--fix|-f]
  */
 
-import { existsSync, readdirSync, rmSync, statSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { c, elapsed, isStderrTTY } from './lib/fmt';
 import { type CollectResult, raceInOrder, run, runPiped, spawnCollect } from './lib/proc';
 
@@ -57,16 +59,63 @@ if (fix) {
 		process.stdout.write(
 			c('1;36', '→ Regenerating TypeScript bindings (Rust sources changed)...') + '\n'
 		);
-		run(['cargo', 'test', '--no-run', '--quiet'], { cwd: 'backend' });
-		rmSync(BINDINGS_DIR, { recursive: true, force: true });
-		run(['cargo', 'test', 'export_bindings', '--quiet'], { cwd: 'backend' });
 
-		run(['bun', 'scripts/bindings-barrel.ts']);
+		// Generate into a temp directory to avoid triggering HMR for every file
+		const tmpDir = mkdtempSync(join(tmpdir(), 'glint-bindings-'));
+		try {
+			for (const cmd of [
+				{ cmd: ['cargo', 'test', '--no-run', '--quiet'], opts: { cwd: 'backend' } },
+				{
+					cmd: ['cargo', 'test', 'export_bindings', '--quiet'],
+					opts: { cwd: 'backend', env: { TS_RS_EXPORT_DIR: tmpDir } }
+				}
+			]) {
+				const result = runPiped(cmd.cmd, cmd.opts);
+				if (result.exitCode !== 0) {
+					if (result.stdout) process.stdout.write(result.stdout);
+					if (result.stderr) process.stderr.write(result.stderr);
+					process.exit(result.exitCode);
+				}
+			}
 
-		const count = readdirSync(BINDINGS_DIR).filter(
-			(f) => f.endsWith('.ts') && f !== 'index.ts'
-		).length;
-		process.stdout.write(c('32', '✓ bindings') + ` (${elapsed(t)}s, ${count} types)\n`);
+			// Diff-sync: only write files whose content actually changed
+			if (!existsSync(BINDINGS_DIR)) {
+				mkdirSync(BINDINGS_DIR, { recursive: true });
+			}
+
+			const newFiles = new Set(readdirSync(tmpDir).filter((f) => f.endsWith('.ts')));
+			const oldFiles = new Set(
+				readdirSync(BINDINGS_DIR).filter((f) => f.endsWith('.ts') && f !== 'index.ts')
+			);
+
+			let changed = 0;
+			for (const file of newFiles) {
+				const newContent = readFileSync(join(tmpDir, file));
+				const oldPath = join(BINDINGS_DIR, file);
+				if (existsSync(oldPath)) {
+					const oldContent = readFileSync(oldPath);
+					if (Buffer.compare(newContent, oldContent) === 0) continue;
+				}
+				writeFileSync(oldPath, newContent);
+				changed++;
+			}
+
+			// Remove orphaned files (types deleted from Rust)
+			for (const file of oldFiles) {
+				if (!newFiles.has(file)) {
+					rmSync(join(BINDINGS_DIR, file));
+					changed++;
+				}
+			}
+
+			run(['bun', 'scripts/bindings-barrel.ts']);
+
+			const count = newFiles.size;
+			const detail = changed > 0 ? `, ${changed} changed` : ', no changes';
+			process.stdout.write(c('32', '✓ bindings') + ` (${elapsed(t)}s, ${count} types${detail})\n`);
+		} finally {
+			rmSync(tmpDir, { recursive: true, force: true });
+		}
 	} else {
 		process.stdout.write(c('2', '· bindings up-to-date, skipped') + '\n');
 	}
