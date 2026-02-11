@@ -25,9 +25,6 @@ mod/**/run/
 !backend/views.sql
 !backend/.sqlx/
 
-!scripts/lib/
-!scripts/optimize-wallpapers.ts
-
 !frontend/
 frontend/node_modules/
 frontend/.svelte-kit/
@@ -35,4 +32,3 @@ frontend/build/
 frontend/.eslintcache
 frontend/test-results/
 frontend/playwright-report/
-frontend/static/wallpapers/

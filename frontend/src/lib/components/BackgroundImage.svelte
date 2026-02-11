@@ -1,12 +1,12 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import type { Snippet } from 'svelte';
-import { wallpaperManifest } from '$lib/data/wallpaper-manifest';
+import type { Background } from '$lib/bindings';
+import { cfImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 
 interface Props {
-	lightWallpapers: number[];
-	darkWallpapers: number[];
+	backgrounds: Background[];
 	blur?: number;
 	overlay?: boolean;
 	overlayOpacity?: number;
@@ -20,8 +20,7 @@ interface Props {
 }
 
 const {
-	lightWallpapers,
-	darkWallpapers,
+	backgrounds,
 	blur = 0,
 	overlay = true,
 	overlayOpacity = 0.5,
@@ -31,40 +30,48 @@ const {
 	lightBrightness = 1.0
 }: Props = $props();
 
-// 4K wallpaper dimensions
-const WALLPAPER_WIDTH = 3840;
-const WALLPAPER_HEIGHT = 2160;
+// Default wallpaper dimensions (used when background has no width/height)
+const DEFAULT_WIDTH = 3840;
+const DEFAULT_HEIGHT = 2160;
 
 let containerHeight = $state(2160);
 let viewportWidth = $state(1920);
 let containerEl: HTMLDivElement | undefined = $state();
 let mounted = $state(false);
-// Track if initial fade-in animation has completed (prevents re-animation on section recreation)
 let initialAnimationDone = $state(false);
 
+// Split backgrounds by theme mode
+const lightBackgrounds = $derived(
+	backgrounds.filter((b) => b.theme_mode === 'light' || b.theme_mode === 'both')
+);
+const darkBackgrounds = $derived(
+	backgrounds.filter((b) => b.theme_mode === 'dark' || b.theme_mode === 'both')
+);
+
 // Calculate the displayed height of each wallpaper section based on scale
+// Use first background's dimensions or defaults
 const sectionHeight = $derived(() => {
-	// At scale 1.75, the wallpaper is zoomed in 175%
-	// The displayed width is viewport width, so displayed height maintains aspect ratio
-	const displayedHeight = (viewportWidth * WALLPAPER_HEIGHT) / WALLPAPER_WIDTH / scale;
+	const ref = backgrounds[0];
+	const w = ref?.width ?? DEFAULT_WIDTH;
+	const h = ref?.height ?? DEFAULT_HEIGHT;
+	const displayedHeight = (viewportWidth * h) / w / scale;
 	return displayedHeight;
 });
 
 // Calculate how many wallpaper sections we need
 const sectionsNeeded = $derived(() => {
 	const height = sectionHeight();
-	if (height <= 0) return 3; // Start with minimum 3 sections
+	if (height <= 0) return 3;
 	return Math.max(3, Math.ceil(containerHeight / height) + 1);
 });
 
-function getWallpaperUrl(index: number): string {
-	return wallpaperManifest[index]?.optimized ?? `/wallpapers/${index}.jpg`;
+function getImageUrl(bg: Background): string {
+	// Use Cloudflare Image Transforms to serve optimized version (480px wide, webp)
+	return cfImageUrl(bg.image_url, { width: 480, quality: 50, format: 'webp' }) ?? bg.image_url;
 }
 
-function getThumbhashBackground(index: number): string | null {
-	const entry = wallpaperManifest[index];
-	if (!entry) return null;
-	return decodeThumbhash(entry.thumbhash);
+function getThumbhashBackground(bg: Background): string | null {
+	return decodeThumbhash(bg.thumbhash);
 }
 
 // Shuffle array using Fisher-Yates algorithm
@@ -77,35 +84,32 @@ function shuffleArray<T>(array: T[]): T[] {
 	return shuffled;
 }
 
-// Cache for shuffled wallpaper arrays (initialized in onMount to prevent double-render)
-let lightShuffled = $state<number[]>([]);
-let darkShuffled = $state<number[]>([]);
+// Cache for shuffled arrays (initialized in onMount)
+let lightShuffled = $state<Background[]>([]);
+let darkShuffled = $state<Background[]>([]);
 
-// Get the wallpaper indices for the required sections (with looping)
-function getWallpaperIndices(wallpapers: number[], count: number): number[] {
-	const indices: number[] = [];
+// Get backgrounds for the required sections (with looping)
+function getBackgroundsForSections(bgs: Background[], count: number): Background[] {
+	if (bgs.length === 0) return [];
+	const result: Background[] = [];
 	for (let i = 0; i < count; i++) {
-		indices.push(wallpapers[i % wallpapers.length]);
+		result.push(bgs[i % bgs.length]);
 	}
-	return indices;
+	return result;
 }
 
-const lightIndices = $derived(getWallpaperIndices(lightShuffled, sectionsNeeded()));
-const darkIndices = $derived(getWallpaperIndices(darkShuffled, sectionsNeeded()));
+const lightSections = $derived(getBackgroundsForSections(lightShuffled, sectionsNeeded()));
+const darkSections = $derived(getBackgroundsForSections(darkShuffled, sectionsNeeded()));
 
-// Track image loading state
 let imagesLoaded = $state(false);
 
-// Calculate background size based on scale
 const backgroundSize = $derived(() => {
-	// Scale is how much we zoom in, so 1.75 means the image is 175% of viewport width
 	return `${scale * 100}%`;
 });
 
 onMount(() => {
-	// Initialize shuffled arrays immediately on mount (before images load)
-	lightShuffled = shuffleArray(lightWallpapers);
-	darkShuffled = shuffleArray(darkWallpapers);
+	lightShuffled = shuffleArray(lightBackgrounds);
+	darkShuffled = shuffleArray(darkBackgrounds);
 
 	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 	let previousHeight = 0;
@@ -117,7 +121,6 @@ onMount(() => {
 			window.innerHeight
 		);
 
-		// Only update if height changed by more than 50px to prevent micro-adjustments
 		if (Math.abs(newHeight - previousHeight) > 50) {
 			containerHeight = newHeight;
 			previousHeight = newHeight;
@@ -129,7 +132,6 @@ onMount(() => {
 		updateHeight();
 	};
 
-	// Initial dimension capture - do this immediately to prevent layout shift
 	updateDimensions();
 	mounted = true;
 
@@ -138,19 +140,20 @@ onMount(() => {
 		debounceTimer = setTimeout(updateHeight, 150);
 	};
 
-	// Preload all wallpaper images before showing them
+	// Preload all background images before showing them
 	const preloadImages = async () => {
-		const allIndices = [...new Set([...lightWallpapers, ...darkWallpapers])];
-		const promises = allIndices.map((index) => {
+		const allBgs = [...new Set([...lightBackgrounds, ...darkBackgrounds])];
+		if (allBgs.length === 0) {
+			imagesLoaded = true;
+			return;
+		}
+
+		const promises = allBgs.map((bg) => {
 			return new Promise<void>((resolve, reject) => {
 				const img = new Image();
-				img.onload = () => {
-					resolve();
-				};
-				img.onerror = () => {
-					reject(new Error(`Failed to load wallpaper ${index}`));
-				};
-				img.src = getWallpaperUrl(index);
+				img.onload = () => resolve();
+				img.onerror = () => reject(new Error(`Failed to load background ${bg.id}`));
+				img.src = getImageUrl(bg);
 			});
 		});
 
@@ -158,19 +161,17 @@ onMount(() => {
 			await Promise.all(promises);
 			imagesLoaded = true;
 		} catch (error) {
-			console.error('Failed to preload wallpaper images:', error);
-			imagesLoaded = true; // Show anyway even if some failed
+			console.error('Failed to preload background images:', error);
+			imagesLoaded = true;
 		}
 	};
 
 	void preloadImages().then(() => {
-		// Mark initial animation as done after it completes (800ms animation duration)
 		setTimeout(() => {
 			initialAnimationDone = true;
 		}, 800);
 	});
 
-	// Use MutationObserver for height changes only (not width)
 	const observer = new MutationObserver(debouncedHeightUpdate);
 
 	observer.observe(document.body, {
@@ -180,7 +181,6 @@ onMount(() => {
 		attributeFilter: ['style', 'class']
 	});
 
-	// Only update width on actual window resize
 	window.addEventListener('resize', updateDimensions);
 
 	return () => {
@@ -203,11 +203,11 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 <div class="background-container" bind:this={containerEl}>
 	<!-- Light theme thumbhash placeholders (shown immediately while images load) -->
 	{#if mounted && !imagesLoaded}
-		{#each lightIndices as wallpaperIndex, i (i)}
+		{#each lightSections as bg, i (i)}
 			{@const top = i * sectionHeight()}
 			{@const isFirst = i === 0}
-			{@const isLast = i === lightIndices.length - 1}
-			{@const thumbhashUrl = getThumbhashBackground(wallpaperIndex)}
+			{@const isLast = i === lightSections.length - 1}
+			{@const thumbhashUrl = getThumbhashBackground(bg)}
 			{#if thumbhashUrl}
 				<div
 					class="wallpaper-section wallpaper-light"
@@ -222,11 +222,11 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 				></div>
 			{/if}
 		{/each}
-		{#each darkIndices as wallpaperIndex, i (i)}
+		{#each darkSections as bg, i (i)}
 			{@const top = i * sectionHeight()}
 			{@const isFirst = i === 0}
-			{@const isLast = i === darkIndices.length - 1}
-			{@const thumbhashUrl = getThumbhashBackground(wallpaperIndex)}
+			{@const isLast = i === darkSections.length - 1}
+			{@const thumbhashUrl = getThumbhashBackground(bg)}
 			{#if thumbhashUrl}
 				<div
 					class="wallpaper-section wallpaper-dark"
@@ -245,16 +245,16 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 
 	<!-- Light theme wallpapers -->
 	{#if mounted && imagesLoaded}
-		{#each lightIndices as wallpaperIndex, i (i)}
+		{#each lightSections as bg, i (i)}
 			{@const top = i * sectionHeight()}
 			{@const isFirst = i === 0}
-			{@const isLast = i === lightIndices.length - 1}
+			{@const isLast = i === lightSections.length - 1}
 			<div
 				class="wallpaper-section wallpaper-light"
 				class:animate-in={!initialAnimationDone}
 				style:top="{top}px"
 				style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
-				style:background-image="url({getWallpaperUrl(wallpaperIndex)})"
+				style:background-image="url({getImageUrl(bg)})"
 				style:background-size={backgroundSize()}
 				style:filter={lightFilterStyle() ?? undefined}
 				style:--blend-height="{blendHeight}px"
@@ -266,16 +266,16 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 
 	<!-- Dark theme wallpapers -->
 	{#if mounted && imagesLoaded}
-		{#each darkIndices as wallpaperIndex, i (i)}
+		{#each darkSections as bg, i (i)}
 			{@const top = i * sectionHeight()}
 			{@const isFirst = i === 0}
-			{@const isLast = i === darkIndices.length - 1}
+			{@const isLast = i === darkSections.length - 1}
 			<div
 				class="wallpaper-section wallpaper-dark"
 				class:animate-in={!initialAnimationDone}
 				style:top="{top}px"
 				style:height="{sectionHeight() + (isLast ? 0 : blendHeight)}px"
-				style:background-image="url({getWallpaperUrl(wallpaperIndex)})"
+				style:background-image="url({getImageUrl(bg)})"
 				style:background-size={backgroundSize()}
 				style:filter={darkFilterStyle ?? undefined}
 				style:--blend-height="{blendHeight}px"

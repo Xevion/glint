@@ -2,7 +2,7 @@ import { createApiClient } from '$lib/api';
 import type { User } from '$lib/bindings';
 import type { LayoutLoad } from './$types';
 
-export const load: LayoutLoad = async ({ fetch }) => {
+export const load: LayoutLoad = async ({ fetch, data }) => {
 	const api = createApiClient(fetch);
 	const result = await api.user.me();
 
@@ -11,5 +11,5 @@ export const load: LayoutLoad = async ({ fetch }) => {
 		Err: () => null
 	});
 
-	return { user };
+	return { ...data, user };
 };

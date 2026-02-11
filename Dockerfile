@@ -42,13 +42,7 @@ COPY package.json bun.lock ./
 COPY frontend/package.json ./frontend/
 RUN bun install --frozen-lockfile
 
-# Copy frontend source and wallpaper optimization script
 COPY frontend/ ./frontend/
-COPY scripts/lib/ ./scripts/lib/
-COPY scripts/optimize-wallpapers.ts ./scripts/
-
-# Generate wallpaper manifest (empty if no source images present)
-RUN bun scripts/optimize-wallpapers.ts
 
 RUN bun --smol run --cwd frontend build
 

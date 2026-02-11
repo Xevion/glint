@@ -36,8 +36,4 @@ project.inlang/cache/
 /playwright/.cache/
 /playwright/.auth/
 
-# Generated assets (screenshots/wallpapers)
-static/wallpapers/
 
-# Generated wallpaper optimization outputs
-src/lib/data/wallpaper-manifest.ts

@@ -27,12 +27,6 @@ jobs:
         working-directory: frontend
         run: bun ci --frozen-lockfile
 
-      - name: Install root dependencies
-        run: bun ci --frozen-lockfile
-
-      - name: Generate wallpaper manifest
-        run: bun scripts/optimize-wallpapers.ts
-
       - name: Sync SvelteKit
         working-directory: frontend
         run: bunx svelte-kit sync
@@ -130,12 +124,6 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: bun ci --frozen-lockfile
-
-      - name: Install root dependencies
-        run: bun ci --frozen-lockfile
-
-      - name: Generate wallpaper manifest
-        run: bun scripts/optimize-wallpapers.ts
 
       - name: Sync SvelteKit
         working-directory: frontend

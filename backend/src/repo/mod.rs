@@ -1,3 +1,4 @@
+pub mod background;
 pub mod capture;
 pub mod capture_health;
 pub mod capture_run;
@@ -15,6 +16,7 @@ pub mod work;
 pub mod world;
 pub mod world_version;
 
+pub use background::BackgroundRepo;
 pub use capture::{CaptureRepo, StorageBucket, StorageStats, ThumbnailInfo};
 pub use capture_health::CaptureHealthRepo;
 pub use capture_run::CaptureRunRepo;

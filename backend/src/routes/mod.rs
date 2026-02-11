@@ -1,5 +1,6 @@
 mod adopt;
 mod auth;
+mod backgrounds;
 mod capture_health;
 mod captures;
 mod device;
@@ -26,6 +27,7 @@ fn api_router() -> Router<AppState> {
     Router::new()
         .route("/health", get(health))
         .nest("/auth", auth::router())
+        .nest("/backgrounds", backgrounds::router())
         .nest("/user", user::router())
         .nest("/shaders", shaders::router().merge(adopt::router()))
         .nest("/scenes", scenes::router())

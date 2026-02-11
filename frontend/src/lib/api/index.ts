@@ -1,6 +1,7 @@
 import { getApiUrl } from './config';
 import { AdminEndpoints } from './endpoints/admin';
 import { AdoptEndpoints } from './endpoints/adopt';
+import { BackgroundEndpoints } from './endpoints/backgrounds';
 import { CaptureEndpoints } from './endpoints/captures';
 import { DeviceEndpoints } from './endpoints/device';
 import { FeaturedEndpoints } from './endpoints/featured';
@@ -29,6 +30,7 @@ export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
 		shaders: new ShaderEndpoints(url, fetchFn),
 		scenes: new SceneEndpoints(url, fetchFn),
 		captures: new CaptureEndpoints(url, fetchFn),
+		backgrounds: new BackgroundEndpoints(url, fetchFn),
 		admin: new AdminEndpoints(url, fetchFn),
 		adopt: new AdoptEndpoints(url, fetchFn),
 		worlds: new WorldsEndpoints(url, fetchFn),

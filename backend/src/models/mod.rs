@@ -1,5 +1,6 @@
 pub mod adopt;
 pub mod agent;
+pub mod background;
 pub mod capture;
 pub mod device;
 pub mod featured;
@@ -11,13 +12,17 @@ pub mod world;
 
 // Re-export ID types for convenience
 pub use crate::id::{
-    CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderId, ShaderVersionId, WorldId,
-    WorldVersionId,
+    BackgroundId, CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderId, ShaderVersionId,
+    WorldId, WorldVersionId,
 };
 
 // Re-export all public types so existing `use crate::models::Foo` imports continue to work.
 
 pub use adopt::{AdoptPreviewAuthor, AdoptPreviewResponse, AdoptShaderRequest, LinkShaderRequest};
+pub use background::{
+    Background, BackgroundUploadResponse, ConfirmBackgroundUploadRequest, ThemeMode,
+    UpdateBackgroundRequest,
+};
 pub use capture::{
     Capture, CaptureDetail, CaptureFreshness, CaptureRun, CaptureRunItem, CaptureRunItemStatus,
     CaptureRunItemWithContext, CaptureRunStatus, CaptureStatus, CaptureWithContext,

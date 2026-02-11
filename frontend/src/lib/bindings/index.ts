@@ -2,6 +2,9 @@
 // Regenerate with: cd backend && cargo test export_bindings
 export type { AdoptPreviewAuthor } from "./AdoptPreviewAuthor";
 export type { AdoptPreviewResponse } from "./AdoptPreviewResponse";
+export type { Background } from "./Background";
+export type { BackgroundId } from "./BackgroundId";
+export type { BackgroundUploadResponse } from "./BackgroundUploadResponse";
 export type { Capture } from "./Capture";
 export type { CaptureDetail } from "./CaptureDetail";
 export type { CaptureFreshness } from "./CaptureFreshness";
@@ -18,6 +21,7 @@ export type { CaptureStatus } from "./CaptureStatus";
 export type { CaptureTargetHealth } from "./CaptureTargetHealth";
 export type { CaptureWithContext } from "./CaptureWithContext";
 export type { Category } from "./Category";
+export type { ConfirmBackgroundUploadRequest } from "./ConfirmBackgroundUploadRequest";
 export type { DeviceAuthResponse } from "./DeviceAuthResponse";
 export type { DeviceCodeStatus } from "./DeviceCodeStatus";
 export type { DeviceConfirmResponse } from "./DeviceConfirmResponse";
@@ -51,6 +55,8 @@ export type { ShaderWithVersions } from "./ShaderWithVersions";
 export type { StaleReason } from "./StaleReason";
 export type { Tag } from "./Tag";
 export type { TargetHealth } from "./TargetHealth";
+export type { ThemeMode } from "./ThemeMode";
+export type { UpdateBackgroundRequest } from "./UpdateBackgroundRequest";
 export type { UploadResponse } from "./UploadResponse";
 export type { User } from "./User";
 export type { UserWithSessions } from "./UserWithSessions";

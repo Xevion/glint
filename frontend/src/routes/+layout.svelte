@@ -10,13 +10,15 @@ import Sidebar from '$lib/components/Sidebar.svelte';
 import { initNavigation } from '$lib/stores/navigation.svelte';
 import { telemetry } from '$lib/telemetry';
 import { themeStore } from '$lib/stores/theme.svelte';
+import type { LayoutData } from './$types';
 import './layout.css';
 
 interface Props {
+	data: LayoutData;
 	children: Snippet;
 }
 
-let { children }: Props = $props();
+let { data, children }: Props = $props();
 
 let osInstance: OverlayScrollbarsInstance | null = null;
 
@@ -50,8 +52,7 @@ onMount(() => {
 </script>
 
 <BackgroundImage
-	lightWallpapers={[13, 53, 31, 71, 18, 65, 32, 97]}
-	darkWallpapers={[102, 69, 23, 94, 13]}
+	backgrounds={data.backgrounds}
 	blur={4}
 	overlayOpacity={0.7}
 	lightBrightness={1.7}
