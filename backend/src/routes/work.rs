@@ -1,6 +1,6 @@
 use axum::{Json, Router, extract::State, routing::get};
 use serde::Deserialize;
-use tracing::debug;
+use tracing::{debug, instrument};
 
 use crate::auth::AgentUser;
 use crate::error::AppResult;
@@ -9,7 +9,6 @@ use crate::repo::work::WorkItem;
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct WorkQuery {
     pub limit: Option<i64>,
     pub force: Option<bool>,
@@ -25,6 +24,7 @@ pub fn router() -> Router<AppState> {
     Router::new().route("/", get(get_work))
 }
 
+#[instrument(skip(state, _user), fields(user_id = _user.user.id))]
 async fn get_work(
     _user: AgentUser,
     State(state): State<AppState>,

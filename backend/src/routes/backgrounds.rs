@@ -4,7 +4,7 @@ use axum::{
     routing::{delete, get, post, put},
 };
 use serde::Deserialize;
-use tracing::warn;
+use tracing::{instrument, warn};
 
 use crate::auth::AdminUser;
 use crate::error::{AppError, AppResult};
@@ -26,12 +26,14 @@ pub fn router() -> Router<AppState> {
 }
 
 /// GET /api/backgrounds — List enabled backgrounds (public, used by frontend SSR)
+#[instrument(skip(state))]
 async fn list_enabled(State(state): State<AppState>) -> AppResult<Json<Vec<Background>>> {
     let backgrounds = BackgroundRepo::list_enabled(state.db()).await?;
     Ok(Json(backgrounds))
 }
 
 /// GET /api/backgrounds/all — List all backgrounds including disabled (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn list_all(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -47,6 +49,7 @@ pub struct InitiateUploadRequest {
 }
 
 /// POST /api/backgrounds — Initiate a background upload (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn initiate_upload(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -112,6 +115,7 @@ async fn initiate_upload(
 }
 
 /// POST /api/backgrounds/{id}/confirm — Confirm upload with metadata (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn confirm_upload(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -132,6 +136,7 @@ async fn confirm_upload(
 }
 
 /// PUT /api/backgrounds/{id} — Update background metadata (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn update_background(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -151,6 +156,7 @@ async fn update_background(
 }
 
 /// DELETE /api/backgrounds/{id} — Delete a background and its R2 file (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn delete_background(
     _admin: AdminUser,
     State(state): State<AppState>,

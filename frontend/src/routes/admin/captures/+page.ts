@@ -33,7 +33,7 @@ export const load: PageLoad = async ({ fetch, url }) => {
 			captures: data.items,
 			totalCount: data.total,
 			page: data.page,
-			pageSize: data.pageSize,
+			pageSize: data.page_size,
 			error: null as string | null,
 			filters: { shader, scene, status, runId },
 			shaders,

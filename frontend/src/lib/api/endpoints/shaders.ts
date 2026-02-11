@@ -24,7 +24,7 @@ export class ShaderEndpoints extends ApiClient {
 		params?: GetShaderParams
 	): Promise<Result<ShaderWithCaptures, ApiError>> {
 		const searchParams = new URLSearchParams();
-		if (params?.versionId) searchParams.set('versionId', params.versionId);
+		if (params?.versionId) searchParams.set('version_id', params.versionId);
 		if (params?.profile) searchParams.set('profile', params.profile);
 		const query = searchParams.toString();
 		const url = `/api/shaders/${encodeURIComponent(idOrSlug)}${query ? `?${query}` : ''}`;

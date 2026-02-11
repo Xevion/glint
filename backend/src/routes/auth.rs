@@ -11,7 +11,7 @@ use axum_extra::extract::{
 use oauth2::{AuthorizationCode, CsrfToken, Scope, TokenResponse};
 use serde::Deserialize;
 use subtle::ConstantTimeEq;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, instrument, warn};
 
 use crate::{
     auth::{self, SESSION_COOKIE_NAME},
@@ -30,7 +30,7 @@ pub fn router() -> Router<AppState> {
         .route("/logout", post(logout))
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct LoginQuery {
     /// URL to redirect to after successful login
     redirect: Option<String>,
@@ -50,6 +50,7 @@ fn validate_redirect_url(url: &str) -> &str {
 }
 
 /// GET /api/auth/discord - Initiates Discord OAuth flow
+#[instrument(skip(state, jar))]
 async fn discord_login(
     State(state): State<AppState>,
     Query(query): Query<LoginQuery>,
@@ -89,7 +90,7 @@ async fn discord_login(
     Ok((jar, Redirect::temporary(auth_url.as_str()).into_response()))
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct CallbackQuery {
     code: String,
     state: String,
@@ -104,6 +105,7 @@ struct DiscordUser {
 }
 
 /// GET /api/auth/discord/callback - Handles Discord OAuth callback
+#[instrument(skip(state, jar))]
 async fn discord_callback(
     State(state): State<AppState>,
     Query(query): Query<CallbackQuery>,
@@ -202,6 +204,7 @@ async fn discord_callback(
 }
 
 /// POST /api/auth/logout - Invalidates the current session
+#[instrument(skip(state, jar))]
 async fn logout(State(state): State<AppState>, jar: CookieJar) -> AppResult<(CookieJar, Response)> {
     // Extract session token from cookie
     if let Some(cookie) = jar.get(SESSION_COOKIE_NAME) {
@@ -228,6 +231,7 @@ async fn logout(State(state): State<AppState>, jar: CookieJar) -> AppResult<(Coo
 }
 
 /// Fetch user info from Discord API
+#[instrument(skip(access_token), level = "debug")]
 async fn fetch_discord_user(access_token: &str) -> AppResult<DiscordUser> {
     let client = reqwest::Client::new();
     let response = client

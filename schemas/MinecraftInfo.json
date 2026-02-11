@@ -19,7 +19,7 @@
         "null"
       ]
     },
-    "irisVersion": {
+    "iris_version": {
       "type": [
         "string",
         "null"

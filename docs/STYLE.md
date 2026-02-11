@@ -81,7 +81,7 @@ HTTP status codes map to error categories: 400 (validation), 404 (not found), 40
 
 ## API Design
 
-- **Casing**: All JSON fields and query parameters use `camelCase`. Rust structs use idiomatic `snake_case` internally with `#[serde(rename_all = "camelCase")]` on all request/response types and query parameter structs.
+- **Casing**: All Glint-owned JSON fields and query parameters use `snake_case`. Rust structs use idiomatic `snake_case` — no `#[serde(rename_all)]` needed since the wire format matches. External API client types (CurseForge, Modrinth) keep whatever casing the upstream API uses.
 - **List responses**: Wrapped with `{ items: [...], total: N }` for pagination support
 - **Single responses**: Return the object directly (no wrapper)
 - **IDs in URLs**: Use the resource's primary identifier: `/api/shaders/{id}`

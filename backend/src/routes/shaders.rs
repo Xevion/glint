@@ -26,7 +26,7 @@ use axum::{
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use tracing::{info, warn};
+use tracing::{info, instrument, warn};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -83,6 +83,7 @@ fn viewer_hash(ip: &str, user_agent: &str) -> String {
 }
 
 /// GET /api/shaders - List all shaders with enrichment (public)
+#[instrument(skip(state))]
 async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<ShaderListItem>>> {
     let db = state.db();
 
@@ -139,7 +140,6 @@ async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shade
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct ShaderDetailQuery {
     version_id: Option<String>,
     profile: Option<String>,
@@ -149,6 +149,7 @@ struct ShaderDetailQuery {
 ///
 /// Supports 301 redirects: if the path param is a nanoid, old slug, or non-canonical slug,
 /// the response redirects to the canonical `/api/shaders/{current_slug}` URL.
+#[instrument(skip(state, headers))]
 async fn get_shader(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -242,6 +243,7 @@ struct TrendingQuery {
 }
 
 /// GET /api/shaders/trending - Get trending shaders by recent view count (public)
+#[instrument(skip(state))]
 async fn trending_shaders(
     State(state): State<AppState>,
     Query(query): Query<TrendingQuery>,
@@ -285,6 +287,7 @@ async fn trending_shaders(
 }
 
 /// POST /api/shaders - Create a new shader (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn create_shader(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -303,6 +306,7 @@ async fn create_shader(
 }
 
 /// POST /api/shaders/{id}/versions - Create a new shader version (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn create_shader_version(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -320,6 +324,7 @@ async fn create_shader_version(
 }
 
 /// PUT /api/shaders/{id} - Update shader metadata (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn update_shader(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -342,6 +347,7 @@ async fn update_shader(
 }
 
 /// DELETE /api/shaders/{id} - Delete a shader (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn delete_shader(
     _admin: AdminUser,
     State(state): State<AppState>,

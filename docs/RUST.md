@@ -87,15 +87,16 @@ Optional services return `Option<&T>` — handlers check availability before use
 
 ## Serialization
 
-- All public-facing types use `#[serde(rename_all = "camelCase")]` — this includes response models, request bodies, **and query parameter structs** (`Query<T>` extractors)
+- All Glint-owned types use `snake_case` field names — no `#[serde(rename_all)]` needed since Rust's default matches. This includes response models, request bodies, **and query parameter structs** (`Query<T>` extractors).
+- External API client types (CurseForge, Modrinth) keep whatever casing the upstream API uses — add `#[serde(rename_all = "camelCase")]` or per-field `#[serde(rename)]` as needed.
+- Enum variants use their own conventions: `snake_case` for statuses, lowercase for sorts, `SCREAMING_SNAKE_CASE` where appropriate.
 - Types exported to frontend derive `TS` with `#[ts(export)]`
 - `DateTime<Utc>` serializes as ISO 8601 strings (`#[ts(type = "string")]` for TypeScript)
 - Request types: derive `Deserialize`. Response types: derive `Serialize`. Shared types: both.
 
 ```rust
-// Query param structs get camelCase too — clients send ?worldId=..., not ?world_id=...
+// Query param structs are snake_case too — clients send ?world_id=..., not ?worldId=...
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct SceneQuery {
     world_id: Option<String>,
 }

@@ -1,4 +1,5 @@
 use axum::{Json, Router, extract::State, routing::get};
+use tracing::instrument;
 
 use crate::auth::AdminUser;
 use crate::error::AppResult;
@@ -11,6 +12,7 @@ pub fn router() -> Router<AppState> {
 }
 
 /// GET /api/admin/capture-health — Full capture target matrix with health status
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn get_capture_health(
     _admin: AdminUser,
     State(state): State<AppState>,

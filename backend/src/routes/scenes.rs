@@ -8,6 +8,7 @@ use axum::{
     routing::{delete, get, put},
 };
 use serde::Deserialize;
+use tracing::instrument;
 use validator::Validate;
 
 use crate::{
@@ -45,6 +46,7 @@ pub fn router() -> Router<AppState> {
 }
 
 /// GET /api/scenes - List active scenes with enrichment (public), optionally filtered by world_id
+#[instrument(skip(state))]
 async fn list_scenes_public(
     State(state): State<AppState>,
     Query(params): Query<SceneQuery>,
@@ -96,6 +98,7 @@ async fn list_scenes_public(
 }
 
 /// GET /api/scenes/all - List all scenes including disabled (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn list_scenes_all(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -104,8 +107,7 @@ async fn list_scenes_all(
     Ok(Json(scenes))
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Deserialize)]
 struct SceneQuery {
     world_id: Option<String>,
 }
@@ -128,6 +130,7 @@ impl IntoResponse for SceneSlugResponse {
 /// GET /api/scenes/by-slug/{slug} - Get scene by slug with captures (public)
 ///
 /// Supports 301 redirects when accessing via an old slug that has since been renamed.
+#[instrument(skip(state))]
 async fn get_scene_by_slug(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -193,6 +196,7 @@ async fn get_scene_by_slug(
 }
 
 /// GET /api/scenes/{id} - Get scene by ID with latest version (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn get_scene_by_id(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -208,6 +212,7 @@ async fn get_scene_by_id(
 }
 
 /// POST /api/scenes - Create a new scene (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn create_scene(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -240,12 +245,12 @@ async fn create_scene(
 }
 
 /// PUT /api/scenes/by-slug/{slug} - Update scene by slug (admin)
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Deserialize)]
 struct WorldIdParam {
     world_id: String,
 }
 
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn update_scene(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -269,6 +274,7 @@ async fn update_scene(
 }
 
 /// PUT /api/scenes/{id} - Update scene metadata by ID (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn update_scene_metadata(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -280,6 +286,7 @@ async fn update_scene_metadata(
 }
 
 /// DELETE /api/scenes/by-slug/{slug} - Disable scene by slug (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn disable_scene(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -296,6 +303,7 @@ async fn disable_scene(
 }
 
 /// DELETE /api/scenes/{id} - Disable scene by ID (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn disable_scene_by_id(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -309,6 +317,7 @@ async fn disable_scene_by_id(
 }
 
 /// PUT /api/scenes/{id}/reactivate - Reactivate a disabled scene (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn reactivate_scene(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -331,13 +340,13 @@ struct BatchDisableRequest {
     slugs: Vec<String>,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Deserialize)]
 struct BatchDisableQuery {
     world_id: String,
 }
 
 /// DELETE /api/scenes/batch - Batch disable scenes by slug within a world (admin)
+#[instrument(skip(state, _admin, body), fields(user_id = _admin.user.id))]
 async fn batch_disable_scenes(
     _admin: AdminUser,
     State(state): State<AppState>,

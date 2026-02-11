@@ -15,6 +15,7 @@ mod work;
 mod worlds;
 
 use axum::{Router, routing::get};
+use tracing::instrument;
 
 use crate::{
     analytics::Analytics,
@@ -80,6 +81,7 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         .layer(make_layer(&rl.global, "global"))
 }
 
+#[instrument]
 async fn health() -> &'static str {
     "ok"
 }

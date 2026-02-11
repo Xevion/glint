@@ -5,7 +5,7 @@ use axum::{
     routing::get,
 };
 use serde::Deserialize;
-use tracing::warn;
+use tracing::{instrument, warn};
 
 use crate::{
     auth::AdminUser,
@@ -20,7 +20,6 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CaptureListParams {
     pub page: Option<i32>,
     pub page_size: Option<i32>,
@@ -39,12 +38,14 @@ pub fn router() -> Router<AppState> {
 }
 
 /// GET /api/captures - List completed captures (public)
+#[instrument(skip(state))]
 async fn list_captures_public(State(state): State<AppState>) -> AppResult<Json<Vec<Capture>>> {
     let captures = CaptureRepo::list_completed(state.db()).await?;
     Ok(Json(captures))
 }
 
 /// GET /api/captures/all - List all captures with context, paginated (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn list_captures_all(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -83,6 +84,7 @@ async fn list_captures_all(
 }
 
 /// GET /api/captures/{id} - Get capture by ID (public, only from active scenes)
+#[instrument(skip(state))]
 async fn get_capture_public(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -102,6 +104,7 @@ async fn get_capture_public(
 }
 
 /// GET /api/captures/{id}/details - Get full capture detail with related captures (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn get_capture_details(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -112,6 +115,7 @@ async fn get_capture_details(
 }
 
 /// DELETE /api/captures/{id} - Delete a capture and its R2 image (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn delete_capture(
     _admin: AdminUser,
     State(state): State<AppState>,

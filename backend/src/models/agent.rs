@@ -74,13 +74,10 @@ pub struct OrchestrationManifest {
 pub struct OrchestrationInfo {
     pub id: String,
     /// Run ID from the run definition (None for interactive captures)
-    #[serde(rename = "runId", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub run_id: Option<String>,
-    #[serde(rename = "startedAt")]
     pub started_at: String,
-    #[serde(rename = "completedAt")]
     pub completed_at: String,
-    #[serde(rename = "totalSessions")]
     pub total_sessions: i32,
     pub status: OrchestrationStatus,
 }
@@ -95,17 +92,11 @@ pub enum OrchestrationStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CaptureSessionData {
-    #[serde(rename = "worldName")]
     pub world_name: String,
-    #[serde(rename = "sceneId")]
     pub scene_id: String,
-    #[serde(rename = "sessionDir")]
     pub session_dir: String,
-    #[serde(rename = "startedAt")]
     pub started_at: String,
-    #[serde(rename = "completedAt")]
     pub completed_at: String,
-    #[serde(rename = "totalCaptures")]
     pub total_captures: i32,
     pub shaders: Vec<String>,
     pub minecraft: MinecraftInfo,
@@ -115,7 +106,6 @@ pub struct CaptureSessionData {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MinecraftInfo {
     pub version: String,
-    #[serde(rename = "irisVersion")]
     pub iris_version: Option<String>,
     pub dimension: Option<String>,
     pub position: Option<Position>,

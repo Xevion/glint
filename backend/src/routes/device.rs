@@ -5,7 +5,7 @@ use axum::{
     routing::{get, post},
 };
 use chrono::Utc;
-use tracing::{debug, warn};
+use tracing::{debug, instrument, warn};
 
 use crate::{
     auth::AuthUser,
@@ -34,6 +34,7 @@ pub fn router() -> Router<AppState> {
 
 /// POST /api/device/authorize - Start device authorization flow
 /// Called by mod to get device_code and user_code
+#[instrument(skip(state))]
 async fn authorize(State(state): State<AppState>) -> AppResult<Json<DeviceAuthResponse>> {
     let code = DeviceCodeRepo::create(state.db()).await?;
 
@@ -64,6 +65,7 @@ async fn authorize(State(state): State<AppState>) -> AppResult<Json<DeviceAuthRe
 
 /// POST /api/device/token - Poll for access token
 /// Called by mod to check if user has authorized and get token
+#[instrument(skip(state, request))]
 async fn token(
     State(state): State<AppState>,
     Json(request): Json<DeviceTokenRequest>,
@@ -137,6 +139,7 @@ async fn token(
 
 /// POST /api/device/confirm - User confirms device authorization
 /// Called by frontend when user clicks "Authorize" button
+#[instrument(skip(state, request, auth), fields(user_id = auth.user.id))]
 async fn confirm(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -155,6 +158,7 @@ async fn confirm(
 
 /// GET /api/device/code/{user_code} - Get device code status
 /// Called by frontend to show code status and verify it exists
+#[instrument(skip(state, _auth), fields(user_id = _auth.user.id))]
 async fn get_code_status(
     _auth: AuthUser,
     State(state): State<AppState>,
@@ -178,6 +182,7 @@ async fn get_code_status(
 
 /// GET /api/device/status - Health check for device auth
 /// Called by mod to verify backend is reachable and auth is working
+#[instrument]
 async fn status() -> &'static str {
     "ok"
 }

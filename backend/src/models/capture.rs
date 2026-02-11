@@ -371,7 +371,6 @@ pub struct CaptureDetail {
 
 /// Paginated captures response envelope
 #[derive(Debug, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct PaginatedCaptures {
     pub items: Vec<CaptureWithContext>,

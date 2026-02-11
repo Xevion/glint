@@ -134,15 +134,13 @@ pub struct CreateSceneRequest {
     pub camera: Camera,
     pub dimension: String,
     pub parent_scene_id: Option<String>,
-    #[serde(rename = "timeOfDay")]
     #[validate(range(min = 0, max = 24000))]
     pub time_of_day: i32,
     #[validate(custom(function = "validate_weather"))]
     pub weather: String,
-    #[serde(rename = "weatherIntensity", default)]
+    #[serde(default)]
     #[validate(range(min = 0.0, max = 1.0))]
     pub weather_intensity: f64,
-    #[serde(rename = "moonPhase")]
     #[validate(range(min = 0, max = 7))]
     pub moon_phase: Option<i32>,
     pub biome: Option<String>,
@@ -157,15 +155,13 @@ pub struct UpdateSceneRequest {
     #[validate(nested)]
     pub camera: Camera,
     pub dimension: String,
-    #[serde(rename = "timeOfDay")]
     #[validate(range(min = 0, max = 24000))]
     pub time_of_day: i32,
     #[validate(custom(function = "validate_weather"))]
     pub weather: String,
-    #[serde(rename = "weatherIntensity", default)]
+    #[serde(default)]
     #[validate(range(min = 0.0, max = 1.0))]
     pub weather_intensity: f64,
-    #[serde(rename = "moonPhase")]
     #[validate(range(min = 0, max = 7))]
     pub moon_phase: Option<i32>,
     pub biome: Option<String>,

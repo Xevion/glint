@@ -4,6 +4,7 @@ use axum::{
     routing::get,
 };
 use serde::Deserialize;
+use tracing::instrument;
 
 use crate::auth::AdminUser;
 use crate::error::AppResult;
@@ -11,7 +12,6 @@ use crate::repo::{CaptureRepo, StorageBucket, StorageStats};
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct GrowthParams {
     days: Option<i32>,
     interval_hours: Option<i32>,
@@ -24,6 +24,7 @@ pub fn router() -> Router<AppState> {
 }
 
 /// GET /api/admin/storage/stats — Aggregate storage statistics
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn storage_stats(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -33,6 +34,7 @@ async fn storage_stats(
 }
 
 /// GET /api/admin/storage/growth — Cumulative storage growth with gap-filled time series
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn storage_growth(
     _admin: AdminUser,
     State(state): State<AppState>,

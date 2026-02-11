@@ -5,6 +5,7 @@ import com.xevion.glint.capture.Camera
 import com.xevion.glint.capture.Position
 import com.xevion.glint.io.AsyncFileIO
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNamingStrategy
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.util.concurrent.CompletableFuture
@@ -18,6 +19,7 @@ object SceneManager {
 
     private val JSON =
         Json {
+            namingStrategy = JsonNamingStrategy.SnakeCase
             prettyPrint = true
             ignoreUnknownKeys = true
         }

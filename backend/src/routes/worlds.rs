@@ -19,7 +19,7 @@ use axum::{
     routing::{get, post},
 };
 use chrono::Utc;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Presigned URL expiry time (5 minutes)
 const PRESIGN_EXPIRY_SECS: u64 = 300;
@@ -227,6 +227,7 @@ struct WorldPreviewRow {
 }
 
 /// GET /api/worlds - List all worlds with latest version (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn list_worlds(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -314,6 +315,7 @@ async fn list_worlds(
 }
 
 /// POST /api/worlds - Initiate world upload (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn create_world_upload(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -369,6 +371,7 @@ async fn create_world_upload(
 }
 
 /// POST /api/worlds/{slug}/complete - Complete world upload (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn complete_world_upload(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -463,6 +466,7 @@ async fn complete_world_upload(
 }
 
 /// GET /api/worlds/{id} - Get world with scenes and latest version (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn get_world(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -485,6 +489,7 @@ async fn get_world(
 }
 
 /// PUT /api/worlds/{id} - Update world metadata (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn update_world(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -504,6 +509,7 @@ async fn update_world(
 }
 
 /// DELETE /api/worlds/{id} - Delete a world (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn delete_world(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -555,6 +561,7 @@ async fn delete_world(
 }
 
 /// GET /api/worlds/{id}/versions - List all versions for a world (admin)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn list_world_versions(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -573,6 +580,7 @@ async fn list_world_versions(
 /// Phase 1 of two-phase upload: creates a pending upload record and returns
 /// a presigned URL for uploading to a staging path. The client must call
 /// `POST /api/worlds/{id}/versions/complete` after uploading.
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn create_world_version(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -624,6 +632,7 @@ async fn create_world_version(
 /// Phase 2 of two-phase upload: verifies the file was uploaded to R2,
 /// checks the hash, moves it to a versioned path, and creates the
 /// WorldVersion database record.
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn complete_world_version_upload(
     _admin: AdminUser,
     State(state): State<AppState>,

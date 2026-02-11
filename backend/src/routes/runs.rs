@@ -5,7 +5,7 @@ use axum::{
     routing::{get, post},
 };
 use serde::Deserialize;
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
 
 use crate::auth::AgentUser;
 use crate::error::{AppError, AppResult};
@@ -14,6 +14,7 @@ use crate::models::{CaptureRun, CaptureRunItemWithContext, CaptureStatus};
 use crate::repo::{CaptureRepo, CaptureRunRepo, ShaderVersionRepo};
 use crate::state::AppState;
 
+#[instrument(skip(s3, content_type), level = "debug")]
 async fn generate_presigned_put_url(
     s3: &aws_sdk_s3::Client,
     bucket: &str,
@@ -114,6 +115,7 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/complete", post(complete_run))
 }
 
+#[instrument(skip(state, _user, request), fields(user_id = _user.user.id))]
 async fn create_run(
     _user: AgentUser,
     State(state): State<AppState>,
@@ -174,6 +176,7 @@ async fn create_run(
     Ok((StatusCode::CREATED, Json(run)))
 }
 
+#[instrument(skip(state, _user), fields(user_id = _user.user.id))]
 async fn list_runs(
     _user: AgentUser,
     State(state): State<AppState>,
@@ -182,6 +185,7 @@ async fn list_runs(
     Ok(Json(runs))
 }
 
+#[instrument(skip(state, _user), fields(user_id = _user.user.id))]
 async fn get_run(
     _user: AgentUser,
     State(state): State<AppState>,
@@ -191,6 +195,7 @@ async fn get_run(
     Ok(Json(run))
 }
 
+#[instrument(skip(state, _user), fields(user_id = _user.user.id))]
 async fn list_run_items(
     _user: AgentUser,
     State(state): State<AppState>,
@@ -200,6 +205,7 @@ async fn list_run_items(
     Ok(Json(items))
 }
 
+#[instrument(skip(state, _user, request), fields(user_id = _user.user.id))]
 async fn fail_item(
     _user: AgentUser,
     State(state): State<AppState>,
@@ -226,6 +232,7 @@ async fn fail_item(
     Ok(StatusCode::OK)
 }
 
+#[instrument(skip(state, _user, request), fields(user_id = _user.user.id))]
 async fn claim_item(
     _user: AgentUser,
     State(state): State<AppState>,
@@ -291,6 +298,7 @@ async fn claim_item(
     }))
 }
 
+#[instrument(skip(state, _user, request), fields(user_id = _user.user.id))]
 async fn confirm_upload(
     _user: AgentUser,
     State(state): State<AppState>,
@@ -323,6 +331,7 @@ async fn confirm_upload(
     Ok(StatusCode::OK)
 }
 
+#[instrument(skip(state, _user), fields(user_id = _user.user.id))]
 async fn complete_run(
     _user: AgentUser,
     State(state): State<AppState>,
@@ -356,6 +365,7 @@ pub fn failure_router() -> Router<AppState> {
     Router::new().route("/report-failure", post(report_failure))
 }
 
+#[instrument(skip(state, _user, request), fields(user_id = _user.user.id))]
 async fn report_failure(
     _user: AgentUser,
     State(state): State<AppState>,
@@ -380,6 +390,7 @@ pub fn upload_router() -> Router<AppState> {
     Router::new().route("/upload-url", post(get_upload_url))
 }
 
+#[instrument(skip(state, _user, request), fields(user_id = _user.user.id))]
 async fn get_upload_url(
     _user: AgentUser,
     State(state): State<AppState>,

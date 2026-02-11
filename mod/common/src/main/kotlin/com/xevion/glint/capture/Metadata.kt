@@ -1,6 +1,5 @@
 package com.xevion.glint.capture
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -23,7 +22,7 @@ data class CaptureSessionData(
 @Serializable
 data class MinecraftInfo(
     val version: String,
-    @SerialName("irisVersion") val irisVersion: String? = null,
+    val irisVersion: String? = null,
     val dimension: String? = null,
     val position: Position? = null,
     val camera: Camera? = null,

@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     routing::post,
 };
+use tracing::instrument;
 
 use crate::{
     auth::AdminUser,
@@ -31,6 +32,7 @@ pub fn router() -> Router<AppState> {
 ///
 /// When `query` is provided: searches platforms by text query.
 /// When `query` is absent/empty: browses platforms using `sort` order (popular or recent).
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn search_platforms(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -177,6 +179,7 @@ async fn search_platforms(
 }
 
 /// POST /api/shaders/adopt/preview
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn adopt_preview(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -190,6 +193,7 @@ async fn adopt_preview(
 }
 
 /// POST /api/shaders/adopt
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn adopt(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -203,6 +207,7 @@ async fn adopt(
 }
 
 /// POST /api/shaders/{id}/link
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn link_platform(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -220,6 +225,7 @@ async fn link_platform(
 }
 
 /// POST /api/shaders/{id}/sync
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn sync_shader(
     _admin: AdminUser,
     State(state): State<AppState>,

@@ -12,6 +12,7 @@ import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.SceneManager
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNamingStrategy
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.io.IOException
@@ -580,7 +581,11 @@ class Orchestrator {
             )
 
         try {
-            val json = Json { prettyPrint = true }
+            val json =
+                Json {
+                    namingStrategy = JsonNamingStrategy.SnakeCase
+                    prettyPrint = true
+                }
             manifestFile.writeText(json.encodeToString(OrchestrationManifest.serializer(), manifest))
             log.info("Manifest written") {
                 "partial" to partial

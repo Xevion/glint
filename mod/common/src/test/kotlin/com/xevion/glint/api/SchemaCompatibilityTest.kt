@@ -4,6 +4,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNamingStrategy
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -21,7 +22,11 @@ import kotlin.test.fail
  * contains the exact field names the API will produce.
  */
 class SchemaCompatibilityTest {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json =
+        Json {
+            namingStrategy = JsonNamingStrategy.SnakeCase
+            ignoreUnknownKeys = true
+        }
     private val schemasDir = findSchemasDir()
 
     /** Builds a minimal JSON object from a JSON Schema definition, using stub values. */

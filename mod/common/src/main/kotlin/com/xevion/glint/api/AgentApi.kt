@@ -2,6 +2,7 @@ package com.xevion.glint.api
 
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNamingStrategy
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.charset.StandardCharsets
@@ -13,6 +14,7 @@ import java.nio.charset.StandardCharsets
 object AgentApi {
     private val JSON =
         Json {
+            namingStrategy = JsonNamingStrategy.SnakeCase
             ignoreUnknownKeys = true
             encodeDefaults = true
         }

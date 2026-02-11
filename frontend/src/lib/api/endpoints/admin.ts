@@ -132,11 +132,11 @@ export class AdminEndpoints extends ApiClient {
 	}): Promise<Result<PaginatedCaptures, ApiError>> {
 		const searchParams = new URLSearchParams();
 		if (params?.page != null) searchParams.set('page', String(params.page));
-		if (params?.pageSize != null) searchParams.set('pageSize', String(params.pageSize));
+		if (params?.pageSize != null) searchParams.set('page_size', String(params.pageSize));
 		if (params?.shader) searchParams.set('shader', params.shader);
 		if (params?.scene) searchParams.set('scene', params.scene);
 		if (params?.status) searchParams.set('status', params.status);
-		if (params?.runId) searchParams.set('runId', params.runId);
+		if (params?.runId) searchParams.set('run_id', params.runId);
 		const qs = searchParams.toString();
 		return this.get<PaginatedCaptures>(`/api/captures/all${qs ? `?${qs}` : ''}`);
 	}
@@ -183,7 +183,7 @@ export class AdminEndpoints extends ApiClient {
 
 	workQueue(limit = 50): Promise<Result<WorkItem[], ApiError>> {
 		const searchParams = new URLSearchParams();
-		searchParams.set('dryRun', 'true');
+		searchParams.set('dry_run', 'true');
 		searchParams.set('limit', String(limit));
 		return this.get<WorkItem[]>(`/api/work?${searchParams.toString()}`);
 	}
@@ -203,7 +203,7 @@ export class AdminEndpoints extends ApiClient {
 	storageGrowth(days = 90, intervalHours = 1): Promise<Result<StorageBucket[], ApiError>> {
 		const searchParams = new URLSearchParams();
 		searchParams.set('days', String(days));
-		searchParams.set('intervalHours', String(intervalHours));
+		searchParams.set('interval_hours', String(intervalHours));
 		return this.get<StorageBucket[]>(`/api/admin/storage/growth?${searchParams.toString()}`);
 	}
 }

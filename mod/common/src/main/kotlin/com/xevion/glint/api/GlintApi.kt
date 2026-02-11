@@ -3,9 +3,9 @@ package com.xevion.glint.api
 import com.xevion.glint.capture.Camera
 import com.xevion.glint.capture.Position
 import com.xevion.glint.scene.Scene
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNamingStrategy
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.HttpURLConnection
@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets
 object GlintApi {
     private val JSON =
         Json {
+            namingStrategy = JsonNamingStrategy.SnakeCase
             ignoreUnknownKeys = true
             encodeDefaults = true
         }
@@ -703,7 +704,7 @@ object GlintApi {
  */
 @Serializable
 data class CreateSceneRequest(
-    @SerialName("world_id") val worldId: String,
+    val worldId: String,
     val slug: String,
     val name: String,
     val position: Position,
@@ -729,7 +730,7 @@ data class BatchDisableRequest(
  */
 @Serializable
 data class UpdateSceneRequest(
-    @SerialName("world_id") val worldId: String,
+    val worldId: String,
     val position: Position,
     val camera: Camera,
     val dimension: String,
@@ -746,18 +747,18 @@ data class UpdateSceneRequest(
 @Serializable
 data class ApiSceneVersion(
     val id: String,
-    @SerialName("scene_id") val sceneId: String,
+    val sceneId: String,
     val x: Double,
     val y: Double,
     val z: Double,
     val pitch: Double,
     val yaw: Double,
-    @SerialName("time_of_day_ticks") val timeOfDayTicks: Int,
+    val timeOfDayTicks: Int,
     val weather: String,
-    @SerialName("weather_intensity") val weatherIntensity: Double,
-    @SerialName("moon_phase") val moonPhase: Int?,
+    val weatherIntensity: Double,
+    val moonPhase: Int?,
     val biome: String?,
-    @SerialName("created_at") val createdAt: String,
+    val createdAt: String,
 )
 
 /**
@@ -771,11 +772,11 @@ data class ApiScene(
     val name: String,
     val slug: String,
     val description: String?,
-    @SerialName("world_id") val worldId: String,
+    val worldId: String,
     val dimension: String,
-    @SerialName("parent_scene_id") val parentSceneId: String? = null,
+    val parentSceneId: String? = null,
     val active: Boolean,
-    @SerialName("created_at") val createdAt: String,
+    val createdAt: String,
     val version: ApiSceneVersion,
 )
 
@@ -785,11 +786,11 @@ data class ApiScene(
 @Serializable
 data class WorldVersionInfo(
     val id: String,
-    @SerialName("world_id") val worldId: String,
-    @SerialName("file_url") val fileUrl: String?,
-    @SerialName("file_hash") val fileHash: String?,
-    @SerialName("size_bytes") val sizeBytes: Long?,
-    @SerialName("created_at") val createdAt: String,
+    val worldId: String,
+    val fileUrl: String?,
+    val fileHash: String?,
+    val sizeBytes: Long?,
+    val createdAt: String,
 )
 
 /**
@@ -801,10 +802,10 @@ data class WorldInfo(
     val slug: String,
     val name: String,
     val description: String?,
-    @SerialName("minecraft_version") val minecraftVersion: String,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("updated_at") val updatedAt: String,
-    @SerialName("latest_version") val latestVersion: WorldVersionInfo?,
+    val minecraftVersion: String,
+    val createdAt: String,
+    val updatedAt: String,
+    val latestVersion: WorldVersionInfo?,
 )
 
 /**
@@ -827,11 +828,11 @@ sealed class UrlValidationResult {
  */
 @Serializable
 data class DeviceAuthResponse(
-    @SerialName("device_code") val deviceCode: String,
-    @SerialName("user_code") val userCode: String,
-    @SerialName("verification_uri") val verificationUri: String,
-    @SerialName("verification_uri_complete") val verificationUriComplete: String,
-    @SerialName("expires_in") val expiresIn: Long,
+    val deviceCode: String,
+    val userCode: String,
+    val verificationUri: String,
+    val verificationUriComplete: String,
+    val expiresIn: Long,
     val interval: Long,
 )
 
@@ -840,9 +841,9 @@ data class DeviceAuthResponse(
  */
 @Serializable
 data class DeviceTokenResponse(
-    @SerialName("access_token") val accessToken: String,
-    @SerialName("token_type") val tokenType: String,
-    @SerialName("expires_in") val expiresIn: Long,
+    val accessToken: String,
+    val tokenType: String,
+    val expiresIn: Long,
 )
 
 /**
@@ -853,9 +854,9 @@ data class CreateWorldUploadRequest(
     val name: String,
     val slug: String,
     val description: String? = null,
-    @SerialName("minecraft_version") val minecraftVersion: String,
-    @SerialName("file_hash") val fileHash: String,
-    @SerialName("file_size_bytes") val fileSizeBytes: Long,
+    val minecraftVersion: String,
+    val fileHash: String,
+    val fileSizeBytes: Long,
 )
 
 /**
@@ -863,9 +864,9 @@ data class CreateWorldUploadRequest(
  */
 @Serializable
 data class CreateWorldUploadResponse(
-    @SerialName("upload_id") val uploadId: String,
-    @SerialName("presigned_url") val presignedUrl: String,
-    @SerialName("expires_at") val expiresAt: String,
+    val uploadId: String,
+    val presignedUrl: String,
+    val expiresAt: String,
 )
 
 /**
@@ -873,7 +874,7 @@ data class CreateWorldUploadResponse(
  */
 @Serializable
 data class CompleteWorldUploadRequest(
-    @SerialName("upload_id") val uploadId: String,
+    val uploadId: String,
 )
 
 /**
@@ -881,8 +882,8 @@ data class CompleteWorldUploadRequest(
  */
 @Serializable
 data class CreateWorldVersionUploadRequest(
-    @SerialName("file_hash") val fileHash: String,
-    @SerialName("file_size_bytes") val fileSizeBytes: Long,
+    val fileHash: String,
+    val fileSizeBytes: Long,
 )
 
 /**
@@ -890,9 +891,9 @@ data class CreateWorldVersionUploadRequest(
  */
 @Serializable
 data class CreateWorldVersionUploadResponse(
-    @SerialName("upload_id") val uploadId: String,
-    @SerialName("presigned_url") val presignedUrl: String,
-    @SerialName("expires_at") val expiresAt: String,
+    val uploadId: String,
+    val presignedUrl: String,
+    val expiresAt: String,
 )
 
 /**
@@ -900,5 +901,5 @@ data class CreateWorldVersionUploadResponse(
  */
 @Serializable
 data class CompleteWorldVersionUploadRequest(
-    @SerialName("upload_id") val uploadId: String,
+    val uploadId: String,
 )

@@ -9,16 +9,16 @@
         "$ref": "#/$defs/CaptureEntry"
       }
     },
-    "completedAt": {
+    "completed_at": {
       "type": "string"
     },
     "minecraft": {
       "$ref": "#/$defs/MinecraftInfo"
     },
-    "sceneId": {
+    "scene_id": {
       "type": "string"
     },
-    "sessionDir": {
+    "session_dir": {
       "type": "string"
     },
     "shaders": {
@@ -27,24 +27,24 @@
         "type": "string"
       }
     },
-    "startedAt": {
+    "started_at": {
       "type": "string"
     },
-    "totalCaptures": {
+    "total_captures": {
       "type": "integer",
       "format": "int32"
     },
-    "worldName": {
+    "world_name": {
       "type": "string"
     }
   },
   "required": [
-    "worldName",
-    "sceneId",
-    "sessionDir",
-    "startedAt",
-    "completedAt",
-    "totalCaptures",
+    "world_name",
+    "scene_id",
+    "session_dir",
+    "started_at",
+    "completed_at",
+    "total_captures",
     "shaders",
     "minecraft",
     "captures"
@@ -115,7 +115,7 @@
             "null"
           ]
         },
-        "irisVersion": {
+        "iris_version": {
           "type": [
             "string",
             "null"

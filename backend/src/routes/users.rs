@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     routing::{delete, get, post, put},
 };
+use tracing::instrument;
 
 use crate::{
     auth::{AdminUser, AuthUser},
@@ -66,6 +67,7 @@ fn build_session_infos(
 }
 
 /// GET /api/users - List all users (admin only)
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn list_users(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -75,6 +77,7 @@ async fn list_users(
 }
 
 /// GET /api/users/{id} - Get user profile with sessions (id=me or admin)
+#[instrument(skip(state, auth), fields(user_id = auth.user.id))]
 async fn get_user(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -90,6 +93,7 @@ async fn get_user(
 }
 
 /// PUT /api/users/{id}/role - Update user role (admin only)
+#[instrument(skip(state, admin, request), fields(user_id = admin.user.id))]
 async fn update_user_role(
     admin: AdminUser,
     State(state): State<AppState>,
@@ -112,6 +116,7 @@ async fn update_user_role(
 }
 
 /// GET /api/users/{id}/sessions - List sessions (id=me or admin)
+#[instrument(skip(state, auth), fields(user_id = auth.user.id))]
 async fn list_sessions(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -124,6 +129,7 @@ async fn list_sessions(
 }
 
 /// DELETE /api/users/{id}/sessions - Revoke ALL sessions for a user (id=me or admin)
+#[instrument(skip(state, auth), fields(user_id = auth.user.id))]
 async fn delete_all_sessions(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -136,6 +142,7 @@ async fn delete_all_sessions(
 }
 
 /// DELETE /api/users/{id}/sessions/{prefix} - Revoke a single session by token prefix
+#[instrument(skip(state, auth), fields(user_id = auth.user.id))]
 async fn delete_session_by_prefix(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -152,6 +159,7 @@ async fn delete_session_by_prefix(
 }
 
 /// POST /api/users/{id}/sessions/revoke-others - Revoke all sessions except current
+#[instrument(skip(state, auth), fields(user_id = auth.user.id))]
 async fn revoke_other_sessions(
     auth: AuthUser,
     State(state): State<AppState>,

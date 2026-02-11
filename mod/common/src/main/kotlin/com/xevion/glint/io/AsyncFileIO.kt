@@ -3,6 +3,7 @@ package com.xevion.glint.io
 import com.xevion.glint.Loggers
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNamingStrategy
 import java.io.File
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
@@ -24,6 +25,7 @@ object AsyncFileIO {
 
     private val json =
         Json {
+            namingStrategy = JsonNamingStrategy.SnakeCase
             prettyPrint = true
             ignoreUnknownKeys = true
         }

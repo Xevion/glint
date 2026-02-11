@@ -3,35 +3,35 @@
   "title": "OrchestrationInfo",
   "type": "object",
   "properties": {
-    "completedAt": {
+    "completed_at": {
       "type": "string"
     },
     "id": {
       "type": "string"
     },
-    "runId": {
+    "run_id": {
       "description": "Run ID from the run definition (None for interactive captures)",
       "type": [
         "string",
         "null"
       ]
     },
-    "startedAt": {
+    "started_at": {
       "type": "string"
     },
     "status": {
       "$ref": "#/$defs/OrchestrationStatus"
     },
-    "totalSessions": {
+    "total_sessions": {
       "type": "integer",
       "format": "int32"
     }
   },
   "required": [
     "id",
-    "startedAt",
-    "completedAt",
-    "totalSessions",
+    "started_at",
+    "completed_at",
+    "total_sessions",
     "status"
   ],
   "$defs": {
