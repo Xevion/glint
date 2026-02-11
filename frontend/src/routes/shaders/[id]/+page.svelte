@@ -260,7 +260,7 @@ const ogDescription = $derived.by(() => {
 						const idx = captures.indexOf(heroCapture);
 						if (idx >= 0) openLightbox(idx);
 					}}
-					onmouseenter={() => preloadImage(heroCapture?.image_url)}
+					onmouseenter={() => preloadImage(heroCapture?.image_url, 'full')}
 					>
 						<!-- Preloads full-res image on hover for instant lightbox display -->
 						<CaptureImage
@@ -314,7 +314,7 @@ const ogDescription = $derived.by(() => {
 								selectedCaptureId = capture.id;
 								openLightbox(i);
 							}}
-								onmouseenter={() => preloadImage(capture.image_url)}
+								onmouseenter={() => preloadImage(capture.image_url, 'full')}
 							>
 								<CaptureImage
 									src={capture.image_url}

@@ -181,7 +181,7 @@ const freshnessColors = {
 				type="button"
 				class="group relative w-full cursor-pointer overflow-hidden rounded-lg border"
 				onclick={() => (lightboxOpen = true)}
-				onmouseenter={() => preloadImage(capture.image_url)}
+				onmouseenter={() => preloadImage(capture.image_url, 'full')}
 				disabled={!capture.image_url}
 			>
 				<CaptureImage

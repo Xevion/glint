@@ -69,8 +69,9 @@ $effect(() => {
 	}
 });
 
-// Preload adjacent images
+// Preload adjacent images only after current image finishes loading
 $effect(() => {
+	if (!imageLoaded) return;
 	const preloadIndices = [currentIndex - 1, currentIndex + 1].filter(
 		(i) => i >= 0 && i < captures.length
 	);
@@ -222,27 +223,27 @@ function handlePointerUp() {
 					<div
 						style="transform: scale({zoomLevel}) translate({panOffset.x}px, {panOffset.y}px); transition: transform {isDragging ? '0s' : '0.15s'} ease;"
 					>
-						{#if placeholderUrl && !imageLoaded}
-							<img
-								src={placeholderUrl}
-								alt=""
-								class="max-h-[90vh] max-w-[90vw] object-contain"
-								aria-hidden="true"
-							/>
-						{/if}
+					<div class="relative">
 						<img
 							bind:this={imgEl}
 							src={fullImageUrl}
 							alt="Capture fullscreen view"
 							class="max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-300"
 							class:opacity-0={!imageLoaded}
-							class:absolute={!imageLoaded && placeholderUrl}
-							class:inset-0={!imageLoaded && placeholderUrl}
 							loading="eager"
 							decoding="async"
 							draggable="false"
 							onload={() => (imageLoaded = true)}
 						/>
+						{#if placeholderUrl && !imageLoaded}
+							<img
+								src={placeholderUrl}
+								alt=""
+								class="absolute inset-0 h-full w-full object-contain"
+								aria-hidden="true"
+							/>
+						{/if}
+					</div>
 					</div>
 
 					<!-- Capture info overlay -->
