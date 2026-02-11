@@ -6,7 +6,33 @@ import { env as publicEnv } from '$env/dynamic/public';
 
 const backendUrl = publicEnv.PUBLIC_BACKEND_URL ?? 'http://localhost:8080';
 
-export const handle: Handle = ({ event, resolve }) => {
+export const handle: Handle = async ({ event, resolve }) => {
+	// Proxy /api/* requests from the browser to the internal Axum backend.
+	// In dev, Vite's proxy handles this. In production, SvelteKit is the
+	// public-facing server and must forward API requests itself.
+	if (event.url.pathname.startsWith('/api/')) {
+		const targetUrl = `${backendUrl}${event.url.pathname}${event.url.search}`;
+		const headers = new Headers(event.request.headers);
+		// Remove host header so the backend sees its own host
+		headers.delete('host');
+
+		const response = await fetch(targetUrl, {
+			method: event.request.method,
+			headers,
+			body: event.request.body,
+			// Don't follow redirects — the browser must follow them (OAuth flow)
+			redirect: 'manual',
+			// @ts-expect-error Bun supports duplex streaming
+			duplex: 'half'
+		});
+
+		return new Response(response.body, {
+			status: response.status,
+			statusText: response.statusText,
+			headers: response.headers
+		});
+	}
+
 	return resolve(event, {
 		transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', 'en'),
 		filterSerializedResponseHeaders: (name) => name === 'content-length' || name === 'content-type'

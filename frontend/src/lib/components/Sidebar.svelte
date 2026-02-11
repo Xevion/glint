@@ -11,6 +11,8 @@ import {
 	Globe,
 	Layers,
 	LayoutDashboard,
+	LogIn,
+	LogOut,
 	Menu,
 	Mountain,
 	Palette,
@@ -22,8 +24,8 @@ import {
 	Zap
 } from '@lucide/svelte';
 
-// Placeholder: would come from auth context
-const isAdmin = true;
+const user = $derived(page.data.user ?? null);
+const isAdmin = $derived(user?.role === 'admin');
 
 let mobileSheetOpen = $state(false);
 
@@ -98,7 +100,56 @@ function getContextItems(ctx: SidebarContext) {
 			return [];
 	}
 }
+
+const loginUrl = $derived(`/login?redirect=${encodeURIComponent(page.url.pathname)}`);
+
+function discordAvatarUrl(discordId: string, avatar: string): string {
+	return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png?size=64`;
+}
 </script>
+
+{#snippet userSection()}
+	<div class="mt-auto flex flex-col gap-0.5">
+		<div class="mx-2 mb-2 border-t border-border"></div>
+		{#if user}
+			<div class="flex items-center gap-2 px-2 py-1.5">
+				{#if user.discord_avatar}
+					<img
+						src={discordAvatarUrl(user.discord_id, user.discord_avatar)}
+						alt={user.discord_username}
+						class="h-6 w-6 rounded-full"
+					/>
+				{:else}
+					<div
+						class="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
+					>
+						{user.discord_username[0]?.toUpperCase()}
+					</div>
+				{/if}
+				<span class="truncate text-sm text-sidebar-muted-foreground">
+					{user.discord_username}
+				</span>
+			</div>
+			<form method="POST" action="/api/auth/logout">
+				<button
+					type="submit"
+					class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+				>
+					<LogOut size={15} strokeWidth={2} />
+					Sign out
+				</button>
+			</form>
+		{:else}
+			<a
+				href={loginUrl}
+				class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline transition-colors text-sidebar-muted-foreground hover:text-foreground hover:bg-muted/50"
+			>
+				<LogIn size={15} strokeWidth={2} />
+				Sign in
+			</a>
+		{/if}
+	</div>
+{/snippet}
 
 {#snippet sidebarNav()}
 	<nav class="flex flex-col gap-0.5">
@@ -161,11 +212,13 @@ function getContextItems(ctx: SidebarContext) {
 			{/each}
 		</nav>
 	{/if}
+
+	{@render userSection()}
 {/snippet}
 
 {#if context !== null}
 	<!-- Desktop sidebar -->
-	<aside class="hidden md:block w-48 shrink-0 pt-1">
+	<aside class="hidden md:flex md:flex-col w-48 shrink-0 pt-1">
 		{@render sidebarNav()}
 	</aside>
 

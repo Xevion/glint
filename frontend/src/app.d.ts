@@ -50,7 +50,10 @@ declare global {
 			stack?: string;
 		}
 		// interface Locals {}
-		// interface PageData {}
+		interface PageData {
+			// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- import() is the only option in ambient declarations
+			user: import('$lib/bindings/User').User | null;
+		}
 		// interface PageState {}
 		// interface Platform {}
 	}

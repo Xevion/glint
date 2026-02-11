@@ -7,6 +7,7 @@ import { FeaturedEndpoints } from './endpoints/featured';
 import { RunEndpoints } from './endpoints/runs';
 import { SceneEndpoints } from './endpoints/scenes';
 import { ShaderEndpoints } from './endpoints/shaders';
+import { UserEndpoints } from './endpoints/user';
 import { WorldsEndpoints } from './endpoints/worlds';
 
 /**
@@ -33,7 +34,8 @@ export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
 		worlds: new WorldsEndpoints(url, fetchFn),
 		device: new DeviceEndpoints(url, fetchFn),
 		runs: new RunEndpoints(url, fetchFn),
-		featured: new FeaturedEndpoints(url, fetchFn)
+		featured: new FeaturedEndpoints(url, fetchFn),
+		user: new UserEndpoints(url, fetchFn)
 	};
 }
 
