@@ -1,36 +1,52 @@
 use std::collections::HashMap;
+use std::net::SocketAddr;
 
 use crate::{
     auth::AdminUser,
     error::{AppError, AppResult},
     id::{self, ShaderVersionId},
+    middleware::client_ip::ClientIp,
     models::{
         CaptureStatus, CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderListItem,
-        ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
+        ShaderVersion, ShaderWithCaptures, TrendingShader, UpdateShaderRequest,
     },
     repo::{
         CaptureRepo, CategoryRepo, FeatureRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo,
+        ShaderViewRepo,
         capture::{CaptureDistinct, CaptureFilters},
     },
     state::AppState,
 };
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
-    http::StatusCode,
+    extract::{ConnectInfo, Path, Query, State},
+    http::{HeaderMap, StatusCode},
     routing::{get, post},
 };
 use serde::Deserialize;
-use tracing::info;
+use sha2::{Digest, Sha256};
+use tracing::{info, warn};
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_shaders).post(create_shader))
+        .route("/trending", get(trending_shaders))
         .route(
             "/{id}",
             get(get_shader).put(update_shader).delete(delete_shader),
         )
         .route("/{id}/versions", post(create_shader_version))
+}
+
+/// Compute a viewer hash from client IP and User-Agent for deduplication.
+fn viewer_hash(ip: &str, user_agent: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(ip.as_bytes());
+    hasher.update(b"|");
+    hasher.update(user_agent.as_bytes());
+    let result = hasher.finalize();
+    // 16 hex chars = 8 bytes of entropy, plenty for hourly dedup
+    hex::encode(&result[..8])
 }
 
 /// GET /api/shaders - List all shaders with enrichment (public)
@@ -98,12 +114,14 @@ struct ShaderDetailQuery {
 /// GET /api/shaders/{id} - Get shader by ID or slug with versions and captures (public)
 async fn get_shader(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path(id): Path<String>,
     Query(query): Query<ShaderDetailQuery>,
+    headers: HeaderMap,
 ) -> AppResult<Json<ShaderWithCaptures>> {
-    let shader = ShaderRepo::get(state.db(), &id).await?;
-    let versions =
-        ShaderVersionRepo::list_by_shader_with_counts(state.db(), shader.id.as_ref()).await?;
+    let db = state.db();
+    let shader = ShaderRepo::get(db, &id).await?;
+    let versions = ShaderVersionRepo::list_by_shader_with_counts(db, shader.id.as_ref()).await?;
 
     // Default to latest version when no version_id is specified
     let effective_version_id = query
@@ -120,14 +138,80 @@ async fn get_shader(
         ..Default::default()
     };
     let (captures, _) =
-        CaptureRepo::list_with_context(state.db(), &filters, None, CaptureDistinct::PerScene)
-            .await?;
+        CaptureRepo::list_with_context(db, &filters, None, CaptureDistinct::PerScene).await?;
+
+    // Fire-and-forget view recording
+    let hops = state.config().rate_limit.trusted_proxy_hops;
+    let client_ip = ClientIp::resolve(&headers, Some(addr), hops);
+    let ua = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("unknown");
+    let hash = viewer_hash(&client_ip.0, ua);
+    let shader_id = shader.id.0.clone();
+    let pool = state.db().clone();
+    tokio::spawn(async move {
+        if let Err(e) = ShaderViewRepo::record_view(&pool, &shader_id, &hash).await {
+            warn!(error = %e, shader_id, "Failed to record shader view");
+        }
+    });
 
     Ok(Json(ShaderWithCaptures {
         shader,
         versions,
         captures,
     }))
+}
+
+#[derive(Debug, Deserialize)]
+struct TrendingQuery {
+    /// Number of days to consider (default: 7)
+    days: Option<i32>,
+    /// Maximum number of results (default: 10)
+    limit: Option<i64>,
+}
+
+/// GET /api/shaders/trending - Get trending shaders by recent view count (public)
+async fn trending_shaders(
+    State(state): State<AppState>,
+    Query(query): Query<TrendingQuery>,
+) -> AppResult<Json<Vec<TrendingShader>>> {
+    let db = state.db();
+    let days = query.days.unwrap_or(7).clamp(1, 90);
+    let limit = query.limit.unwrap_or(10).clamp(1, 50);
+
+    let trending = ShaderViewRepo::trending(db, days, limit).await?;
+
+    if trending.is_empty() {
+        return Ok(Json(vec![]));
+    }
+
+    let shader_ids: Vec<String> = trending.iter().map(|e| e.shader_id.0.clone()).collect();
+
+    let (shaders_map, thumbnails) = tokio::try_join!(
+        ShaderRepo::get_many(db, &shader_ids),
+        CaptureRepo::batch_thumbnails_for_shaders(db, &shader_ids),
+    )?;
+
+    let result = trending
+        .into_iter()
+        .filter_map(|entry| {
+            let id = entry.shader_id.as_ref();
+            let shader = shaders_map.get(id).cloned();
+            if shader.is_none() {
+                tracing::debug!(shader_id = id, "Trending shader not found, skipping");
+            }
+            let thumb = thumbnails.get(id);
+            shader.map(|s| TrendingShader {
+                shader: s,
+                trending_views: entry.view_count,
+                image_url: thumb.map(|t| t.image_url.clone()),
+                thumbhash: thumb.and_then(|t| t.thumbhash.clone()),
+            })
+        })
+        .collect();
+
+    Ok(Json(result))
 }
 
 /// POST /api/shaders - Create a new shader (admin)
@@ -181,4 +265,37 @@ async fn delete_shader(
         return Err(AppError::NotFound("Shader not found".into()));
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn viewer_hash_is_deterministic() {
+        let h1 = viewer_hash("192.168.1.1", "Mozilla/5.0");
+        let h2 = viewer_hash("192.168.1.1", "Mozilla/5.0");
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn viewer_hash_differs_by_ip() {
+        let h1 = viewer_hash("192.168.1.1", "Mozilla/5.0");
+        let h2 = viewer_hash("10.0.0.1", "Mozilla/5.0");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn viewer_hash_differs_by_ua() {
+        let h1 = viewer_hash("192.168.1.1", "Mozilla/5.0");
+        let h2 = viewer_hash("192.168.1.1", "curl/7.88");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn viewer_hash_is_16_hex_chars() {
+        let h = viewer_hash("1.2.3.4", "agent");
+        assert_eq!(h.len(), 16, "should be 16 hex chars (8 bytes)");
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
+    }
 }

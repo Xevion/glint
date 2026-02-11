@@ -43,6 +43,22 @@ impl ShaderRepo {
         }
     }
 
+    /// Fetch multiple shaders by ID in a single query.
+    /// Returns a map from shader ID to Shader.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn get_many(
+        executor: impl sqlx::PgExecutor<'_>,
+        ids: &[String],
+    ) -> AppResult<HashMap<String, Shader>> {
+        let shaders = sqlx::query_as!(Shader, "SELECT * FROM shaders WHERE id = ANY($1)", ids)
+            .fetch_all(executor)
+            .await
+            .context("failed to batch fetch shaders")?;
+
+        debug!(count = shaders.len(), "Batch fetched shaders");
+        Ok(shaders.into_iter().map(|s| (s.id.0.clone(), s)).collect())
+    }
+
     #[instrument(skip(executor), level = "debug")]
     pub async fn find_by_slug(
         executor: impl sqlx::PgExecutor<'_>,

@@ -77,6 +77,11 @@
         "ordinal": 14,
         "name": "last_synced_at",
         "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "view_count",
+        "type_info": "Int8"
       }
     ],
     "parameters": {
@@ -99,7 +104,8 @@
       true,
       true,
       true,
-      true
+      true,
+      false
     ]
   },
   "hash": "de915b6852b7ad645bf1e0a54cba8f985fa7dcff8a59de2648e2b2228b711f8b"

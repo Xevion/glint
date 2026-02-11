@@ -23,8 +23,12 @@ const filteredShaders = $derived.by(() => {
 	// Sort
 	result = [...result].sort((a, b) => {
 		switch (sortBy) {
-			case 'popular':
+			case 'popular': {
+				// Primary: view count, secondary: upstream downloads
+				const viewDiff = b.view_count - a.view_count;
+				if (viewDiff !== 0) return viewDiff;
 				return (b.upstream_downloads ?? 0) - (a.upstream_downloads ?? 0);
+			}
 			case 'name':
 				return a.name.localeCompare(b.name);
 			case 'updated':

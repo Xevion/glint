@@ -37,7 +37,7 @@ pub use shader::{
     CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderAdopted, ShaderAuthor,
     ShaderListItem, ShaderSearchRequest, ShaderSearchResponse, ShaderSearchResult,
     ShaderSearchSort, ShaderVersion, ShaderVersionDetail, ShaderWithCaptures, ShaderWithVersions,
-    UpdateShaderRequest,
+    TrendingShader, UpdateShaderRequest,
 };
 pub use taxonomy::{Category, Feature, Tag};
 pub use user::{Session, SessionInfo, UpdateUserRoleRequest, User, UserWithSessions};

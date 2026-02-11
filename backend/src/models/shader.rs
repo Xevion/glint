@@ -30,6 +30,7 @@ pub struct Shader {
     pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
     pub updated_at: DateTime<Utc>,
+    pub view_count: i64,
 }
 
 /// Specific release of a shader pack
@@ -97,6 +98,19 @@ pub struct ShaderWithCaptures {
     pub shader: Shader,
     pub versions: Vec<ShaderVersionDetail>,
     pub captures: Vec<CaptureWithContext>,
+}
+
+/// A shader that is currently trending (high view count in a recent time window).
+/// The `view_count` from the flattened `Shader` represents the all-time total;
+/// `trending_views` is the count within the requested time window.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct TrendingShader {
+    #[serde(flatten)]
+    pub shader: Shader,
+    pub trending_views: i64,
+    pub image_url: Option<String>,
+    pub thumbhash: Option<String>,
 }
 
 /// Shader author from upstream platform

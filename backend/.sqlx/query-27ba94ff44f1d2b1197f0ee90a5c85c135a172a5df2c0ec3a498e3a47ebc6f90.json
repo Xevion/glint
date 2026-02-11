@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT shader_id, COUNT(*) as view_count\n            FROM shader_views\n            WHERE viewed_at > (now() AT TIME ZONE 'UTC') - make_interval(days => $1)\n            GROUP BY shader_id\n            ORDER BY view_count DESC\n            LIMIT $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "view_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "27ba94ff44f1d2b1197f0ee90a5c85c135a172a5df2c0ec3a498e3a47ebc6f90"
+}

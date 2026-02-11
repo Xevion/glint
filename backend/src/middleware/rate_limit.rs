@@ -1,6 +1,6 @@
 use std::{
     future::Future,
-    net::{IpAddr, SocketAddr},
+    net::SocketAddr,
     num::NonZeroU32,
     pin::Pin,
     sync::Arc,
@@ -10,7 +10,6 @@ use std::{
 use axum::{
     body::Body,
     extract::{ConnectInfo, Request},
-    http::HeaderMap,
     response::{IntoResponse, Response},
 };
 use governor::{DefaultKeyedRateLimiter, Quota, RateLimiter as GovernorRateLimiter, clock::Clock};
@@ -20,6 +19,7 @@ use tracing::warn;
 
 use crate::analytics::Analytics;
 use crate::error::AppError;
+use crate::middleware::client_ip::ClientIp;
 
 /// Top-level rate limiting configuration, deserialized from `[rate_limit]`.
 #[derive(Debug, Clone, Deserialize)]
@@ -138,34 +138,14 @@ impl Limiter {
 }
 
 /// Extract client IP from the request, respecting `X-Forwarded-For` when
-/// `trusted_proxy_hops > 0`.
-///
-/// `X-Forwarded-For` is built left-to-right: `client, proxy1, proxy2, ...`.
-/// The rightmost N entries were appended by our N trusted proxies. The entry
-/// just before them (`parts[len - hops - 1]`) is the real client IP as seen
-/// by the first trusted proxy.
-///
-/// With `trusted_proxy_hops = 0`, `X-Forwarded-For` is ignored and we use
-/// the direct connection address from `ConnectInfo`.
-fn extract_client_ip(headers: &HeaderMap, connect_info: Option<SocketAddr>, hops: u8) -> String {
-    if hops > 0
-        && let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok())
-    {
-        let parts: Vec<&str> = xff.split(',').map(|s| s.trim()).collect();
-        let idx = parts.len().saturating_sub(hops as usize + 1);
-        if let Some(ip_str) = parts.get(idx)
-            && ip_str.parse::<IpAddr>().is_ok()
-        {
-            return (*ip_str).to_string();
-        }
-    }
-
-    connect_info
-        .map(|ci| ci.ip().to_string())
-        .unwrap_or_else(|| {
-            warn!("No ConnectInfo or X-Forwarded-For available, using shared \"unknown\" bucket");
-            "unknown".to_string()
-        })
+/// `trusted_proxy_hops > 0`. Delegates to [`ClientIp::resolve`] for the
+/// actual parsing logic.
+fn extract_client_ip(
+    headers: &axum::http::HeaderMap,
+    connect_info: Option<SocketAddr>,
+    hops: u8,
+) -> String {
+    ClientIp::resolve(headers, connect_info, hops).0
 }
 
 /// Tower [`Layer`] that applies rate limiting to requests.
@@ -302,6 +282,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::http::HeaderMap;
 
     #[test]
     fn extract_ip_direct_connection() {

@@ -56,6 +56,7 @@ export type { StaleReason } from "./StaleReason";
 export type { Tag } from "./Tag";
 export type { TargetHealth } from "./TargetHealth";
 export type { ThemeMode } from "./ThemeMode";
+export type { TrendingShader } from "./TrendingShader";
 export type { UpdateBackgroundRequest } from "./UpdateBackgroundRequest";
 export type { UploadResponse } from "./UploadResponse";
 export type { User } from "./User";

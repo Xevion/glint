@@ -4,4 +4,4 @@ import type { ShaderId } from "./ShaderId";
 /**
  * Shader pack identity (not version-specific)
  */
-export type Shader = { id: ShaderId, name: string, slug: string, description: string | null, modrinth_id: string | null, curseforge_id: string | null, website_url: string | null, icon_url: string | null, source_url: string | null, license_id: string | null, upstream_downloads: number | null, upstream_updated_at: string | null, last_synced_at: string | null, created_at: string, updated_at: string, };
+export type Shader = { id: ShaderId, name: string, slug: string, description: string | null, modrinth_id: string | null, curseforge_id: string | null, website_url: string | null, icon_url: string | null, source_url: string | null, license_id: string | null, upstream_downloads: number | null, upstream_updated_at: string | null, last_synced_at: string | null, created_at: string, updated_at: string, view_count: number, };

@@ -788,6 +788,51 @@ impl CaptureRepo {
             .collect())
     }
 
+    /// Like [`batch_thumbnails_by_shader`], but filtered to a specific set of shader IDs.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn batch_thumbnails_for_shaders(
+        executor: impl sqlx::PgExecutor<'_>,
+        shader_ids: &[String],
+    ) -> AppResult<HashMap<String, ThumbnailInfo>> {
+        struct Row {
+            shader_id: String,
+            image_url: String,
+            thumbhash: Option<String>,
+        }
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT DISTINCT ON (sv.shader_id)
+                sv.shader_id,
+                c.image_url as "image_url!",
+                c.thumbhash
+            FROM captures c
+            JOIN shader_versions sv ON c.shader_version_id = sv.id
+            JOIN scenes sc ON c.scene_id = sc.id
+            WHERE c.status = 'completed' AND c.image_url IS NOT NULL AND sc.active = TRUE
+                AND sv.shader_id = ANY($1)
+            ORDER BY sv.shader_id, md5(sv.shader_id || c.id)
+            "#,
+            shader_ids,
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to batch fetch shader thumbnails for subset")?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    r.shader_id,
+                    ThumbnailInfo {
+                        image_url: r.image_url,
+                        thumbhash: r.thumbhash,
+                    },
+                )
+            })
+            .collect())
+    }
+
     /// Get the most recent completed non-outdated thumbnail per scene (active scenes only)
     #[instrument(skip(executor), level = "debug")]
     pub async fn batch_thumbnails_by_scene(

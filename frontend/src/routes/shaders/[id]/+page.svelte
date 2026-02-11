@@ -186,13 +186,20 @@ const ogDescription = $derived.by(() => {
 					<span class="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
 						{captures.length} {captures.length === 1 ? 'scene' : 'scenes'}
 					</span>
-					{#if shader.upstream_downloads}
-						<span
-							class="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"
-						>
-							{formatNumber(shader.upstream_downloads)} downloads
-						</span>
-					{/if}
+				{#if shader.upstream_downloads}
+					<span
+						class="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"
+					>
+						{formatNumber(shader.upstream_downloads)} downloads
+					</span>
+				{/if}
+				{#if shader.view_count >= 10}
+					<span
+						class="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"
+					>
+						{formatNumber(shader.view_count)} views
+					</span>
+				{/if}
 
 					<!-- Profiles -->
 					{#each profiles as profile (profile)}
