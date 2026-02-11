@@ -94,6 +94,27 @@ impl R2Config {
             format!("https://{}.r2.cloudflarestorage.com/{}", bucket, key)
         }
     }
+
+    /// Extract the R2 object key from a public URL (inverse of `public_url_for_key`).
+    ///
+    /// Given `https://pub-xxx.r2.dev/captures/shader/scene/id.webp`,
+    /// returns `captures/shader/scene/id.webp`.
+    pub fn key_from_url(&self, url: &str) -> String {
+        if let Some(ref prefix) = self.public_url {
+            let trimmed = prefix.trim_end_matches('/');
+            if let Some(key) = url.strip_prefix(trimmed) {
+                return key.trim_start_matches('/').to_string();
+            }
+        }
+        // Fallback: take everything after the host (third slash)
+        url.find("://")
+            .and_then(|i| url[i + 3..].find('/'))
+            .map(|i| {
+                let start = url.find("://").unwrap() + 3 + i + 1;
+                url[start..].to_string()
+            })
+            .unwrap_or_else(|| url.to_string())
+    }
 }
 
 fn default_host() -> String {

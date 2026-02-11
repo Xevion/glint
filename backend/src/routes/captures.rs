@@ -5,6 +5,7 @@ use axum::{
     routing::get,
 };
 use serde::Deserialize;
+use tracing::warn;
 
 use crate::{
     auth::AdminUser,
@@ -109,15 +110,30 @@ async fn get_capture_details(
     Ok(Json(detail))
 }
 
-/// DELETE /api/captures/{id} - Delete a capture (admin)
+/// DELETE /api/captures/{id} - Delete a capture and its R2 image (admin)
 async fn delete_capture(
     _admin: AdminUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<StatusCode> {
+    let capture = CaptureRepo::find_by_id(state.db(), &id)
+        .await?
+        .or_not_found("Capture", &id)?;
+
     let deleted = CaptureRepo::delete(state.db(), &id).await?;
     if !deleted {
         return Err(AppError::NotFound("Capture not found".into()));
     }
+
+    // Best-effort R2 cleanup
+    if let (Some(image_url), Some(s3)) = (capture.image_url, state.s3()) {
+        let r2_config = &state.config().r2;
+        let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+        let key = r2_config.key_from_url(&image_url);
+        if let Err(e) = s3.delete_object().bucket(bucket).key(&key).send().await {
+            warn!(key, error = %e, "Failed to delete capture image from R2");
+        }
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }

@@ -228,7 +228,7 @@ async fn transcode_capture(pool: &PgPool, s3: &S3Client, r2_config: &R2Config, c
     let png_size = png_bytes.len() as i64;
 
     // Derive the new R2 key by replacing .png with .webp in the old URL
-    let old_r2_key = extract_r2_key_from_url(&image_url, r2_config);
+    let old_r2_key = r2_config.key_from_url(&image_url);
     let new_r2_key = old_r2_key.replace(".png", ".webp");
     let new_image_url = r2_config.public_url_for_key(&new_r2_key);
     let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
@@ -293,27 +293,6 @@ fn encode_to_webp(input: &[u8]) -> anyhow::Result<Vec<u8>> {
     let mut buf = std::io::Cursor::new(Vec::new());
     img.write_to(&mut buf, image::ImageFormat::WebP)?;
     Ok(buf.into_inner())
-}
-
-/// Extract the R2 object key from a public URL.
-///
-/// Given `https://pub-xxx.r2.dev/captures/shader/scene/id.png`, returns `captures/shader/scene/id.png`.
-fn extract_r2_key_from_url(image_url: &str, r2_config: &R2Config) -> String {
-    if let Some(ref prefix) = r2_config.public_url {
-        let trimmed = prefix.trim_end_matches('/');
-        if let Some(key) = image_url.strip_prefix(trimmed) {
-            return key.trim_start_matches('/').to_string();
-        }
-    }
-    // Fallback: take everything after the third slash (https://host/key...)
-    image_url
-        .find("://")
-        .and_then(|i| image_url[i + 3..].find('/'))
-        .map(|i| {
-            let start = image_url.find("://").unwrap() + 3 + i + 1;
-            image_url[start..].to_string()
-        })
-        .unwrap_or_else(|| image_url.to_string())
 }
 
 /// Full GET: download image, generate thumbhash, extract file size and content type.
