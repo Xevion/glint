@@ -2,7 +2,21 @@ use figment::{
     Figment,
     providers::{Env, Format, Toml},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
+
+/// Accept either a sequence `["a", "b"]` or a comma-separated string `"a,b"`.
+fn deserialize_string_or_seq<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrSeq {
+        Seq(Vec<String>),
+        Str(String),
+    }
+    match StringOrSeq::deserialize(de)? {
+        StringOrSeq::Seq(v) => Ok(v),
+        StringOrSeq::Str(s) => Ok(s.split(',').map(|s| s.trim().to_string()).collect()),
+    }
+}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -14,7 +28,10 @@ pub struct Config {
 
     pub database_url: String,
 
-    #[serde(default = "default_cors_origins")]
+    #[serde(
+        default = "default_cors_origins",
+        deserialize_with = "deserialize_string_or_seq"
+    )]
     pub cors_origins: Vec<String>,
 
     /// R2/S3 configuration for capture image storage
@@ -88,7 +105,10 @@ fn default_port() -> u16 {
 }
 
 fn default_cors_origins() -> Vec<String> {
-    vec!["http://localhost:5173".to_string()]
+    vec![
+        "http://localhost:5173".to_string(),
+        "http://localhost:8080".to_string(),
+    ]
 }
 
 /// Discord OAuth configuration

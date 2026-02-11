@@ -179,7 +179,9 @@ async fn main() -> anyhow::Result<()> {
         integrity_metadata_tx,
     ));
 
-    // Configure CORS with specific allowed origins
+    // Configure CORS. SvelteKit's universal fetch enforces CORS during SSR using
+    // the page's origin, so the frontend origin (wherever SvelteKit is served)
+    // must be included in cors_origins.
     let allowed_origins: Vec<HeaderValue> = config
         .cors_origins
         .iter()
