@@ -51,14 +51,14 @@ export class OgImageCache {
  * Singleflight gate — deduplicates concurrent requests for the same key.
  * If a generation is already in-flight, subsequent requests await the same promise.
  */
-export class Singleflight {
-	private inflight = new Map<string, Promise<Uint8Array>>();
+export class Singleflight<T = Uint8Array> {
+	private inflight = new Map<string, Promise<T>>();
 
 	/**
 	 * Execute `fn` for `key`, deduplicating concurrent calls.
 	 * If a call for the same key is already in-flight, returns its result.
 	 */
-	async do(key: string, fn: () => Promise<Uint8Array>): Promise<Uint8Array> {
+	async do(key: string, fn: () => Promise<T>): Promise<T> {
 		const existing = this.inflight.get(key);
 		if (existing) return existing;
 
@@ -73,4 +73,10 @@ export class Singleflight {
 
 /** Shared instances for the OG image endpoint */
 export const ogCache = new OgImageCache();
-export const ogSingleflight = new Singleflight();
+
+interface OgGenerationResult {
+	buffer: Uint8Array;
+	fallback: boolean;
+}
+
+export const ogSingleflight = new Singleflight<OgGenerationResult>();

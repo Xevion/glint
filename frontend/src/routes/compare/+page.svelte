@@ -72,12 +72,31 @@ const modes: { value: CompareMode; label: string; icon: typeof Columns3 }[] = [
 	{ value: 'split', label: 'Split', icon: SplitSquareHorizontal },
 	{ value: 'toggle', label: 'Toggle', icon: ToggleLeft }
 ];
+
+// OG metadata: build a dynamic title and pick the first capture as the image
+const ogTitle = $derived.by(() => {
+	if (images.length >= 2) {
+		const left = images[0].shader.name;
+		const right = images[1].shader.name;
+		const scene = data.scenes.find((s: { slug: string }) => s.slug === data.selectedSceneSlug);
+		const scenePart = scene ? ` on ${scene.name}` : '';
+		return `${left} vs ${right}${scenePart}`;
+	}
+	return 'Compare Shaders';
+});
+const ogImage = $derived(data.captures[0]?.image_url ?? null);
+const ogImagePath = $derived(
+	data.selectedSceneSlug ? `/og/compare/${data.selectedSceneSlug}/og.png` : null
+);
+const ogDescription = $derived.by(() => {
+	if (images.length >= 2) {
+		return `Side-by-side comparison of ${images[0].shader.name} and ${images[1].shader.name} shaders for Minecraft.`;
+	}
+	return 'Side-by-side shader comparison for Minecraft. Compare screenshots with a slider, split view, or toggle.';
+});
 </script>
 
-<Meta
-	title="Compare Shaders"
-	description="Side-by-side shader comparison for Minecraft. Compare screenshots with a slider, split view, or toggle."
-/>
+<Meta title={ogTitle} description={ogDescription} image={ogImage} ogImagePath={ogImagePath} />
 
 <div class="py-8">
 	<div class="mx-auto max-w-4xl">

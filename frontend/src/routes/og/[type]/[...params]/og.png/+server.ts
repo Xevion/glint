@@ -6,18 +6,23 @@ import { getLogger } from '@logtape/logtape';
 
 const logger = getLogger(['ssr', 'routes', 'og']);
 
-const VALID_TYPES: ReadonlySet<string> = new Set<OgType>(['shader', 'scene', 'home', 'shaders']);
+const VALID_TYPES: ReadonlySet<string> = new Set<OgType>([
+	'shader',
+	'scene',
+	'home',
+	'shaders',
+	'scenes',
+	'compare'
+]);
 
 const CACHE_CONTROL = 'public, max-age=86400, stale-while-revalidate=3600';
+const CACHE_CONTROL_SHORT = 'public, max-age=300, stale-while-revalidate=60';
 
-function jpegResponse(data: Uint8Array): Response {
-	// Copy into a fresh ArrayBuffer-backed Uint8Array to satisfy TS strict typing
-	// (Uint8Array<ArrayBufferLike> includes SharedArrayBuffer which isn't a valid BlobPart)
-	const body = new Uint8Array(data) as BlobPart;
-	return new Response(new Blob([body], { type: 'image/jpeg' }), {
+function jpegResponse(data: Uint8Array, fallback = false): Response {
+	return new Response(new Uint8Array(data) as BlobPart, {
 		headers: {
 			'Content-Type': 'image/jpeg',
-			'Cache-Control': CACHE_CONTROL
+			'Cache-Control': fallback ? CACHE_CONTROL_SHORT : CACHE_CONTROL
 		}
 	});
 }
@@ -25,7 +30,7 @@ function jpegResponse(data: Uint8Array): Response {
 export const GET: RequestHandler = async ({ params: routeParams, fetch }) => {
 	const { type } = routeParams;
 	if (!VALID_TYPES.has(type)) {
-		return new Response(`Invalid OG type: ${type}`, { status: 400 });
+		return new Response('Invalid OG image type', { status: 400 });
 	}
 
 	const ogType = type as OgType;
@@ -38,7 +43,7 @@ export const GET: RequestHandler = async ({ params: routeParams, fetch }) => {
 
 	// Singleflight: deduplicate concurrent requests for the same image
 	try {
-		const buffer = await ogSingleflight.do(cacheKey, async () => {
+		const { buffer, fallback } = await ogSingleflight.do(cacheKey, async () => {
 			const data = await fetchOgData(ogType, slug, fetch);
 
 			let imageBuffer: Uint8Array;
@@ -47,7 +52,10 @@ export const GET: RequestHandler = async ({ params: routeParams, fetch }) => {
 				// Fetch the screenshot from CDN
 				const imageResponse = await fetch(data.imageUrl);
 				if (!imageResponse.ok) {
-					return renderTextOnlyOgImage(data.text);
+					return {
+						buffer: await renderTextOnlyOgImage(data.text),
+						fallback: true
+					};
 				}
 
 				const rawImage = Buffer.from(await imageResponse.arrayBuffer());
@@ -56,11 +64,15 @@ export const GET: RequestHandler = async ({ params: routeParams, fetch }) => {
 				imageBuffer = await renderTextOnlyOgImage(data.text);
 			}
 
-			ogCache.set(cacheKey, imageBuffer);
-			return imageBuffer;
+			// Don't cache fallback images (missing resources) — they should be re-checked
+			if (!data.fallback) {
+				ogCache.set(cacheKey, imageBuffer);
+			}
+
+			return { buffer: imageBuffer, fallback: !!data.fallback };
 		});
 
-		return jpegResponse(buffer);
+		return jpegResponse(buffer, fallback);
 	} catch (error) {
 		logger.error('OG image generation failed: {cacheKey}', {
 			cacheKey,

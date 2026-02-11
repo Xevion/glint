@@ -2,13 +2,15 @@ import { createApiClient } from '$lib/api';
 import { formatNumber, formatVersion } from '$lib/utils/display';
 import type { TextOverlayProps } from './text';
 
-export type OgType = 'shader' | 'scene' | 'home' | 'shaders';
+export type OgType = 'shader' | 'scene' | 'home' | 'shaders' | 'scenes' | 'compare';
 
 export interface OgImageData {
 	/** URL of the screenshot to use as background (null = text-only) */
 	imageUrl: string | null;
 	/** Text overlay props */
 	text: TextOverlayProps;
+	/** Whether this is a fallback for a missing resource (should not be cached long-term) */
+	fallback?: boolean;
 }
 
 /**
@@ -32,6 +34,10 @@ export async function fetchOgData(
 			return fetchHomeOgData(api);
 		case 'shaders':
 			return fetchShadersListOgData(api);
+		case 'scenes':
+			return fetchScenesListOgData(api);
+		case 'compare':
+			return fetchCompareOgData(api, params);
 		default: {
 			const _exhaustive: never = type;
 			throw new Error(`Unknown OG type: ${String(_exhaustive)}`);
@@ -47,7 +53,8 @@ async function fetchShaderOgData(api: ApiClient, slug: string): Promise<OgImageD
 	if (result.isErr) {
 		return {
 			imageUrl: null,
-			text: { title: 'Shader Not Found' }
+			text: { title: 'Shader Not Found' },
+			fallback: true
 		};
 	}
 
@@ -77,7 +84,8 @@ async function fetchSceneOgData(api: ApiClient, slug: string): Promise<OgImageDa
 	if (result.isErr || result.value.length === 0) {
 		return {
 			imageUrl: null,
-			text: { title: 'Scene Not Found' }
+			text: { title: 'Scene Not Found' },
+			fallback: true
 		};
 	}
 
@@ -123,6 +131,59 @@ async function fetchShadersListOgData(api: ApiClient): Promise<OgImageData> {
 		text: {
 			title: 'Shaders',
 			meta: 'Browse and compare Minecraft shaders'
+		}
+	};
+}
+
+async function fetchScenesListOgData(api: ApiClient): Promise<OgImageData> {
+	const result = await api.scenes.list();
+
+	const firstWithImage = result.isOk ? result.value.find((s) => s.image_url != null) : undefined;
+
+	return {
+		imageUrl: firstWithImage?.image_url ?? null,
+		text: {
+			title: 'Scenes',
+			meta: result.isOk
+				? `${result.value.length} test scenes for shader comparison`
+				: 'Minecraft test scenes for shader comparison'
+		}
+	};
+}
+
+async function fetchCompareOgData(api: ApiClient, sceneSlug: string): Promise<OgImageData> {
+	if (!sceneSlug) {
+		return {
+			imageUrl: null,
+			text: {
+				title: 'Compare Shaders',
+				meta: 'Side-by-side shader comparison for Minecraft'
+			}
+		};
+	}
+
+	const result = await api.scenes.getBySlug(sceneSlug);
+
+	if (result.isErr || result.value.length === 0) {
+		return {
+			imageUrl: null,
+			text: {
+				title: 'Compare Shaders',
+				meta: 'Side-by-side shader comparison for Minecraft'
+			},
+			fallback: true
+		};
+	}
+
+	const scene = result.value[0];
+	const firstCapture = scene.captures[0];
+
+	return {
+		imageUrl: firstCapture?.image_url ?? null,
+		text: {
+			title: 'Compare Shaders',
+			subtitle: scene.name,
+			meta: scene.captures.length > 0 ? `${scene.captures.length} shaders to compare` : undefined
 		}
 	};
 }

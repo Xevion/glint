@@ -30,6 +30,7 @@ const ogImage = $derived(scenes[0]?.image_url ?? null);
 	title="Scenes"
 	description="Explore Minecraft test scenes used for shader comparison. See how different lighting, biomes, and weather affect each shader."
 	image={ogImage}
+	ogImagePath="/og/scenes/og.png"
 />
 
 <div class="py-8">

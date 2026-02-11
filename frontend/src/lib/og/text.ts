@@ -3,10 +3,8 @@ import { Resvg } from '@resvg/resvg-js';
 import { render } from 'svelte/server';
 import { html } from '@xevion/satori-html';
 import OgOverlay from '$lib/components/OgOverlay.svelte';
+import { OG_HEIGHT, OG_WIDTH } from './constants';
 import { loadOGFonts } from './fonts';
-
-const OG_WIDTH = 1200;
-const OG_HEIGHT = 630;
 
 export interface TextOverlayProps {
 	title: string;

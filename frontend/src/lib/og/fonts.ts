@@ -19,11 +19,21 @@ let cached: SatoriOptions['fonts'] | null = null;
 export async function loadOGFonts(): Promise<SatoriOptions['fonts']> {
 	if (cached) return cached;
 
-	const [geistSansBlack, interRegular, interMedium] = await Promise.all([
-		read(geistSansBlackUrl).arrayBuffer(),
-		read(interRegularUrl).arrayBuffer(),
-		read(interMediumUrl).arrayBuffer()
-	]);
+	let geistSansBlack: ArrayBuffer;
+	let interRegular: ArrayBuffer;
+	let interMedium: ArrayBuffer;
+
+	try {
+		[geistSansBlack, interRegular, interMedium] = await Promise.all([
+			read(geistSansBlackUrl).arrayBuffer(),
+			read(interRegularUrl).arrayBuffer(),
+			read(interMediumUrl).arrayBuffer()
+		]);
+	} catch (err) {
+		throw new Error(
+			`Failed to load OG fonts from build output. Ensure @fontsource/geist-sans and @fontsource/inter are installed: ${err instanceof Error ? err.message : String(err)}`
+		);
+	}
 
 	cached = [
 		{ name: 'Geist Sans', data: geistSansBlack, weight: 900, style: 'normal' as const },

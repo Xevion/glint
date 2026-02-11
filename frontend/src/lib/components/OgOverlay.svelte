@@ -27,7 +27,7 @@ const titleSize = $derived(title.length > 24 ? '44px' : title.length > 16 ? '52p
 		style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-bottom: 12px;"
 	>
 		<div
-			style="font-family: 'Geist Sans', sans-serif; font-weight: 900; font-size: {titleSize}; color: #ffffff; line-height: 1.15; max-width: 850px; overflow: hidden; text-overflow: ellipsis;"
+			style="font-family: 'Geist Sans', sans-serif; font-weight: 900; font-size: {titleSize}; color: #ffffff; line-height: 1.15; max-width: 850px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
 		>
 			{title}
 		</div>

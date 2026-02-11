@@ -36,9 +36,15 @@ const currentUrl = $derived(page.url.href);
 const ogImageUrl = $derived.by(() => {
 	// Composite OG image path takes precedence
 	if (ogImagePath) return `${page.url.origin}${ogImagePath}`;
-	// Fall back to Cloudflare-transformed raw image
-	return cfImageUrl(image, { width: 1200, height: 630, fit: 'cover', quality: 85, format: 'jpeg' });
+	// Fall back to Cloudflare-transformed raw image (only for absolute URLs)
+	if (image && URL.canParse(image)) {
+		return cfImageUrl(image, { width: 1200, height: 630, fit: 'cover', quality: 85, format: 'jpeg' });
+	}
+	return null;
 });
+
+// Composite OG images are JPEG; Cloudflare-transformed images use JPEG format param
+const ogImageType = $derived(ogImageUrl ? 'image/jpeg' : null);
 </script>
 
 <svelte:head>
@@ -61,6 +67,9 @@ const ogImageUrl = $derived.by(() => {
 		<meta property="og:image" content={ogImageUrl} />
 		<meta property="og:image:width" content="1200" />
 		<meta property="og:image:height" content="630" />
+		{#if ogImageType}
+			<meta property="og:image:type" content={ogImageType} />
+		{/if}
 	{/if}
 
 	<!-- Twitter Card -->
