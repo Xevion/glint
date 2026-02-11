@@ -14,8 +14,6 @@ export const load: PageLoad = async ({ params, fetch }) => {
 
 	return result.match({
 		Ok: (user) => ({ user }),
-		Err: (e) => {
-			error(e.statusCode ?? 500, e.message);
-		}
+		Err: (e) => e.throw()
 	});
 };

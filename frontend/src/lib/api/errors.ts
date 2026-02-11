@@ -1,3 +1,5 @@
+import { error } from '@sveltejs/kit';
+
 export enum ApiErrorType {
 	Network = 'NETWORK_ERROR',
 	NotFound = 'NOT_FOUND',
@@ -9,15 +11,46 @@ export enum ApiErrorType {
 }
 
 export class ApiError extends Error {
+	public readonly statusCode: number;
+
 	constructor(
 		public readonly type: ApiErrorType,
 		message: string,
-		public readonly statusCode?: number,
+		statusCode?: number,
 		public readonly details?: unknown,
 		public readonly code?: string
 	) {
 		super(message);
 		this.name = 'ApiError';
+		this.statusCode = statusCode ?? ApiError.statusCodeForType(type);
+	}
+
+	/**
+	 * Log the error and throw a SvelteKit HttpError.
+	 * Use in load functions instead of raw `error()` so SSR failures always produce a log line.
+	 */
+	throw(): never {
+		console.error(`[ssr] ${this.type} ${this.statusCode}: ${this.message}`);
+		error(this.statusCode, this.message);
+	}
+
+	private static statusCodeForType(type: ApiErrorType): number {
+		switch (type) {
+			case ApiErrorType.BadRequest:
+				return 400;
+			case ApiErrorType.Unauthorized:
+				return 401;
+			case ApiErrorType.Forbidden:
+				return 403;
+			case ApiErrorType.NotFound:
+				return 404;
+			case ApiErrorType.Network:
+				return 502;
+			case ApiErrorType.ServerError:
+				return 500;
+			case ApiErrorType.Unknown:
+				return 500;
+		}
 	}
 
 	static fromResponse(response: Response, body?: unknown): ApiError {

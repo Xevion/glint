@@ -1,5 +1,4 @@
 import { createApiClient } from '$lib/api';
-import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params, fetch }) => {
@@ -12,16 +11,12 @@ export const load: PageLoad = async ({ params, fetch }) => {
 
 	const scene = sceneRes.match({
 		Ok: (s) => s,
-		Err: (e) => {
-			error(e.statusCode ?? 500, e.message);
-		}
+		Err: (e) => e.throw()
 	});
 
 	const capturesData = capturesRes.match({
 		Ok: (c) => c,
-		Err: (e) => {
-			error(e.statusCode ?? 500, e.message);
-		}
+		Err: (e) => e.throw()
 	});
 
 	// Fetch world data for display name (non-critical — fall back to world_id)

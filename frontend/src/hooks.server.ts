@@ -7,24 +7,36 @@ import { env as publicEnv } from '$env/dynamic/public';
 const backendUrl = publicEnv.PUBLIC_BACKEND_URL ?? 'http://localhost:8080';
 
 export const handle: Handle = async ({ event, resolve }) => {
+	const { method } = event.request;
+	const { pathname } = event.url;
+
 	// Proxy /api/* requests from the browser to the internal Axum backend.
 	// In dev, Vite's proxy handles this. In production, SvelteKit is the
 	// public-facing server and must forward API requests itself.
-	if (event.url.pathname.startsWith('/api/')) {
-		const targetUrl = `${backendUrl}${event.url.pathname}${event.url.search}`;
+	if (pathname.startsWith('/api/')) {
+		const targetUrl = `${backendUrl}${pathname}${event.url.search}`;
 		const headers = new Headers(event.request.headers);
 		// Remove host header so the backend sees its own host
 		headers.delete('host');
 
-		const response = await fetch(targetUrl, {
-			method: event.request.method,
-			headers,
-			body: event.request.body,
-			// Don't follow redirects — the browser must follow them (OAuth flow)
-			redirect: 'manual',
-			// @ts-expect-error Bun supports duplex streaming
-			duplex: 'half'
-		});
+		let response: Response;
+		try {
+			response = await fetch(targetUrl, {
+				method,
+				headers,
+				body: event.request.body,
+				// Don't follow redirects — the browser must follow them (OAuth flow)
+				redirect: 'manual',
+				// @ts-expect-error Bun supports duplex streaming
+				duplex: 'half'
+			});
+		} catch (err) {
+			console.error(`[proxy] ${method} ${pathname} → backend unreachable`, err);
+			return new Response(JSON.stringify({ error: 'Backend unavailable' }), {
+				status: 502,
+				headers: { 'content-type': 'application/json' }
+			});
+		}
 
 		return new Response(response.body, {
 			status: response.status,
@@ -33,10 +45,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 		});
 	}
 
-	return resolve(event, {
+	const response = await resolve(event, {
 		transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', 'en'),
 		filterSerializedResponseHeaders: (name) => name === 'content-length' || name === 'content-type'
 	});
+
+	if (response.status >= 400) {
+		console.error(`[ssr] ${method} ${pathname} ${response.status}`);
+	}
+
+	return response;
 };
 
 /**
@@ -61,7 +79,7 @@ const posthog = posthogKey && posthogHost ? new PostHog(posthogKey, { host: post
 
 export const handleError: HandleServerError = ({ error, event, status }) => {
 	if (status !== 404) {
-		console.error(`[SSR ${status}] ${event.request.method} ${event.url.pathname}`, error);
+		console.error(`[ssr] ${event.request.method} ${event.url.pathname} ${status} (unhandled)`, error);
 	}
 
 	if (posthog && status !== 404) {

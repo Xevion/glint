@@ -7,15 +7,15 @@ export const load: PageLoad = async ({ params, fetch }) => {
 	const api = createApiClient(fetch);
 	const result = await api.shaders.getShader(params.id);
 
-	if (result.isErr) {
-		const err = result.error;
-		if (err.type === ApiErrorType.NotFound) {
-			error(404, { message: `Shader "${params.id}" not found` });
+	let shader = result.match({
+		Ok: (s) => s,
+		Err: (err) => {
+			if (err.type === ApiErrorType.NotFound) {
+				error(404, { message: `Shader "${params.id}" not found` });
+			}
+			return err.throw();
 		}
-		error(500, { message: 'Failed to load shader data' });
-	}
-
-	let shader = result.value;
+	});
 
 	// Default fetch returns captures for the latest version. If that version has
 	// no captures but an older one does, re-fetch with the correct version so SSR

@@ -1,5 +1,4 @@
 import { createApiClient } from '$lib/api';
-import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params, fetch }) => {
@@ -12,16 +11,12 @@ export const load: PageLoad = async ({ params, fetch }) => {
 
 	const run = runRes.match({
 		Ok: (r) => r,
-		Err: (e) => {
-			error(404, e.message);
-		}
+		Err: (e) => e.throw()
 	});
 
 	const items = itemsRes.match({
 		Ok: (i) => i,
-		Err: (e) => {
-			error(500, e.message);
-		}
+		Err: (e) => e.throw()
 	});
 
 	return { run, items };
