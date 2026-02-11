@@ -1,4 +1,7 @@
 import { error } from '@sveltejs/kit';
+import { getLogger } from '@logtape/logtape';
+
+const logger = getLogger(['ssr', 'api', 'error']);
 
 export enum ApiErrorType {
 	Network = 'NETWORK_ERROR',
@@ -30,7 +33,12 @@ export class ApiError extends Error {
 	 * Use in load functions instead of raw `error()` so SSR failures always produce a log line.
 	 */
 	throw(): never {
-		console.error(`[ssr] ${this.type} ${this.statusCode}: ${this.message}`);
+		logger.error('{type} {statusCode}: {message}', {
+			type: this.type,
+			statusCode: this.statusCode,
+			message: this.message,
+			...(this.code && { code: this.code })
+		});
 		error(this.statusCode, this.message);
 	}
 

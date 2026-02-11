@@ -4,12 +4,17 @@ const PORT = process.env.PORT || '8080';
 const BACKEND_PORT = process.env.GLINT_PORT || '3001';
 const BACKEND_HOST = process.env.GLINT_HOST || '127.0.0.1';
 const HEALTH_URL = `http://localhost:${BACKEND_PORT}/api/health`;
-const LOG_JSON = process.env.LOG_JSON === 'true';
+
+// Logging defaults: JSON in production (entrypoint only runs in Docker).
+// Both the Rust backend and SvelteKit frontend read LOG_JSON identically,
+// so we normalize once here and propagate via env to both subprocesses.
+const LOG_JSON = process.env.LOG_JSON ?? 'true';
+const LOG_LEVEL = process.env.LOG_LEVEL; // undefined = let each subsystem pick its default
 
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 
 function log(level: LogLevel, message: string, fields?: Record<string, unknown>) {
-	if (LOG_JSON) {
+	if (LOG_JSON === 'true' || LOG_JSON === '1') {
 		const entry = {
 			timestamp: new Date().toISOString(),
 			level,
@@ -31,9 +36,20 @@ function log(level: LogLevel, message: string, fields?: Record<string, unknown>)
 	}
 }
 
+// Build shared env for both subprocesses — ensures LOG_JSON and LOG_LEVEL
+// are propagated even if the parent env didn't have them explicitly set.
+const sharedEnv: Record<string, string | undefined> = {
+	...process.env,
+	LOG_JSON
+};
+if (LOG_LEVEL) {
+	sharedEnv.LOG_LEVEL = LOG_LEVEL;
+}
+
 log('info', 'Starting Axum backend', { host: BACKEND_HOST, port: BACKEND_PORT });
 const rustProc = spawn({
 	cmd: ['/app/glint'],
+	env: sharedEnv,
 	stdout: 'inherit',
 	stderr: 'inherit'
 });
@@ -65,10 +81,10 @@ log('info', 'Axum backend is healthy');
 
 log('info', 'Starting SvelteKit SSR', { host: '0.0.0.0', port: PORT });
 const bunProc = spawn({
-	cmd: ['bun', 'build/index.js'],
+	cmd: ['bun', '--preload', '/app/web/console-logger.js', 'build/index.js'],
 	cwd: '/app/web',
 	env: {
-		...process.env,
+		...sharedEnv,
 		PORT,
 		HOST: '0.0.0.0',
 		ORIGIN: process.env.ORIGIN ?? `http://localhost:${PORT}`,

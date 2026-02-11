@@ -74,6 +74,7 @@
 		"@careswitch/svelte-data-table": "^0.6.3",
 		"@fontsource/geist-sans": "^5.2.5",
 		"@fontsource/inter": "^5.2.8",
+		"@logtape/logtape": "^2.0.2",
 		"@resvg/resvg-js": "^2.6.2",
 		"@xevion/satori-html": "^0.4.1",
 		"class-variance-authority": "^0.7.1",

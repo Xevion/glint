@@ -3,9 +3,10 @@ import tailwindcss from '@tailwindcss/vite';
 import { sveltePhosphorOptimize } from 'phosphor-svelte/vite';
 import { defineConfig } from 'vite';
 import devtoolsJson from 'vite-plugin-devtools-json';
+import { jsonLogger } from './vite-plugin-json-logger';
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit(), sveltePhosphorOptimize(), devtoolsJson()],
+	plugins: [jsonLogger(), tailwindcss(), sveltekit(), sveltePhosphorOptimize(), devtoolsJson()],
 	server: {
 		watch: {
 			ignored: ['**/.svelte-kit/generated/**']

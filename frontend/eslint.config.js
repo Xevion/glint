@@ -64,7 +64,13 @@ export default tseslint.config(
 	},
 	// Disable type-checked rules for config files not in project
 	{
-		files: ['playwright.config.ts', 'vitest.config.ts', 'vite.config.ts', 'tests/**/*.ts'],
+		files: [
+			'playwright.config.ts',
+			'vitest.config.ts',
+			'vite.config.ts',
+			'vite-plugin-json-logger.ts',
+			'tests/**/*.ts'
+		],
 		...tseslint.configs.disableTypeChecked
 	}
 );

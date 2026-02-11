@@ -1,10 +1,23 @@
 import type { Handle, HandleFetch, HandleServerError } from '@sveltejs/kit';
-import { PostHog } from 'posthog-node';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { env as publicEnv } from '$env/dynamic/public';
+import { initLogger } from '$lib/logger';
+import { requestContext } from '$lib/server/context';
+import { getLogger } from '@logtape/logtape';
+import { PostHog } from 'posthog-node';
+
+await initLogger();
 
 const backendUrl = publicEnv.PUBLIC_BACKEND_URL ?? 'http://localhost:8080';
+
+const posthog =
+	env.POSTHOG_KEY && env.POSTHOG_HOST
+		? new PostHog(env.POSTHOG_KEY, { host: env.POSTHOG_HOST })
+		: null;
+
+const proxyLogger = getLogger(['ssr', 'proxy']);
+const errorLogger = getLogger(['ssr', 'error']);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const { method } = event.request;
@@ -16,7 +29,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (pathname.startsWith('/api/')) {
 		const targetUrl = `${backendUrl}${pathname}${event.url.search}`;
 		const headers = new Headers(event.request.headers);
-		// Remove host header so the backend sees its own host
 		headers.delete('host');
 
 		let response: Response;
@@ -25,13 +37,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 				method,
 				headers,
 				body: event.request.body,
-				// Don't follow redirects — the browser must follow them (OAuth flow)
 				redirect: 'manual',
 				// @ts-expect-error Bun supports duplex streaming
 				duplex: 'half'
 			});
 		} catch (err) {
-			console.error(`[proxy] ${method} ${pathname} → backend unreachable`, err);
+			proxyLogger.error('{method} {path} → backend unreachable', {
+				method,
+				path: pathname,
+				error: err instanceof Error ? err.message : String(err)
+			});
 			return new Response(JSON.stringify({ error: 'Backend unavailable' }), {
 				status: 502,
 				headers: { 'content-type': 'application/json' }
@@ -45,16 +60,26 @@ export const handle: Handle = async ({ event, resolve }) => {
 		});
 	}
 
-	const response = await resolve(event, {
-		transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', 'en'),
-		filterSerializedResponseHeaders: (name) => name === 'content-length' || name === 'content-type'
+	// Extract or generate a request ID for tracing
+	const requestId = event.request.headers.get('x-request-id') ?? crypto.randomUUID();
+
+	return requestContext.run({ requestId }, async () => {
+		const response = await resolve(event, {
+			transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', 'en'),
+			filterSerializedResponseHeaders: (name) => name === 'content-length' || name === 'content-type'
+		});
+
+		if (response.status >= 400) {
+			const reqLogger = getLogger(['ssr', 'request']);
+			reqLogger.warn('{method} {path} {status}', {
+				method,
+				path: pathname,
+				status: response.status
+			});
+		}
+
+		return response;
 	});
-
-	if (response.status >= 400) {
-		console.error(`[ssr] ${method} ${pathname} ${response.status}`);
-	}
-
-	return response;
 };
 
 /**
@@ -72,14 +97,14 @@ export const handleFetch: HandleFetch = async ({ event, request, fetch }) => {
 	return fetch(request);
 };
 
-const posthogKey = env.POSTHOG_KEY;
-const posthogHost = env.POSTHOG_HOST;
-
-const posthog = posthogKey && posthogHost ? new PostHog(posthogKey, { host: posthogHost }) : null;
-
 export const handleError: HandleServerError = ({ error, event, status }) => {
 	if (status !== 404) {
-		console.error(`[ssr] ${event.request.method} ${event.url.pathname} ${status} (unhandled)`, error);
+		errorLogger.error('{method} {path} {status} (unhandled)', {
+			status,
+			method: event.request.method,
+			path: event.url.pathname,
+			error: error instanceof Error ? error.message : String(error)
+		});
 	}
 
 	if (posthog && status !== 404) {
@@ -100,7 +125,6 @@ export const handleError: HandleServerError = ({ error, event, status }) => {
 
 	return {
 		message,
-		// Expose stack trace in dev for the error page to display
 		...(dev && error instanceof Error && error.stack ? { stack: error.stack } : {})
 	};
 };

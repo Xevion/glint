@@ -31,7 +31,7 @@ COPY backend/.sqlx/ ./.sqlx/
 
 # Build with SQLx offline mode (no live database needed)
 ENV SQLX_OFFLINE=true
-RUN cargo build --release && strip target/release/glint
+RUN cargo build --release
 
 # ========== Stage 4: Frontend Builder ==========
 FROM oven/bun:1 AS frontend
@@ -63,16 +63,19 @@ COPY --from=frontend /build/build ./web/build
 # Copy production node_modules (runtime dependencies externalized by the adapter)
 COPY --from=frontend /build/node_modules ./web/node_modules
 
-# Copy entrypoint
+# Copy entrypoint and console logger (preloaded by Bun to intercept stray console.* calls)
 COPY frontend/entrypoint.ts ./web/entrypoint.ts
+COPY frontend/console-logger.js ./web/console-logger.js
 
 # Environment defaults
 # PORT = public-facing SvelteKit (Railway injects $PORT)
 # GLINT_PORT = internal Axum backend (not exposed)
+# LOG_JSON = structured JSON output (both backend and frontend read this)
 ENV PORT=8080 \
     GLINT_HOST=127.0.0.1 \
     GLINT_PORT=3001 \
     PUBLIC_BACKEND_URL=http://localhost:3001 \
+    LOG_JSON=true \
     TZ=Etc/UTC
 
 EXPOSE 8080

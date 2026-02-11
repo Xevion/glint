@@ -2,6 +2,9 @@ import type { RequestHandler } from './$types';
 import { fetchOgData, type OgType } from '$lib/og/data';
 import { renderOgImage, renderTextOnlyOgImage } from '$lib/og/render';
 import { ogCache, ogSingleflight } from '$lib/og/cache';
+import { getLogger } from '@logtape/logtape';
+
+const logger = getLogger(['ssr', 'routes', 'og']);
 
 const VALID_TYPES: ReadonlySet<string> = new Set<OgType>(['shader', 'scene', 'home', 'shaders']);
 
@@ -59,7 +62,11 @@ export const GET: RequestHandler = async ({ params: routeParams, fetch }) => {
 
 		return jpegResponse(buffer);
 	} catch (error) {
-		console.error('OG image generation failed:', cacheKey, error);
+		logger.error('OG image generation failed: {cacheKey}', {
+			cacheKey,
+			error: error instanceof Error ? error.message : String(error),
+			stack: error instanceof Error ? error.stack : undefined
+		});
 		return new Response('Failed to generate OG image', { status: 500 });
 	}
 };

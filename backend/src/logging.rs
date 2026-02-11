@@ -2,8 +2,15 @@
 //!
 //! ## Output Formats
 //!
-//! - **Pretty** (default): `HH:MM:SS.sssss LEVEL span{fields} target: message`
-//! - **JSON** (`LOG_JSON=true`): Machine-readable structured JSON per line
+//! - **Pretty**: `HH:MM:SS.sss LEVEL span{fields} target: message`
+//! - **JSON**: Machine-readable structured JSON per line
+//!
+//! Format selection (via `LOG_JSON`):
+//! - `LOG_JSON=true` or `LOG_JSON=1` → JSON
+//! - `LOG_JSON=false` or `LOG_JSON=0` → Pretty
+//! - Unset → JSON in release builds, pretty in debug builds
+//!
+//! This matches the frontend's `shouldUseJson()` logic identically.
 //!
 //! ## Verbosity Control
 //!
@@ -28,15 +35,19 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
 };
 
-/// Timestamp format: `HH:MM:SS.sssss` (5 decimal places for subseconds)
+/// Pretty timestamp format: `HH:MM:SS.sss`
 const TIME_FORMAT: &[FormatItem<'static>] =
-    format_description!("[hour]:[minute]:[second].[subsecond digits:5]");
+    format_description!("[hour]:[minute]:[second].[subsecond digits:3]");
+
+/// JSON timestamp format: ISO 8601 with millisecond precision (always UTC)
+const JSON_TIME_FORMAT: &[FormatItem<'static>] =
+    format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
 
 // ── Pretty Formatter ──────────────────────────────────────────────
 
 /// Custom formatter that outputs compact timestamps with colored levels and spans.
 ///
-/// Format: `HH:MM:SS.sssss LEVEL span{fields}:span2 target: message`
+/// Format: `HH:MM:SS.sss LEVEL span{fields}:span2 target: message`
 #[derive(Default)]
 pub struct CompactFormatter;
 
@@ -210,8 +221,8 @@ where
 
         let json = EventFields {
             timestamp: time::OffsetDateTime::now_utc()
-                .format(&time::format_description::well_known::Rfc3339)
-                .unwrap_or_else(|_| String::from("1970-01-01T00:00:00Z")),
+                .format(JSON_TIME_FORMAT)
+                .unwrap_or_else(|_| String::from("1970-01-01T00:00:00.000Z")),
             message: message.unwrap_or_default(),
             level: meta.level().to_string().to_lowercase(),
             target: meta.target().to_string(),
@@ -337,12 +348,25 @@ pub fn init_with_verbosity(verbose_count: u8) {
     init_with_filter(filter);
 }
 
+/// Determine whether JSON logging should be used.
+///
+/// Priority:
+/// 1. `LOG_JSON` env var explicitly set → use that value
+/// 2. Otherwise → JSON in release builds, pretty in debug builds
+///
+/// This matches the frontend's `shouldUseJson()` logic so both subsystems
+/// behave identically with the same (or absent) env vars.
+fn should_use_json() -> bool {
+    match env::var("LOG_JSON") {
+        Ok(v) => v == "true" || v == "1",
+        Err(_) => !cfg!(debug_assertions),
+    }
+}
+
 /// Build and initialize the subscriber with the given filter, selecting
 /// pretty or JSON format based on `LOG_JSON` env var.
 fn init_with_filter(filter: EnvFilter) {
-    let use_json = env::var("LOG_JSON")
-        .map(|v| v == "true" || v == "1")
-        .unwrap_or(false);
+    let use_json = should_use_json();
 
     if use_json {
         tracing_subscriber::registry()
@@ -364,9 +388,7 @@ fn init_with_filter(filter: EnvFilter) {
 
 /// Like `init_with_filter` but returns an error instead of panicking if already initialized.
 fn try_init_with_filter(filter: EnvFilter) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let use_json = env::var("LOG_JSON")
-        .map(|v| v == "true" || v == "1")
-        .unwrap_or(false);
+    let use_json = should_use_json();
 
     if use_json {
         Ok(tracing_subscriber::registry()
