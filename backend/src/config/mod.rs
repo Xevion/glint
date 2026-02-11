@@ -185,6 +185,14 @@ impl Config {
             )
             .extract()?;
 
+        // If ORIGIN is set (shared with the SvelteKit frontend), ensure it's
+        // included in the allowed CORS origins so SSR fetch requests succeed.
+        if let Ok(origin) = std::env::var("ORIGIN") {
+            if !config.cors_origins.contains(&origin) {
+                config.cors_origins.push(origin);
+            }
+        }
+
         // Load R2 config from env vars directly (secrets - avoid logging)
         config.r2 = R2Config {
             account_id: std::env::var("GLINT_R2_ACCOUNT_ID").ok(),

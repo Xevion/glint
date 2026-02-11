@@ -71,7 +71,7 @@ const bunProc = spawn({
 		...process.env,
 		PORT,
 		HOST: '0.0.0.0',
-		ORIGIN: `http://localhost:${PORT}`,
+		ORIGIN: process.env.ORIGIN ?? `http://localhost:${PORT}`,
 		PUBLIC_BACKEND_URL: `http://localhost:${BACKEND_PORT}`
 	},
 	stdout: 'inherit',
