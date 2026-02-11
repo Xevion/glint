@@ -101,10 +101,23 @@ impl TierConfig {
     }
 }
 
+/// Aborts the background cleanup task when dropped.
+struct CleanupGuard(tokio::task::JoinHandle<()>);
+
+impl Drop for CleanupGuard {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 /// Thread-safe, Arc-wrapped keyed rate limiter. Clone is cheap.
+/// The background cleanup task is automatically aborted when all clones are dropped.
 #[derive(Clone)]
 struct Limiter {
     inner: Arc<DefaultKeyedRateLimiter<String>>,
+    /// Shared ownership ensures the task lives as long as any Limiter clone,
+    /// then aborts via [`CleanupGuard::drop`].
+    _cleanup: Arc<CleanupGuard>,
 }
 
 impl Limiter {
@@ -112,7 +125,7 @@ impl Limiter {
         let inner = Arc::new(GovernorRateLimiter::keyed(tier.to_quota()));
 
         let limiter = Arc::clone(&inner);
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
             loop {
                 interval.tick().await;
@@ -121,7 +134,10 @@ impl Limiter {
             }
         });
 
-        Self { inner }
+        Self {
+            inner,
+            _cleanup: Arc::new(CleanupGuard(handle)),
+        }
     }
 
     /// Check if the given key is allowed. Returns `Ok(())` or the number of

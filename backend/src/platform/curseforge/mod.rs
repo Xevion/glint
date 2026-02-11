@@ -33,6 +33,8 @@ impl CurseForgeClient<Authenticated> {
         Self {
             client: reqwest::Client::builder()
                 .default_headers(headers)
+                .connect_timeout(std::time::Duration::from_secs(10))
+                .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .expect("failed to create HTTP client"),
             _auth: PhantomData,

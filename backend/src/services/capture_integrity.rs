@@ -69,7 +69,11 @@ async fn sweep_orphaned_uploads(pool: &PgPool) {
         "Integrity sweep: checking orphaned uploads"
     );
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .expect("failed to create HTTP client");
     let mut completed = 0u32;
     let mut failed = 0u32;
 
@@ -170,7 +174,11 @@ async fn sweep_unverified_completions(
         "Integrity sweep: checking unverified completions"
     );
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .expect("failed to create HTTP client");
     let mut requeued = 0u32;
     let mut failed = 0u32;
 

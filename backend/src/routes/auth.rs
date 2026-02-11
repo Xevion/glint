@@ -153,7 +153,11 @@ async fn discord_callback(
     let jar = jar.add(clear_csrf);
 
     // Exchange authorization code for access token
-    let http_client = reqwest::Client::new();
+    let http_client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| AppError::Internal(e.into()))?;
     let token_result = oauth_client
         .exchange_code(AuthorizationCode::new(query.code))
         .request_async(&http_client)
@@ -233,7 +237,11 @@ async fn logout(State(state): State<AppState>, jar: CookieJar) -> AppResult<(Coo
 /// Fetch user info from Discord API
 #[instrument(skip(access_token), level = "debug")]
 async fn fetch_discord_user(access_token: &str) -> AppResult<DiscordUser> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| AppError::Internal(e.into()))?;
     let response = client
         .get("https://discord.com/api/v10/users/@me")
         .bearer_auth(access_token)

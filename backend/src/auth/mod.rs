@@ -71,18 +71,24 @@ impl FromRequestParts<AppState> for MaybeAuthUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        match extract_token(parts, state).await {
-            Ok(token) => {
-                match state
-                    .session_cache()
-                    .get_or_validate(state.db(), &token)
-                    .await
-                {
-                    Ok((user, session)) => Ok(MaybeAuthUser(Some(AuthUser { user, session }))),
-                    Err(_) => Ok(MaybeAuthUser(None)),
-                }
-            }
-            Err(_) => Ok(MaybeAuthUser(None)),
+        let token = match extract_token(parts, state).await {
+            Ok(token) => token,
+            // No token present — genuinely unauthenticated
+            Err(AppError::Unauthorized(_)) => return Ok(MaybeAuthUser(None)),
+            // Infrastructure errors must propagate
+            Err(e) => return Err(e),
+        };
+
+        match state
+            .session_cache()
+            .get_or_validate(state.db(), &token)
+            .await
+        {
+            Ok((user, session)) => Ok(MaybeAuthUser(Some(AuthUser { user, session }))),
+            // Invalid/expired token — treat as unauthenticated
+            Err(AppError::Unauthorized(_)) => Ok(MaybeAuthUser(None)),
+            // DB outages, internal errors — propagate so callers see 500, not silent anon
+            Err(e) => Err(e),
         }
     }
 }

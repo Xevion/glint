@@ -10,7 +10,6 @@ use crate::{
     repo::{PendingUploadRepo, SceneRepo, WorldRepo, WorldVersionRepo},
     state::AppState,
 };
-use anyhow::Context;
 use aws_sdk_s3::Client as S3Client;
 use axum::{
     Json, Router,
@@ -209,23 +208,6 @@ pub fn router() -> Router<AppState> {
         .route("/{slug}/complete", post(complete_world_upload))
 }
 
-/// Aggregate counts per world for the list endpoint
-#[derive(Debug, sqlx::FromRow)]
-struct WorldAggregate {
-    world_id: String,
-    scene_count: i64,
-    version_count: i64,
-    capture_count: i64,
-}
-
-/// Preview capture for a world (first available image)
-#[derive(Debug, sqlx::FromRow)]
-struct WorldPreviewRow {
-    world_id: String,
-    image_url: Option<String>,
-    thumbhash: Option<String>,
-}
-
 /// GET /api/worlds - List all worlds with latest version (admin)
 #[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
 async fn list_worlds(
@@ -237,52 +219,8 @@ async fn list_worlds(
     let (worlds, latest_versions, aggregates, previews) = tokio::try_join!(
         WorldRepo::list(db),
         WorldVersionRepo::batch_latest(db),
-        async {
-            sqlx::query_as::<_, WorldAggregate>(
-                r#"
-                SELECT
-                    w.id AS world_id,
-                    COALESCE(s.scene_count, 0) AS scene_count,
-                    COALESCE(v.version_count, 0) AS version_count,
-                    COALESCE(c.capture_count, 0) AS capture_count
-                FROM worlds w
-                LEFT JOIN (
-                    SELECT world_id, COUNT(*) AS scene_count FROM scenes GROUP BY world_id
-                ) s ON s.world_id = w.id
-                LEFT JOIN (
-                    SELECT world_id, COUNT(*) AS version_count FROM world_versions GROUP BY world_id
-                ) v ON v.world_id = w.id
-                LEFT JOIN (
-                    SELECT s2.world_id, COUNT(*) AS capture_count
-                    FROM captures cap
-                    JOIN scenes s2 ON s2.id = cap.scene_id
-                    GROUP BY s2.world_id
-                ) c ON c.world_id = w.id
-                "#,
-            )
-            .fetch_all(db)
-            .await
-            .context("failed to fetch world aggregates")
-            .map_err(AppError::from)
-        },
-        async {
-            sqlx::query_as::<_, WorldPreviewRow>(
-                r#"
-                SELECT DISTINCT ON (s.world_id)
-                    s.world_id,
-                    cap.image_url,
-                    cap.thumbhash
-                FROM captures cap
-                JOIN scenes s ON s.id = cap.scene_id
-                WHERE cap.image_url IS NOT NULL OR cap.thumbhash IS NOT NULL
-                ORDER BY s.world_id, cap.created_at DESC
-                "#,
-            )
-            .fetch_all(db)
-            .await
-            .context("failed to fetch world preview captures")
-            .map_err(AppError::from)
-        },
+        WorldRepo::aggregate_counts(db),
+        WorldRepo::preview_captures(db),
     )?;
 
     let items =

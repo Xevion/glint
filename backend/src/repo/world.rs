@@ -1,8 +1,25 @@
 use anyhow::Context;
 use tracing::{debug, instrument};
 
-use crate::error::{AppResult, SqlxResultExt};
+use crate::error::{AppError, AppResult, SqlxResultExt};
 use crate::models::{CreateWorldRequest, UpdateWorldRequest, World};
+
+/// Aggregate counts per world for the list endpoint.
+#[derive(Debug, sqlx::FromRow)]
+pub struct WorldAggregate {
+    pub world_id: String,
+    pub scene_count: i64,
+    pub version_count: i64,
+    pub capture_count: i64,
+}
+
+/// Preview capture for a world (most recent available image).
+#[derive(Debug, sqlx::FromRow)]
+pub struct WorldPreviewRow {
+    pub world_id: String,
+    pub image_url: Option<String>,
+    pub thumbhash: Option<String>,
+}
 
 pub struct WorldRepo;
 
@@ -63,6 +80,62 @@ impl WorldRepo {
 
         debug!(count = worlds.len(), "Listed worlds");
         Ok(worlds)
+    }
+
+    /// Fetch scene, version, and capture counts for every world.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn aggregate_counts(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<Vec<WorldAggregate>> {
+        sqlx::query_as::<_, WorldAggregate>(
+            r#"
+            SELECT
+                w.id AS world_id,
+                COALESCE(s.scene_count, 0) AS scene_count,
+                COALESCE(v.version_count, 0) AS version_count,
+                COALESCE(c.capture_count, 0) AS capture_count
+            FROM worlds w
+            LEFT JOIN (
+                SELECT world_id, COUNT(*) AS scene_count FROM scenes GROUP BY world_id
+            ) s ON s.world_id = w.id
+            LEFT JOIN (
+                SELECT world_id, COUNT(*) AS version_count FROM world_versions GROUP BY world_id
+            ) v ON v.world_id = w.id
+            LEFT JOIN (
+                SELECT s2.world_id, COUNT(*) AS capture_count
+                FROM captures cap
+                JOIN scenes s2 ON s2.id = cap.scene_id
+                GROUP BY s2.world_id
+            ) c ON c.world_id = w.id
+            "#,
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to fetch world aggregates")
+        .map_err(AppError::from)
+    }
+
+    /// Fetch the most recent capture preview image for every world.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn preview_captures(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<Vec<WorldPreviewRow>> {
+        sqlx::query_as::<_, WorldPreviewRow>(
+            r#"
+            SELECT DISTINCT ON (s.world_id)
+                s.world_id,
+                cap.image_url,
+                cap.thumbhash
+            FROM captures cap
+            JOIN scenes s ON s.id = cap.scene_id
+            WHERE cap.image_url IS NOT NULL OR cap.thumbhash IS NOT NULL
+            ORDER BY s.world_id, cap.created_at DESC
+            "#,
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to fetch world preview captures")
+        .map_err(AppError::from)
     }
 
     #[instrument(skip(executor, req), level = "debug")]

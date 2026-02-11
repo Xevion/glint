@@ -3,6 +3,7 @@ package com.xevion.glint.capture
 import com.xevion.glint.Loggers
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.ChunkPos
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -19,7 +20,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object ChunkForceLoader {
     private val log = Loggers.Capture.get()
-    private val forcedChunks = mutableSetOf<Long>()
+    private val forcedChunks: MutableSet<Long> = ConcurrentHashMap.newKeySet()
+
+    @Volatile
     private var forcedDimension: net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>? = null
     private val generationComplete = AtomicBoolean(false)
 

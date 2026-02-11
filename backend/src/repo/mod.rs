@@ -35,5 +35,5 @@ pub use slug_redirect::SlugRedirectRepo;
 pub use taxonomy::{CategoryRepo, FeatureRepo, TagRepo};
 pub use user::UserRepo;
 pub use work::WorkRepo;
-pub use world::WorldRepo;
+pub use world::{WorldAggregate, WorldPreviewRow, WorldRepo};
 pub use world_version::WorldVersionRepo;

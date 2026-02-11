@@ -21,6 +21,8 @@ impl ModrinthClient {
         Self {
             client: reqwest::Client::builder()
                 .user_agent(user_agent)
+                .connect_timeout(std::time::Duration::from_secs(10))
+                .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .expect("failed to create HTTP client"),
         }

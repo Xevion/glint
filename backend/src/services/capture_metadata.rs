@@ -327,7 +327,10 @@ async fn fetch_and_process(image_url: &str) -> anyhow::Result<(String, i64, Stri
 /// Returns `None` for file_size when Content-Length header is absent, avoiding
 /// permanently marking captures as 0 bytes.
 async fn fetch_file_metadata(image_url: &str) -> anyhow::Result<(Option<i64>, String)> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
     let response = client.head(image_url).send().await?;
 
     let content_type = response
