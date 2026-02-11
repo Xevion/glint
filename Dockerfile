@@ -58,8 +58,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy Rust binary
 COPY --from=builder /build/target/release/glint ./glint
 
-# Copy SvelteKit build output (self-contained, no node_modules needed)
+# Copy SvelteKit build output
 COPY --from=frontend /build/frontend/build ./web/build
+
+# Copy production node_modules (sharp and other runtime dependencies externalized by the adapter)
+COPY --from=frontend /build/node_modules ./web/node_modules
 
 # Copy entrypoint
 COPY frontend/entrypoint.ts ./web/entrypoint.ts
