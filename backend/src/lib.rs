@@ -13,4 +13,5 @@ pub mod platform;
 pub mod repo;
 pub mod routes;
 pub mod services;
+pub mod slug;
 pub mod state;

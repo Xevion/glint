@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT entity_id FROM slug_redirects WHERE entity_type = $1 AND old_slug = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "51fab0eba2932e3f321666dfb7fe70fde26d0a9c67739b31223894fd027dbae1"
+}

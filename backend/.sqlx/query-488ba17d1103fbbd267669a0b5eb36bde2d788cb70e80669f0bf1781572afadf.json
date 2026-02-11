@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO slug_redirects (entity_type, old_slug, entity_id, created_at)\n            VALUES ($1, $2, $3, now())\n            ON CONFLICT (entity_type, old_slug) DO UPDATE SET entity_id = $3\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "488ba17d1103fbbd267669a0b5eb36bde2d788cb70e80669f0bf1781572afadf"
+}

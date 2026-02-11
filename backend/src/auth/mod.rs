@@ -108,7 +108,7 @@ impl FromRequestParts<AppState> for AgentUser {
             .get_or_validate(state.db(), &token)
             .await?;
 
-        if user.role != "agent" && user.role != "admin" {
+        if !user.role.has_agent_access() {
             return Err(AppError::Forbidden("Agent access required".to_string()));
         }
 
@@ -135,7 +135,7 @@ impl FromRequestParts<AppState> for AdminUser {
             .get_or_validate(state.db(), &token)
             .await?;
 
-        if user.role != "admin" {
+        if !user.role.is_admin() {
             return Err(AppError::Forbidden("Admin access required".to_string()));
         }
 

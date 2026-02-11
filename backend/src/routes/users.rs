@@ -39,7 +39,7 @@ fn resolve_user_id(auth: &AuthUser, id: &str) -> AppResult<(i32, bool)> {
         return Ok((target_id, true));
     }
 
-    if auth.user.role != "admin" {
+    if !auth.user.role.is_admin() {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
 
@@ -103,8 +103,7 @@ async fn update_user_role(
             .map_err(|_| AppError::BadRequest(format!("Invalid user ID: '{id}'")))?
     };
 
-    request.validate()?;
-    let user = UserRepo::update_role(state.db(), target_id, &request.role).await?;
+    let user = UserRepo::update_role(state.db(), target_id, request.role).await?;
 
     // Invalidate cached sessions so the new role takes effect immediately
     state.session_cache().invalidate_user(target_id);

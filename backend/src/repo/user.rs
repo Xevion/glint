@@ -2,7 +2,7 @@ use anyhow::Context;
 use tracing::{debug, instrument};
 
 use crate::error::{AppResult, OptionNotFoundExt};
-use crate::models::User;
+use crate::models::{Role, User};
 
 pub struct UserRepo;
 
@@ -12,11 +12,15 @@ impl UserRepo {
         executor: impl sqlx::PgExecutor<'_>,
         id: i32,
     ) -> AppResult<Option<User>> {
-        sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", id)
-            .fetch_optional(executor)
-            .await
-            .context(format!("failed to find user by id '{}'", id))
-            .map_err(Into::into)
+        sqlx::query_as!(
+            User,
+            r#"SELECT id, discord_id, discord_username, discord_avatar, role as "role: Role", created_at, updated_at FROM users WHERE id = $1"#,
+            id
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to find user by id '{}'", id))
+        .map_err(Into::into)
     }
 
     #[instrument(skip(executor), level = "debug")]
@@ -26,7 +30,7 @@ impl UserRepo {
     ) -> AppResult<Option<User>> {
         sqlx::query_as!(
             User,
-            "SELECT * FROM users WHERE discord_id = $1",
+            r#"SELECT id, discord_id, discord_username, discord_avatar, role as "role: Role", created_at, updated_at FROM users WHERE discord_id = $1"#,
             discord_id
         )
         .fetch_optional(executor)
@@ -55,7 +59,7 @@ impl UserRepo {
                 discord_username = EXCLUDED.discord_username,
                 discord_avatar = EXCLUDED.discord_avatar,
                 updated_at = now()
-            RETURNING id, discord_id, discord_username, discord_avatar, role, created_at, updated_at
+            RETURNING id, discord_id, discord_username, discord_avatar, role as "role: Role", created_at, updated_at
             "#,
             discord_id,
             discord_username,
@@ -73,16 +77,16 @@ impl UserRepo {
     pub async fn update_role(
         executor: impl sqlx::PgExecutor<'_>,
         id: i32,
-        role: &str,
+        role: Role,
     ) -> AppResult<User> {
         sqlx::query_as!(
             User,
             r#"
             UPDATE users SET role = $1, updated_at = now()
             WHERE id = $2
-            RETURNING id, discord_id, discord_username, discord_avatar, role, created_at, updated_at
+            RETURNING id, discord_id, discord_username, discord_avatar, role as "role: Role", created_at, updated_at
             "#,
-            role,
+            role as Role,
             id
         )
         .fetch_optional(executor)
@@ -93,7 +97,7 @@ impl UserRepo {
 
     #[instrument(skip(executor), level = "debug")]
     pub async fn list(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<User>> {
-        let users = sqlx::query_as!(User, "SELECT * FROM users ORDER BY created_at DESC")
+        let users = sqlx::query_as!(User, r#"SELECT id, discord_id, discord_username, discord_avatar, role as "role: Role", created_at, updated_at FROM users ORDER BY created_at DESC"#)
             .fetch_all(executor)
             .await
             .context("failed to list users")?;

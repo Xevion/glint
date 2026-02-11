@@ -1,7 +1,45 @@
+use std::fmt;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use ts_rs::TS;
+
+/// User roles with compile-time safety.
+///
+/// Stored as lowercase text in PostgreSQL (`user`, `admin`, `agent`).
+/// Using an enum prevents typo-based auth bypasses that string comparisons allow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, TS)]
+#[sqlx(type_name = "text", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum Role {
+    User,
+    Admin,
+    Agent,
+}
+
+impl Role {
+    /// Whether this role grants admin privileges.
+    pub fn is_admin(self) -> bool {
+        matches!(self, Role::Admin)
+    }
+
+    /// Whether this role grants agent-level access (agents and admins).
+    pub fn has_agent_access(self) -> bool {
+        matches!(self, Role::Agent | Role::Admin)
+    }
+}
+
+impl fmt::Display for Role {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Role::User => write!(f, "user"),
+            Role::Admin => write!(f, "admin"),
+            Role::Agent => write!(f, "agent"),
+        }
+    }
+}
 
 /// Discord OAuth user
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
@@ -11,7 +49,7 @@ pub struct User {
     pub discord_id: String,
     pub discord_username: String,
     pub discord_avatar: Option<String>,
-    pub role: String,
+    pub role: Role,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
@@ -49,25 +87,7 @@ pub struct SessionInfo {
     pub expires_at: DateTime<Utc>,
 }
 
-/// Valid user roles
-pub const VALID_ROLES: &[&str] = &["user", "admin", "agent"];
-
 #[derive(Debug, Deserialize)]
 pub struct UpdateUserRoleRequest {
-    pub role: String,
-}
-
-impl UpdateUserRoleRequest {
-    /// Validate that the role is one of the known valid roles.
-    pub fn validate(&self) -> Result<(), crate::error::AppError> {
-        if VALID_ROLES.contains(&self.role.as_str()) {
-            Ok(())
-        } else {
-            Err(crate::error::AppError::BadRequest(format!(
-                "Invalid role '{}'. Must be one of: {}",
-                self.role,
-                VALID_ROLES.join(", ")
-            )))
-        }
-    }
+    pub role: Role,
 }

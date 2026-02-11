@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM users ORDER BY created_at DESC",
+  "query": "SELECT id, discord_id, discord_username, discord_avatar, role as \"role: Role\", created_at, updated_at FROM users WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -25,7 +25,7 @@
       },
       {
         "ordinal": 4,
-        "name": "role",
+        "name": "role: Role",
         "type_info": "Text"
       },
       {
@@ -40,7 +40,9 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Int4"
+      ]
     },
     "nullable": [
       false,
@@ -52,5 +54,5 @@
       false
     ]
   },
-  "hash": "79d6ec6e0c3275438cf735d6637075398cb2e188b4d55df37eff9d7cabc4dd5f"
+  "hash": "92287dc638fe93188fbfac6b932ceee68811e292c2432fcd72c75c05b592f0c5"
 }

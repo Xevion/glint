@@ -30,6 +30,7 @@ export type { DeviceTokenResponse } from "./DeviceTokenResponse";
 export type { Feature } from "./Feature";
 export type { FeaturedPair } from "./FeaturedPair";
 export type { PaginatedCaptures } from "./PaginatedCaptures";
+export type { Role } from "./Role";
 export type { Scene } from "./Scene";
 export type { SceneId } from "./SceneId";
 export type { SceneListItem } from "./SceneListItem";

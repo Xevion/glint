@@ -125,6 +125,7 @@ impl SessionCache {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::Role;
     use chrono::Utc;
 
     fn make_user(id: i32) -> User {
@@ -133,7 +134,7 @@ mod tests {
             discord_id: format!("{id}"),
             discord_username: format!("user{id}"),
             discord_avatar: None,
-            role: "user".into(),
+            role: Role::User,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

@@ -40,7 +40,7 @@ pub use shader::{
     TrendingShader, UpdateShaderRequest,
 };
 pub use taxonomy::{Category, Feature, Tag};
-pub use user::{Session, SessionInfo, UpdateUserRoleRequest, User, UserWithSessions};
+pub use user::{Role, Session, SessionInfo, UpdateUserRoleRequest, User, UserWithSessions};
 pub use world::{
     CompleteUploadRequest, CreateWorldRequest, CreateWorldUploadRequest,
     CreateWorldVersionUploadRequest, PendingUpload, UpdateWorldRequest, UploadResponse, World,

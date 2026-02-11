@@ -4,7 +4,7 @@ use rand::Rng;
 use tracing::{debug, instrument};
 
 use crate::error::{AppError, AppResult};
-use crate::models::{Session, User};
+use crate::models::{Role, Session, User};
 
 /// Raw session row returned by list queries (before `is_current` enrichment)
 pub struct SessionRow {
@@ -31,7 +31,7 @@ struct UserSessionRow {
     discord_id: String,
     discord_username: String,
     discord_avatar: Option<String>,
-    role: String,
+    role: Role,
     user_created_at: chrono::DateTime<Utc>,
     user_updated_at: chrono::DateTime<Utc>,
     token: String,
@@ -85,7 +85,7 @@ impl SessionRepo {
                 u.discord_id,
                 u.discord_username,
                 u.discord_avatar,
-                u.role,
+                u.role as "role: Role",
                 u.created_at as user_created_at,
                 u.updated_at as user_updated_at,
                 s.token,
