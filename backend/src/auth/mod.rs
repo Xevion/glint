@@ -72,6 +72,32 @@ impl FromRequestParts<AppState> for MaybeAuthUser {
     }
 }
 
+/// Agent user extractor - fails if not authenticated or not an agent/admin.
+/// Agents can operate the capture pipeline (runs, work, uploads) but not
+/// perform full admin operations like shader/scene CRUD.
+pub struct AgentUser {
+    pub user: User,
+    pub session: Session,
+}
+
+impl FromRequestParts<AppState> for AgentUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let token = extract_token(parts, state).await?;
+        let (user, session) = SessionRepo::validate(state.db(), &token).await?;
+
+        if user.role != "agent" && user.role != "admin" {
+            return Err(AppError::Forbidden("Agent access required".to_string()));
+        }
+
+        Ok(AgentUser { user, session })
+    }
+}
+
 /// Admin user extractor - fails if not authenticated or not an admin
 pub struct AdminUser {
     pub user: User,

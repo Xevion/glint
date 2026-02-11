@@ -7,7 +7,7 @@ use axum::{
 use serde::Deserialize;
 use tracing::{debug, info};
 
-use crate::auth::AuthUser;
+use crate::auth::AgentUser;
 use crate::error::{AppError, AppResult};
 use crate::id::generate_id;
 use crate::models::{CaptureRun, CaptureRunItemWithContext, CaptureStatus};
@@ -115,7 +115,7 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn create_run(
-    _user: AuthUser,
+    _user: AgentUser,
     State(state): State<AppState>,
     Json(request): Json<CreateRunRequest>,
 ) -> AppResult<(StatusCode, Json<CaptureRun>)> {
@@ -175,7 +175,7 @@ async fn create_run(
 }
 
 async fn list_runs(
-    _user: AuthUser,
+    _user: AgentUser,
     State(state): State<AppState>,
 ) -> AppResult<Json<Vec<CaptureRun>>> {
     let runs = CaptureRunRepo::list(state.db()).await?;
@@ -183,7 +183,7 @@ async fn list_runs(
 }
 
 async fn get_run(
-    _user: AuthUser,
+    _user: AgentUser,
     State(state): State<AppState>,
     Path(run_id): Path<String>,
 ) -> AppResult<Json<CaptureRun>> {
@@ -192,7 +192,7 @@ async fn get_run(
 }
 
 async fn list_run_items(
-    _user: AuthUser,
+    _user: AgentUser,
     State(state): State<AppState>,
     Path(run_id): Path<String>,
 ) -> AppResult<Json<Vec<CaptureRunItemWithContext>>> {
@@ -201,7 +201,7 @@ async fn list_run_items(
 }
 
 async fn fail_item(
-    _user: AuthUser,
+    _user: AgentUser,
     State(state): State<AppState>,
     Path((run_id, item_id)): Path<(String, String)>,
     Json(request): Json<FailItemRequest>,
@@ -227,7 +227,7 @@ async fn fail_item(
 }
 
 async fn claim_item(
-    _user: AuthUser,
+    _user: AgentUser,
     State(state): State<AppState>,
     Path((run_id, item_id)): Path<(String, String)>,
     Json(request): Json<ClaimItemRequest>,
@@ -292,7 +292,7 @@ async fn claim_item(
 }
 
 async fn confirm_upload(
-    _user: AuthUser,
+    _user: AgentUser,
     State(state): State<AppState>,
     Path((run_id, item_id)): Path<(String, String)>,
     Json(request): Json<ConfirmUploadRequest>,
@@ -324,7 +324,7 @@ async fn confirm_upload(
 }
 
 async fn complete_run(
-    _user: AuthUser,
+    _user: AgentUser,
     State(state): State<AppState>,
     Path(run_id): Path<String>,
 ) -> AppResult<Json<CaptureRun>> {
@@ -357,7 +357,7 @@ pub fn failure_router() -> Router<AppState> {
 }
 
 async fn report_failure(
-    _user: AuthUser,
+    _user: AgentUser,
     State(state): State<AppState>,
     Json(request): Json<ReportFailureRequest>,
 ) -> AppResult<StatusCode> {
@@ -381,7 +381,7 @@ pub fn upload_router() -> Router<AppState> {
 }
 
 async fn get_upload_url(
-    _user: AuthUser,
+    _user: AgentUser,
     State(state): State<AppState>,
     Json(request): Json<UploadUrlRequest>,
 ) -> AppResult<Json<UploadUrlResponse>> {
