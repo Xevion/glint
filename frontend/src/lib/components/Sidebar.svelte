@@ -109,7 +109,7 @@ function discordAvatarUrl(discordId: string, avatar: string): string {
 </script>
 
 {#snippet userSection()}
-	<div class="mt-auto flex flex-col gap-0.5">
+	<div class="flex flex-col gap-0.5 mt-4">
 		<div class="mx-2 mb-2 border-t border-border"></div>
 		{#if user}
 			<div class="flex items-center gap-2 px-2 py-1.5">
@@ -152,8 +152,8 @@ function discordAvatarUrl(discordId: string, avatar: string): string {
 {/snippet}
 
 {#snippet sidebarNav()}
-	<nav class="flex flex-col gap-0.5">
-		{#if context && context !== 'admin'}
+	{#if context && context !== 'admin'}
+		<nav class="flex flex-col gap-0.5">
 			<span
 				class="px-2 text-[11px] font-medium uppercase tracking-wider text-sidebar-muted-foreground/60 mb-0.5"
 			>
@@ -168,29 +168,13 @@ function discordAvatarUrl(discordId: string, avatar: string): string {
 					{item.label}
 				</a>
 			{/each}
-		{:else if context === 'admin'}
-			<span
-				class="px-2 text-[11px] font-medium uppercase tracking-wider text-sidebar-muted-foreground/60 mb-0.5"
-			>
-				Admin
-			</span>
-			{#each adminItems as item (item.href)}
-				<a
-					href={item.href}
-					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline transition-colors
-						{isActive(item.href)
-						? 'text-foreground bg-muted font-medium'
-						: 'text-sidebar-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-				>
-					<item.icon size={15} strokeWidth={2} />
-					{item.label}
-				</a>
-			{/each}
-		{/if}
-	</nav>
+		</nav>
+	{/if}
 
-	<!-- Admin section (for non-admin contexts, when user is admin) -->
-	{#if isAdmin && context !== 'admin' && context !== null}
+	{@render userSection()}
+
+	<!-- Admin section (on admin pages, or for non-admin contexts when user is admin) -->
+	{#if context === 'admin' || (isAdmin && context !== null)}
 		<nav class="flex flex-col gap-0.5 mt-4">
 			<div class="mx-2 mb-2 border-t border-border"></div>
 			<span
@@ -212,8 +196,6 @@ function discordAvatarUrl(discordId: string, avatar: string): string {
 			{/each}
 		</nav>
 	{/if}
-
-	{@render userSection()}
 {/snippet}
 
 {#if context !== null}
