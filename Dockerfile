@@ -37,14 +37,13 @@ RUN cargo build --release && strip target/release/glint
 FROM oven/bun:1 AS frontend
 WORKDIR /build
 
-# Install dependencies via workspace root (cached until lockfile changes)
-COPY package.json bun.lock ./
-COPY frontend/package.json ./frontend/
+# Install dependencies (standalone, no workspace)
+COPY frontend/package.json frontend/bun.lock ./
 RUN bun install --frozen-lockfile
 
-COPY frontend/ ./frontend/
+COPY frontend/ ./
 
-RUN bun --smol run --cwd frontend build
+RUN bun --smol run build
 
 # ========== Stage 5: Runtime ==========
 FROM oven/bun:1-slim
@@ -59,9 +58,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /build/target/release/glint ./glint
 
 # Copy SvelteKit build output
-COPY --from=frontend /build/frontend/build ./web/build
+COPY --from=frontend /build/build ./web/build
 
-# Copy production node_modules (sharp and other runtime dependencies externalized by the adapter)
+# Copy production node_modules (runtime dependencies externalized by the adapter)
 COPY --from=frontend /build/node_modules ./web/node_modules
 
 # Copy entrypoint

@@ -67,6 +67,9 @@
 		"vite-plugin-devtools-json": "^1.0.0",
 		"vitest": "^4.0.18"
 	},
+	"overrides": {
+		"cookie": "^0.7.0"
+	},
 	"dependencies": {
 		"@careswitch/svelte-data-table": "^0.6.3",
 		"@fontsource/geist-sans": "^5.2.5",

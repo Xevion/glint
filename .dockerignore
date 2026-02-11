@@ -15,9 +15,6 @@ mod/**/.idea/
 mod/**/run/
 
 # === Web Dockerfile (Dockerfile) ===
-!package.json
-!bun.lock
-
 !backend/Cargo.toml
 !backend/Cargo.lock
 !backend/src/

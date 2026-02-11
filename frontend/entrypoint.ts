@@ -1,13 +1,37 @@
 import { spawn, type Subprocess } from 'bun';
-import { existsSync } from 'fs';
 
 const PORT = process.env.PORT || '8080';
 const BACKEND_PORT = process.env.GLINT_PORT || '3001';
 const BACKEND_HOST = process.env.GLINT_HOST || '127.0.0.1';
 const HEALTH_URL = `http://localhost:${BACKEND_PORT}/api/health`;
+const LOG_JSON = process.env.LOG_JSON === 'true';
 
-// Start Axum backend first (SvelteKit SSR needs it for load functions)
-console.log(`Starting Axum backend on ${BACKEND_HOST}:${BACKEND_PORT}...`);
+type LogLevel = 'info' | 'warn' | 'error' | 'debug';
+
+function log(level: LogLevel, message: string, fields?: Record<string, unknown>) {
+	if (LOG_JSON) {
+		const entry = {
+			timestamp: new Date().toISOString(),
+			level,
+			target: 'glint::entrypoint',
+			message,
+			...fields
+		};
+		const out = level === 'error' ? process.stderr : process.stdout;
+		out.write(JSON.stringify(entry) + '\n');
+	} else {
+		const prefix = level === 'error' ? 'ERROR: ' : '';
+		const suffix = fields
+			? ` ${Object.entries(fields)
+					.map(([k, v]) => `${k}=${v}`)
+					.join(' ')}`
+			: '';
+		const out = level === 'error' ? console.error : console.log;
+		out(`${prefix}${message}${suffix}`);
+	}
+}
+
+log('info', 'Starting Axum backend', { host: BACKEND_HOST, port: BACKEND_PORT });
 const rustProc = spawn({
 	cmd: ['/app/glint'],
 	stdout: 'inherit',
@@ -19,7 +43,7 @@ const startTime = Date.now();
 let healthy = false;
 while (!healthy) {
 	if (Date.now() - startTime > 15_000) {
-		console.error('ERROR: Axum backend failed to become healthy within 15s');
+		log('error', 'Axum backend failed to become healthy within 15s');
 		rustProc.kill();
 		process.exit(1);
 	}
@@ -37,10 +61,9 @@ while (!healthy) {
 		await Bun.sleep(250);
 	}
 }
-console.log('Axum backend is healthy');
+log('info', 'Axum backend is healthy');
 
-// Start SvelteKit SSR (public-facing)
-console.log(`Starting SvelteKit SSR on 0.0.0.0:${PORT}...`);
+log('info', 'Starting SvelteKit SSR', { host: '0.0.0.0', port: PORT });
 const bunProc = spawn({
 	cmd: ['bun', 'build/index.js'],
 	cwd: '/app/web',
@@ -57,14 +80,13 @@ const bunProc = spawn({
 // Monitor both processes — exit if either dies
 async function monitor(name: string, proc: Subprocess) {
 	const exitCode = await proc.exited;
-	console.error(`${name} exited with code ${exitCode}`);
+	log('error', `${name} exited`, { exit_code: exitCode });
 	return { name, exitCode };
 }
 
 const result = await Promise.race([monitor('Axum', rustProc), monitor('SvelteKit', bunProc)]);
 
-// Kill the other process
-console.error(`${result.name} died, shutting down...`);
+log('error', 'Shutting down', { trigger: result.name });
 rustProc.kill();
 bunProc.kill();
 process.exit(result.exitCode || 1);

@@ -3,28 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "description": "Shader Preview Catalog - Automated shader capture and comparison platform",
-  "workspaces": [
-    "frontend"
-  ],
   "scripts": {
-    "dev": "bun run --filter='frontend' dev",
-    "build": "bun run --filter='*' build",
-    "lint": "bun run --filter='*' lint",
-    "format": "bun run --filter='*' format",
     "prepare": "husky"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "concurrently": "^9.2.1",
-    "husky": "^9.1.7",
-    "sharp": "^0.34.5",
-    "thumbhash": "^0.1.1"
+    "husky": "^9.1.7"
   },
   "engines": {
     "bun": ">=1.0.0"
   },
-  "packageManager": "bun@1.3.3",
-  "overrides": {
-    "cookie": "^0.7.0"
-  }
+  "packageManager": "bun@1.3.3"
 }
