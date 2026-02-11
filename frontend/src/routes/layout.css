@@ -151,6 +151,9 @@
 
 	body {
 		@apply bg-background text-foreground;
+		/* Hide native scrollbar immediately so it never renders before
+		   OverlayScrollbars initializes — prevents layout shift on first paint. */
+		overflow: hidden;
 	}
 }
 
