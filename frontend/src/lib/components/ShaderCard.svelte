@@ -7,7 +7,6 @@ import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import { comparisonStore } from '$lib/stores/comparison.svelte';
 import { cn } from '$lib/utils';
 import {
-	formatDate,
 	formatGameVersions,
 	formatVersion,
 	getCurseforgeUrl,
@@ -92,9 +91,9 @@ function handleCheckboxClick(e: MouseEvent) {
 			thumbhash={shader.thumbhash}
 			preset="card"
 			alt="{shader.name} preview"
-			class="h-full w-full object-cover transition-all duration-500 ease-out group-hover:scale-105"
+			class="h-full w-full object-cover"
 			containerClass="aspect-video w-full overflow-hidden"
-			style="will-change: transform; backface-visibility: hidden;"
+
 		/>
 
 		<!-- Gradient overlay -->
@@ -123,9 +122,9 @@ function handleCheckboxClick(e: MouseEvent) {
 	</div>
 
 	<!-- Card Body -->
-	<div class="flex flex-1 flex-col gap-3 p-4">
+	<div class="flex flex-1 flex-col gap-2 px-3 pt-2.5 pb-2">
 		<!-- Header -->
-		<div class="space-y-1">
+		<div class="flex flex-wrap items-baseline gap-x-2">
 			<a
 				href={resolve('/shaders/[id]', { id: shader.slug })}
 				data-clickable
@@ -133,18 +132,13 @@ function handleCheckboxClick(e: MouseEvent) {
 					e.stopPropagation();
 				}}
 				class={cn(
-					'line-clamp-1 block text-lg font-semibold text-card-foreground transition-colors hover:text-primary',
+					'block text-xl font-semibold text-card-foreground transition-colors hover:text-primary',
 					hasAnySelection ? 'cursor-pointer' : ''
 				)}
 			>
 				{shader.name}
 			</a>
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<span>by</span>
-				<span class="font-medium text-card-foreground">{shader.authors[0]?.name ?? 'Unknown Author'}</span>
-				<span class="text-muted-foreground/50">·</span>
-				<span>{formatDate(shader.updated_at)}</span>
-			</div>
+			<span class="shrink-0 text-sm text-muted-foreground">by <span class="font-medium text-card-foreground">{shader.authors[0]?.name ?? 'Unknown'}</span></span>
 		</div>
 
 		<!-- Description -->
@@ -177,7 +171,7 @@ function handleCheckboxClick(e: MouseEvent) {
 		{/if}
 
 		<!-- Footer: Version & Links -->
-		<div class="mt-auto flex items-center justify-between border-t border-border pt-3">
+		<div class="mt-auto flex items-center justify-between border-t border-border pt-2">
 			<div class="flex min-w-0 items-center gap-3">
 				<!-- Version -->
 				<span class="inline-flex shrink-0 items-center gap-1 text-xs">
@@ -204,7 +198,7 @@ function handleCheckboxClick(e: MouseEvent) {
 						rel="noopener noreferrer"
 						data-external-link
 						data-clickable
-						class="group/modrinth inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent"
+						class="group/modrinth inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent"
 						title="View on Modrinth"
 					>
 						<BrandIcon name="modrinth" colorOnHover />
@@ -217,7 +211,7 @@ function handleCheckboxClick(e: MouseEvent) {
 						rel="noopener noreferrer"
 						data-external-link
 						data-clickable
-						class="group/curseforge inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent"
+						class="group/curseforge inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent"
 						title="View on CurseForge"
 					>
 						<BrandIcon name="curseforge" colorOnHover />
@@ -230,7 +224,7 @@ function handleCheckboxClick(e: MouseEvent) {
 						rel="noopener noreferrer"
 						data-external-link
 						data-clickable
-						class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent"
+						class="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent"
 						title="Visit website"
 					>
 						<ExternalLink class="h-4 w-4" />
