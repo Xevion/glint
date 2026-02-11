@@ -1,4 +1,5 @@
 <script lang="ts">
+import Meta from '$lib/components/Meta.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
@@ -37,9 +38,16 @@ const filteredShaders = $derived.by(() => {
 });
 
 const hasFilters = $derived(searchQuery !== '');
+
+// OG image: use the most popular shader's capture image
+const ogImage = $derived(shaders[0]?.image_url ?? null);
 </script>
 
-<svelte:head><title>Shaders - Glint</title></svelte:head>
+<Meta
+	title="Shaders"
+	description="Browse and compare Minecraft shaders. See how each shader transforms your game with side-by-side screenshots."
+	image={ogImage}
+/>
 
 <div class="py-6">
 	<!-- Minimal inline header -->

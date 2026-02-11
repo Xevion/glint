@@ -1,4 +1,5 @@
 <script lang="ts">
+import Meta from '$lib/components/Meta.svelte';
 import SceneCard from '$lib/components/SceneCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
@@ -20,9 +21,16 @@ const filteredScenes = $derived.by(() => {
 });
 
 const hasFilters = $derived(searchQuery !== '');
+
+// OG image: first scene's representative capture
+const ogImage = $derived(scenes[0]?.image_url ?? null);
 </script>
 
-<svelte:head><title>Scenes - Glint</title></svelte:head>
+<Meta
+	title="Scenes"
+	description="Explore Minecraft test scenes used for shader comparison. See how different lighting, biomes, and weather affect each shader."
+	image={ogImage}
+/>
 
 <div class="py-8">
 	<!-- Header -->

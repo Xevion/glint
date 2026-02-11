@@ -1,5 +1,6 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
+import Meta from '$lib/components/Meta.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import HeroSlider from '$lib/components/hero/HeroSlider.svelte';
 import { Button } from '$lib/components/ui/button';
@@ -21,6 +22,9 @@ const hasFeaturedPairs = $derived(featuredPairs.length > 0);
 const sceneCount = $derived(new Set(captures.map((c) => c.scene_id)).size);
 
 let overlayVisible = $state(true);
+
+// OG image: use first featured pair's right image (the shader-enhanced one)
+const ogImage = $derived(featuredPairs[0]?.right_image_url ?? captures[0]?.image_url ?? null);
 </script>
 
 {#snippet statsBar()}
@@ -33,7 +37,12 @@ let overlayVisible = $state(true);
 	</div>
 {/snippet}
 
-<svelte:head><title>Glint</title></svelte:head>
+<Meta
+	title="Glint"
+	bare
+	description="Shader Preview Catalog for Minecraft. Browse, compare, and discover shaders visually."
+	image={ogImage}
+/>
 
 <!-- Hero Section -->
 {#if hasFeaturedPairs}

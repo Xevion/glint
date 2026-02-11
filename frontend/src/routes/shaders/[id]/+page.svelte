@@ -4,6 +4,7 @@ import type { ShaderWithCaptures } from '$lib/bindings';
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
+import Meta from '$lib/components/Meta.svelte';
 import * as Select from '$lib/components/ui/select';
 import { formatNumber, formatVersion } from '$lib/utils/display';
 import { preloadImage } from '$lib/utils/image';
@@ -83,9 +84,23 @@ function openLightbox(captureIndex: number) {
 	lightboxIndex = captureIndex;
 	lightboxOpen = true;
 }
+
+// OG metadata
+const ogImage = $derived(heroCapture?.image_url ?? null);
+const ogDescription = $derived.by(() => {
+	const parts = [`${shader.name} shader for Minecraft`];
+	if (selectedVersion) parts.push(`v${selectedVersion.version}`);
+	if (captures.length > 0)
+		parts.push(`${captures.length} screenshot${captures.length === 1 ? '' : 's'}`);
+	return parts.join(' \u00b7 ');
+});
 </script>
 
-<svelte:head><title>{shader.name} - Glint</title></svelte:head>
+<Meta
+	title={shader.name}
+	description={ogDescription}
+	image={ogImage}
+/>
 
 {#key shader.id}
 		<div class="py-8">

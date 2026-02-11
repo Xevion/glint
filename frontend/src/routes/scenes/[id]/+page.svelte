@@ -4,6 +4,7 @@ import type { CaptureWithContext, SceneWithCaptures } from '$lib/bindings';
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import CaptureGallery from '$lib/components/CaptureGallery.svelte';
+import Meta from '$lib/components/Meta.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import { fly } from 'svelte/transition';
@@ -58,9 +59,22 @@ const timeLabel = $derived.by(() => {
 	if (hours < 18) return 'Day';
 	return 'Evening';
 });
+
+// OG metadata
+const ogImage = $derived(captures[0]?.image_url ?? null);
+const ogDescription = $derived.by(() => {
+	const parts = [`${scene.name} scene for Minecraft shader comparison`];
+	if (captures.length > 0)
+		parts.push(`${captures.length} shader screenshot${captures.length === 1 ? '' : 's'}`);
+	return parts.join(' \u00b7 ');
+});
 </script>
 
-<svelte:head><title>{scene.name} - Glint</title></svelte:head>
+<Meta
+	title={scene.name}
+	description={ogDescription}
+	image={ogImage}
+/>
 
 {#if scene}
 	{#key scene.id}

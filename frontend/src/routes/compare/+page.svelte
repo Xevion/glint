@@ -8,6 +8,7 @@ import {
 	ShaderCompare,
 	type ShaderDisplayInfo
 } from '$lib/components/compare';
+import Meta from '$lib/components/Meta.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Alert } from '$lib/components/ui/alert';
 import { ArrowLeftRight, Columns3, SplitSquareHorizontal, ToggleLeft } from '@lucide/svelte';
@@ -73,7 +74,10 @@ const modes: { value: CompareMode; label: string; icon: typeof Columns3 }[] = [
 ];
 </script>
 
-<svelte:head><title>Compare - Glint</title></svelte:head>
+<Meta
+	title="Compare Shaders"
+	description="Side-by-side shader comparison for Minecraft. Compare screenshots with a slider, split view, or toggle."
+/>
 
 <div class="py-8">
 	<div class="mx-auto max-w-4xl">
