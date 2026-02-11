@@ -79,13 +79,13 @@ class WorldLoader {
             log.info("Loading world") {
                 "world" to worldFolder
             }
-            try {
+            runCatching {
                 mc.createWorldOpenFlows().openWorld(worldFolder) {
                     log.debug("World load cancelled") {
                         "world" to worldFolder
                     }
                 }
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 log.error(e, "Exception initiating world load") {
                     "world" to worldFolder
                 }

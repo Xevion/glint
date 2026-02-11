@@ -7,7 +7,9 @@ import com.xevion.glint.api.CreateRunRequest
 import com.xevion.glint.api.WorkItem
 import com.xevion.glint.session.SessionRegistry
 import net.minecraft.client.Minecraft
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -158,61 +160,67 @@ class AutonomousRunner(
 
         pendingFuture = null
 
-        try {
-            @Suppress("UNCHECKED_CAST")
-            val triple =
+        @Suppress("UNCHECKED_CAST")
+        val triple =
+            try {
                 (future as CompletableFuture<Triple<String, List<com.xevion.glint.api.CaptureRunItem>, List<WorkItem>>>).join()
-            val (runId, runItems, workItems) = triple
-
-            currentRunId = runId
-            log.info("Created capture run") {
-                "run_id" to runId
-                "items" to runItems.size
+            } catch (e: CompletionException) {
+                log.error("Failed to create capture run") { "error" to (e.cause?.message ?: e.message) }
+                shutdown()
+                return
+            } catch (e: CancellationException) {
+                log.error("Capture run creation cancelled") { "error" to e.message }
+                shutdown()
+                return
             }
 
-            // Build lookup: (shaderVersionId, sceneId, profile) → RunItemInfo
-            // Merge run items (which have item IDs) with work items (which have world version IDs)
-            val workItemsByKey =
-                workItems.associateBy { Triple(it.shaderVersionId, it.sceneId, it.profile) }
-            val itemLookup =
-                runItems.associate { item ->
-                    val key = Triple(item.shaderVersionId, item.sceneId, item.profile)
-                    val workItem = workItemsByKey[key]
-                    val worldVersionId =
-                        workItem?.worldVersionId
-                            ?: error("Work item missing world_version_id for ${item.shaderVersionId}/${item.sceneId}")
-                    val sceneVersionId =
-                        workItem.sceneVersionId
-                            ?: error("Work item missing scene_version_id for ${item.shaderVersionId}/${item.sceneId}")
-                    key to RunItemInfo(item.id, worldVersionId, sceneVersionId)
+        val (runId, runItems, workItems) = triple
+
+        currentRunId = runId
+        log.info("Created capture run") {
+            "run_id" to runId
+            "items" to runItems.size
+        }
+
+        // Build lookup: (shaderVersionId, sceneId, profile) → RunItemInfo
+        // Merge run items (which have item IDs) with work items (which have world version IDs)
+        val workItemsByKey =
+            workItems.associateBy { Triple(it.shaderVersionId, it.sceneId, it.profile) }
+        val itemLookup =
+            runItems.associate { item ->
+                val key = Triple(item.shaderVersionId, item.sceneId, item.profile)
+                val workItem = workItemsByKey[key]
+                val worldVersionId =
+                    workItem?.worldVersionId
+                        ?: error("Work item missing world_version_id for ${item.shaderVersionId}/${item.sceneId}")
+                val sceneVersionId =
+                    workItem.sceneVersionId
+                        ?: error("Work item missing scene_version_id for ${item.shaderVersionId}/${item.sceneId}")
+                key to RunItemInfo(item.id, worldVersionId, sceneVersionId)
+            }
+
+        runUploader = RunUploader(apiUrl, apiToken, runId, itemLookup)
+
+        // Group work items by shader version
+        shaderGroups =
+            workItems
+                .groupBy { it.shaderVersionId }
+                .map { (_, items) ->
+                    val first = items.first()
+                    ShaderGroup(
+                        shaderVersionId = first.shaderVersionId,
+                        shaderId = first.shaderId,
+                        shaderSlug = first.shaderSlug,
+                        shaderName = first.shaderName,
+                        version = first.version,
+                        downloadUrl = first.downloadUrl,
+                        fileHash = first.fileHash,
+                        items = items,
+                    )
                 }
 
-            runUploader = RunUploader(apiUrl, apiToken, runId, itemLookup)
-
-            // Group work items by shader version
-            shaderGroups =
-                workItems
-                    .groupBy { it.shaderVersionId }
-                    .map { (_, items) ->
-                        val first = items.first()
-                        ShaderGroup(
-                            shaderVersionId = first.shaderVersionId,
-                            shaderId = first.shaderId,
-                            shaderSlug = first.shaderSlug,
-                            shaderName = first.shaderName,
-                            version = first.version,
-                            downloadUrl = first.downloadUrl,
-                            fileHash = first.fileHash,
-                            items = items,
-                        )
-                    }
-
-            currentGroupIndex = 0
-            state = State.PreparingCapture
-        } catch (e: Exception) {
-            log.error("Failed to create capture run") { "error" to e.message }
-            shutdown()
-        }
+        currentGroupIndex = 0
+        state = State.PreparingCapture
     }
 
     // -- PreparingCapture (async) --

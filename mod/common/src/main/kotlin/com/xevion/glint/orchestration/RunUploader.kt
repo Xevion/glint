@@ -2,17 +2,21 @@ package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.AgentApi
+import com.xevion.glint.api.ApiError
 import com.xevion.glint.api.ClaimItemRequest
 import com.xevion.glint.api.ConfirmUploadRequest
 import com.xevion.glint.api.FailItemRequest
 import com.xevion.glint.api.ReportFailureRequest
 import com.xevion.glint.api.WorkItem
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -85,7 +89,7 @@ class RunUploader(
                     "completed" to completed
                     "failed" to failedCount.get()
                 }
-            } catch (e: Exception) {
+            } catch (e: ApiError) {
                 val failed = failedCount.incrementAndGet()
                 log.error("Upload failed") {
                     "item_id" to info.itemId
@@ -93,20 +97,19 @@ class RunUploader(
                     "completed" to completedCount.get()
                     "failed" to failed
                 }
-                try {
-                    AgentApi.failItem(
+                AgentApi
+                    .failItem(
                         apiUrl,
                         apiToken,
                         runId,
                         info.itemId,
                         FailItemRequest(errorMessage = "Upload failed: ${e.message}"),
-                    )
-                } catch (failError: Exception) {
-                    log.error("Failed to report item failure") {
-                        "item_id" to info.itemId
-                        "error" to failError.message
+                    ).onFailure { failError ->
+                        log.error("Failed to report item failure") {
+                            "item_id" to info.itemId
+                            "error" to failError.message
+                        }
                     }
-                }
             } finally {
                 pendingCount.decrementAndGet()
             }
@@ -133,24 +136,24 @@ class RunUploader(
         for ((item, itemId) in unsubmittedEntries) {
             val future =
                 CompletableFuture.runAsync({
-                    try {
-                        AgentApi.failItem(
+                    AgentApi
+                        .failItem(
                             apiUrl,
                             apiToken,
                             runId,
                             itemId,
                             FailItemRequest(errorMessage = "Capture not taken"),
-                        )
-                        log.debug("Failed unsubmitted item") {
-                            "item_id" to itemId
-                            "scene_id" to item.sceneId
+                        ).onSuccess {
+                            log.debug("Failed unsubmitted item") {
+                                "item_id" to itemId
+                                "scene_id" to item.sceneId
+                            }
+                        }.onFailure { e ->
+                            log.error("Failed to report unsubmitted item failure") {
+                                "item_id" to itemId
+                                "error" to e.message
+                            }
                         }
-                    } catch (e: Exception) {
-                        log.error("Failed to report unsubmitted item failure") {
-                            "item_id" to itemId
-                            "error" to e.message
-                        }
-                    }
                 }, executor)
             pendingFutures.add(future)
         }
@@ -167,25 +170,25 @@ class RunUploader(
     ) {
         val future =
             CompletableFuture.runAsync({
-                try {
-                    AgentApi.reportFailure(
+                AgentApi
+                    .reportFailure(
                         apiUrl,
                         apiToken,
                         ReportFailureRequest(
                             shaderVersionId = shaderVersionId,
                             errorMessage = message,
                         ),
-                    )
-                    log.debug("Reported shader failure") {
-                        "shader_version_id" to shaderVersionId
-                        "message" to message
+                    ).onSuccess {
+                        log.debug("Reported shader failure") {
+                            "shader_version_id" to shaderVersionId
+                            "message" to message
+                        }
+                    }.onFailure { e ->
+                        log.error("Failed to report shader failure") {
+                            "shader_version_id" to shaderVersionId
+                            "error" to e.message
+                        }
                     }
-                } catch (e: Exception) {
-                    log.error("Failed to report shader failure") {
-                        "shader_version_id" to shaderVersionId
-                        "error" to e.message
-                    }
-                }
             }, executor)
         pendingFutures.add(future)
     }
@@ -211,8 +214,16 @@ class RunUploader(
         for (future in futures) {
             try {
                 future.get(10, TimeUnit.SECONDS)
-            } catch (e: Exception) {
-                log.error("Failure report did not complete") { "error" to e.message }
+            } catch (e: TimeoutException) {
+                log.error("Failure report timed out") { "error" to e.message }
+            } catch (e: ExecutionException) {
+                log.error("Failure report did not complete") { "error" to (e.cause?.message ?: e.message) }
+            } catch (e: CancellationException) {
+                log.error("Failure report was cancelled") { "error" to e.message }
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                log.error("Interrupted while draining failure reports")
+                break
             }
         }
 

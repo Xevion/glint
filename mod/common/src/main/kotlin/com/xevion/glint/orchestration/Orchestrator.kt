@@ -10,9 +10,11 @@ import com.xevion.glint.capture.IrisIntegration
 import com.xevion.glint.io.SessionDirectoryManager
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.SceneManager
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import java.io.File
+import java.io.IOException
 import java.time.Instant
 
 /** Event fired when a single capture is taken during orchestration. */
@@ -555,7 +557,10 @@ class Orchestrator {
             }
             log.info("Session directory created") { "path" to sessionDir!!.absolutePath }
             true
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            log.error(e, "Failed to create session directory")
+            false
+        } catch (e: SecurityException) {
             log.error(e, "Failed to create session directory")
             false
         }
@@ -581,8 +586,10 @@ class Orchestrator {
                 "partial" to partial
                 "path" to manifestFile.absolutePath
             }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
             log.error(e, "Failed to write manifest")
+        } catch (e: SerializationException) {
+            log.error(e, "Failed to serialize manifest")
         }
     }
 

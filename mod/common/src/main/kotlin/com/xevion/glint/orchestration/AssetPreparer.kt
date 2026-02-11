@@ -10,6 +10,8 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import net.minecraft.client.Minecraft
 import java.io.File
+import java.io.IOException
+import java.util.concurrent.CompletionException
 
 data class ShaderGroup(
     val shaderVersionId: String,
@@ -152,7 +154,11 @@ class AssetPreparer(
                         log.error("Downloaded world has no level.dat") { "path" to downloadedDir.absolutePath }
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: CompletionException) {
+                log.error(e.cause ?: e, "Failed to download world") { "slug" to world.slug }
+            } catch (e: IOException) {
+                log.error(e, "Failed to download world") { "slug" to world.slug }
+            } catch (e: SecurityException) {
                 log.error(e, "Failed to download world") { "slug" to world.slug }
             }
         }
@@ -213,7 +219,11 @@ class AssetPreparer(
                 "bytes" to targetFile.length()
             }
             return filename
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            log.error(e, "Failed to download shader")
+            targetFile.delete()
+            return null
+        } catch (e: SecurityException) {
             log.error(e, "Failed to download shader")
             targetFile.delete()
             return null
