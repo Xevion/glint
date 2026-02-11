@@ -1,23 +1,23 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
-import { untrack } from 'svelte';
 import { api } from '$lib/api';
 import type { UpdateShaderRequest } from '$lib/api/endpoints/admin';
 import type { CaptureWithContext, ShaderVersionDetail, ShaderWithCaptures } from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
+import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
-import { Textarea } from '$lib/components/ui/textarea';
 import * as Table from '$lib/components/ui/table';
-import { Alert } from '$lib/components/ui/alert';
+import { Textarea } from '$lib/components/ui/textarea';
 import { formatGameVersions } from '$lib/utils/display';
 import { CircleAlert, Link, LoaderCircle, RefreshCw, Trash2 } from '@lucide/svelte';
+import { untrack } from 'svelte';
 import type { PageData } from './$types';
 
 const PLATFORM_URL_PATTERN =

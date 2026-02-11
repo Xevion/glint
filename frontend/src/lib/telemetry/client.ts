@@ -1,7 +1,7 @@
-import posthog from 'posthog-js';
-import { afterNavigate } from '$app/navigation';
 import { browser, dev } from '$app/environment';
+import { afterNavigate } from '$app/navigation';
 import { env } from '$env/dynamic/public';
+import posthog from 'posthog-js';
 import type { TelemetryEvent } from './events';
 
 class TelemetryClient {

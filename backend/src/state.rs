@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     analytics::Analytics,
+    cache::SessionCache,
     config::Config,
     db::{DbPool, DbTransaction},
     error::{AppError, AppResult},
@@ -36,6 +37,7 @@ pub struct AppStateInner {
     pub curseforge: Option<CurseForgeClient>,
     pub metadata_tx: mpsc::UnboundedSender<String>,
     pub analytics: Option<Analytics>,
+    pub session_cache: SessionCache,
 }
 
 impl AppState {
@@ -49,6 +51,7 @@ impl AppState {
         curseforge: Option<CurseForgeClient>,
         metadata_tx: mpsc::UnboundedSender<String>,
         analytics: Option<Analytics>,
+        session_cache: SessionCache,
     ) -> Self {
         Self {
             inner: Arc::new(AppStateInner {
@@ -60,6 +63,7 @@ impl AppState {
                 curseforge,
                 metadata_tx,
                 analytics,
+                session_cache,
             }),
         }
     }
@@ -94,6 +98,10 @@ impl AppState {
 
     pub fn analytics(&self) -> Option<&Analytics> {
         self.inner.analytics.as_ref()
+    }
+
+    pub fn session_cache(&self) -> &SessionCache {
+        &self.inner.session_cache
     }
 
     /// Fire-and-forget analytics event. No-op if analytics is not configured.

@@ -7,7 +7,6 @@ mod device;
 mod featured;
 mod runs;
 mod scenes;
-mod sessions;
 mod shaders;
 mod storage;
 mod user;
@@ -69,7 +68,6 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         .nest("/scenes", scenes::router())
         .nest("/captures", captures::router())
         .nest("/users", users::router())
-        .nest("/sessions", sessions::router())
         .nest("/work", work::router())
         .nest("/featured", featured::router())
         .nest("/admin/capture-health", capture_health::router())

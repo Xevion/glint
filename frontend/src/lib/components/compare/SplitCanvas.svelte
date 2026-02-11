@@ -1,7 +1,7 @@
 <script lang="ts">
+import { themeStore } from '$lib/stores/theme.svelte';
 import { onMount } from 'svelte';
 import ShaderInfoOverlay from './ShaderInfoOverlay.svelte';
-import { themeStore } from '$lib/stores/theme.svelte';
 import { LUMINANCE, TOUCH, ZOOM } from './constants';
 import type { ElementBounds, ElementLuminances, ShaderDisplayInfo } from './types';
 

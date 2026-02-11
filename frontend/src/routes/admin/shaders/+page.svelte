@@ -1,9 +1,9 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import type { Shader } from '$lib/bindings';
-import { AdminPageHeader } from '$lib/components/admin';
 import AdminTable from '$lib/components/AdminTable.svelte';
 import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
+import { AdminPageHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import type { PageData } from './$types';
 

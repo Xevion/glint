@@ -1,6 +1,8 @@
 <script lang="ts">
-import ErrorBoundaryFallback from '$lib/components/ErrorBoundaryFallback.svelte';
+import { goto } from '$app/navigation';
 import type { CaptureWithContext } from '$lib/bindings';
+import ErrorBoundaryFallback from '$lib/components/ErrorBoundaryFallback.svelte';
+import Meta from '$lib/components/Meta.svelte';
 import {
 	type CompareMode,
 	type ImageOption,
@@ -8,11 +10,9 @@ import {
 	ShaderCompare,
 	type ShaderDisplayInfo
 } from '$lib/components/compare';
-import Meta from '$lib/components/Meta.svelte';
-import { Button } from '$lib/components/ui/button';
 import { Alert } from '$lib/components/ui/alert';
+import { Button } from '$lib/components/ui/button';
 import { ArrowLeftRight, Columns3, SplitSquareHorizontal, ToggleLeft } from '@lucide/svelte';
-import { goto } from '$app/navigation';
 import { fade, fly } from 'svelte/transition';
 import type { PageData } from './$types';
 

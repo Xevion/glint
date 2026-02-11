@@ -1,9 +1,9 @@
 <script lang="ts">
-import type { Snippet } from 'svelte';
 import type { CaptureWithContext } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import { ImageOff } from '@lucide/svelte';
+import type { Snippet } from 'svelte';
 import { fade, scale } from 'svelte/transition';
 
 interface Props {

@@ -4,10 +4,10 @@ import { api } from '$lib/api';
 import type { UserWithSessions } from '$lib/bindings';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminBreadcrumb } from '$lib/components/admin';
+import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
-import { Alert } from '$lib/components/ui/alert';
 import { Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
@@ -58,7 +58,7 @@ async function confirmDeleteAllSessions() {
 async function deleteSession(tokenPrefix: string) {
 	error = null;
 	deletingSessionToken = tokenPrefix;
-	const result = await api.admin.deleteSession(tokenPrefix);
+	const result = await api.admin.deleteSession(user.id, tokenPrefix);
 	result.match({
 		Ok: () => void invalidateAll(),
 		Err: (err) => {

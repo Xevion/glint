@@ -1,20 +1,20 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
-import { untrack } from 'svelte';
 import { api } from '$lib/api';
 import type { UpdateSceneMetadataRequest } from '$lib/api/endpoints/admin';
 import type { CaptureWithContext, SceneWithVersion, WorldWithDetails } from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
+import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
-import { Textarea } from '$lib/components/ui/textarea';
 import { StatusBadge } from '$lib/components/ui/status-badge';
-import { Alert } from '$lib/components/ui/alert';
+import { Textarea } from '$lib/components/ui/textarea';
 import { RotateCcw, Trash2 } from '@lucide/svelte';
+import { untrack } from 'svelte';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

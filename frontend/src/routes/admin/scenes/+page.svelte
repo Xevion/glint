@@ -1,11 +1,11 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import type { SceneWithWorld } from '$lib/bindings';
-import { AdminPageHeader } from '$lib/components/admin';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import * as Checkbox from '$lib/components/ui/checkbox';
+import { AdminPageHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
+import * as Checkbox from '$lib/components/ui/checkbox';
 import { Camera, CloudSun, Globe, MapPin } from '@lucide/svelte';
 import type { PageData } from './$types';
 

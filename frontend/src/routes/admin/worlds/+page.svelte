@@ -1,12 +1,12 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import type { WorldListItem } from '$lib/bindings';
-import { AdminPageHeader } from '$lib/components/admin';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import WorldUploadDialog from '$lib/components/WorldUploadDialog.svelte';
-import { formatBytes } from '$lib/utils/format';
+import { AdminPageHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
+import { formatBytes } from '$lib/utils/format';
 import { Camera, Globe, HardDrive, Layers, MapPin } from '@lucide/svelte';
 import type { PageData } from './$types';
 

@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { getLogger, type Logger } from '@logtape/logtape';
+import { type Logger, getLogger } from '@logtape/logtape';
 import { Result } from 'true-myth';
 import { getApiUrl } from './config';
 import { ApiError, ApiErrorType } from './errors';

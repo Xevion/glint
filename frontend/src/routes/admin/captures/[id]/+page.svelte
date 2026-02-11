@@ -6,14 +6,14 @@ import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
+import { AdminBreadcrumb } from '$lib/components/admin';
+import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Tabs from '$lib/components/ui/tabs';
-import { Alert } from '$lib/components/ui/alert';
 import { formatBytes } from '$lib/utils/format';
 import { preloadImage } from '$lib/utils/image';
 import { statusColorFallback, statusColors } from '$lib/utils/status';
-import { AdminBreadcrumb } from '$lib/components/admin';
 import { Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 

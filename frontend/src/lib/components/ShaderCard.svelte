@@ -2,10 +2,10 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import type { ShaderListItem } from '$lib/bindings';
-import { comparisonStore } from '$lib/stores/comparison.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
-import { cn } from '$lib/utils';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
+import { comparisonStore } from '$lib/stores/comparison.svelte';
+import { cn } from '$lib/utils';
 import {
 	formatDate,
 	formatGameVersions,

@@ -1,5 +1,6 @@
 <script lang="ts">
 import { api } from '$lib/api';
+import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
@@ -13,7 +14,6 @@ import {
 	validateFileSize
 } from '$lib/utils/compression';
 import { calculateSHA256 } from '$lib/utils/hash';
-import { Alert } from '$lib/components/ui/alert';
 import { FileArchive, Folder, Plus, Upload } from '@lucide/svelte';
 
 interface Props {

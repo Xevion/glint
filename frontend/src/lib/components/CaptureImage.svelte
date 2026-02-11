@@ -1,6 +1,6 @@
 <script lang="ts">
 import { cn } from '$lib/utils';
-import { cfImageSrcset, cfImageUrl, IMAGE_PRESETS, type ImagePreset } from '$lib/utils/image';
+import { IMAGE_PRESETS, type ImagePreset, cfImageSrcset, cfImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 
 interface Props {

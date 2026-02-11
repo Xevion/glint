@@ -8,8 +8,8 @@ import BackgroundImage from '$lib/components/BackgroundImage.svelte';
 import Navigation from '$lib/components/Navigation.svelte';
 import Sidebar from '$lib/components/Sidebar.svelte';
 import { initNavigation } from '$lib/stores/navigation.svelte';
-import { telemetry } from '$lib/telemetry';
 import { themeStore } from '$lib/stores/theme.svelte';
+import { telemetry } from '$lib/telemetry';
 import type { LayoutData } from './$types';
 import './layout.css';
 

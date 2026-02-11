@@ -39,6 +39,10 @@ pub struct UserWithSessions {
 #[ts(export)]
 pub struct SessionInfo {
     pub token_prefix: String,
+    /// How the session was created: "web" (browser OAuth) or "device" (mod)
+    pub source: String,
+    /// Whether this is the session making the current request
+    pub is_current: bool,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "string")]

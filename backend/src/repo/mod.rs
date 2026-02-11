@@ -25,7 +25,7 @@ pub use device_code::DeviceCodeRepo;
 pub use featured::FeaturedRepo;
 pub use pending_upload::PendingUploadRepo;
 pub use scene::{SceneRepo, SceneVersionRepo};
-pub use session::SessionRepo;
+pub use session::{SessionRepo, SessionRow};
 pub use shader::ShaderRepo;
 pub use shader_author::ShaderAuthorRepo;
 pub use shader_version::ShaderVersionRepo;

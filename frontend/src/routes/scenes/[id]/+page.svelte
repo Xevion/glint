@@ -2,8 +2,8 @@
 import { resolve } from '$app/paths';
 import type { CaptureWithContext, SceneWithCaptures } from '$lib/bindings';
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
-import CaptureImage from '$lib/components/CaptureImage.svelte';
 import CaptureGallery from '$lib/components/CaptureGallery.svelte';
+import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
 import { SvelteMap } from 'svelte/reactivity';

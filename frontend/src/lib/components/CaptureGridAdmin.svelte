@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { Snippet } from 'svelte';
 import type { CaptureWithContext } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
+import type { Snippet } from 'svelte';
 
 interface Props {
 	captures: CaptureWithContext[];

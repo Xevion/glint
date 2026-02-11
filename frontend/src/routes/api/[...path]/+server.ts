@@ -1,5 +1,5 @@
-import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/public';
+import type { RequestHandler } from './$types';
 
 const BACKEND_URL = env.PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
 

@@ -8,10 +8,10 @@ import { AdminPageHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
-import { cfImageUrl } from '$lib/utils/image';
 import { formatBytes } from '$lib/utils/format';
+import { cfImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
-import { ImagePlus, Trash2, Upload, Eye, EyeOff } from '@lucide/svelte';
+import { Eye, EyeOff, ImagePlus, Trash2, Upload } from '@lucide/svelte';
 import { rgbaToThumbHash } from 'thumbhash';
 import type { PageData } from './$types';
 

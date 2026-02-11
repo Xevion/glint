@@ -1,7 +1,7 @@
 <script lang="ts">
-import { untrack } from 'svelte';
 import { Button } from '$lib/components/ui/button';
 import { Check, RefreshCw } from '@lucide/svelte';
+import { untrack } from 'svelte';
 
 interface Props {
 	refreshing: boolean;

@@ -2,13 +2,13 @@ use axum::{
     Json, Router,
     extract::{Path, State},
     http::StatusCode,
-    routing::{delete, get, put},
+    routing::{delete, get, post, put},
 };
 
 use crate::{
-    auth::AdminUser,
-    error::{AppResult, OptionNotFoundExt},
-    models::{UpdateUserRoleRequest, User, UserWithSessions},
+    auth::{AdminUser, AuthUser},
+    error::{AppError, AppResult, OptionNotFoundExt},
+    models::{SessionInfo, UpdateUserRoleRequest, User, UserWithSessions},
     repo::{SessionRepo, UserRepo},
     state::AppState,
 };
@@ -18,10 +18,54 @@ pub fn router() -> Router<AppState> {
         .route("/", get(list_users))
         .route("/{id}", get(get_user))
         .route("/{id}/role", put(update_user_role))
-        .route("/{id}/sessions", delete(delete_user_sessions))
+        .route("/{id}/sessions", get(list_sessions))
+        .route("/{id}/sessions", delete(delete_all_sessions))
+        .route("/{id}/sessions/{prefix}", delete(delete_session_by_prefix))
+        .route("/{id}/sessions/revoke-others", post(revoke_other_sessions))
 }
 
-/// GET /api/users - List all users (admin)
+/// Parse the `{id}` path segment: "me" resolves to the authenticated user,
+/// numeric IDs require admin privileges when targeting another user.
+fn resolve_user_id(auth: &AuthUser, id: &str) -> AppResult<(i32, bool)> {
+    if id == "me" {
+        return Ok((auth.user.id, true));
+    }
+
+    let target_id: i32 = id
+        .parse()
+        .map_err(|_| AppError::BadRequest(format!("Invalid user ID: '{id}'")))?;
+
+    if target_id == auth.user.id {
+        return Ok((target_id, true));
+    }
+
+    if auth.user.role != "admin" {
+        return Err(AppError::Forbidden("Admin access required".to_string()));
+    }
+
+    Ok((target_id, false))
+}
+
+/// Build `Vec<SessionInfo>` from raw rows, enriching with `is_current`.
+fn build_session_infos(
+    rows: Vec<crate::repo::SessionRow>,
+    current_token: &str,
+) -> Vec<SessionInfo> {
+    rows.into_iter()
+        .map(|row| {
+            let is_current = row.token == current_token;
+            SessionInfo {
+                token_prefix: row.token.chars().take(8).collect(),
+                source: row.source,
+                is_current,
+                created_at: row.created_at,
+                expires_at: row.expires_at,
+            }
+        })
+        .collect()
+}
+
+/// GET /api/users - List all users (admin only)
 async fn list_users(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -30,37 +74,99 @@ async fn list_users(
     Ok(Json(users))
 }
 
-/// GET /api/users/{id} - Get user by ID with sessions (admin)
+/// GET /api/users/{id} - Get user profile with sessions (id=me or admin)
 async fn get_user(
-    _admin: AdminUser,
+    auth: AuthUser,
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<String>,
 ) -> AppResult<Json<UserWithSessions>> {
-    let user = UserRepo::find_by_id(state.db(), id)
+    let (user_id, _is_self) = resolve_user_id(&auth, &id)?;
+    let user = UserRepo::find_by_id(state.db(), user_id)
         .await?
-        .or_not_found("User", id)?;
-    let sessions = SessionRepo::list_for_user(state.db(), id).await?;
+        .or_not_found("User", user_id)?;
+    let rows = SessionRepo::list_for_user(state.db(), user_id).await?;
+    let sessions = build_session_infos(rows, &auth.session.token);
     Ok(Json(UserWithSessions { user, sessions }))
 }
 
-/// PUT /api/users/{id}/role - Update user role (admin)
+/// PUT /api/users/{id}/role - Update user role (admin only)
 async fn update_user_role(
-    _admin: AdminUser,
+    admin: AdminUser,
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<String>,
     Json(request): Json<UpdateUserRoleRequest>,
 ) -> AppResult<Json<User>> {
+    let target_id: i32 = if id == "me" {
+        admin.user.id
+    } else {
+        id.parse()
+            .map_err(|_| AppError::BadRequest(format!("Invalid user ID: '{id}'")))?
+    };
+
     request.validate()?;
-    let user = UserRepo::update_role(state.db(), id, &request.role).await?;
+    let user = UserRepo::update_role(state.db(), target_id, &request.role).await?;
+
+    // Invalidate cached sessions so the new role takes effect immediately
+    state.session_cache().invalidate_user(target_id);
+
     Ok(Json(user))
 }
 
-/// DELETE /api/users/{id}/sessions - Delete all sessions for a user (admin)
-async fn delete_user_sessions(
-    _admin: AdminUser,
+/// GET /api/users/{id}/sessions - List sessions (id=me or admin)
+async fn list_sessions(
+    auth: AuthUser,
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<String>,
+) -> AppResult<Json<Vec<SessionInfo>>> {
+    let (user_id, _is_self) = resolve_user_id(&auth, &id)?;
+    let rows = SessionRepo::list_for_user(state.db(), user_id).await?;
+    let sessions = build_session_infos(rows, &auth.session.token);
+    Ok(Json(sessions))
+}
+
+/// DELETE /api/users/{id}/sessions - Revoke ALL sessions for a user (id=me or admin)
+async fn delete_all_sessions(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
 ) -> AppResult<StatusCode> {
-    SessionRepo::delete_for_user(state.db(), id).await?;
+    let (user_id, _is_self) = resolve_user_id(&auth, &id)?;
+    SessionRepo::delete_for_user(state.db(), user_id).await?;
+    state.session_cache().invalidate_user(user_id);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// DELETE /api/users/{id}/sessions/{prefix} - Revoke a single session by token prefix
+async fn delete_session_by_prefix(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path((id, prefix)): Path<(String, String)>,
+) -> AppResult<StatusCode> {
+    let (user_id, _is_self) = resolve_user_id(&auth, &id)?;
+
+    let deleted_token = SessionRepo::delete_by_prefix(state.db(), user_id, &prefix)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Session not found".into()))?;
+
+    state.session_cache().invalidate_token(&deleted_token);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/users/{id}/sessions/revoke-others - Revoke all sessions except current
+async fn revoke_other_sessions(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> AppResult<StatusCode> {
+    let (user_id, is_self) = resolve_user_id(&auth, &id)?;
+
+    if !is_self {
+        SessionRepo::delete_for_user(state.db(), user_id).await?;
+    } else {
+        SessionRepo::delete_others_for_user(state.db(), user_id, &auth.session.token).await?;
+    }
+
+    // Invalidate all cached sessions for user; the current session re-populates on next request
+    state.session_cache().invalidate_user(user_id);
     Ok(StatusCode::NO_CONTENT)
 }

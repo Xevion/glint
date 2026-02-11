@@ -1,8 +1,8 @@
-import type { RequestHandler } from './$types';
-import { fetchOgData, type OgType } from '$lib/og/data';
-import { renderOgImage, renderTextOnlyOgImage } from '$lib/og/render';
 import { ogCache, ogSingleflight } from '$lib/og/cache';
+import { type OgType, fetchOgData } from '$lib/og/data';
+import { renderOgImage, renderTextOnlyOgImage } from '$lib/og/render';
 import { getLogger } from '@logtape/logtape';
+import type { RequestHandler } from './$types';
 
 const logger = getLogger(['ssr', 'routes', 'og']);
 

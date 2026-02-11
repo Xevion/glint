@@ -5,6 +5,7 @@ use axum::{
 use axum_extra::extract::CookieJar;
 
 use crate::{
+    cache::SessionCache,
     db::DbPool,
     error::{AppError, AppResult},
     models::{Session, User},
@@ -13,7 +14,6 @@ use crate::{
 };
 
 pub const SESSION_COOKIE_NAME: &str = "glint_session";
-pub const SESSION_DURATION_DAYS: i64 = 7;
 
 /// Create a new session in the database (delegates to SessionRepo)
 /// `source` indicates how the session was created: "web" (browser) or "device" (mod)
@@ -21,14 +21,22 @@ pub async fn create_session(db: &DbPool, user_id: i32, source: &str) -> AppResul
     SessionRepo::create(db, user_id, source).await
 }
 
-/// Validate a session token and return the associated user (delegates to SessionRepo)
-pub async fn validate_session(db: &DbPool, token: &str) -> AppResult<(User, Session)> {
-    SessionRepo::validate(db, token).await
+/// Validate a session token and return the associated user (cache-through)
+pub async fn validate_session(
+    db: &DbPool,
+    cache: &SessionCache,
+    token: &str,
+) -> AppResult<(User, Session)> {
+    cache.get_or_validate(db, token).await
 }
 
-/// Delete a session by token (delegates to SessionRepo)
-pub async fn delete_session(db: &DbPool, token: &str) -> AppResult<bool> {
-    SessionRepo::delete(db, token).await
+/// Delete a session by token and evict from cache
+pub async fn delete_session(db: &DbPool, cache: &SessionCache, token: &str) -> AppResult<bool> {
+    let deleted = SessionRepo::delete(db, token).await?;
+    if deleted {
+        cache.invalidate_token(token);
+    }
+    Ok(deleted)
 }
 
 /// Authenticated user extractor - fails if not authenticated
@@ -45,9 +53,10 @@ impl FromRequestParts<AppState> for AuthUser {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         let token = extract_token(parts, state).await?;
-
-        let (user, session) = SessionRepo::validate(state.db(), &token).await?;
-
+        let (user, session) = state
+            .session_cache()
+            .get_or_validate(state.db(), &token)
+            .await?;
         Ok(AuthUser { user, session })
     }
 }
@@ -63,10 +72,16 @@ impl FromRequestParts<AppState> for MaybeAuthUser {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         match extract_token(parts, state).await {
-            Ok(token) => match SessionRepo::validate(state.db(), &token).await {
-                Ok((user, session)) => Ok(MaybeAuthUser(Some(AuthUser { user, session }))),
-                Err(_) => Ok(MaybeAuthUser(None)),
-            },
+            Ok(token) => {
+                match state
+                    .session_cache()
+                    .get_or_validate(state.db(), &token)
+                    .await
+                {
+                    Ok((user, session)) => Ok(MaybeAuthUser(Some(AuthUser { user, session }))),
+                    Err(_) => Ok(MaybeAuthUser(None)),
+                }
+            }
             Err(_) => Ok(MaybeAuthUser(None)),
         }
     }
@@ -88,7 +103,10 @@ impl FromRequestParts<AppState> for AgentUser {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         let token = extract_token(parts, state).await?;
-        let (user, session) = SessionRepo::validate(state.db(), &token).await?;
+        let (user, session) = state
+            .session_cache()
+            .get_or_validate(state.db(), &token)
+            .await?;
 
         if user.role != "agent" && user.role != "admin" {
             return Err(AppError::Forbidden("Agent access required".to_string()));
@@ -112,7 +130,10 @@ impl FromRequestParts<AppState> for AdminUser {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         let token = extract_token(parts, state).await?;
-        let (user, session) = SessionRepo::validate(state.db(), &token).await?;
+        let (user, session) = state
+            .session_cache()
+            .get_or_validate(state.db(), &token)
+            .await?;
 
         if user.role != "admin" {
             return Err(AppError::Forbidden("Admin access required".to_string()));

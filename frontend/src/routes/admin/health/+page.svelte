@@ -1,12 +1,12 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
 import type { CaptureTargetHealth, StaleReason, TargetHealth } from '$lib/bindings';
-import { Badge } from '$lib/components/ui/badge';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
+import { Alert } from '$lib/components/ui/alert';
+import { Badge } from '$lib/components/ui/badge';
 import * as Table from '$lib/components/ui/table';
 import * as Tabs from '$lib/components/ui/tabs';
 import * as Tooltip from '$lib/components/ui/tooltip';
-import { Alert } from '$lib/components/ui/alert';
 import { Activity, Grid3x3 } from '@lucide/svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { PageData } from './$types';

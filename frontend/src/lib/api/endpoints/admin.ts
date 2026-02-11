@@ -169,8 +169,10 @@ export class AdminEndpoints extends ApiClient {
 
 	// ============== Sessions ==============
 
-	deleteSession(token: string): Promise<Result<null, ApiError>> {
-		return this.delete<null>(`/api/sessions/${encodeURIComponent(token)}`);
+	deleteSession(userId: number, tokenPrefix: string): Promise<Result<null, ApiError>> {
+		return this.delete<null>(
+			`/api/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(tokenPrefix)}`
+		);
 	}
 
 	// ============== Capture Health ==============

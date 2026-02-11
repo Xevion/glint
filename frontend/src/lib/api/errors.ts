@@ -1,5 +1,5 @@
-import { error } from '@sveltejs/kit';
 import { getLogger } from '@logtape/logtape';
+import { error } from '@sveltejs/kit';
 
 const logger = getLogger(['ssr', 'api', 'error']);
 

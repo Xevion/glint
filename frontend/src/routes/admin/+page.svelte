@@ -2,21 +2,10 @@
 import { invalidateAll } from '$app/navigation';
 import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
+import RefreshButton from '$lib/components/RefreshButton.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Button } from '$lib/components/ui/button';
 import { formatBytes, formatDatetime } from '$lib/utils/format';
-import {
-	Chart,
-	Svg,
-	Area,
-	Axis,
-	Highlight,
-	LinearGradient,
-	RectClipPath,
-	Tooltip
-} from 'layerchart';
-import { scaleTime, scaleLinear } from 'd3-scale';
-import RefreshButton from '$lib/components/RefreshButton.svelte';
 import {
 	Activity,
 	ArrowRight,
@@ -30,6 +19,17 @@ import {
 	Sparkles,
 	Users
 } from '@lucide/svelte';
+import { scaleLinear, scaleTime } from 'd3-scale';
+import {
+	Area,
+	Axis,
+	Chart,
+	Highlight,
+	LinearGradient,
+	RectClipPath,
+	Svg,
+	Tooltip
+} from 'layerchart';
 import { onDestroy, onMount } from 'svelte';
 import type { PageData } from './$types';
 

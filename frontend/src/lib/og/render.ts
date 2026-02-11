@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { OG_HEIGHT, OG_WIDTH } from './constants';
-import { renderTextOverlay, type TextOverlayProps } from './text';
+import { type TextOverlayProps, renderTextOverlay } from './text';
 
 /**
  * SVG gradient overlay: transparent at top, dark at bottom.

@@ -1,8 +1,8 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
 import type { CaptureRun, CaptureRunItemWithContext } from '$lib/bindings';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import * as Table from '$lib/components/ui/table';
 import { formatDuration } from '$lib/utils/format';
 import { statusColorFallback, statusColors } from '$lib/utils/status';

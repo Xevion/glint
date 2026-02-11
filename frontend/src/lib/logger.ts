@@ -1,6 +1,6 @@
 import { dev } from '$app/environment';
-import { configure, getConsoleSink, type LogRecord } from '@logtape/logtape';
 import { requestContext } from '$lib/server/context';
+import { type LogRecord, configure, getConsoleSink } from '@logtape/logtape';
 
 interface JsonLogEntry {
 	timestamp: string;

@@ -1,6 +1,6 @@
 <script lang="ts">
-import type { Snippet } from 'svelte';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
+import type { Snippet } from 'svelte';
 
 interface Props {
 	title: string;

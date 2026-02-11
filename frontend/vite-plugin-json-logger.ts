@@ -1,5 +1,5 @@
+import { type LogRecord, configure, getLogger } from '@logtape/logtape';
 import type { Plugin, ViteDevServer } from 'vite';
-import { configure, getLogger, type LogRecord } from '@logtape/logtape';
 
 interface JsonLogEntry {
 	timestamp: string;

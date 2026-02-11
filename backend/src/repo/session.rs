@@ -4,7 +4,15 @@ use rand::Rng;
 use tracing::{debug, instrument};
 
 use crate::error::{AppError, AppResult};
-use crate::models::{Session, SessionInfo, User};
+use crate::models::{Session, User};
+
+/// Raw session row returned by list queries (before `is_current` enrichment)
+pub struct SessionRow {
+    pub token: String,
+    pub source: String,
+    pub created_at: chrono::DateTime<Utc>,
+    pub expires_at: chrono::DateTime<Utc>,
+}
 
 pub const SESSION_DURATION_DAYS: i64 = 7;
 
@@ -167,17 +175,18 @@ impl SessionRepo {
         Ok(count)
     }
 
-    /// List sessions for a user (for admin dashboard)
+    /// List sessions for a user (returns raw rows for caller to enrich with `is_current`)
     #[instrument(skip(executor), level = "debug")]
     pub async fn list_for_user(
         executor: impl sqlx::PgExecutor<'_>,
         user_id: i32,
-    ) -> AppResult<Vec<SessionInfo>> {
-        let sessions = sqlx::query!(
+    ) -> AppResult<Vec<SessionRow>> {
+        let sessions = sqlx::query_as!(
+            SessionRow,
             r#"
-            SELECT token, created_at, expires_at
+            SELECT token, source, created_at, expires_at
             FROM sessions
-            WHERE user_id = $1
+            WHERE user_id = $1 AND expires_at > now()
             ORDER BY created_at DESC
             "#,
             user_id
@@ -186,15 +195,66 @@ impl SessionRepo {
         .await
         .context(format!("failed to list sessions for user '{}'", user_id))?;
 
-        let infos = sessions
-            .into_iter()
-            .map(|row| SessionInfo {
-                token_prefix: row.token.chars().take(8).collect(),
-                created_at: row.created_at,
-                expires_at: row.expires_at,
-            })
-            .collect();
+        Ok(sessions)
+    }
 
-        Ok(infos)
+    /// Delete a session by token prefix (first 8 chars) for a specific user.
+    /// Returns the full token of the deleted session (for cache eviction), or None.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn delete_by_prefix(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_id: i32,
+        prefix: &str,
+    ) -> AppResult<Option<String>> {
+        if prefix.len() != 8 || !prefix.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(AppError::BadRequest(
+                "Session prefix must be exactly 8 hex characters".into(),
+            ));
+        }
+
+        let like_pattern = format!("{}%", prefix);
+        let result = sqlx::query_scalar!(
+            r#"
+            DELETE FROM sessions
+            WHERE user_id = $1 AND token LIKE $2
+            RETURNING token
+            "#,
+            user_id,
+            like_pattern
+        )
+        .fetch_optional(executor)
+        .await
+        .context("failed to delete session by prefix")?;
+
+        if result.is_some() {
+            debug!(user_id, prefix, "Deleted session by prefix");
+        }
+        Ok(result)
+    }
+
+    /// Delete all sessions for a user except the specified token.
+    #[instrument(skip(executor, except_token), level = "debug")]
+    pub async fn delete_others_for_user(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_id: i32,
+        except_token: &str,
+    ) -> AppResult<u64> {
+        let result = sqlx::query!(
+            "DELETE FROM sessions WHERE user_id = $1 AND token != $2",
+            user_id,
+            except_token
+        )
+        .execute(executor)
+        .await
+        .context(format!(
+            "failed to delete other sessions for user '{}'",
+            user_id
+        ))?;
+
+        let count = result.rows_affected();
+        if count > 0 {
+            debug!(user_id, count, "Deleted other user sessions");
+        }
+        Ok(count)
     }
 }

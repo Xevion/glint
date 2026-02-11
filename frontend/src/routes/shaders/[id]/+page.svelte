@@ -1,5 +1,6 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
+import { createApiClient } from '$lib/api';
 import type { ShaderWithCaptures } from '$lib/bindings';
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
@@ -8,8 +9,7 @@ import Meta from '$lib/components/Meta.svelte';
 import * as Select from '$lib/components/ui/select';
 import { formatNumber, formatVersion } from '$lib/utils/display';
 import { preloadImage } from '$lib/utils/image';
-import { ChevronRight, ImageOff, ExternalLink, Download } from '@lucide/svelte';
-import { createApiClient } from '$lib/api';
+import { ChevronRight, Download, ExternalLink, ImageOff } from '@lucide/svelte';
 import { fly } from 'svelte/transition';
 
 interface Props {

@@ -208,7 +208,7 @@ async fn logout(State(state): State<AppState>, jar: CookieJar) -> AppResult<(Coo
         let token = cookie.value();
 
         // Delete session from database
-        if let Err(e) = auth::delete_session(state.db(), token).await {
+        if let Err(e) = auth::delete_session(state.db(), state.session_cache(), token).await {
             warn!(error = %e, "Failed to delete session from database");
         }
     }

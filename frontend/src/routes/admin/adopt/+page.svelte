@@ -3,12 +3,12 @@ import { api } from '$lib/api';
 import type { Shader, ShaderSearchResult, ShaderSearchSort } from '$lib/bindings';
 import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
+import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
 import * as Table from '$lib/components/ui/table';
 import * as Tabs from '$lib/components/ui/tabs';
-import { Alert } from '$lib/components/ui/alert';
 import { cn } from '$lib/utils';
 import {
 	Check,

@@ -1,10 +1,10 @@
-import type { Handle, HandleFetch, HandleServerError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { env as publicEnv } from '$env/dynamic/public';
 import { initLogger } from '$lib/logger';
 import { requestContext } from '$lib/server/context';
 import { getLogger } from '@logtape/logtape';
+import type { Handle, HandleFetch, HandleServerError } from '@sveltejs/kit';
 import { PostHog } from 'posthog-node';
 
 await initLogger();

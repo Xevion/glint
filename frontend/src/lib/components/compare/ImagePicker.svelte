@@ -1,6 +1,6 @@
 <script lang="ts">
 import CaptureImage from '$lib/components/CaptureImage.svelte';
-import { ChevronDown, Check } from '@lucide/svelte';
+import { Check, ChevronDown } from '@lucide/svelte';
 import { Popover } from 'bits-ui';
 import type { ImageOption } from './types';
 

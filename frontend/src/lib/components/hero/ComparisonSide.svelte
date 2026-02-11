@@ -3,8 +3,8 @@ import { resolve } from '$app/paths';
 import { formatVersion } from '$lib/utils/display';
 import { cfImageSrcset, cfImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
-import { crossfade } from 'svelte/transition';
 import { cubicInOut } from 'svelte/easing';
+import { crossfade } from 'svelte/transition';
 import type { Orientation, SliderSide } from './types';
 
 interface Props {

@@ -1,9 +1,9 @@
 <script lang="ts">
-import { onMount } from 'svelte';
-import type { Snippet } from 'svelte';
 import type { Background } from '$lib/bindings';
 import { cfImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
+import { onMount } from 'svelte';
+import type { Snippet } from 'svelte';
 
 interface Props {
 	backgrounds: Background[];

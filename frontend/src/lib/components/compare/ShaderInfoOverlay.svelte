@@ -1,7 +1,7 @@
 <script lang="ts">
+import { formatVersion } from '$lib/utils/display';
 import { onMount } from 'svelte';
 import { fade } from 'svelte/transition';
-import { formatVersion } from '$lib/utils/display';
 import { LUMINANCE } from './constants';
 import type { ElementBounds, ElementLuminances, ShaderDisplayInfo } from './types';
 

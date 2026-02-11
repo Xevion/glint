@@ -1,6 +1,6 @@
 <script lang="ts">
-import type { Snippet } from 'svelte';
 import { ArrowLeft } from '@lucide/svelte';
+import type { Snippet } from 'svelte';
 
 interface Props {
 	backHref: string;

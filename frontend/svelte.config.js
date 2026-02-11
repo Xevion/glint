@@ -1,5 +1,5 @@
-import adapter from '@xevion/svelte-adapter-bun';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+import adapter from '@xevion/svelte-adapter-bun';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {

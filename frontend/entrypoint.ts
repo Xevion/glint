@@ -1,4 +1,4 @@
-import { spawn, type Subprocess } from 'bun';
+import { type Subprocess, spawn } from 'bun';
 
 const PORT = process.env.PORT || '8080';
 const BACKEND_PORT = process.env.GLINT_PORT || '3001';

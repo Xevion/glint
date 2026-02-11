@@ -5,10 +5,10 @@ import type { CaptureWithContext } from '$lib/bindings';
 import AdminTable from '$lib/components/AdminTable.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { AdminPageHeader } from '$lib/components/admin';
+import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { formatBytes } from '$lib/utils/format';
 import { statusColorFallback, statusColors } from '$lib/utils/status';
-import { Alert } from '$lib/components/ui/alert';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

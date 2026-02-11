@@ -1,12 +1,12 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import type { CaptureRun } from '$lib/bindings';
-import { AdminPageHeader } from '$lib/components/admin';
 import AdminTable from '$lib/components/AdminTable.svelte';
+import { AdminPageHeader } from '$lib/components/admin';
+import { Alert } from '$lib/components/ui/alert';
+import * as Tooltip from '$lib/components/ui/tooltip';
 import { formatDuration } from '$lib/utils/format';
 import { statusColorFallback, statusColors } from '$lib/utils/status';
-import * as Tooltip from '$lib/components/ui/tooltip';
-import { Alert } from '$lib/components/ui/alert';
 import type { PageData } from './$types';
 
 let { data } = $props<{ data: PageData }>();

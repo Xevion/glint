@@ -7,7 +7,8 @@ use tower_http::cors::CorsLayer;
 use tracing::{debug, info, warn};
 
 use glint::{
-    cli, config::Config, db, platform, repo::SessionRepo, routes, services, state::AppState,
+    cache::SessionCache, cli, config::Config, db, platform, repo::SessionRepo, routes, services,
+    state::AppState,
 };
 
 #[tokio::main]
@@ -139,6 +140,7 @@ async fn main() -> anyhow::Result<()> {
     let integrity_metadata_tx = metadata_tx.clone();
 
     // Build application state
+    let session_cache = SessionCache::new();
     let state = AppState::new(
         pool.clone(),
         config.clone(),
@@ -148,6 +150,7 @@ async fn main() -> anyhow::Result<()> {
         curseforge_client,
         metadata_tx,
         analytics,
+        session_cache,
     );
 
     // Start upload cleanup background task

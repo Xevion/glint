@@ -3,14 +3,14 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import type { SceneListItem } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
-import { cn } from '$lib/utils';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
+import { StatusBadge } from '$lib/components/ui/status-badge';
+import { cn } from '$lib/utils';
 import {
 	getBiomeDisplayName,
 	getDimensionDisplayName,
 	getWeatherDisplayName
 } from '$lib/utils/display';
-import { StatusBadge } from '$lib/components/ui/status-badge';
 import { ArrowRight, Sun } from '@lucide/svelte';
 
 interface Props {
