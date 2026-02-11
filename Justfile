@@ -172,15 +172,35 @@ mcjar +args='':
     set -euo pipefail
     exec bun ./scripts/mcjar.ts "$@"
 
+# === Docker (Web Server) ===
+
+# Build the web server Docker image
+web-build *flags:
+    docker build -t glint-web:latest {{flags}} .
+
+# Run the web server in Docker (reads backend/.env for DATABASE_URL and credentials)
+web-run *flags:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f backend/.env ]; then
+        echo "ERROR: backend/.env not found" >&2
+        exit 1
+    fi
+    docker run --rm -it \
+        --network host \
+        --env-file backend/.env \
+        {{flags}} \
+        glint-web:latest
+
 # === Docker (Headless Capture) ===
 
 # Build the headless capture Docker image
-docker-build *flags:
+capture-build *flags:
     docker build -t glint-capture:latest -f docker/Dockerfile {{flags}} .
 
 # Run a capture session in Docker (requires NVIDIA GPU + Container Toolkit)
 # Set RECORD=true to save a screen recording to docker/output/capture.mp4
-docker-run *flags:
+capture-run *flags:
     #!/usr/bin/env bash
     set -euo pipefail
     [ -f .env ] && set -a && source .env && set +a
@@ -208,7 +228,7 @@ docker-run *flags:
         glint-capture:latest
 
 # Smoke test: verify Xvfb + VirtualGL can see the GPU inside the container
-docker-smoke:
+capture-smoke:
     #!/usr/bin/env bash
     set -euo pipefail
     GPUCOMP_MOUNT=""

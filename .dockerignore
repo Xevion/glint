@@ -1,11 +1,11 @@
 # Ignore everything, then whitelist what we need
 *
 
-# Docker support files
+# === Capture Dockerfile (docker/Dockerfile) ===
 !docker/
 docker/output/
 
-# Mod source (needed for Stage 1 build)
+# Mod source (needed for capture Stage 1 build)
 !mod/
 
 # Exclude mod build artifacts and IDE files
@@ -13,3 +13,26 @@ mod/**/build/
 mod/**/.gradle/
 mod/**/.idea/
 mod/**/run/
+
+# === Web Dockerfile (Dockerfile) ===
+!package.json
+!bun.lock
+
+!backend/Cargo.toml
+!backend/Cargo.lock
+!backend/src/
+!backend/migrations/
+!backend/views.sql
+!backend/.sqlx/
+
+!scripts/lib/
+!scripts/optimize-wallpapers.ts
+
+!frontend/
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+frontend/.eslintcache
+frontend/test-results/
+frontend/playwright-report/
+frontend/static/wallpapers/

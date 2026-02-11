@@ -196,7 +196,9 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http());
 
     // Start server
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let addr: SocketAddr = format!("{}:{}", config.host, config.port)
+        .parse()
+        .expect("invalid host:port configuration");
     info!(addr = %addr, "Server started");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;

@@ -1,0 +1,87 @@
+# ========== Stage 1: Cargo Chef Base ==========
+FROM rust:1.91-slim AS chef
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && cargo install cargo-chef --locked
+
+# ========== Stage 2: Recipe Planner ==========
+FROM chef AS planner
+
+COPY backend/Cargo.toml backend/Cargo.lock ./
+COPY backend/src/ ./src/
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+# ========== Stage 3: Rust Builder ==========
+FROM chef AS builder
+
+# Cook dependencies (cached until Cargo.toml/Cargo.lock change)
+COPY --from=planner /build/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# Copy source, migrations, and SQLx offline cache
+COPY backend/Cargo.toml backend/Cargo.lock ./
+COPY backend/src/ ./src/
+COPY backend/migrations/ ./migrations/
+COPY backend/views.sql ./views.sql
+COPY backend/.sqlx/ ./.sqlx/
+
+# Build with SQLx offline mode (no live database needed)
+ENV SQLX_OFFLINE=true
+RUN cargo build --release && strip target/release/glint
+
+# ========== Stage 4: Frontend Builder ==========
+FROM oven/bun:1 AS frontend
+WORKDIR /build
+
+# Install dependencies via workspace root (cached until lockfile changes)
+COPY package.json bun.lock ./
+COPY frontend/package.json ./frontend/
+RUN bun install --frozen-lockfile
+
+# Copy frontend source and wallpaper optimization script
+COPY frontend/ ./frontend/
+COPY scripts/lib/ ./scripts/lib/
+COPY scripts/optimize-wallpapers.ts ./scripts/
+
+# Generate wallpaper manifest (empty if no source images present)
+RUN bun scripts/optimize-wallpapers.ts
+
+RUN bun --smol run --cwd frontend build
+
+# ========== Stage 5: Runtime ==========
+FROM oven/bun:1-slim
+WORKDIR /app
+
+# Install runtime dependencies (ca-certificates for HTTPS, wget for healthcheck)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Rust binary
+COPY --from=builder /build/target/release/glint ./glint
+
+# Copy SvelteKit build output (self-contained, no node_modules needed)
+COPY --from=frontend /build/frontend/build ./web/build
+
+# Copy entrypoint
+COPY frontend/entrypoint.ts ./web/entrypoint.ts
+
+# Environment defaults
+# PORT = public-facing SvelteKit (Railway injects $PORT)
+# GLINT_PORT = internal Axum backend (not exposed)
+ENV PORT=8080 \
+    GLINT_HOST=127.0.0.1 \
+    GLINT_PORT=3001 \
+    PUBLIC_BACKEND_URL=http://localhost:3001 \
+    TZ=Etc/UTC
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD wget -q --spider http://localhost:${PORT}/api/health || exit 1
+
+ENTRYPOINT ["bun", "run", "/app/web/entrypoint.ts"]
