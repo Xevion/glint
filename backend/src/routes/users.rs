@@ -50,6 +50,7 @@ async fn update_user_role(
     Path(id): Path<i32>,
     Json(request): Json<UpdateUserRoleRequest>,
 ) -> AppResult<Json<User>> {
+    request.validate()?;
     let user = UserRepo::update_role(state.db(), id, &request.role).await?;
     Ok(Json(user))
 }

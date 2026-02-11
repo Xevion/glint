@@ -1,11 +1,9 @@
 use std::net::SocketAddr;
 
+use axum::http::{HeaderValue, Method, header};
 use clap::Parser;
 use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
-use tower_http::{
-    cors::{Any, CorsLayer},
-    trace::TraceLayer,
-};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{debug, info, warn};
 
 use glint::{cli, config::Config, db, platform, routes, services, state::AppState};
@@ -181,11 +179,29 @@ async fn main() -> anyhow::Result<()> {
         integrity_metadata_tx,
     ));
 
-    // Configure CORS
+    // Configure CORS with specific allowed origins
+    let allowed_origins: Vec<HeaderValue> = config
+        .cors_origins
+        .iter()
+        .filter_map(|origin| origin.parse::<HeaderValue>().ok())
+        .collect();
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin(allowed_origins)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::PATCH,
+            Method::OPTIONS,
+        ])
+        .allow_headers([
+            header::CONTENT_TYPE,
+            header::AUTHORIZATION,
+            header::ACCEPT,
+            header::COOKIE,
+        ])
+        .allow_credentials(true);
 
     // Build router
     let analytics_layer =

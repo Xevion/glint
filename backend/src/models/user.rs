@@ -45,7 +45,25 @@ pub struct SessionInfo {
     pub expires_at: DateTime<Utc>,
 }
 
+/// Valid user roles
+pub const VALID_ROLES: &[&str] = &["user", "admin", "agent"];
+
 #[derive(Debug, Deserialize)]
 pub struct UpdateUserRoleRequest {
     pub role: String,
+}
+
+impl UpdateUserRoleRequest {
+    /// Validate that the role is one of the known valid roles.
+    pub fn validate(&self) -> Result<(), crate::error::AppError> {
+        if VALID_ROLES.contains(&self.role.as_str()) {
+            Ok(())
+        } else {
+            Err(crate::error::AppError::BadRequest(format!(
+                "Invalid role '{}'. Must be one of: {}",
+                self.role,
+                VALID_ROLES.join(", ")
+            )))
+        }
+    }
 }

@@ -19,6 +19,9 @@ use crate::{
     state::AppState,
 };
 
+/// Cookie name for OAuth CSRF state token
+const OAUTH_STATE_COOKIE: &str = "glint_oauth_state";
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/discord", get(discord_login))
@@ -32,20 +35,49 @@ pub struct LoginQuery {
     redirect: Option<String>,
 }
 
+/// Validate that a redirect URL is safe (relative path only, no open redirects).
+/// Rejects absolute URLs, protocol-relative URLs, and other redirect attacks.
+fn validate_redirect_url(url: &str) -> &str {
+    let url = url.trim();
+
+    // Must start with "/" and must not start with "//" (protocol-relative)
+    if url.starts_with('/') && !url.starts_with("//") {
+        url
+    } else {
+        "/"
+    }
+}
+
 /// GET /api/auth/discord - Initiates Discord OAuth flow
 async fn discord_login(
     State(state): State<AppState>,
     Query(query): Query<LoginQuery>,
-) -> AppResult<Response> {
+    jar: CookieJar,
+) -> AppResult<(CookieJar, Response)> {
     let oauth_client = state
         .oauth()
         .ok_or_else(|| AppError::ServiceUnavailable("Discord OAuth not configured".to_string()))?;
 
-    // Generate CSRF state token
-    // In production, this should be stored server-side and validated in callback
-    // For now, we encode the redirect URL in the state (simplified approach)
-    let redirect_url = query.redirect.unwrap_or_else(|| "/".to_string());
-    let state_value = format!("{}:{}", CsrfToken::new_random().secret(), redirect_url);
+    // Validate and sanitize redirect URL (prevent open redirects)
+    let redirect_url = query
+        .redirect
+        .as_deref()
+        .map(validate_redirect_url)
+        .unwrap_or("/");
+
+    // Generate CSRF state token and store it in a short-lived HttpOnly cookie
+    let csrf_token = CsrfToken::new_random();
+    let state_value = format!("{}:{}", csrf_token.secret(), redirect_url);
+
+    // Store CSRF token in cookie for validation in callback
+    let csrf_cookie = Cookie::build((OAUTH_STATE_COOKIE, csrf_token.secret().clone()))
+        .path("/")
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(true)
+        .max_age(time::Duration::minutes(10))
+        .build();
+    let jar = jar.add(csrf_cookie);
 
     let (auth_url, _csrf_token) = oauth_client
         .authorize_url(|| CsrfToken::new(state_value))
@@ -53,7 +85,7 @@ async fn discord_login(
         .url();
 
     debug!(url = %auth_url, "Redirecting to Discord OAuth");
-    Ok(Redirect::temporary(auth_url.as_str()).into_response())
+    Ok((jar, Redirect::temporary(auth_url.as_str()).into_response()))
 }
 
 #[derive(Deserialize)]
@@ -80,12 +112,41 @@ async fn discord_callback(
         .oauth()
         .ok_or_else(|| AppError::ServiceUnavailable("Discord OAuth not configured".to_string()))?;
 
-    // Extract redirect URL from state (format: "csrf_token:redirect_url")
-    let redirect_url = query
+    // Validate CSRF state: extract token from cookie and compare with state parameter
+    let stored_csrf = jar
+        .get(OAUTH_STATE_COOKIE)
+        .map(|c| c.value().to_string())
+        .ok_or_else(|| {
+            warn!("OAuth callback missing CSRF state cookie");
+            AppError::BadRequest("Invalid OAuth state: missing CSRF cookie".to_string())
+        })?;
+
+    // Parse state parameter (format: "csrf_token:redirect_url")
+    let (state_csrf, redirect_url) = query
         .state
         .split_once(':')
-        .map(|(_, url)| url.to_string())
-        .unwrap_or_else(|| "/".to_string());
+        .ok_or_else(|| AppError::BadRequest("Invalid OAuth state format".to_string()))?;
+
+    // Constant-time comparison not strictly necessary for CSRF tokens, but good practice
+    if state_csrf != stored_csrf {
+        warn!("OAuth CSRF token mismatch");
+        return Err(AppError::BadRequest(
+            "Invalid OAuth state: CSRF token mismatch".to_string(),
+        ));
+    }
+
+    // Validate redirect URL again on callback (defense in depth)
+    let redirect_url = validate_redirect_url(redirect_url);
+
+    // Clear the CSRF cookie
+    let clear_csrf = Cookie::build((OAUTH_STATE_COOKIE, ""))
+        .path("/")
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(true)
+        .max_age(time::Duration::ZERO)
+        .build();
+    let jar = jar.add(clear_csrf);
 
     // Exchange authorization code for access token
     let http_client = reqwest::Client::new();
@@ -124,6 +185,7 @@ async fn discord_callback(
     let cookie = Cookie::build((SESSION_COOKIE_NAME, session.token))
         .path("/")
         .http_only(true)
+        .secure(true)
         .same_site(SameSite::Lax)
         .max_age(time::Duration::days(SESSION_DURATION_DAYS))
         .build();
@@ -134,7 +196,7 @@ async fn discord_callback(
         user_id = user.id,
         "Session created, redirecting to {}", redirect_url
     );
-    Ok((jar, Redirect::temporary(&redirect_url).into_response()))
+    Ok((jar, Redirect::temporary(redirect_url).into_response()))
 }
 
 /// POST /api/auth/logout - Invalidates the current session
@@ -153,6 +215,7 @@ async fn logout(State(state): State<AppState>, jar: CookieJar) -> AppResult<(Coo
     let cookie = Cookie::build((SESSION_COOKIE_NAME, ""))
         .path("/")
         .http_only(true)
+        .secure(true)
         .same_site(SameSite::Lax)
         .max_age(time::Duration::ZERO)
         .build();
