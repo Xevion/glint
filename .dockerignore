@@ -22,6 +22,9 @@ mod/**/run/
 !backend/views.sql
 !backend/.sqlx/
 
+# === Backup Dockerfile (Dockerfile.backup) ===
+!scripts/backup.ts
+
 !frontend/
 frontend/node_modules/
 frontend/.svelte-kit/
