@@ -1367,6 +1367,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "sqlx",
+ "subtle",
  "thiserror 2.0.17",
  "thumbhash",
  "time",

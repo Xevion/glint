@@ -6,7 +6,9 @@ use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
 use tower_http::cors::CorsLayer;
 use tracing::{debug, info, warn};
 
-use glint::{cli, config::Config, db, platform, routes, services, state::AppState};
+use glint::{
+    cli, config::Config, db, platform, repo::SessionRepo, routes, services, state::AppState,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -175,13 +177,43 @@ async fn main() -> anyhow::Result<()> {
 
     // Start capture integrity sweep (verifies R2 images, cleans up orphans)
     tokio::spawn(services::capture_integrity::run(
-        pool,
+        pool.clone(),
         integrity_metadata_tx,
     ));
+
+    // Purge expired sessions every hour
+    {
+        let pool = pool.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+            loop {
+                interval.tick().await;
+                match SessionRepo::delete_expired(&pool).await {
+                    Ok(count) if count > 0 => {
+                        info!(count, "Purged expired sessions");
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "Failed to purge expired sessions");
+                    }
+                    _ => {}
+                }
+            }
+        });
+    }
 
     // Configure CORS. SvelteKit's universal fetch enforces CORS during SSR using
     // the page's origin, so the frontend origin (wherever SvelteKit is served)
     // must be included in cors_origins.
+    if config
+        .cors_origins
+        .iter()
+        .all(|o| o.contains("localhost") || o.contains("127.0.0.1"))
+    {
+        warn!(
+            origins = ?config.cors_origins,
+            "CORS origins contain only localhost addresses — set GLINT_CORS_ORIGINS for production"
+        );
+    }
     let allowed_origins: Vec<HeaderValue> = config
         .cors_origins
         .iter()

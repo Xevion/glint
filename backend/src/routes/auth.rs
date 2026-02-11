@@ -10,6 +10,7 @@ use axum_extra::extract::{
 };
 use oauth2::{AuthorizationCode, CsrfToken, Scope, TokenResponse};
 use serde::Deserialize;
+use subtle::ConstantTimeEq;
 use tracing::{debug, error, warn};
 
 use crate::{
@@ -127,8 +128,9 @@ async fn discord_callback(
         .split_once(':')
         .ok_or_else(|| AppError::BadRequest("Invalid OAuth state format".to_string()))?;
 
-    // Constant-time comparison not strictly necessary for CSRF tokens, but good practice
-    if state_csrf != stored_csrf {
+    if state_csrf.as_bytes().ct_eq(stored_csrf.as_bytes()).into() {
+        // Tokens match — continue
+    } else {
         warn!("OAuth CSRF token mismatch");
         return Err(AppError::BadRequest(
             "Invalid OAuth state: CSRF token mismatch".to_string(),
