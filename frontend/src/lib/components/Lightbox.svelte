@@ -216,14 +216,20 @@ function handlePointerUp() {
 		>
 			{#key currentIndex}
 				<div
-					in:fly={{ x: direction === 'left' ? 40 : -40, duration: 200, delay: 100 }}
+					in:fly={{ x: direction === 'left' ? 40 : -40, duration: 200, opacity: 1 }}
 					out:fade={{ duration: 100 }}
 					class="absolute inset-0 flex items-center justify-center"
 				>
 					<div
 						style="transform: scale({zoomLevel}) translate({panOffset.x}px, {panOffset.y}px); transition: transform {isDragging ? '0s' : '0.15s'} ease;"
 					>
-					<div class="relative">
+					<div
+						class="relative"
+						style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
+						style:background-size="contain"
+						style:background-position="center"
+						style:background-repeat="no-repeat"
+					>
 						<img
 							bind:this={imgEl}
 							src={fullImageUrl}
@@ -235,14 +241,6 @@ function handlePointerUp() {
 							draggable="false"
 							onload={() => (imageLoaded = true)}
 						/>
-						{#if placeholderUrl && !imageLoaded}
-							<img
-								src={placeholderUrl}
-								alt=""
-								class="absolute inset-0 h-full w-full object-contain"
-								aria-hidden="true"
-							/>
-						{/if}
 					</div>
 					</div>
 

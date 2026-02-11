@@ -1,4 +1,5 @@
 <script lang="ts">
+import { browser } from '$app/environment';
 import { resolve } from '$app/paths';
 import { formatVersion } from '$lib/utils/display';
 import { cfImageSrcset, cfImageUrl } from '$lib/utils/image';
@@ -19,7 +20,7 @@ let { side, position, clipPath, orientation, willChange }: Props = $props();
 
 let loaded = $state(false);
 
-const placeholder = $derived(decodeThumbhash(side.thumbhash));
+const placeholder = $derived(browser ? decodeThumbhash(side.thumbhash) : null);
 const src = $derived(cfImageUrl(side.image, { width: 1280, format: 'auto' }));
 const srcset = $derived(cfImageSrcset(side.image, 'hero'));
 
