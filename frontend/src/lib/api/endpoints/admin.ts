@@ -181,7 +181,7 @@ export class AdminEndpoints extends ApiClient {
 	// ============== Health ==============
 
 	health(): Promise<Result<string, ApiError>> {
-		return this.getText('/health');
+		return this.getText('/api/health');
 	}
 
 	// ============== Storage ==============

@@ -154,7 +154,7 @@ const apiToken = resolveApiToken();
 async function checkBackend(): Promise<boolean> {
 	console.log(`[preflight] Checking backend at ${apiUrl}...`);
 	try {
-		const resp = await fetch(`${apiUrl}/health`, {
+		const resp = await fetch(`${apiUrl}/api/health`, {
 			signal: AbortSignal.timeout(5000),
 		});
 		if (resp.ok) {

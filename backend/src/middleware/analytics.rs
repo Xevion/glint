@@ -64,6 +64,7 @@ where
             // Only track API routes (skip health checks, static assets, etc.)
             if let Some(ref analytics) = analytics
                 && path.starts_with("/api")
+                && path != "/api/health"
             {
                 let duration_ms = start.elapsed().as_millis() as u64;
                 let status = response.status().as_u16();

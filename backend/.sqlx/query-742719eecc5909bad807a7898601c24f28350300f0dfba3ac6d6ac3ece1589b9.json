@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE captures\n            SET status = 'failed', error_message = $2, updated_at = now()\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "742719eecc5909bad807a7898601c24f28350300f0dfba3ac6d6ac3ece1589b9"
+}
