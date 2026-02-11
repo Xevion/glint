@@ -227,7 +227,8 @@ pub struct CaptureRun {
     pub completed_items: i32,
     pub failed_items: i32,
     pub skipped_items: i32,
-    pub metadata_json: Option<String>,
+    #[ts(type = "Record<string, unknown> | null")]
+    pub metadata_json: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]

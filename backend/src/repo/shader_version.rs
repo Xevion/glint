@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
+use sqlx::types::Json;
 use tracing::{debug, instrument};
 
 use crate::error::{AppResult, OptionNotFoundExt};
@@ -19,9 +20,9 @@ struct ShaderVersionWithCount {
     download_url: Option<String>,
     file_hash: Option<String>,
     file_size: Option<i64>,
-    game_versions: Option<serde_json::Value>,
+    game_versions: Option<Json<Vec<String>>>,
     release_channel: Option<String>,
-    supported_profiles: Option<serde_json::Value>,
+    supported_profiles: Option<Json<Vec<String>>>,
     upstream_published_at: Option<chrono::DateTime<chrono::Utc>>,
     created_at: chrono::DateTime<chrono::Utc>,
     capture_failure_count: i32,
@@ -39,7 +40,14 @@ impl ShaderVersionRepo {
     ) -> AppResult<Vec<ShaderVersion>> {
         let versions = sqlx::query_as!(
             ShaderVersion,
-            "SELECT * FROM shader_versions WHERE shader_id = $1 ORDER BY upstream_published_at DESC NULLS LAST, created_at DESC",
+            r#"SELECT id, shader_id, version, modrinth_version_id, curseforge_file_id,
+                download_url, file_hash, file_size,
+                game_versions as "game_versions: Json<Vec<String>>",
+                release_channel,
+                supported_profiles as "supported_profiles: Json<Vec<String>>",
+                upstream_published_at, created_at, capture_failure_count, last_capture_error
+            FROM shader_versions WHERE shader_id = $1
+            ORDER BY upstream_published_at DESC NULLS LAST, created_at DESC"#,
             shader_id
         )
         .fetch_all(executor)
@@ -62,7 +70,12 @@ impl ShaderVersionRepo {
             ShaderVersionWithCount,
             r#"
             SELECT
-                sv.*,
+                sv.id, sv.shader_id, sv.version, sv.modrinth_version_id, sv.curseforge_file_id,
+                sv.download_url, sv.file_hash, sv.file_size,
+                sv.game_versions as "game_versions: Json<Vec<String>>",
+                sv.release_channel,
+                sv.supported_profiles as "supported_profiles: Json<Vec<String>>",
+                sv.upstream_published_at, sv.created_at, sv.capture_failure_count, sv.last_capture_error,
                 COUNT(c.id) FILTER (WHERE c.status = 'completed') as "capture_count!: i64"
             FROM shader_versions sv
             LEFT JOIN captures c ON c.shader_version_id = sv.id
@@ -111,7 +124,13 @@ impl ShaderVersionRepo {
     ) -> AppResult<Option<ShaderVersion>> {
         sqlx::query_as!(
             ShaderVersion,
-            "SELECT * FROM shader_versions WHERE id = $1",
+            r#"SELECT id, shader_id, version, modrinth_version_id, curseforge_file_id,
+                download_url, file_hash, file_size,
+                game_versions as "game_versions: Json<Vec<String>>",
+                release_channel,
+                supported_profiles as "supported_profiles: Json<Vec<String>>",
+                upstream_published_at, created_at, capture_failure_count, last_capture_error
+            FROM shader_versions WHERE id = $1"#,
             id
         )
         .fetch_optional(executor)
@@ -141,7 +160,12 @@ impl ShaderVersionRepo {
             r#"
             INSERT INTO shader_versions (id, shader_id, version, modrinth_version_id, download_url, file_hash, created_at)
             VALUES ($1, $2, $3, $4, $5, $6, now())
-            RETURNING *
+            RETURNING id, shader_id, version, modrinth_version_id, curseforge_file_id,
+                download_url, file_hash, file_size,
+                game_versions as "game_versions: Json<Vec<String>>",
+                release_channel,
+                supported_profiles as "supported_profiles: Json<Vec<String>>",
+                upstream_published_at, created_at, capture_failure_count, last_capture_error
             "#,
             id,
             shader_id,
@@ -162,11 +186,10 @@ impl ShaderVersionRepo {
         id: &str,
         profiles: &[String],
     ) -> AppResult<()> {
-        let json_value =
-            serde_json::to_value(profiles).expect("Vec<String> serialization cannot fail");
+        let json_value = Json(profiles.to_vec());
         sqlx::query!(
             "UPDATE shader_versions SET supported_profiles = $1 WHERE id = $2",
-            json_value,
+            json_value as Json<Vec<String>>,
             id
         )
         .execute(executor)
@@ -209,7 +232,13 @@ impl ShaderVersionRepo {
         let versions = sqlx::query_as!(
             ShaderVersion,
             r#"
-            SELECT DISTINCT ON (shader_id) *
+            SELECT DISTINCT ON (shader_id)
+                id, shader_id, version, modrinth_version_id, curseforge_file_id,
+                download_url, file_hash, file_size,
+                game_versions as "game_versions: Json<Vec<String>>",
+                release_channel,
+                supported_profiles as "supported_profiles: Json<Vec<String>>",
+                upstream_published_at, created_at, capture_failure_count, last_capture_error
             FROM shader_versions
             ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC
             "#
@@ -304,7 +333,7 @@ impl ShaderVersionRepo {
             version.download_url,
             version.file_hash,
             version.file_size,
-            version.game_versions.as_ref().map(|gv| serde_json::to_value(gv).expect("Vec<String> serialization cannot fail")),
+            version.game_versions.as_ref().map(|gv| Json(gv.clone())) as Option<Json<Vec<String>>>,
             version.release_channel,
             version.published_at,
         )
@@ -351,13 +380,9 @@ impl ShaderVersionRepo {
         let file_hashes: Vec<Option<&str>> =
             versions.iter().map(|v| v.file_hash.as_deref()).collect();
         let file_sizes: Vec<Option<i64>> = versions.iter().map(|v| v.file_size).collect();
-        let game_versions: Vec<Option<serde_json::Value>> = versions
+        let game_versions: Vec<Option<Json<Vec<String>>>> = versions
             .iter()
-            .map(|v| {
-                v.game_versions.as_ref().map(|gv| {
-                    serde_json::to_value(gv).expect("Vec<String> serialization cannot fail")
-                })
-            })
+            .map(|v| v.game_versions.as_ref().map(|gv| Json(gv.clone())))
             .collect();
         let release_channels: Vec<Option<&str>> = versions
             .iter()
@@ -397,7 +422,7 @@ impl ShaderVersionRepo {
             &download_urls as &[Option<&str>],
             &file_hashes as &[Option<&str>],
             &file_sizes as &[Option<i64>],
-            &game_versions as &[Option<serde_json::Value>],
+            &game_versions as &[Option<Json<Vec<String>>>],
             &release_channels as &[Option<&str>],
             &published_ats as &[Option<chrono::DateTime<chrono::Utc>>],
         )
@@ -423,7 +448,14 @@ impl ShaderVersionRepo {
     ) -> AppResult<Option<ShaderVersion>> {
         sqlx::query_as!(
             ShaderVersion,
-            "SELECT * FROM shader_versions WHERE shader_id = $1 ORDER BY upstream_published_at DESC NULLS LAST, created_at DESC LIMIT 1",
+            r#"SELECT id, shader_id, version, modrinth_version_id, curseforge_file_id,
+                download_url, file_hash, file_size,
+                game_versions as "game_versions: Json<Vec<String>>",
+                release_channel,
+                supported_profiles as "supported_profiles: Json<Vec<String>>",
+                upstream_published_at, created_at, capture_failure_count, last_capture_error
+            FROM shader_versions WHERE shader_id = $1
+            ORDER BY upstream_published_at DESC NULLS LAST, created_at DESC LIMIT 1"#,
             shader_id
         )
         .fetch_optional(executor)

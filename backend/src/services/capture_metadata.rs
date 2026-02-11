@@ -145,7 +145,7 @@ async fn try_process_capture(pool: &PgPool, capture_id: &str) -> Result<(), Proc
         CaptureRepo::set_thumbhash(pool, capture_id, &hash_b64)
             .await
             .map_err(|e| ProcessError::Transient(e.into()))?;
-        CaptureRepo::set_file_metadata(pool, capture_id, file_size, &content_type)
+        CaptureRepo::set_file_metadata(pool, capture_id, Some(file_size), &content_type)
             .await
             .map_err(|e| ProcessError::Transient(e.into()))?;
 
@@ -165,7 +165,8 @@ async fn try_process_capture(pool: &PgPool, capture_id: &str) -> Result<(), Proc
 
         debug!(
             capture_id,
-            file_size, "Metadata: saved file metadata via HEAD"
+            ?file_size,
+            "Metadata: saved file metadata via HEAD"
         );
     }
 
@@ -323,7 +324,9 @@ async fn fetch_and_process(image_url: &str) -> anyhow::Result<(String, i64, Stri
 }
 
 /// HEAD request: extract file size and content type without downloading the image.
-async fn fetch_file_metadata(image_url: &str) -> anyhow::Result<(i64, String)> {
+/// Returns `None` for file_size when Content-Length header is absent, avoiding
+/// permanently marking captures as 0 bytes.
+async fn fetch_file_metadata(image_url: &str) -> anyhow::Result<(Option<i64>, String)> {
     let client = reqwest::Client::new();
     let response = client.head(image_url).send().await?;
 
@@ -338,8 +341,7 @@ async fn fetch_file_metadata(image_url: &str) -> anyhow::Result<(i64, String)> {
         .headers()
         .get(reqwest::header::CONTENT_LENGTH)
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i64>().ok())
-        .unwrap_or(0);
+        .and_then(|v| v.parse::<i64>().ok());
 
     Ok((file_size, content_type))
 }

@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use sqlx::types::Json;
 use ts_rs::TS;
 
 use super::capture::CaptureWithContext;
@@ -46,11 +47,11 @@ pub struct ShaderVersion {
     pub file_hash: Option<String>,
     pub file_size: Option<i64>,
     #[ts(type = "Array<string> | null")]
-    pub game_versions: Option<serde_json::Value>,
+    pub game_versions: Option<Json<Vec<String>>>,
     pub release_channel: Option<String>,
     /// Array of profile names, discovered after first capture
     #[ts(type = "Array<string> | null")]
-    pub supported_profiles: Option<serde_json::Value>,
+    pub supported_profiles: Option<Json<Vec<String>>>,
     #[ts(type = "string | null")]
     pub upstream_published_at: Option<DateTime<Utc>>,
     #[ts(type = "string")]
@@ -69,7 +70,7 @@ pub struct ShaderListItem {
     pub features: Vec<Feature>,
     pub latest_version: Option<String>,
     #[ts(type = "Array<string> | null")]
-    pub game_versions: Option<serde_json::Value>,
+    pub game_versions: Option<Json<Vec<String>>>,
     pub image_url: Option<String>,
     pub thumbhash: Option<String>,
 }

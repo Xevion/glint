@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                sv.*,\n                COUNT(c.id) FILTER (WHERE c.status = 'completed') as \"capture_count!: i64\"\n            FROM shader_versions sv\n            LEFT JOIN captures c ON c.shader_version_id = sv.id\n            WHERE sv.shader_id = $1\n            GROUP BY sv.id\n            ORDER BY sv.upstream_published_at DESC NULLS LAST, sv.created_at DESC\n            ",
+  "query": "\n            SELECT DISTINCT ON (shader_id)\n                id, shader_id, version, modrinth_version_id, curseforge_file_id,\n                download_url, file_hash, file_size,\n                game_versions as \"game_versions: Json<Vec<String>>\",\n                release_channel,\n                supported_profiles as \"supported_profiles: Json<Vec<String>>\",\n                upstream_published_at, created_at, capture_failure_count, last_capture_error\n            FROM shader_versions\n            ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -25,47 +25,47 @@
       },
       {
         "ordinal": 4,
-        "name": "download_url",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 5,
-        "name": "file_hash",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 6,
-        "name": "supported_profiles",
-        "type_info": "Jsonb"
-      },
-      {
-        "ordinal": 7,
-        "name": "created_at",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 8,
         "name": "curseforge_file_id",
         "type_info": "Int4"
       },
       {
-        "ordinal": 9,
+        "ordinal": 5,
+        "name": "download_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
         "name": "file_size",
         "type_info": "Int8"
       },
       {
-        "ordinal": 10,
-        "name": "game_versions",
+        "ordinal": 8,
+        "name": "game_versions: Json<Vec<String>>",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 11,
+        "ordinal": 9,
         "name": "release_channel",
         "type_info": "Text"
       },
       {
-        "ordinal": 12,
+        "ordinal": 10,
+        "name": "supported_profiles: Json<Vec<String>>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
         "name": "upstream_published_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
@@ -77,17 +77,10 @@
         "ordinal": 14,
         "name": "last_capture_error",
         "type_info": "Text"
-      },
-      {
-        "ordinal": 15,
-        "name": "capture_count!: i64",
-        "type_info": "Int8"
       }
     ],
     "parameters": {
-      "Left": [
-        "Text"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -97,16 +90,15 @@
       true,
       true,
       true,
-      false,
       true,
       true,
       true,
       true,
       true,
       false,
-      true,
-      null
+      false,
+      true
     ]
   },
-  "hash": "2f230b34e3ea110d3d4631b7bc32b7d47d0cbbc08a7fad21b0c93625644d8196"
+  "hash": "d1e65f20b8fb46145acf1d17a1985b005727f7a6a5e4bf2eb2e94d4d8272e6eb"
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                cr.id AS \"id: CaptureRunId\", cr.agent_id, cr.started_at, cr.completed_at,\n                cr.status AS \"status!: CaptureRunStatus\", cr.total_items,\n                COALESCE(counts.completed, 0)::int4 as \"completed_items!\",\n                COALESCE(counts.failed, 0)::int4 as \"failed_items!\",\n                COALESCE(counts.skipped, 0)::int4 as \"skipped_items!\",\n                cr.metadata_json\n            FROM capture_runs cr\n            LEFT JOIN LATERAL (\n                SELECT\n                    COUNT(*) FILTER (WHERE status = 'completed') AS completed,\n                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,\n                    COUNT(*) FILTER (WHERE status = 'skipped') AS skipped\n                FROM capture_run_items WHERE run_id = cr.id\n            ) counts ON TRUE\n            ORDER BY cr.started_at DESC\n            ",
+  "query": "\n            SELECT\n                cr.id AS \"id: CaptureRunId\", cr.agent_id, cr.started_at, cr.completed_at,\n                cr.status AS \"status!: CaptureRunStatus\", cr.total_items,\n                COALESCE(counts.completed, 0)::int4 as \"completed_items!\",\n                COALESCE(counts.failed, 0)::int4 as \"failed_items!\",\n                COALESCE(counts.skipped, 0)::int4 as \"skipped_items!\",\n                cr.metadata_json as \"metadata_json: serde_json::Value\"\n            FROM capture_runs cr\n            LEFT JOIN LATERAL (\n                SELECT\n                    COUNT(*) FILTER (WHERE status = 'completed') AS completed,\n                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,\n                    COUNT(*) FILTER (WHERE status = 'skipped') AS skipped\n                FROM capture_run_items WHERE run_id = cr.id\n            ) counts ON TRUE\n            WHERE cr.id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -50,12 +50,14 @@
       },
       {
         "ordinal": 9,
-        "name": "metadata_json",
-        "type_info": "Text"
+        "name": "metadata_json: serde_json::Value",
+        "type_info": "Jsonb"
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Text"
+      ]
     },
     "nullable": [
       false,
@@ -70,5 +72,5 @@
       true
     ]
   },
-  "hash": "cbc93dfe023f8919cf45ca596158fd1591c7a70130d5e5266ec66d05b6269812"
+  "hash": "fca745a4c68a7eebb9433c0b474724309fe74de25f6998f89aaca0a25d914c29"
 }

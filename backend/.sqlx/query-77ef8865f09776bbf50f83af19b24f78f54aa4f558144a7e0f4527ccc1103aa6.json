@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO capture_runs (id, agent_id, total_items, metadata_json, status, started_at)\n            VALUES ($1, $2, $3, $4, 'running', now())\n            RETURNING id AS \"id: CaptureRunId\", agent_id, started_at, completed_at,\n                status AS \"status!: CaptureRunStatus\",\n                total_items,\n                completed_items,\n                failed_items,\n                skipped_items,\n                metadata_json\n            ",
+  "query": "\n            INSERT INTO capture_runs (id, agent_id, total_items, metadata_json, status, started_at)\n            VALUES ($1, $2, $3, $4::jsonb, 'running', now())\n            RETURNING id AS \"id: CaptureRunId\", agent_id, started_at, completed_at,\n                status AS \"status!: CaptureRunStatus\",\n                total_items,\n                completed_items,\n                failed_items,\n                skipped_items,\n                metadata_json as \"metadata_json: serde_json::Value\"\n            ",
   "describe": {
     "columns": [
       {
@@ -50,8 +50,8 @@
       },
       {
         "ordinal": 9,
-        "name": "metadata_json",
-        "type_info": "Text"
+        "name": "metadata_json: serde_json::Value",
+        "type_info": "Jsonb"
       }
     ],
     "parameters": {
@@ -59,7 +59,7 @@
         "Text",
         "Text",
         "Int4",
-        "Text"
+        "Jsonb"
       ]
     },
     "nullable": [
@@ -75,5 +75,5 @@
       true
     ]
   },
-  "hash": "88b0b0ae41a88a06a79fb7db127491b65db2f942260ed45f256dc40efad3172b"
+  "hash": "77ef8865f09776bbf50f83af19b24f78f54aa4f558144a7e0f4527ccc1103aa6"
 }

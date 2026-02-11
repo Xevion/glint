@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE captures SET file_size_bytes = COALESCE($2, file_size_bytes), content_type = $3 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1cb2ff5121e784133a849a5a6110dfcdf323fed865397134d8ec649285cf6c47"
+}

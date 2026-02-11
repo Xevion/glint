@@ -43,7 +43,7 @@ async fn generate_presigned_put_url(
 pub struct CreateRunRequest {
     pub agent_id: Option<String>,
     pub items: Vec<CreateRunItemRequest>,
-    pub metadata_json: Option<String>,
+    pub metadata_json: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -127,7 +127,7 @@ async fn create_run(
         &run_id,
         request.agent_id.as_deref(),
         total_items,
-        request.metadata_json.as_deref(),
+        request.metadata_json.as_ref(),
     )
     .await?;
 

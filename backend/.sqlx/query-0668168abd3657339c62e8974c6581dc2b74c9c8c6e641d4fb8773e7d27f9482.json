@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                sv.id, sv.shader_id, sv.version, sv.modrinth_version_id, sv.curseforge_file_id,\n                sv.download_url, sv.file_hash, sv.file_size,\n                sv.game_versions as \"game_versions: Json<Vec<String>>\",\n                sv.release_channel,\n                sv.supported_profiles as \"supported_profiles: Json<Vec<String>>\",\n                sv.upstream_published_at, sv.created_at, sv.capture_failure_count, sv.last_capture_error,\n                COUNT(c.id) FILTER (WHERE c.status = 'completed') as \"capture_count!: i64\"\n            FROM shader_versions sv\n            LEFT JOIN captures c ON c.shader_version_id = sv.id\n            WHERE sv.shader_id = $1\n            GROUP BY sv.id\n            ORDER BY sv.upstream_published_at DESC NULLS LAST, sv.created_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "modrinth_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "curseforge_file_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "download_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "file_size",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "game_versions: Json<Vec<String>>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 9,
+        "name": "release_channel",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "supported_profiles: Json<Vec<String>>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
+        "name": "upstream_published_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "capture_failure_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "last_capture_error",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "capture_count!: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "0668168abd3657339c62e8974c6581dc2b74c9c8c6e641d4fb8773e7d27f9482"
+}

@@ -2,6 +2,7 @@ package com.xevion.glint.api
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /** A single work item: one (shader_version, scene, profile) triple to capture. */
 @Serializable
@@ -43,7 +44,7 @@ data class WorkItem(
 data class CreateRunRequest(
     @SerialName("agent_id") val agentId: String? = null,
     val items: List<CreateRunItemRequest>,
-    @SerialName("metadata_json") val metadataJson: String? = null,
+    @SerialName("metadata_json") val metadataJson: JsonObject? = null,
 )
 
 /** A single item within a create-run request. */
@@ -66,7 +67,7 @@ data class CaptureRun(
     @SerialName("completed_items") val completedItems: Int,
     @SerialName("failed_items") val failedItems: Int,
     @SerialName("skipped_items") val skippedItems: Int,
-    @SerialName("metadata_json") val metadataJson: String? = null,
+    @SerialName("metadata_json") val metadataJson: JsonObject? = null,
 )
 
 /** A single item within a capture run. */

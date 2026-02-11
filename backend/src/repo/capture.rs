@@ -915,16 +915,19 @@ impl CaptureRepo {
         Ok(())
     }
 
-    /// Set file metadata (size and content type) for a capture
+    /// Set file metadata (size and content type) for a capture.
+    /// `file_size_bytes` is optional — when `None` (e.g. HEAD response lacked
+    /// Content-Length), only content_type is updated, leaving file_size_bytes
+    /// as NULL rather than writing a bogus 0.
     #[instrument(skip(executor), level = "debug")]
     pub async fn set_file_metadata(
         executor: impl sqlx::PgExecutor<'_>,
         id: &str,
-        file_size_bytes: i64,
+        file_size_bytes: Option<i64>,
         content_type: &str,
     ) -> AppResult<()> {
         sqlx::query!(
-            "UPDATE captures SET file_size_bytes = $2, content_type = $3 WHERE id = $1",
+            "UPDATE captures SET file_size_bytes = COALESCE($2, file_size_bytes), content_type = $3 WHERE id = $1",
             id,
             file_size_bytes,
             content_type

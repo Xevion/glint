@@ -17,20 +17,20 @@ impl CaptureRunRepo {
         id: &str,
         agent_id: Option<&str>,
         total_items: i32,
-        metadata_json: Option<&str>,
+        metadata_json: Option<&serde_json::Value>,
     ) -> AppResult<CaptureRun> {
         let run = sqlx::query_as!(
             CaptureRun,
             r#"
             INSERT INTO capture_runs (id, agent_id, total_items, metadata_json, status, started_at)
-            VALUES ($1, $2, $3, $4, 'running', now())
+            VALUES ($1, $2, $3, $4::jsonb, 'running', now())
             RETURNING id AS "id: CaptureRunId", agent_id, started_at, completed_at,
                 status AS "status!: CaptureRunStatus",
                 total_items,
                 completed_items,
                 failed_items,
                 skipped_items,
-                metadata_json
+                metadata_json as "metadata_json: serde_json::Value"
             "#,
             id,
             agent_id,
@@ -57,7 +57,7 @@ impl CaptureRunRepo {
                 COALESCE(counts.completed, 0)::int4 as "completed_items!",
                 COALESCE(counts.failed, 0)::int4 as "failed_items!",
                 COALESCE(counts.skipped, 0)::int4 as "skipped_items!",
-                cr.metadata_json
+                cr.metadata_json as "metadata_json: serde_json::Value"
             FROM capture_runs cr
             LEFT JOIN LATERAL (
                 SELECT
@@ -88,7 +88,7 @@ impl CaptureRunRepo {
                 COALESCE(counts.completed, 0)::int4 as "completed_items!",
                 COALESCE(counts.failed, 0)::int4 as "failed_items!",
                 COALESCE(counts.skipped, 0)::int4 as "skipped_items!",
-                cr.metadata_json
+                cr.metadata_json as "metadata_json: serde_json::Value"
             FROM capture_runs cr
             LEFT JOIN LATERAL (
                 SELECT
@@ -139,7 +139,7 @@ impl CaptureRunRepo {
                 capture_runs.completed_items,
                 capture_runs.failed_items,
                 capture_runs.skipped_items,
-                capture_runs.metadata_json
+                capture_runs.metadata_json as "metadata_json: serde_json::Value"
             "#,
             id
         )

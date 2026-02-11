@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM shader_versions WHERE shader_id = $1 ORDER BY upstream_published_at DESC NULLS LAST, created_at DESC LIMIT 1",
+  "query": "\n            INSERT INTO shader_versions (id, shader_id, version, modrinth_version_id, download_url, file_hash, created_at)\n            VALUES ($1, $2, $3, $4, $5, $6, now())\n            RETURNING id, shader_id, version, modrinth_version_id, curseforge_file_id,\n                download_url, file_hash, file_size,\n                game_versions as \"game_versions: Json<Vec<String>>\",\n                release_channel,\n                supported_profiles as \"supported_profiles: Json<Vec<String>>\",\n                upstream_published_at, created_at, capture_failure_count, last_capture_error\n            ",
   "describe": {
     "columns": [
       {
@@ -25,47 +25,47 @@
       },
       {
         "ordinal": 4,
-        "name": "download_url",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 5,
-        "name": "file_hash",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 6,
-        "name": "supported_profiles",
-        "type_info": "Jsonb"
-      },
-      {
-        "ordinal": 7,
-        "name": "created_at",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 8,
         "name": "curseforge_file_id",
         "type_info": "Int4"
       },
       {
-        "ordinal": 9,
+        "ordinal": 5,
+        "name": "download_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
         "name": "file_size",
         "type_info": "Int8"
       },
       {
-        "ordinal": 10,
-        "name": "game_versions",
+        "ordinal": 8,
+        "name": "game_versions: Json<Vec<String>>",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 11,
+        "ordinal": 9,
         "name": "release_channel",
         "type_info": "Text"
       },
       {
-        "ordinal": 12,
+        "ordinal": 10,
+        "name": "supported_profiles: Json<Vec<String>>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
         "name": "upstream_published_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
@@ -81,6 +81,11 @@
     ],
     "parameters": {
       "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
         "Text"
       ]
     },
@@ -92,15 +97,15 @@
       true,
       true,
       true,
+      true,
+      true,
+      true,
+      true,
+      true,
       false,
-      true,
-      true,
-      true,
-      true,
-      true,
       false,
       true
     ]
   },
-  "hash": "4c6279b538e5965f341db46dbf12a49c45a4af89f2c6ae9a2b9ba210ab2d7737"
+  "hash": "1cec9a76a8c7d74dea2dfd24ba4455b694fd170bfb4ad4f0368a4580136d5bb8"
 }
