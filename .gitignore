@@ -30,3 +30,4 @@ docker/output/
 .worktrees/
 .worktrees/
 frontend/static/wallpapers
+scripts/backup/node_modules

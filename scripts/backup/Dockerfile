@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY scripts/backup.ts ./backup.ts
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+COPY script.ts ./script.ts
 
-ENTRYPOINT ["bun", "run", "/app/backup.ts"]
+ENTRYPOINT ["bun", "run", "/app/script.ts"]
