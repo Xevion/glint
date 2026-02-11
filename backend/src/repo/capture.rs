@@ -1065,4 +1065,111 @@ impl CaptureRepo {
             })
             .collect())
     }
+
+    /// Mark a capture as failed with an error message.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn mark_failed(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+        error_message: &str,
+    ) -> AppResult<bool> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE captures
+            SET status = 'failed', error_message = $2, updated_at = now()
+            WHERE id = $1
+            "#,
+            id,
+            error_message
+        )
+        .execute(executor)
+        .await
+        .context(format!("failed to mark capture '{}' as failed", id))?;
+
+        debug!(id, error_message, "Capture marked as failed");
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// List captures stuck in 'uploading' status beyond the given age threshold.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_stale_uploading(
+        executor: impl sqlx::PgExecutor<'_>,
+        min_age_secs: i64,
+    ) -> AppResult<Vec<Capture>> {
+        let captures = sqlx::query_as!(
+            Capture,
+            r#"
+            SELECT
+                id AS "id: CaptureId",
+                shader_version_id AS "shader_version_id: ShaderVersionId",
+                scene_id AS "scene_id: SceneId",
+                profile, image_url, image_path,
+                video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
+                minecraft_version, iris_version, gpu_model, resolution_width,
+                resolution_height, captured_at,
+                status AS "status!: CaptureStatus",
+                error_message, thumbhash, file_size_bytes, content_type,
+                world_version_id AS "world_version_id: WorldVersionId",
+                scene_version_id AS "scene_version_id: SceneVersionId",
+                created_at, updated_at
+            FROM captures
+            WHERE status = 'uploading'
+              AND created_at < now() - make_interval(secs => $1::float8)
+            ORDER BY created_at ASC
+            "#,
+            min_age_secs as f64,
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to list stale uploading captures")?;
+
+        debug!(
+            count = captures.len(),
+            min_age_secs, "Listed stale uploading captures"
+        );
+        Ok(captures)
+    }
+
+    /// List completed captures older than `min_age_secs` that are still missing
+    /// thumbhash or file metadata (candidates for integrity verification).
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_unverified_completed(
+        executor: impl sqlx::PgExecutor<'_>,
+        min_age_secs: i64,
+    ) -> AppResult<Vec<Capture>> {
+        let captures = sqlx::query_as!(
+            Capture,
+            r#"
+            SELECT
+                id AS "id: CaptureId",
+                shader_version_id AS "shader_version_id: ShaderVersionId",
+                scene_id AS "scene_id: SceneId",
+                profile, image_url, image_path,
+                video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
+                minecraft_version, iris_version, gpu_model, resolution_width,
+                resolution_height, captured_at,
+                status AS "status!: CaptureStatus",
+                error_message, thumbhash, file_size_bytes, content_type,
+                world_version_id AS "world_version_id: WorldVersionId",
+                scene_version_id AS "scene_version_id: SceneVersionId",
+                created_at, updated_at
+            FROM captures
+            WHERE status = 'completed'
+              AND image_url IS NOT NULL
+              AND (thumbhash IS NULL OR file_size_bytes IS NULL)
+              AND created_at < now() - make_interval(secs => $1::float8)
+            ORDER BY created_at ASC
+            "#,
+            min_age_secs as f64,
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to list unverified completed captures")?;
+
+        debug!(
+            count = captures.len(),
+            min_age_secs, "Listed unverified completed captures"
+        );
+        Ok(captures)
+    }
 }

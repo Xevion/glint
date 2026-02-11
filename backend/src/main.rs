@@ -136,6 +136,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create capture metadata channel
     let (metadata_tx, metadata_rx) = tokio::sync::mpsc::unbounded_channel();
+    let integrity_metadata_tx = metadata_tx.clone();
 
     // Build application state
     let state = AppState::new(
@@ -170,7 +171,15 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Start capture run monitor (detects and times out stale runs)
-    tokio::spawn(services::capture_run_monitor::monitor_capture_runs(pool));
+    tokio::spawn(services::capture_run_monitor::monitor_capture_runs(
+        pool.clone(),
+    ));
+
+    // Start capture integrity sweep (verifies R2 images, cleans up orphans)
+    tokio::spawn(services::capture_integrity::run(
+        pool,
+        integrity_metadata_tx,
+    ));
 
     // Configure CORS
     let cors = CorsLayer::new()

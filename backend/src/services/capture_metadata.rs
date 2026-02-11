@@ -71,78 +71,105 @@ pub async fn run(
     warn!("Metadata worker channel closed, shutting down");
 }
 
+/// Max retry attempts for transient fetch failures (CDN propagation delays, etc.)
+const MAX_RETRIES: u32 = 3;
+
+/// Initial retry delay (doubles each attempt: 10s, 20s, 40s)
+const INITIAL_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(10);
+
 async fn process_capture(pool: &PgPool, capture_id: &str) {
+    for attempt in 0..MAX_RETRIES {
+        match try_process_capture(pool, capture_id).await {
+            Ok(()) => return,
+            Err(ProcessError::Permanent(msg)) => {
+                debug!(capture_id, reason = %msg, "Metadata: skipping (permanent)");
+                return;
+            }
+            Err(ProcessError::Transient(e)) => {
+                if attempt + 1 < MAX_RETRIES {
+                    let delay = INITIAL_RETRY_DELAY * 2u32.pow(attempt);
+                    warn!(
+                        capture_id,
+                        attempt = attempt + 1,
+                        max = MAX_RETRIES,
+                        delay_secs = delay.as_secs(),
+                        error = %e,
+                        "Metadata: transient failure, retrying"
+                    );
+                    tokio::time::sleep(delay).await;
+                } else {
+                    error!(
+                        capture_id,
+                        attempts = MAX_RETRIES,
+                        error = %e,
+                        "Metadata: exhausted retries, giving up"
+                    );
+                }
+            }
+        }
+    }
+}
+
+enum ProcessError {
+    /// Not retryable (capture not found, no URL, already processed)
+    Permanent(String),
+    /// Retryable (network error, CDN propagation, transient failure)
+    Transient(anyhow::Error),
+}
+
+async fn try_process_capture(pool: &PgPool, capture_id: &str) -> Result<(), ProcessError> {
     let capture = match CaptureRepo::find_by_id(pool, capture_id).await {
         Ok(Some(c)) => c,
-        Ok(None) => {
-            warn!(capture_id, "Metadata: capture not found, skipping");
-            return;
-        }
-        Err(e) => {
-            error!(capture_id, error = %e, "Metadata: failed to fetch capture");
-            return;
-        }
+        Ok(None) => return Err(ProcessError::Permanent("capture not found".into())),
+        Err(e) => return Err(ProcessError::Transient(e.into())),
     };
 
     let image_url = match capture.image_url {
         Some(ref url) if !url.is_empty() => url.clone(),
-        _ => {
-            debug!(capture_id, "Metadata: no image_url, skipping");
-            return;
-        }
+        _ => return Err(ProcessError::Permanent("no image_url".into())),
     };
 
     let needs_thumbhash = capture.thumbhash.is_none();
     let needs_file_metadata = capture.file_size_bytes.is_none();
 
     if !needs_thumbhash && !needs_file_metadata {
-        debug!(capture_id, "Metadata: already fully processed, skipping");
-        return;
+        return Err(ProcessError::Permanent("already fully processed".into()));
     }
 
     if needs_thumbhash {
         // Full GET: generate thumbhash + extract file metadata
-        match fetch_and_process(&image_url).await {
-            Ok((hash_b64, file_size, content_type)) => {
-                if let Err(e) = CaptureRepo::set_thumbhash(pool, capture_id, &hash_b64).await {
-                    error!(capture_id, error = %e, "Metadata: failed to save thumbhash");
-                    return;
-                }
-                if let Err(e) =
-                    CaptureRepo::set_file_metadata(pool, capture_id, file_size, &content_type).await
-                {
-                    error!(capture_id, error = %e, "Metadata: failed to save file metadata");
-                    return;
-                }
-                debug!(
-                    capture_id,
-                    file_size, "Metadata: generated thumbhash + file metadata"
-                );
-            }
-            Err(e) => {
-                warn!(capture_id, error = %e, "Metadata: failed to fetch and process image");
-            }
-        }
+        let (hash_b64, file_size, content_type) = fetch_and_process(&image_url)
+            .await
+            .map_err(ProcessError::Transient)?;
+
+        CaptureRepo::set_thumbhash(pool, capture_id, &hash_b64)
+            .await
+            .map_err(|e| ProcessError::Transient(e.into()))?;
+        CaptureRepo::set_file_metadata(pool, capture_id, file_size, &content_type)
+            .await
+            .map_err(|e| ProcessError::Transient(e.into()))?;
+
+        debug!(
+            capture_id,
+            file_size, "Metadata: generated thumbhash + file metadata"
+        );
     } else if needs_file_metadata {
         // HEAD only: just extract file metadata (thumbhash already exists)
-        match fetch_file_metadata(&image_url).await {
-            Ok((file_size, content_type)) => {
-                if let Err(e) =
-                    CaptureRepo::set_file_metadata(pool, capture_id, file_size, &content_type).await
-                {
-                    error!(capture_id, error = %e, "Metadata: failed to save file metadata");
-                    return;
-                }
-                debug!(
-                    capture_id,
-                    file_size, "Metadata: saved file metadata via HEAD"
-                );
-            }
-            Err(e) => {
-                warn!(capture_id, error = %e, "Metadata: failed to HEAD image for metadata");
-            }
-        }
+        let (file_size, content_type) = fetch_file_metadata(&image_url)
+            .await
+            .map_err(ProcessError::Transient)?;
+
+        CaptureRepo::set_file_metadata(pool, capture_id, file_size, &content_type)
+            .await
+            .map_err(|e| ProcessError::Transient(e.into()))?;
+
+        debug!(
+            capture_id,
+            file_size, "Metadata: saved file metadata via HEAD"
+        );
     }
+
+    Ok(())
 }
 
 /// Transcode a single PNG capture to AVIF and update R2 + DB.
