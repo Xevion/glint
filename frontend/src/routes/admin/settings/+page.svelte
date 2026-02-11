@@ -3,7 +3,7 @@
 <div class="space-y-4">
 	<header>
 		<h1 class="text-2xl font-semibold">Settings</h1>
-		<p class="text-muted-foreground">Configure application settings and preferences</p>
+		<p class="text-foreground">Configure application settings and preferences</p>
 	</header>
 
 	<div class="rounded-lg border border-border bg-card p-4">

@@ -163,9 +163,9 @@ function formatNumber(n: number): string {
 <div class="space-y-4">
 	<header>
 		<h1 class="text-2xl font-semibold">Adopt Shaders</h1>
-		<p class="mt-1 text-sm text-muted-foreground">
-			Browse or search for shaders on Modrinth and CurseForge to adopt into Glint.
-		</p>
+	<p class="mt-1 text-sm text-foreground">
+		Browse or search for shaders on Modrinth and CurseForge to adopt into Glint.
+	</p>
 	</header>
 
 	<!-- Search input -->
@@ -237,7 +237,7 @@ function formatNumber(n: number): string {
 			{/each}
 		</div>
 	{:else if results.length === 0 && !error}
-		<p class="py-8 text-center text-muted-foreground">
+		<p class="py-8 text-center text-foreground">
 			{#if searchActive}
 				No shaders found for "{searchQuery}".
 			{:else}
@@ -245,11 +245,11 @@ function formatNumber(n: number): string {
 			{/if}
 		</p>
 	{:else if results.length > 0}
-		<div class="text-xs text-muted-foreground">
-			{totalModrinth} Modrinth results{totalCurseforge !== null
-				? `, ${totalCurseforge} CurseForge results`
-				: ''}
-		</div>
+	<div class="text-xs text-foreground">
+		{totalModrinth} Modrinth results{totalCurseforge !== null
+			? `, ${totalCurseforge} CurseForge results`
+			: ''}
+	</div>
 
 		<!-- Desktop table -->
 		<Table.Root class="hidden border md:block">

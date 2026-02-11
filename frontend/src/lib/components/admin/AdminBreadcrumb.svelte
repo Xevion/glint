@@ -18,15 +18,15 @@ let { backHref, backLabel = 'Go back', segments, trailing }: Props = $props();
 </script>
 
 <nav class="flex items-center gap-1.5 text-sm">
-	<a href={backHref} class="text-muted-foreground hover:text-foreground" aria-label={backLabel}>
+	<a href={backHref} class="text-foreground/70 hover:text-foreground" aria-label={backLabel}>
 		<ArrowLeft class="h-4 w-4" />
 	</a>
 	{#each segments as segment, i (i)}
 		{#if i > 0}
-			<ChevronRight class="h-3.5 w-3.5 text-muted-foreground/60" />
+			<ChevronRight class="h-3.5 w-3.5 text-foreground/60" />
 		{/if}
 		{#if segment.href}
-			<a href={segment.href} class="text-muted-foreground hover:text-foreground">
+			<a href={segment.href} class="text-foreground/70 hover:text-foreground">
 				{segment.label}
 			</a>
 		{:else}

@@ -137,13 +137,13 @@ onDestroy(() => {
 		</div>
 		<div class="flex items-center gap-4">
 			{#if lastRefreshed}
-				<div class="text-sm text-muted-foreground">
-					{#if refreshing}
-						Refreshing...
-					{:else}
-						Updated <TimeAgo timestamp={lastRefreshed} />
-					{/if}
-				</div>
+			<div class="text-sm text-foreground">
+				{#if refreshing}
+					Refreshing...
+				{:else}
+					Updated <TimeAgo timestamp={lastRefreshed} />
+				{/if}
+			</div>
 			{/if}
 			<div class="flex gap-2">
 				<Button

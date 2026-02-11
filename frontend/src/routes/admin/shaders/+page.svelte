@@ -38,7 +38,7 @@ async function refresh() {
 	{#if error}
 		<Alert variant="destructive">Error: {error}</Alert>
 	{:else if shaders.length === 0}
-		<p class="text-muted-foreground">No shaders yet.</p>
+		<p class="text-foreground">No shaders yet.</p>
 	{:else}
 		<AdminTable
 			data={shaders}

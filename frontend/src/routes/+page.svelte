@@ -25,11 +25,11 @@ let overlayVisible = $state(true);
 
 {#snippet statsBar()}
 	<div class="inline-flex items-center gap-6 rounded-full bg-muted/50 backdrop-blur-sm px-6 py-2 text-sm">
-		<span><strong class="text-foreground">{shaders.length}</strong> <span class="text-muted-foreground">Shaders</span></span>
-		<span class="text-muted-foreground/30">|</span>
-		<span><strong class="text-foreground">{sceneCount}</strong> <span class="text-muted-foreground">Scenes</span></span>
-		<span class="text-muted-foreground/30">|</span>
-		<span><strong class="text-foreground">{captures.length}</strong> <span class="text-muted-foreground">Captures</span></span>
+		<span><strong class="text-foreground">{shaders.length}</strong> <span class="text-foreground">Shaders</span></span>
+		<span class="text-foreground/30">|</span>
+		<span><strong class="text-foreground">{sceneCount}</strong> <span class="text-foreground">Scenes</span></span>
+		<span class="text-foreground/30">|</span>
+		<span><strong class="text-foreground">{captures.length}</strong> <span class="text-foreground">Captures</span></span>
 	</div>
 {/snippet}
 
@@ -59,21 +59,21 @@ let overlayVisible = $state(true);
 				>
 					Shader Preview Catalog for Minecraft
 				</p>
-				<div class="mt-6 flex gap-4 {overlayVisible ? 'pointer-events-auto' : 'pointer-events-none'}">
-					<Button href={resolve('/shaders', {})} size="lg" class="shadow-lg">Browse Shaders</Button>
-					<Button href={resolve('/compare', {})} variant="outline" size="lg" class="border-white/50 bg-black/30 text-white shadow-lg backdrop-blur-sm hover:bg-black/50">Compare</Button>
-				</div>
+			<div class="dark mt-6 flex gap-4 {overlayVisible ? 'pointer-events-auto' : 'pointer-events-none'}">
+				<Button href={resolve('/shaders', {})} size="lg" class="shadow-lg">Browse Shaders</Button>
+				<Button href={resolve('/compare', {})} variant="outline" size="lg" class="border-white/50 bg-black/30 text-white shadow-lg backdrop-blur-sm hover:bg-black/50">Compare</Button>
+			</div>
 			</div>
 		</div>
 
 		<!-- Mobile hero text (below slider, not overlaid) -->
 		<div class="mt-4 text-center sm:hidden">
 			<h1 class="text-3xl font-bold tracking-tight">Glint</h1>
-			<p class="mt-1 text-base text-muted-foreground">Shader Preview Catalog for Minecraft</p>
-			<div class="mt-4 flex justify-center gap-3">
-				<Button href={resolve('/shaders', {})} size="default">Browse Shaders</Button>
-				<Button href={resolve('/compare', {})} variant="outline" size="default">Compare</Button>
-			</div>
+			<p class="mt-1 text-base text-foreground">Shader Preview Catalog for Minecraft</p>
+		<div class="mt-4 flex justify-center gap-3">
+			<Button href={resolve('/shaders', {})} size="default">Browse Shaders</Button>
+			<Button href={resolve('/compare', {})} variant="outline" size="default" class="border-foreground/20 bg-foreground/5 hover:bg-foreground/10">Compare</Button>
+		</div>
 		</div>
 
 		<!-- Stats (below hero) -->
@@ -97,15 +97,15 @@ let overlayVisible = $state(true);
 		</h1>
 		<p
 			in:fly={{ y: -10, duration: 500, delay: 100 }}
-			class="mt-4 text-xl text-muted-foreground sm:text-2xl"
+			class="mt-4 text-xl text-foreground sm:text-2xl"
 		>
 			Shader Preview Catalog for Minecraft
 		</p>
 
-		<div in:fade={{ duration: 400, delay: 200 }} class="mt-10 flex justify-center gap-4">
-			<Button href={resolve('/shaders', {})} size="lg">Browse Shaders</Button>
-			<Button href={resolve('/compare', {})} variant="outline" size="lg">Compare</Button>
-		</div>
+	<div in:fade={{ duration: 400, delay: 200 }} class="dark mt-10 flex justify-center gap-4">
+		<Button href={resolve('/shaders', {})} size="lg">Browse Shaders</Button>
+		<Button href={resolve('/compare', {})} variant="outline" size="lg">Compare</Button>
+	</div>
 
 		{#if hasStats}
 			<div
@@ -125,7 +125,7 @@ let overlayVisible = $state(true);
 			<h2 class="text-xl font-semibold">Featured Shaders</h2>
 			<a
 				href={resolve('/shaders', {})}
-				class="text-sm text-muted-foreground hover:text-foreground transition-colors"
+				class="text-sm text-foreground/70 hover:text-foreground transition-colors"
 			>
 				View all →
 			</a>
@@ -149,9 +149,9 @@ let overlayVisible = $state(true);
 			class="group rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm p-6 transition-all hover:border-primary/50 hover:bg-card/50"
 		>
 			<h3 class="text-lg font-medium mb-2">Browse by Scene</h3>
-			<p class="text-sm text-muted-foreground">
-				Compare how different shaders render the same environments
-			</p>
+		<p class="text-sm text-foreground">
+			Compare how different shaders render the same environments
+		</p>
 		</a>
 
 		<a
@@ -159,9 +159,9 @@ let overlayVisible = $state(true);
 			class="group rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm p-6 transition-all hover:border-primary/50 hover:bg-card/50"
 		>
 			<h3 class="text-lg font-medium mb-2">Side-by-Side Compare</h3>
-			<p class="text-sm text-muted-foreground">
-				Put shaders head-to-head to find your perfect match
-			</p>
+		<p class="text-sm text-foreground">
+			Put shaders head-to-head to find your perfect match
+		</p>
 		</a>
 	</div>
 </section>

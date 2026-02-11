@@ -80,9 +80,9 @@ const modes: { value: CompareMode; label: string; icon: typeof Columns3 }[] = [
 		<!-- Header -->
 		<div in:fly={{ y: -10, duration: 400 }} class="mb-6">
 			<h1 class="mb-2 text-3xl font-bold text-foreground">Compare Shaders</h1>
-			<p class="text-muted-foreground">
-				Compare shader screenshots with a slider, split view, or toggle between them.
-			</p>
+		<p class="text-foreground">
+			Compare shader screenshots with a slider, split view, or toggle between them.
+		</p>
 		</div>
 
 		<!-- Scene selector + mode selector -->
@@ -172,7 +172,7 @@ const modes: { value: CompareMode; label: string; icon: typeof Columns3 }[] = [
 			</div>
 
 			<!-- Help text -->
-			<div in:fade={{ duration: 300, delay: 200 }} class="mt-6 text-center text-sm text-muted-foreground">
+			<div in:fade={{ duration: 300, delay: 200 }} class="mt-6 text-center text-sm text-foreground">
 				{#if mode === 'slider'}
 					Drag the slider to reveal one shader over the other
 				{:else if mode === 'split'}

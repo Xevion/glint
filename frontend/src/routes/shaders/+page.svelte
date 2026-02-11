@@ -45,16 +45,16 @@ const hasFilters = $derived(searchQuery !== '');
 		<!-- Title with count -->
 		<h1 class="text-2xl font-semibold tracking-tight">
 			Shaders
-			<span class="ml-1 text-lg font-normal text-muted-foreground">({filteredShaders.length})</span>
+			<span class="ml-1 text-lg font-normal text-foreground">({filteredShaders.length})</span>
 		</h1>
 
 		<div class="flex w-full flex-wrap items-center gap-3 sm:ml-auto sm:w-auto">
 			<!-- Search -->
 			<div class="relative">
-				<Search
-					class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-					strokeWidth={2}
-				/>
+			<Search
+				class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-foreground"
+				strokeWidth={2}
+			/>
 			<Input
 				type="text"
 				placeholder="Search..."
@@ -97,9 +97,9 @@ const hasFilters = $derived(searchQuery !== '');
 		</div>
 	{:else}
 		<div class="flex flex-col items-center justify-center py-16 text-center">
-			<Search class="mb-4 h-16 w-16 text-muted-foreground opacity-50" strokeWidth={1.5} />
-			<h3 class="text-lg font-semibold text-muted-foreground">No shaders found</h3>
-			<p class="mt-1 text-sm text-muted-foreground/70">Try adjusting your filters</p>
+		<Search class="mb-4 h-16 w-16 text-foreground opacity-50" strokeWidth={1.5} />
+		<h3 class="text-lg font-semibold text-foreground">No shaders found</h3>
+		<p class="mt-1 text-sm text-foreground/70">Try adjusting your filters</p>
 		</div>
 	{/if}
 </div>

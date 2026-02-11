@@ -194,9 +194,9 @@ async function refresh() {
 		<Badge variant="destructive">{health.summary.missing} missing</Badge>
 		<Badge variant="secondary">{health.summary.stale} stale</Badge>
 		<Badge variant="outline">{health.summary.failed} failed</Badge>
-		<span class="text-sm text-muted-foreground">
-			/ {health.summary.total_targets} total targets
-		</span>
+	<span class="text-sm text-foreground">
+		/ {health.summary.total_targets} total targets
+	</span>
 	</div>
 
 	<Tabs.Root value="matrix">
@@ -212,10 +212,10 @@ async function refresh() {
 		</Tabs.List>
 
 		<Tabs.Content value="matrix" class="mt-4">
-			{#if shaders.length === 0 || scenes.length === 0}
-				<p class="text-muted-foreground">
-					{shaders.length === 0 ? 'No shaders found.' : 'No active scenes found.'}
-				</p>
+		{#if shaders.length === 0 || scenes.length === 0}
+			<p class="text-foreground">
+				{shaders.length === 0 ? 'No shaders found.' : 'No active scenes found.'}
+			</p>
 			{:else}
 				<div class="flex gap-4">
 					<!-- Matrix Grid -->
@@ -327,7 +327,7 @@ async function refresh() {
 
 		<Tabs.Content value="queue" class="mt-4">
 			{#if workQueue.length === 0}
-				<p class="text-muted-foreground">Work queue is empty. All targets are up to date.</p>
+				<p class="text-foreground">Work queue is empty. All targets are up to date.</p>
 			{:else}
 			<Table.Root class="border">
 				<Table.Header>

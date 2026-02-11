@@ -93,7 +93,7 @@ function openLightbox(captureIndex: number) {
 			<nav
 				aria-label="Breadcrumb"
 				in:fly|local={{ y: -10, duration: 400 }}
-				class="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
+				class="mb-6 flex items-center gap-2 text-sm text-foreground"
 			>
 				<a href={resolve('/shaders', {})} class="transition-colors hover:text-foreground">
 					Shaders
@@ -117,9 +117,9 @@ function openLightbox(captureIndex: number) {
 						<div>
 							<h1 class="text-3xl font-bold text-foreground">{shader.name}</h1>
 							{#if shader.description}
-								<p class="mt-1 max-w-2xl text-sm text-muted-foreground">
-									{shader.description}
-								</p>
+						<p class="mt-1 max-w-2xl text-sm text-foreground">
+								{shader.description}
+							</p>
 							{/if}
 						</div>
 					</div>
@@ -192,38 +192,38 @@ function openLightbox(captureIndex: number) {
 
 					<!-- Links -->
 					{#if shader.website_url}
-						<a
-							href={shader.website_url}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-						>
-							<ExternalLink class="h-3 w-3" />
-							Website
-						</a>
-					{/if}
-					{#if shader.modrinth_id}
-						<a
-							href="https://modrinth.com/shader/{shader.modrinth_id}"
-							target="_blank"
-							rel="noopener noreferrer"
-							class="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-						>
-							<Download class="h-3 w-3" />
-							Modrinth
-						</a>
-					{/if}
-					{#if shader.source_url}
-						<a
-							href={shader.source_url}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-						>
-							<ExternalLink class="h-3 w-3" />
-							Source
-						</a>
-					{/if}
+					<a
+						href={shader.website_url}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex items-center gap-1 text-xs text-foreground/70 transition-colors hover:text-foreground"
+					>
+						<ExternalLink class="h-3 w-3" />
+						Website
+					</a>
+				{/if}
+				{#if shader.modrinth_id}
+					<a
+						href="https://modrinth.com/shader/{shader.modrinth_id}"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex items-center gap-1 text-xs text-foreground/70 transition-colors hover:text-foreground"
+					>
+						<Download class="h-3 w-3" />
+						Modrinth
+					</a>
+				{/if}
+				{#if shader.source_url}
+					<a
+						href={shader.source_url}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex items-center gap-1 text-xs text-foreground/70 transition-colors hover:text-foreground"
+					>
+						<ExternalLink class="h-3 w-3" />
+						Source
+					</a>
+				{/if}
 				</div>
 			</div>
 

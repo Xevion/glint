@@ -116,7 +116,7 @@ async function refresh() {
 	{#if error}
 		<Alert variant="destructive">Error: {error}</Alert>
 	{:else if captures.length === 0}
-		<p class="text-muted-foreground">No captures yet.</p>
+		<p class="text-foreground">No captures yet.</p>
 	{:else}
 		<AdminTable
 			data={captures}
@@ -197,12 +197,12 @@ async function refresh() {
 
 	{#if totalPages > 1}
 		<div class="flex items-center justify-between border-t pt-4">
-			<div class="text-sm text-muted-foreground">
-				Showing {(currentPage - 1) * pageSize + 1}&ndash;{Math.min(
-					currentPage * pageSize,
-					totalCount
-				)} of {totalCount}
-			</div>
+		<div class="text-sm text-foreground">
+			Showing {(currentPage - 1) * pageSize + 1}&ndash;{Math.min(
+				currentPage * pageSize,
+				totalCount
+			)} of {totalCount}
+		</div>
 			<div class="flex items-center gap-2">
 				<Button
 					variant="outline"

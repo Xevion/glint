@@ -168,6 +168,32 @@ Use `opacity-*` on the element instead — this composites the entire SVG as one
 
 Transparent text colors on regular HTML elements (spans, paragraphs) are fine — this only affects multi-path SVGs.
 
+### Muted Foreground and Background Contrast
+
+`text-muted-foreground` is designed for text on **opaque** surfaces (`bg-card`, `bg-muted`, `bg-background`). Glint's page background is not plain white — it layers blurred Minecraft wallpaper images beneath a 70% overlay. In light mode, the effective background is a light gray with subtle color, not pure white. `text-muted-foreground` (oklch 0.552 in light mode) against this produces poor contrast.
+
+**Rule:** Only use `text-muted-foreground` inside elements with an opaque background ancestor (`bg-card`, `bg-muted`, etc.). For text floating directly on the page background (breadcrumbs, subtitles, help text, empty states), use `text-foreground` and express visual hierarchy through font size and weight instead.
+
+```svelte
+<!-- Bad: washed out against wallpaper background -->
+<p class="text-sm text-muted-foreground">Subtitle text here</p>
+
+<!-- Good: readable, hierarchy via text-sm -->
+<p class="text-sm text-foreground">Subtitle text here</p>
+
+<!-- OK: inside an opaque card container -->
+<div class="bg-card p-4">
+    <p class="text-sm text-muted-foreground">Description inside card</p>
+</div>
+```
+
+Components with opaque backgrounds where `text-muted-foreground` is safe:
+- `ShaderCard` / `SceneCard` (use `bg-card`)
+- Admin list rows (use `bg-card`)
+- Filter/toolbar containers (use `bg-card`)
+- Stats pills with `bg-muted`
+- Any element inside a `bg-card`, `bg-muted`, or `bg-background` parent
+
 ## Type Safety
 
 - Import backend types: `import type { Shader } from '$lib/bindings'`

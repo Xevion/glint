@@ -102,7 +102,7 @@ async function deleteSession(tokenPrefix: string) {
 		{/if}
 		<div>
 			<h1 class="text-2xl font-semibold">{user.discord_username}</h1>
-			<code class="text-xs text-muted-foreground">{user.discord_id}</code>
+			<code class="text-xs text-foreground">{user.discord_id}</code>
 		</div>
 	</div>
 

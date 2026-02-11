@@ -202,7 +202,7 @@ async function confirmDelete() {
 	<div class="space-y-3">
 		<h2 class="text-lg font-medium">Versions ({versions.length})</h2>
 		{#if versions.length === 0}
-			<p class="text-sm text-muted-foreground">No versions yet.</p>
+			<p class="text-sm text-foreground">No versions yet.</p>
 		{:else}
 		<Table.Root class="border">
 			<Table.Header>
@@ -247,7 +247,7 @@ async function confirmDelete() {
 			{/if}
 		</div>
 	{#if captures.length === 0}
-		<p class="text-sm text-muted-foreground">No captures yet.</p>
+		<p class="text-sm text-foreground">No captures yet.</p>
 	{:else}
 		<CaptureGridAdmin {captures} alt={(c: CaptureWithContext) => c.scene_name ?? c.scene_id}>
 		{#snippet footer(capture: CaptureWithContext)}

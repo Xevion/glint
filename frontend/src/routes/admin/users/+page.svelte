@@ -43,7 +43,7 @@ function handleRowClick(user: User) {
 	{#if data.error}
 		<Alert variant="destructive">Error: {data.error}</Alert>
 	{:else if users.length === 0}
-		<p class="text-muted-foreground">No users yet.</p>
+		<p class="text-foreground">No users yet.</p>
 	{:else}
 		<AdminTable
 			data={users}

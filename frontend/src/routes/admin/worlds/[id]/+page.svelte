@@ -189,7 +189,7 @@ async function loadVersions() {
 
 		<button
 			type="button"
-			class="flex w-full items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+			class="flex w-full items-center gap-2 text-sm text-foreground/70 hover:text-foreground"
 			onclick={toggleVersions}
 		>
 			{#if showVersions}
@@ -202,9 +202,9 @@ async function loadVersions() {
 
 		{#if showVersions}
 			{#if loadingVersions}
-				<p class="text-sm text-muted-foreground">Loading versions...</p>
+				<p class="text-sm text-foreground">Loading versions...</p>
 			{:else if versions.length === 0}
-				<p class="text-sm text-muted-foreground">No versions found.</p>
+				<p class="text-sm text-foreground">No versions found.</p>
 			{:else}
 				<div class="space-y-2">
 					{#each versions as version, i (version.id)}
@@ -243,7 +243,7 @@ async function loadVersions() {
 	<div class="space-y-3">
 		<h2 class="text-lg font-medium">Scenes ({scenes.length})</h2>
 		{#if scenes.length === 0}
-			<p class="text-sm text-muted-foreground">No scenes for this world.</p>
+			<p class="text-sm text-foreground">No scenes for this world.</p>
 		{:else}
 			<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 				{#each scenes as scene (scene.id)}

@@ -45,7 +45,7 @@ const statCards = $derived([
 	<!-- Header -->
 	<header class="space-y-2">
 		<div class="flex items-center gap-2">
-		<a href="/admin/runs" class="text-muted-foreground hover:text-foreground" aria-label="Back to runs">
+		<a href="/admin/runs" class="text-foreground/70 hover:text-foreground" aria-label="Back to runs">
 			<ArrowLeft class="h-4 w-4" />
 		</a>
 			<h1 class="text-2xl font-semibold">Capture Run</h1>

@@ -16,7 +16,7 @@ let { title, count, refreshing = false, onrefresh, actions }: Props = $props();
 	<div class="flex items-baseline gap-3">
 		<h1 class="text-2xl font-semibold">{title}</h1>
 		{#if count !== undefined}
-			<span class="text-lg text-muted-foreground">{count}</span>
+			<span class="text-lg text-foreground">{count}</span>
 		{/if}
 	</div>
 	<div class="flex items-center gap-2">

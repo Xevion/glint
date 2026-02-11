@@ -48,7 +48,7 @@ let devStack = $derived(dev ? page.error?.stack : null);
 
 		<p
 			in:fade={{ duration: 300, delay: 200 }}
-			class="mb-12 text-xl text-muted-foreground"
+			class="mb-12 text-xl text-foreground"
 		>
 			{message.description}
 		</p>

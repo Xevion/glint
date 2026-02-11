@@ -34,9 +34,9 @@ function formatDimension(dim: string): string {
 	<AdminPageHeader title="Scenes" count={filteredScenes.length} {refreshing} onrefresh={refresh}>
 		{#snippet actions()}
 			{#if showInactive && scenes.some((s) => !s.active)}
-				<span class="text-sm text-muted-foreground">
-					({scenes.filter((s) => !s.active).length} inactive)
-				</span>
+			<span class="text-sm text-foreground">
+				({scenes.filter((s) => !s.active).length} inactive)
+			</span>
 			{/if}
 			<label class="flex items-center gap-2 text-sm">
 				<Checkbox.Root
@@ -51,11 +51,11 @@ function formatDimension(dim: string): string {
 	{#if error}
 		<Alert variant="destructive">Error: {error}</Alert>
 	{:else if filteredScenes.length === 0}
-		<p class="text-muted-foreground">
-			{showInactive
-				? 'No scenes yet.'
-				: 'No active scenes. Enable "Show inactive" to see disabled scenes.'}
-		</p>
+	<p class="text-foreground">
+		{showInactive
+			? 'No scenes yet.'
+			: 'No active scenes. Enable "Show inactive" to see disabled scenes.'}
+	</p>
 	{:else}
 		<div class="flex flex-col overflow-hidden rounded-lg border border-border">
 			{#each filteredScenes as scene (scene.id)}

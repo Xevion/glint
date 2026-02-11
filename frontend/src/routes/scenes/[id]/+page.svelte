@@ -68,7 +68,7 @@ const timeLabel = $derived.by(() => {
 			<!-- Breadcrumb -->
 			<nav
 				in:fly|local={{ y: -10, duration: 400 }}
-				class="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
+				class="mb-6 flex items-center gap-2 text-sm text-foreground"
 			>
 				<a href={resolve('/scenes', {})} class="transition-colors hover:text-foreground">Scenes</a>
 				<ChevronRight class="h-4 w-4" strokeWidth={2} />
