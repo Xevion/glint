@@ -280,6 +280,43 @@ async function beginTransition() {
 			syncRightFromIndex(rightIndex);
 		}
 
+		// If the two visible sides now show different scenes, do a double-swap:
+		// sweep through to the opposite edge to hide the stale side, swap it too.
+		let finalEdgeIsLeft = hidingLeft;
+		const leftScene = pairs[leftIndex].left_scene_name;
+		const rightScene = pairs[rightIndex].right_scene_name;
+
+		if (leftScene !== rightScene) {
+			await generationDelay(SWAP_DELAY, gen);
+			if (generation !== gen) return;
+
+			// Preload the other side's next image during the cross-sweep
+			if (hidingLeft) {
+				const nextIdx = (rightIndex + 1) % rightPool.length;
+				preloadImage(rightPool[nextIdx].image);
+			} else {
+				const nextIdx = (leftIndex + 1) % leftPool.length;
+				preloadImage(leftPool[nextIdx].image);
+			}
+
+			// Sweep from current edge all the way to the opposite edge
+			const crossOvershoot = orientation === 'diagonal' ? SKEW_DEG / 100 : 0;
+			const oppositeEdge = hidingLeft ? 1 + crossOvershoot : 0 - crossOvershoot;
+			await tweenTo(oppositeEdge, SWEEP_MS * 2);
+			if (generation !== gen) return;
+
+			// Swap the now-hidden other side
+			if (hidingLeft) {
+				rightIndex = (rightIndex + 1) % rightPool.length;
+				syncRightFromIndex(rightIndex);
+			} else {
+				leftIndex = (leftIndex + 1) % leftPool.length;
+				syncLeftFromIndex(leftIndex);
+			}
+
+			finalEdgeIsLeft = !hidingLeft;
+		}
+
 		swapSide = swapSide === 'left' ? 'right' : 'left';
 
 		// Brief pause for image swap to render
@@ -291,7 +328,7 @@ async function beginTransition() {
 		orientation = nextOrientation;
 
 		const inOvershoot = nextOrientation === 'diagonal' ? SKEW_DEG / 100 : 0;
-		dividerPosition = hidingLeft ? 0 - inOvershoot : 1 + inOvershoot;
+		dividerPosition = finalEdgeIsLeft ? 0 - inOvershoot : 1 + inOvershoot;
 
 		await tweenTo(0.5, SWEEP_MS);
 		if (generation !== gen) return;
