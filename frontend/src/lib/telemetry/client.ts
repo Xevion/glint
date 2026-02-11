@@ -96,7 +96,7 @@ class TelemetryClient {
 
 	private log(message: string, data?: unknown): void {
 		if (dev) {
-			console.log(`[telemetry] ${message}`, data ?? '');
+			console.debug(`[telemetry] ${message}`, data ?? '');
 		}
 	}
 }

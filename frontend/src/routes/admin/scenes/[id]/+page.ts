@@ -1,4 +1,5 @@
-import { createApiClient } from '$lib/api';
+import { createApiClient, ApiErrorType } from '$lib/api';
+import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params, fetch }) => {
@@ -11,12 +12,17 @@ export const load: PageLoad = async ({ params, fetch }) => {
 
 	const scene = sceneRes.match({
 		Ok: (s) => s,
-		Err: (e) => e.throw()
+		Err: (err) => {
+			if (err.type === ApiErrorType.NotFound) error(404, { message: 'Scene not found' });
+			error(500, { message: 'Failed to load scene' });
+		}
 	});
 
 	const capturesData = capturesRes.match({
 		Ok: (c) => c,
-		Err: (e) => e.throw()
+		Err: () => {
+			error(500, { message: 'Failed to load captures' });
+		}
 	});
 
 	// Fetch world data for display name (non-critical — fall back to world_id)

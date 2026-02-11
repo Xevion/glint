@@ -73,7 +73,9 @@ export class ApiClient {
 					path,
 					status: response.status
 				});
-				return Result.ok(null as T);
+				// Type-safe: only fetchVoid() should reach this path.
+				// The cast is sound because fetchVoid() fixes T = null.
+				return Result.ok(null as T & null);
 			}
 
 			// Parse successful response
@@ -107,6 +109,15 @@ export class ApiClient {
 			});
 			return Result.err(ApiError.network(message));
 		}
+	}
+
+	/**
+	 * Fetch wrapper for endpoints that return no body (204 No Content).
+	 * Type-safe alternative to fetchJson<null> — prevents accidental use
+	 * with non-null type parameters.
+	 */
+	protected fetchVoid(path: string, options?: RequestInit): Promise<Result<null, ApiError>> {
+		return this.fetchJson<null>(path, options);
 	}
 
 	/**
@@ -174,9 +185,9 @@ export class ApiClient {
 	}
 
 	/**
-	 * DELETE request
+	 * DELETE request (returns no body)
 	 */
-	protected delete<T>(path: string): Promise<Result<T, ApiError>> {
-		return this.fetchJson<T>(path, { method: 'DELETE' });
+	protected delete(path: string): Promise<Result<null, ApiError>> {
+		return this.fetchVoid(path, { method: 'DELETE' });
 	}
 }

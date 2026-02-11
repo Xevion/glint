@@ -69,7 +69,7 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	deleteShader(id: string): Promise<Result<null, ApiError>> {
-		return this.delete<null>(`/api/shaders/${encodeURIComponent(id)}`);
+		return this.delete(`/api/shaders/${encodeURIComponent(id)}`);
 	}
 
 	syncShader(id: string): Promise<Result<Shader, ApiError>> {
@@ -91,7 +91,7 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	deleteWorld(id: string): Promise<Result<null, ApiError>> {
-		return this.delete<null>(`/api/worlds/${encodeURIComponent(id)}`);
+		return this.delete(`/api/worlds/${encodeURIComponent(id)}`);
 	}
 
 	listWorldVersions(worldId: string): Promise<Result<WorldVersion[], ApiError>> {
@@ -113,7 +113,7 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	disableScene(id: string): Promise<Result<null, ApiError>> {
-		return this.delete<null>(`/api/scenes/${encodeURIComponent(id)}`);
+		return this.delete(`/api/scenes/${encodeURIComponent(id)}`);
 	}
 
 	reactivateScene(id: string): Promise<Result<Scene, ApiError>> {
@@ -146,7 +146,7 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	deleteCapture(id: string): Promise<Result<null, ApiError>> {
-		return this.delete<null>(`/api/captures/${encodeURIComponent(id)}`);
+		return this.delete(`/api/captures/${encodeURIComponent(id)}`);
 	}
 
 	// ============== Users ==============
@@ -164,13 +164,13 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	deleteUserSessions(id: number): Promise<Result<null, ApiError>> {
-		return this.delete<null>(`/api/users/${encodeURIComponent(id)}/sessions`);
+		return this.delete(`/api/users/${encodeURIComponent(id)}/sessions`);
 	}
 
 	// ============== Sessions ==============
 
 	deleteSession(userId: number, tokenPrefix: string): Promise<Result<null, ApiError>> {
-		return this.delete<null>(
+		return this.delete(
 			`/api/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(tokenPrefix)}`
 		);
 	}

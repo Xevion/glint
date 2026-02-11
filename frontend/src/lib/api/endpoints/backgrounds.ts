@@ -48,6 +48,6 @@ export class BackgroundEndpoints extends ApiClient {
 	}
 
 	remove(id: string): Promise<Result<null, ApiError>> {
-		return this.fetchJson<null>(`/api/backgrounds/${encodeURIComponent(id)}`, { method: 'DELETE' });
+		return this.delete(`/api/backgrounds/${encodeURIComponent(id)}`);
 	}
 }

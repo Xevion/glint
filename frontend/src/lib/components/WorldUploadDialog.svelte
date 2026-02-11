@@ -179,6 +179,12 @@ async function handleSubmit() {
 }
 
 async function handleVersionUpload(fileToUpload: Blob) {
+	if (!worldId) {
+		error = 'No world ID provided';
+		step = 'error';
+		return;
+	}
+
 	try {
 		// Step 1: Compute hash
 		step = 'hashing';
@@ -189,7 +195,7 @@ async function handleVersionUpload(fileToUpload: Blob) {
 
 		// Step 2: Request presigned URL for version
 		step = 'preparing';
-		const prepareResult = await api.worlds.createWorldVersionUpload(worldId!, {
+		const prepareResult = await api.worlds.createWorldVersionUpload(worldId, {
 			file_hash: hashWithPrefix,
 			file_size_bytes: fileToUpload.size
 		});
@@ -222,7 +228,7 @@ async function handleVersionUpload(fileToUpload: Blob) {
 
 		// Step 4: Complete upload (verify + create version record)
 		step = 'finalizing';
-		const completeResult = await api.worlds.completeWorldVersionUpload(worldId!, {
+		const completeResult = await api.worlds.completeWorldVersionUpload(worldId, {
 			upload_id
 		});
 
