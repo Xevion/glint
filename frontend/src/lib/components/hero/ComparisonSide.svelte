@@ -30,7 +30,7 @@ $effect(() => {
 	loaded = false;
 });
 
-const href = $derived(side.slug ? resolve('/shaders/[id]', { id: side.slug }) : undefined);
+const href = $derived(side.slug ? resolve('/shaders/[slug]', { slug: side.slug }) : undefined);
 const detail = $derived.by(() => {
 	if (side.author && side.version) return `by ${side.author}, ${formatVersion(side.version)}`;
 	if (side.version) return formatVersion(side.version);

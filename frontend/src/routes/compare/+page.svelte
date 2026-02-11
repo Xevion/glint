@@ -16,7 +16,10 @@ import { ArrowLeftRight, Columns3, SplitSquareHorizontal, ToggleLeft } from '@lu
 import { fade, fly } from 'svelte/transition';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 
 type CompareImageOption = ImageOption & { shader: ShaderDisplayInfo };
 

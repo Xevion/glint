@@ -108,6 +108,7 @@ impl ShaderRepo {
     pub async fn create(
         executor: impl sqlx::PgExecutor<'_>,
         id: &str,
+        slug: &str,
         req: &CreateShaderRequest,
     ) -> AppResult<Shader> {
         let result = sqlx::query_as!(
@@ -119,7 +120,7 @@ impl ShaderRepo {
             "#,
             id,
             req.name,
-            req.slug,
+            slug,
             req.description,
             req.modrinth_id,
             req.curseforge_id,
@@ -128,7 +129,7 @@ impl ShaderRepo {
         .fetch_one(executor)
         .await;
 
-        result.conflict_on_unique(format!("Shader with slug '{}' already exists", req.slug))
+        result.conflict_on_unique(format!("Shader with slug '{}' already exists", slug))
     }
 
     #[instrument(skip(executor), level = "debug")]
@@ -151,15 +152,17 @@ impl ShaderRepo {
             r#"
             UPDATE shaders SET
                 name = COALESCE($1, name),
-                description = COALESCE($2, description),
-                modrinth_id = COALESCE($3, modrinth_id),
-                curseforge_id = COALESCE($4, curseforge_id),
-                website_url = COALESCE($5, website_url),
+                slug = COALESCE($2, slug),
+                description = COALESCE($3, description),
+                modrinth_id = COALESCE($4, modrinth_id),
+                curseforge_id = COALESCE($5, curseforge_id),
+                website_url = COALESCE($6, website_url),
                 updated_at = now()
-            WHERE id = $6
+            WHERE id = $7
             RETURNING *
             "#,
             req.name,
+            req.slug,
             req.description,
             req.modrinth_id,
             req.curseforge_id,

@@ -33,7 +33,10 @@ import {
 import { onDestroy, onMount } from 'svelte';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 
 let shaderCount: number = $derived(data.shaderCount);
 let worldCount: number = $derived(data.worldCount);

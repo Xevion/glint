@@ -17,7 +17,10 @@ import { statusColorFallback, statusColors } from '$lib/utils/status';
 import { Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 let capture: CaptureDetail = $derived(data.capture);
 
 let error = $state<string | null>(null);

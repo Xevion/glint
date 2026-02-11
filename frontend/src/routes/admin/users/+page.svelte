@@ -6,7 +6,10 @@ import { AdminPageHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 let users = $derived(data.users);
 let refreshing = $state(false);
 

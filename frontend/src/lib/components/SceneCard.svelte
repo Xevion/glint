@@ -32,13 +32,13 @@ function getTimeOfDay(ticks: number): string {
 const timeOfDay = $derived(getTimeOfDay(scene.version.time_of_day_ticks));
 
 function handleCardClick() {
-	void goto(resolve('/scenes/[id]', { id: scene.slug }), { invalidateAll: true });
+	void goto(resolve('/scenes/[slug]', { slug: scene.slug }), { invalidateAll: true });
 }
 
 function handleKeyDown(e: KeyboardEvent) {
 	if (e.key === 'Enter' || e.key === ' ') {
 		e.preventDefault();
-		void goto(resolve('/scenes/[id]', { id: scene.slug }), { invalidateAll: true });
+		void goto(resolve('/scenes/[slug]', { slug: scene.slug }), { invalidateAll: true });
 	}
 }
 </script>
@@ -87,7 +87,7 @@ function handleKeyDown(e: KeyboardEvent) {
 		<!-- Header -->
 		<div class="space-y-1.5">
 			<a
-				href={resolve('/scenes/[id]', { id: scene.slug })}
+				href={resolve('/scenes/[slug]', { slug: scene.slug })}
 				data-clickable
 				onclick={(e) => {
 					e.stopPropagation();

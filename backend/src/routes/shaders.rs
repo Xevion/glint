@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 
 use crate::{
     auth::AdminUser,
-    error::{AppError, AppResult},
+    error::{AppError, AppResult, OptionNotFoundExt},
     id::{self, ShaderVersionId},
     middleware::client_ip::ClientIp,
     models::{
@@ -12,7 +12,7 @@ use crate::{
     },
     repo::{
         CaptureRepo, CategoryRepo, FeatureRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo,
-        ShaderViewRepo,
+        ShaderViewRepo, SlugRedirectRepo,
         capture::{CaptureDistinct, CaptureFilters},
     },
     state::AppState,
@@ -21,6 +21,7 @@ use axum::{
     Json, Router,
     extract::{ConnectInfo, Path, Query, State},
     http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Redirect, Response},
     routing::{get, post},
 };
 use serde::Deserialize;
@@ -36,6 +37,38 @@ pub fn router() -> Router<AppState> {
             get(get_shader).put(update_shader).delete(delete_shader),
         )
         .route("/{id}/versions", post(create_shader_version))
+}
+
+/// Response type for shader detail endpoint: either JSON data or a 301 redirect.
+enum ShaderDetailResponse {
+    Data(Box<Json<ShaderWithCaptures>>),
+    Redirect(Redirect),
+}
+
+impl IntoResponse for ShaderDetailResponse {
+    fn into_response(self) -> Response {
+        match self {
+            Self::Data(json) => json.into_response(),
+            Self::Redirect(r) => r.into_response(),
+        }
+    }
+}
+
+/// Build a redirect URL for a shader, preserving query params.
+fn build_shader_redirect_url(slug: &str, query: &ShaderDetailQuery) -> String {
+    let mut url = format!("/api/shaders/{}", slug);
+    let mut params = Vec::new();
+    if let Some(ref v) = query.version_id {
+        params.push(format!("versionId={v}"));
+    }
+    if let Some(ref p) = query.profile {
+        params.push(format!("profile={p}"));
+    }
+    if !params.is_empty() {
+        url.push('?');
+        url.push_str(&params.join("&"));
+    }
+    url
 }
 
 /// Compute a viewer hash from client IP and User-Agent for deduplication.
@@ -113,15 +146,49 @@ struct ShaderDetailQuery {
 }
 
 /// GET /api/shaders/{id} - Get shader by ID or slug with versions and captures (public)
+///
+/// Supports 301 redirects: if the path param is a nanoid, old slug, or non-canonical slug,
+/// the response redirects to the canonical `/api/shaders/{current_slug}` URL.
 async fn get_shader(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path(id): Path<String>,
     Query(query): Query<ShaderDetailQuery>,
     headers: HeaderMap,
-) -> AppResult<Json<ShaderWithCaptures>> {
+) -> Result<ShaderDetailResponse, AppError> {
     let db = state.db();
-    let shader = ShaderRepo::get(db, &id).await?;
+
+    // Try lookup by ID or slug without auto-404
+    let shader = if id.len() <= crate::id::ID_LENGTH {
+        // Could be a nanoid or a short slug — check both
+        ShaderRepo::find_by_id(db, &id)
+            .await?
+            .or(ShaderRepo::find_by_slug(db, &id).await?)
+    } else {
+        ShaderRepo::find_by_slug(db, &id).await?
+    };
+
+    let shader = match shader {
+        Some(shader) => {
+            if id != shader.slug {
+                // Input was nanoid or non-canonical — redirect to canonical slug URL
+                let url = build_shader_redirect_url(&shader.slug, &query);
+                return Ok(ShaderDetailResponse::Redirect(Redirect::permanent(&url)));
+            }
+            shader
+        }
+        None => {
+            // Not found by ID or slug — check redirect table for old slugs
+            if let Some(entity_id) = SlugRedirectRepo::find_entity_id(db, "shader", &id).await?
+                && let Some(shader) = ShaderRepo::find_by_id(db, &entity_id).await?
+            {
+                let url = build_shader_redirect_url(&shader.slug, &query);
+                return Ok(ShaderDetailResponse::Redirect(Redirect::permanent(&url)));
+            }
+            return Err(AppError::NotFound(format!("Shader '{}' not found", id)));
+        }
+    };
+
     let versions = ShaderVersionRepo::list_by_shader_with_counts(db, shader.id.as_ref()).await?;
 
     // Default to latest version when no version_id is specified
@@ -157,11 +224,13 @@ async fn get_shader(
         }
     });
 
-    Ok(Json(ShaderWithCaptures {
-        shader,
-        versions,
-        captures,
-    }))
+    Ok(ShaderDetailResponse::Data(Box::new(Json(
+        ShaderWithCaptures {
+            shader,
+            versions,
+            captures,
+        },
+    ))))
 }
 
 #[derive(Debug, Deserialize)]
@@ -221,8 +290,14 @@ async fn create_shader(
     State(state): State<AppState>,
     Json(request): Json<CreateShaderRequest>,
 ) -> AppResult<(StatusCode, Json<Shader>)> {
+    let slug = request
+        .slug
+        .clone()
+        .unwrap_or_else(|| crate::slug::slugify(&request.name));
     let id = id::generate_id();
-    let shader = ShaderRepo::create(state.db(), &id, &request).await?;
+    // Clear any old redirect for this slug so the new entity owns it cleanly
+    SlugRedirectRepo::delete_by_old_slug(state.db(), "shader", &slug).await?;
+    let shader = ShaderRepo::create(state.db(), &id, &slug, &request).await?;
     info!(shader_id = %shader.id, slug = %shader.slug, "Shader created");
     Ok((StatusCode::CREATED, Json(shader)))
 }
@@ -251,6 +326,17 @@ async fn update_shader(
     Path(id): Path<String>,
     Json(request): Json<UpdateShaderRequest>,
 ) -> AppResult<Json<Shader>> {
+    // If slug is being changed, record the old one as a redirect
+    if let Some(ref new_slug) = request.slug {
+        let old = ShaderRepo::find_by_id(state.db(), &id)
+            .await?
+            .or_not_found("Shader", &id)?;
+        if old.slug != *new_slug {
+            SlugRedirectRepo::upsert(state.db(), "shader", &old.slug, &old.id.0).await?;
+            // Clear any existing redirect for the new slug so it's not stale
+            SlugRedirectRepo::delete_by_old_slug(state.db(), "shader", new_slug).await?;
+        }
+    }
     let shader = ShaderRepo::update(state.db(), &id, &request).await?;
     Ok(Json(shader))
 }

@@ -9,7 +9,10 @@ import * as Checkbox from '$lib/components/ui/checkbox';
 import { Camera, CloudSun, Globe, MapPin } from '@lucide/svelte';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 let scenes: SceneWithWorld[] = $derived(data.scenes);
 let refreshing = $state(false);
 let showInactive = $state(false);

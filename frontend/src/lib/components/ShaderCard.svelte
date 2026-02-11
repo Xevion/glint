@@ -47,7 +47,7 @@ function handleCardClick(e: MouseEvent) {
 		return;
 	}
 
-	void goto(resolve('/shaders/[id]', { id: shader.slug }), { invalidateAll: true });
+	void goto(resolve('/shaders/[slug]', { slug: shader.slug }), { invalidateAll: true });
 }
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -56,7 +56,7 @@ function handleKeyDown(e: KeyboardEvent) {
 		if (hasAnySelection) {
 			comparisonStore.select(shader);
 		} else {
-			void goto(resolve('/shaders/[id]', { id: shader.slug }), { invalidateAll: true });
+			void goto(resolve('/shaders/[slug]', { slug: shader.slug }), { invalidateAll: true });
 		}
 	}
 }
@@ -126,7 +126,7 @@ function handleCheckboxClick(e: MouseEvent) {
 		<!-- Header -->
 		<div class="flex flex-wrap items-baseline gap-x-2">
 			<a
-				href={resolve('/shaders/[id]', { id: shader.slug })}
+				href={resolve('/shaders/[slug]', { slug: shader.slug })}
 				data-clickable
 				onclick={(e) => {
 					e.stopPropagation();

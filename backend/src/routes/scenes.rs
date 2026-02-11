@@ -4,6 +4,7 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
+    response::{IntoResponse, Redirect, Response},
     routing::{delete, get, put},
 };
 use serde::Deserialize;
@@ -17,7 +18,7 @@ use crate::{
         SceneWithVersion, SceneWithWorld, UpdateSceneMetadataRequest, UpdateSceneRequest,
     },
     repo::{
-        CaptureRepo, SceneRepo, SceneVersionRepo, TagRepo, WorldRepo,
+        CaptureRepo, SceneRepo, SceneVersionRepo, SlugRedirectRepo, TagRepo, WorldRepo,
         capture::{CaptureDistinct, CaptureFilters},
     },
     state::AppState,
@@ -109,12 +110,29 @@ struct SceneQuery {
     world_id: Option<String>,
 }
 
+/// Response type for scene-by-slug endpoint: either JSON data or a 301 redirect.
+enum SceneSlugResponse {
+    Data(Json<Vec<SceneWithCaptures>>),
+    Redirect(Redirect),
+}
+
+impl IntoResponse for SceneSlugResponse {
+    fn into_response(self) -> Response {
+        match self {
+            Self::Data(json) => json.into_response(),
+            Self::Redirect(r) => r.into_response(),
+        }
+    }
+}
+
 /// GET /api/scenes/by-slug/{slug} - Get scene by slug with captures (public)
+///
+/// Supports 301 redirects when accessing via an old slug that has since been renamed.
 async fn get_scene_by_slug(
     State(state): State<AppState>,
     Path(slug): Path<String>,
     Query(params): Query<SceneQuery>,
-) -> AppResult<Json<Vec<SceneWithCaptures>>> {
+) -> Result<SceneSlugResponse, AppError> {
     // Fetch all scenes with this slug (world-scoped), optionally filtered by world_id
     let scenes = if let Some(ref world_id) = params.world_id {
         match SceneRepo::find_by_slug_and_world(state.db(), &slug, world_id).await? {
@@ -125,8 +143,18 @@ async fn get_scene_by_slug(
         SceneRepo::find_active_by_slug(state.db(), &slug).await?
     };
 
-    // Return 404 only if slug is completely unused (no scenes found at all)
+    // If no scenes found, check redirect table before returning 404
     if scenes.is_empty() {
+        if let Some(entity_id) =
+            SlugRedirectRepo::find_entity_id(state.db(), "scene", &slug).await?
+            && let Some(scene) = SceneRepo::find_by_id(state.db(), &entity_id).await?
+        {
+            let mut url = format!("/api/scenes/by-slug/{}", scene.slug);
+            if let Some(ref wid) = params.world_id {
+                url.push_str(&format!("?worldId={wid}"));
+            }
+            return Ok(SceneSlugResponse::Redirect(Redirect::permanent(&url)));
+        }
         return Err(AppError::NotFound(format!("Scene '{}' not found", slug)));
     }
 
@@ -161,7 +189,7 @@ async fn get_scene_by_slug(
         });
     }
 
-    Ok(Json(results))
+    Ok(SceneSlugResponse::Data(Json(results)))
 }
 
 /// GET /api/scenes/{id} - Get scene by ID with latest version (admin)

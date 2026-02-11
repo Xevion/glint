@@ -17,7 +17,10 @@ import { RotateCcw, Trash2 } from '@lucide/svelte';
 import { untrack } from 'svelte';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 let scene: SceneWithVersion = $derived(data.scene);
 let world: WorldWithDetails | null = $derived(data.world);
 let captures: CaptureWithContext[] = $derived(data.captures);

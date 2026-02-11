@@ -5,13 +5,13 @@ import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	const api = createApiClient(fetch);
-	const result = await api.shaders.getShader(params.id);
+	const result = await api.shaders.getShader(params.slug);
 
 	let shader = result.match({
 		Ok: (s) => s,
 		Err: (err) => {
 			if (err.type === ApiErrorType.NotFound) {
-				error(404, { message: `Shader "${params.id}" not found` });
+				error(404, { message: `Shader "${params.slug}" not found` });
 			}
 			return err.throw();
 		}
@@ -23,7 +23,7 @@ export const load: PageLoad = async ({ params, fetch }) => {
 	if (shader.captures.length === 0) {
 		const versionWithCaptures = shader.versions.find((v) => v.capture_count > 0);
 		if (versionWithCaptures) {
-			const refetch = await api.shaders.getShader(params.id, {
+			const refetch = await api.shaders.getShader(params.slug, {
 				versionId: versionWithCaptures.id
 			});
 			if (refetch.isOk) {

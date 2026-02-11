@@ -10,7 +10,10 @@ import { formatBytes } from '$lib/utils/format';
 import { Camera, Globe, HardDrive, Layers, MapPin } from '@lucide/svelte';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 let worlds = $derived(data.worlds);
 let refreshing = $state(false);
 let error = $derived(data.error);

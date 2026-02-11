@@ -7,7 +7,10 @@ import { Search } from '@lucide/svelte';
 import { fade, fly, scale } from 'svelte/transition';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 const scenes = $derived(data.scenes);
 
 // Filter state

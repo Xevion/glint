@@ -28,7 +28,10 @@ import {
 import type { PageData } from './$types';
 
 // --- My Shaders data (from SSR load) ---
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 let shaders = $derived(data.shaders);
 let shadersError = $derived(data.error);
 

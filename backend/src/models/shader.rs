@@ -182,7 +182,7 @@ pub struct ShaderSearchRequest {
 #[derive(Debug, Deserialize)]
 pub struct CreateShaderRequest {
     pub name: String,
-    pub slug: String,
+    pub slug: Option<String>,
     pub description: Option<String>,
     pub modrinth_id: Option<String>,
     pub curseforge_id: Option<String>,
@@ -200,6 +200,7 @@ pub struct CreateShaderVersionRequest {
 #[derive(Debug, Deserialize)]
 pub struct UpdateShaderRequest {
     pub name: Option<String>,
+    pub slug: Option<String>,
     pub description: Option<String>,
     pub modrinth_id: Option<String>,
     pub curseforge_id: Option<String>,

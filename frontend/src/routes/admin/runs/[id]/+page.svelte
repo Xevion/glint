@@ -9,7 +9,10 @@ import { statusColorFallback, statusColors } from '$lib/utils/status';
 import { ArrowLeft, ExternalLink } from '@lucide/svelte';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 let run: CaptureRun = $derived(data.run);
 let items: CaptureRunItemWithContext[] = $derived(data.items);
 let refreshing = $state(false);

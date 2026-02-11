@@ -23,7 +23,10 @@ import type { PageData } from './$types';
 const PLATFORM_URL_PATTERN =
 	/^https?:\/\/(www\.)?(modrinth\.com\/shader\/|curseforge\.com\/minecraft\/shaders\/)/i;
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 let shader: ShaderWithCaptures = $derived(data.shader);
 let versions: ShaderVersionDetail[] = $derived(data.shader.versions);
 let captures: CaptureWithContext[] = $derived(data.shader.captures);

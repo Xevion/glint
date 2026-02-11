@@ -11,7 +11,10 @@ import { Activity, Grid3x3 } from '@lucide/svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 
 let health = $derived(data.health);
 let workQueue = $derived(data.workQueue);

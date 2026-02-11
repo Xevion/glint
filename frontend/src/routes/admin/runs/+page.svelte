@@ -9,7 +9,10 @@ import { formatDuration } from '$lib/utils/format';
 import { statusColorFallback, statusColors } from '$lib/utils/status';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 let runs = $derived(data.runs);
 let refreshing = $state(false);
 

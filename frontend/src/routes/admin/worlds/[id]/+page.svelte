@@ -18,7 +18,10 @@ import { ChevronDown, ChevronRight, Trash2 } from '@lucide/svelte';
 import { untrack } from 'svelte';
 import type { PageData } from './$types';
 
-let { data } = $props<{ data: PageData }>();
+interface Props {
+	data: PageData;
+}
+let { data }: Props = $props();
 let world: WorldWithDetails = $derived(data.world);
 let scenes: Scene[] = $derived(data.world.scenes);
 
