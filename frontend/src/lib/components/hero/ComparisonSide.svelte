@@ -21,7 +21,7 @@ let { side, position, clipPath, orientation, willChange }: Props = $props();
 let loaded = $state(false);
 
 const placeholder = $derived(browser ? decodeThumbhash(side.thumbhash) : null);
-const src = $derived(cfImageUrl(side.image, { width: 1280, format: 'auto' }));
+const src = $derived(cfImageUrl(side.image, 'hero'));
 const srcset = $derived(cfImageSrcset(side.image, 'hero'));
 
 // Reset loaded state when the image URL changes

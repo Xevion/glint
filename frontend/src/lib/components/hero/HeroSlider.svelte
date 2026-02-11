@@ -404,7 +404,10 @@ $effect(() => {
 		}
 	}
 	return () => {
-		if (img) img.src = '';
+		if (img) {
+			img.srcset = '';
+			img.src = '';
+		}
 	};
 });
 

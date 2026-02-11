@@ -113,7 +113,8 @@ export function resolveImageSource(source: string | ImageSourceLike): {
 }
 
 /**
- * Preload an image in the background at the given preset (defaults to 'hero').
+ * Preload an image in the background using responsive srcset/sizes so the
+ * browser fetches the same variant it would pick for the actual `<img>`.
  * Returns the Image element for optional cleanup.
  */
 export function preloadImage(
@@ -121,9 +122,13 @@ export function preloadImage(
 	preset: ImagePreset = 'hero'
 ): HTMLImageElement | null {
 	if (!src) return null;
-	const url = cfImageUrl(src, preset);
-	if (!url) return null;
+	const srcset = cfImageSrcset(src, preset);
+	if (!srcset) return null;
 	const img = new Image();
-	img.src = url;
+	img.srcset = srcset;
+	img.sizes = IMAGE_PRESETS[preset].sizes;
+	// Fallback src for browsers that ignore srcset on Image()
+	const url = cfImageUrl(src, preset);
+	if (url) img.src = url;
 	return img;
 }
