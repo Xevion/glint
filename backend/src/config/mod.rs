@@ -4,6 +4,8 @@ use figment::{
 };
 use serde::{Deserialize, Deserializer};
 
+use crate::middleware::rate_limit::RateLimitConfig;
+
 /// Accept either a sequence `["a", "b"]` or a comma-separated string `"a,b"`.
 fn deserialize_string_or_seq<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<String>, D::Error> {
     #[derive(Deserialize)]
@@ -49,6 +51,10 @@ pub struct Config {
     /// PostHog analytics configuration
     #[serde(default)]
     pub posthog: PostHogConfig,
+
+    /// Rate limiting configuration
+    #[serde(default)]
+    pub rate_limit: RateLimitConfig,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]

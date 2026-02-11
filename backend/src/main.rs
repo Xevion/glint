@@ -205,10 +205,24 @@ async fn main() -> anyhow::Result<()> {
         ])
         .allow_credentials(true);
 
+    // Log rate limiting status
+    if config.rate_limit.enabled {
+        info!(
+            global = config.rate_limit.global.requests_per_minute,
+            auth = config.rate_limit.auth.requests_per_minute,
+            device = config.rate_limit.device.requests_per_minute,
+            upload = config.rate_limit.upload.requests_per_minute,
+            trusted_proxy_hops = config.rate_limit.trusted_proxy_hops,
+            "Rate limiting enabled"
+        );
+    } else {
+        warn!("Rate limiting disabled");
+    }
+
     // Build router
     let analytics_layer =
         glint::middleware::analytics::AnalyticsLayer::new(state.analytics().cloned());
-    let app = routes::router(state)
+    let app = routes::router(state.clone(), &config.rate_limit, state.analytics())
         .layer(analytics_layer)
         .layer(cors)
         .layer(glint::middleware::request_id::RequestIdLayer);
@@ -220,7 +234,11 @@ async fn main() -> anyhow::Result<()> {
     info!(addr = %addr, "Server started");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

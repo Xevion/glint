@@ -57,7 +57,8 @@ where
         let path = req.uri().path().to_string();
         let start = Instant::now();
 
-        let mut inner = self.inner.clone();
+        let clone = self.inner.clone();
+        let mut inner = std::mem::replace(&mut self.inner, clone);
         Box::pin(async move {
             let response = inner.call(req).await?;
 
