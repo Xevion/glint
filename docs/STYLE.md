@@ -81,7 +81,7 @@ HTTP status codes map to error categories: 400 (validation), 404 (not found), 40
 
 ## API Design
 
-- **Casing**: All JSON fields use `camelCase`
+- **Casing**: All JSON fields and query parameters use `camelCase`. Rust structs use idiomatic `snake_case` internally with `#[serde(rename_all = "camelCase")]` on all request/response types and query parameter structs.
 - **List responses**: Wrapped with `{ items: [...], total: N }` for pagination support
 - **Single responses**: Return the object directly (no wrapper)
 - **IDs in URLs**: Use the resource's primary identifier: `/api/shaders/{id}`

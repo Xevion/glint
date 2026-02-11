@@ -91,7 +91,7 @@ let viewAllHref = $derived.by(() => {
 		case 'scene':
 			return `/admin/captures?scene=${capture.scene_id}`;
 		case 'run':
-			return `/admin/captures?run_id=${capture.run_id}`;
+			return `/admin/captures?runId=${capture.run_id}`;
 		default:
 			return null;
 	}

@@ -16,8 +16,7 @@ export class SceneEndpoints extends ApiClient {
 	 */
 	getBySlug(slug: string, worldId?: string): Promise<Result<SceneWithCaptures[], ApiError>> {
 		const searchParams = new URLSearchParams();
-		// TODO: backend uses snake_case query params (world_id) — migrate to camelCase (worldId)
-		if (worldId) searchParams.set('world_id', worldId);
+		if (worldId) searchParams.set('worldId', worldId);
 		const query = searchParams.toString();
 		const url = `/api/scenes/by-slug/${encodeURIComponent(slug)}${query ? `?${query}` : ''}`;
 		return this.get<SceneWithCaptures[]>(url);

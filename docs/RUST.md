@@ -87,10 +87,19 @@ Optional services return `Option<&T>` — handlers check availability before use
 
 ## Serialization
 
-- All public-facing types use `#[serde(rename_all = "camelCase")]`
+- All public-facing types use `#[serde(rename_all = "camelCase")]` — this includes response models, request bodies, **and query parameter structs** (`Query<T>` extractors)
 - Types exported to frontend derive `TS` with `#[ts(export)]`
 - `DateTime<Utc>` serializes as ISO 8601 strings (`#[ts(type = "string")]` for TypeScript)
 - Request types: derive `Deserialize`. Response types: derive `Serialize`. Shared types: both.
+
+```rust
+// Query param structs get camelCase too — clients send ?worldId=..., not ?world_id=...
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SceneQuery {
+    world_id: Option<String>,
+}
+```
 
 ## Async
 

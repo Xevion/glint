@@ -411,7 +411,7 @@ object GlintApi {
         worldId: String,
         token: String,
     ): Result<List<ApiScene>> {
-        val url = "$apiUrl/api/scenes?world_id=$worldId"
+        val url = "$apiUrl/api/scenes?worldId=$worldId"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
@@ -451,7 +451,7 @@ object GlintApi {
         slugs: List<String>,
         token: String,
     ): Result<Unit> {
-        val url = "$apiUrl/api/scenes/batch?world_id=$worldId"
+        val url = "$apiUrl/api/scenes/batch?worldId=$worldId"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
@@ -490,7 +490,7 @@ object GlintApi {
         sceneSlug: String,
         token: String,
     ): Result<Unit> {
-        val url = "$apiUrl/api/scenes/by-slug/$sceneSlug?world_id=$worldId"
+        val url = "$apiUrl/api/scenes/by-slug/$sceneSlug?worldId=$worldId"
 
         return try {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection

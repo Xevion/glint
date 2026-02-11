@@ -106,6 +106,7 @@ async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shade
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ShaderDetailQuery {
     version_id: Option<String>,
     profile: Option<String>,

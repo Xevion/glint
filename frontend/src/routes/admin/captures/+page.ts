@@ -6,11 +6,11 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	const api = createApiClient(fetch);
 
 	const page = Number(url.searchParams.get('page') ?? '1');
-	const pageSize = Number(url.searchParams.get('page_size') ?? '50');
+	const pageSize = Number(url.searchParams.get('pageSize') ?? '50');
 	const shader = url.searchParams.get('shader') ?? undefined;
 	const scene = url.searchParams.get('scene') ?? undefined;
 	const status = url.searchParams.get('status') ?? undefined;
-	const runId = url.searchParams.get('run_id') ?? undefined;
+	const runId = url.searchParams.get('runId') ?? undefined;
 
 	const [result, shadersRes, scenesRes] = await Promise.all([
 		api.admin.listCaptures({ page, pageSize, shader, scene, status, runId }),

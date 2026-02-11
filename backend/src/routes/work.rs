@@ -9,6 +9,7 @@ use crate::repo::work::WorkItem;
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkQuery {
     pub limit: Option<i64>,
     pub force: Option<bool>,

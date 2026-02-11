@@ -30,7 +30,7 @@ function navigateToPage(p: number) {
 
 function changePageSize(size: number) {
 	const url = new URL(pageStore.url);
-	url.searchParams.set('page_size', String(size));
+	url.searchParams.set('pageSize', String(size));
 	url.searchParams.set('page', '1');
 	void goto(url.toString(), { keepFocus: true });
 }
@@ -55,7 +55,7 @@ const columns = [
 	{ id: 'file_size', key: 'file_size_bytes', name: 'Size' },
 	{ id: 'captured_at', key: 'captured_at', name: 'Captured', component: 'time' as const },
 	{ id: 'freshness', key: 'freshness', name: 'Freshness' },
-	{ id: 'run', key: 'run_id', name: 'Run' }
+	{ id: 'run', key: 'runId', name: 'Run' }
 ];
 
 async function refresh() {
@@ -107,7 +107,7 @@ async function refresh() {
 		{#if data.filters.runId}
 			<span class="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs">
 				Run: {data.filters.runId}
-				<button class="hover:text-foreground" onclick={() => setFilter('run_id', '')}>x</button
+				<button class="hover:text-foreground" onclick={() => setFilter('runId', '')}>x</button
 				>
 			</span>
 		{/if}

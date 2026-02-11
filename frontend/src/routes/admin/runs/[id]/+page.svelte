@@ -85,7 +85,7 @@ class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {st
 	<!-- Link to captures filtered by this run -->
 	<div>
 		<a
-			href="/admin/captures?run_id={run.id}"
+			href="/admin/captures?runId={run.id}"
 			class="inline-flex items-center gap-1 text-sm text-primary hover:underline"
 		>
 			View all captures from this run <ExternalLink class="h-3 w-3" />

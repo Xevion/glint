@@ -104,6 +104,7 @@ async fn list_scenes_all(
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SceneQuery {
     world_id: Option<String>,
 }
@@ -212,6 +213,7 @@ async fn create_scene(
 
 /// PUT /api/scenes/by-slug/{slug} - Update scene by slug (admin)
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct WorldIdParam {
     world_id: String,
 }
@@ -302,6 +304,7 @@ struct BatchDisableRequest {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct BatchDisableQuery {
     world_id: String,
 }

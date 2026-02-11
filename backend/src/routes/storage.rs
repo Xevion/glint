@@ -11,6 +11,7 @@ use crate::repo::{CaptureRepo, StorageBucket, StorageStats};
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct GrowthParams {
     days: Option<i32>,
     interval_hours: Option<i32>,

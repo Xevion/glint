@@ -20,6 +20,7 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CaptureListParams {
     pub page: Option<i32>,
     pub page_size: Option<i32>,

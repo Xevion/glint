@@ -5,7 +5,7 @@ import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params, fetch, url }) => {
 	const api = createApiClient(fetch);
-	const worldId = url.searchParams.get('world_id');
+	const worldId = url.searchParams.get('worldId');
 
 	const result = await api.scenes.getBySlug(params.id, worldId ?? undefined);
 
