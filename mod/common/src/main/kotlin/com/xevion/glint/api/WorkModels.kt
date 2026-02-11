@@ -82,22 +82,6 @@ data class CaptureRunItem(
     val errorMessage: String? = null,
 )
 
-/** Request for a presigned upload URL. */
-@Serializable
-data class UploadUrlRequest(
-    val shaderId: String,
-    val sceneId: String,
-)
-
-/** Response with presigned upload URL and capture metadata. */
-@Serializable
-data class UploadUrlResponse(
-    val captureId: String,
-    val r2Key: String,
-    val presignedUrl: String,
-    val imageUrl: String,
-)
-
 /** Request to mark a run item as completed. */
 @Serializable
 data class CompleteItemRequest(

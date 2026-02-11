@@ -2,8 +2,9 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
-import com.xevion.glint.api.GlintApi
+import com.xevion.glint.api.HttpClient
 import com.xevion.glint.api.PushResult
+import com.xevion.glint.api.SceneClient
 import com.xevion.glint.api.SceneSyncManager
 import com.xevion.glint.orchestration.CaptureSpec
 import com.xevion.glint.orchestration.ShaderSpec
@@ -369,6 +370,7 @@ class SceneManagerScreen(
         }
 
         val allCollections = SceneManager.discoverAllCollections()
+        val client = HttpClient(config.apiUrl, token = config.accessToken)
         var totalScenes = 0
 
         for ((_, collection) in allCollections) {
@@ -377,7 +379,7 @@ class SceneManagerScreen(
 
             java.util.concurrent.CompletableFuture
                 .supplyAsync {
-                    GlintApi.fetchScenes(config.apiUrl, worldId, config.accessToken)
+                    SceneClient.fetchScenes(client, worldId)
                 }.thenAccept { fetchResult ->
                     fetchResult.fold(
                         onSuccess = { apiScenes ->
@@ -401,6 +403,7 @@ class SceneManagerScreen(
                                                     ),
                                                 )
                                             }
+
                                             is PushResult.Failure -> {
                                                 SystemToast.addOrUpdate(
                                                     minecraft!!.toastManager,

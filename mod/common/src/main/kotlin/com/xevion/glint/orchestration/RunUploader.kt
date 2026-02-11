@@ -1,11 +1,12 @@
 package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.api.AgentApi
+import com.xevion.glint.api.AgentClient
 import com.xevion.glint.api.ApiError
 import com.xevion.glint.api.ClaimItemRequest
 import com.xevion.glint.api.ConfirmUploadRequest
 import com.xevion.glint.api.FailItemRequest
+import com.xevion.glint.api.HttpClient
 import com.xevion.glint.api.ReportFailureRequest
 import com.xevion.glint.api.WorkItem
 import java.util.concurrent.CancellationException
@@ -41,6 +42,7 @@ class RunUploader(
     maxConcurrent: Int = 4,
 ) {
     private val log = Loggers.Orchestration.get()
+    private val client = HttpClient(apiUrl, token = apiToken)
     private val executor: ExecutorService = Executors.newFixedThreadPool(maxConcurrent)
     private val submittedItemIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val pendingCount = AtomicInteger(0)
@@ -97,10 +99,9 @@ class RunUploader(
                     "completed" to completedCount.get()
                     "failed" to failed
                 }
-                AgentApi
+                AgentClient
                     .failItem(
-                        apiUrl,
-                        apiToken,
+                        client,
                         runId,
                         info.itemId,
                         FailItemRequest(errorMessage = "Upload failed: ${e.message}"),
@@ -136,10 +137,9 @@ class RunUploader(
         for ((item, itemId) in unsubmittedEntries) {
             val future =
                 CompletableFuture.runAsync({
-                    AgentApi
+                    AgentClient
                         .failItem(
-                            apiUrl,
-                            apiToken,
+                            client,
                             runId,
                             itemId,
                             FailItemRequest(errorMessage = "Capture not taken"),
@@ -170,10 +170,9 @@ class RunUploader(
     ) {
         val future =
             CompletableFuture.runAsync({
-                AgentApi
+                AgentClient
                     .reportFailure(
-                        apiUrl,
-                        apiToken,
+                        client,
                         ReportFailureRequest(
                             shaderVersionId = shaderVersionId,
                             errorMessage = message,
@@ -244,10 +243,9 @@ class RunUploader(
     ) {
         log.debug("Claiming item") { "item_id" to itemId }
         val claimResponse =
-            AgentApi
+            AgentClient
                 .claimItem(
-                    apiUrl,
-                    apiToken,
+                    client,
                     runId,
                     itemId,
                     ClaimItemRequest(
@@ -263,9 +261,9 @@ class RunUploader(
             "item_id" to itemId
             "capture_id" to claimResponse.captureId
         }
-        AgentApi.uploadFile(claimResponse.presignedUrl, event.fileBytes).getOrThrow()
+        AgentClient.uploadFile(claimResponse.presignedUrl, event.fileBytes).getOrThrow()
 
         log.debug("Confirming upload") { "item_id" to itemId }
-        AgentApi.confirmUpload(apiUrl, apiToken, runId, itemId, ConfirmUploadRequest()).getOrThrow()
+        AgentClient.confirmUpload(client, runId, itemId, ConfirmUploadRequest()).getOrThrow()
     }
 }

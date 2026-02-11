@@ -2,9 +2,9 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiError
+import com.xevion.glint.api.AuthClient
 import com.xevion.glint.api.DeviceAuthResponse
 import com.xevion.glint.api.DeviceTokenResponse
-import com.xevion.glint.api.GlintApi
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintScreen
 import com.xevion.glint.ui.base.GlintTheme
@@ -144,7 +144,7 @@ class DeviceAuthScreen(
 
         CompletableFuture
             .supplyAsync {
-                GlintApi.startDeviceAuth(serverUrl)
+                AuthClient.startDeviceAuth(serverUrl)
             }.thenAccept { result ->
                 minecraft?.execute {
                     isLoading = false
@@ -202,7 +202,7 @@ class DeviceAuthScreen(
 
                     if (!isPolling.get()) break
 
-                    val result = GlintApi.pollDeviceToken(serverUrl, response.deviceCode)
+                    val result = AuthClient.pollDeviceToken(serverUrl, response.deviceCode)
                     result
                         .onSuccess { tokenResponse ->
                             isPolling.set(false)

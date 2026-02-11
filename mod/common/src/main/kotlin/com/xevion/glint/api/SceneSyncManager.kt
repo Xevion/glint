@@ -41,7 +41,8 @@ object SceneSyncManager {
                     "collection" to collectionFileName
                 }
 
-                val fetchResult = GlintApi.fetchScenes(config.apiUrl, worldId, config.accessToken)
+                val client = HttpClient(config.apiUrl, token = config.accessToken)
+                val fetchResult = SceneClient.fetchScenes(client, worldId)
 
                 fetchResult.fold(
                     onSuccess = { apiScenes ->
@@ -147,12 +148,13 @@ object SceneSyncManager {
                     "remove" to diff.toRemove.size
                 }
 
+                val client = HttpClient(config.apiUrl, token = config.accessToken)
                 var created = 0
                 var updated = 0
                 var removed = 0
 
                 for (scene in diff.toCreate) {
-                    val result = GlintApi.createScene(config.apiUrl, worldId, scene, config.accessToken)
+                    val result = SceneClient.createScene(client, worldId, scene)
                     result.fold(
                         onSuccess = {
                             log.debug("Created scene") { "slug" to scene.id }
@@ -173,7 +175,7 @@ object SceneSyncManager {
 
                 for (sceneUpdate in diff.toUpdate) {
                     val result =
-                        GlintApi.updateScene(config.apiUrl, worldId, sceneUpdate.local, config.accessToken)
+                        SceneClient.updateScene(client, worldId, sceneUpdate.local)
                     result.fold(
                         onSuccess = {
                             log.debug("Updated scene") { "slug" to sceneUpdate.local.id }
@@ -195,7 +197,7 @@ object SceneSyncManager {
                 if (diff.toRemove.isNotEmpty()) {
                     val slugs = diff.toRemove.map { it.slug }
                     val result =
-                        GlintApi.batchDisableScenes(config.apiUrl, worldId, slugs, config.accessToken)
+                        SceneClient.batchDisableScenes(client, worldId, slugs)
                     result.fold(
                         onSuccess = {
                             log.debug("Batch disabled scenes") { "count" to slugs.size }

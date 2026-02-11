@@ -1,7 +1,7 @@
 package com.xevion.glint
 
 import com.xevion.glint.api.ApiConfig
-import com.xevion.glint.api.GlintApi
+import com.xevion.glint.api.UrlValidation
 import com.xevion.glint.input.KeybindHandler
 import com.xevion.glint.orchestration.AutonomousRunner
 import com.xevion.glint.session.SessionRegistry
@@ -117,7 +117,7 @@ object Glint {
 
         CompletableFuture
             .supplyAsync {
-                GlintApi.testConnection(config.apiUrl)
+                UrlValidation.testConnection(config.apiUrl)
             }.thenAccept { result ->
                 result
                     .onSuccess {

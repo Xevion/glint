@@ -5,7 +5,8 @@ import com.xevion.glint.api.CompleteWorldUploadRequest
 import com.xevion.glint.api.CompleteWorldVersionUploadRequest
 import com.xevion.glint.api.CreateWorldUploadRequest
 import com.xevion.glint.api.CreateWorldVersionUploadRequest
-import com.xevion.glint.api.GlintApi
+import com.xevion.glint.api.HttpClient
+import com.xevion.glint.api.WorldClient
 import com.xevion.glint.api.WorldInfo
 import net.minecraft.client.Minecraft
 import java.io.File
@@ -89,10 +90,11 @@ object WorldUploader {
                 // Step 3: Initiate upload (get presigned URL)
                 progressCallback(UploadProgress.finalizing())
                 val fileHash = "sha256:$hash"
+                val client = HttpClient(apiUrl, token = token)
 
                 val createResult =
-                    GlintApi.createWorldUpload(
-                        apiUrl = apiUrl,
+                    WorldClient.createWorldUpload(
+                        client,
                         request =
                             CreateWorldUploadRequest(
                                 name = name,
@@ -102,7 +104,6 @@ object WorldUploader {
                                 fileHash = fileHash,
                                 fileSizeBytes = zipSize,
                             ),
-                        token = token,
                     )
 
                 val uploadResponse =
@@ -125,11 +126,10 @@ object WorldUploader {
                 // Step 5: Complete upload
                 progressCallback(UploadProgress.finalizing())
                 val completeResult =
-                    GlintApi.completeWorldUpload(
-                        apiUrl = apiUrl,
+                    WorldClient.completeWorldUpload(
+                        client,
                         worldSlug = slug,
                         request = CompleteWorldUploadRequest(uploadId = uploadResponse.uploadId),
-                        token = token,
                     )
 
                 val worldInfo =
@@ -214,17 +214,17 @@ object WorldUploader {
                 // Step 3: Create version upload (get presigned URL)
                 progressCallback(UploadProgress.finalizing())
                 val fileHash = "sha256:$hash"
+                val client = HttpClient(apiUrl, token = token)
 
                 val createResult =
-                    GlintApi.createWorldVersionUpload(
-                        apiUrl = apiUrl,
+                    WorldClient.createWorldVersionUpload(
+                        client,
                         worldId = worldId,
                         request =
                             CreateWorldVersionUploadRequest(
                                 fileHash = fileHash,
                                 fileSizeBytes = zipSize,
                             ),
-                        token = token,
                     )
 
                 val response =
@@ -250,11 +250,10 @@ object WorldUploader {
                 // Step 5: Complete upload (verify + create version record)
                 progressCallback(UploadProgress.finalizing())
                 val completeResult =
-                    GlintApi.completeWorldVersionUpload(
-                        apiUrl = apiUrl,
+                    WorldClient.completeWorldVersionUpload(
+                        client,
                         worldId = worldId,
                         request = CompleteWorldVersionUploadRequest(uploadId = response.uploadId),
-                        token = token,
                     )
 
                 completeResult.getOrElse { error ->

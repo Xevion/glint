@@ -2,10 +2,13 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
-import com.xevion.glint.api.GlintApi
+import com.xevion.glint.api.HttpClient
 import com.xevion.glint.api.PullResult
 import com.xevion.glint.api.PushResult
+import com.xevion.glint.api.SceneClient
 import com.xevion.glint.api.SceneSyncManager
+import com.xevion.glint.api.UrlValidation
+import com.xevion.glint.api.WorldClient
 import com.xevion.glint.api.WorldInfo
 import com.xevion.glint.download.WorldDownloader
 import com.xevion.glint.orchestration.CaptureSpec
@@ -716,7 +719,7 @@ class GlintMainScreen(
         CompletableFuture
             .supplyAsync {
                 val start = System.currentTimeMillis()
-                val result = GlintApi.testConnection(config.apiUrl)
+                val result = UrlValidation.testConnection(config.apiUrl)
                 val latency = System.currentTimeMillis() - start
                 Pair(result, latency)
             }.thenAccept { (result, latency) ->
@@ -991,7 +994,7 @@ class GlintMainScreen(
 
         CompletableFuture
             .supplyAsync {
-                GlintApi.fetchScenes(config.apiUrl, apiWorldId, config.accessToken)
+                SceneClient.fetchScenes(HttpClient(config.apiUrl, token = config.accessToken), apiWorldId)
             }.thenAccept { fetchResult ->
                 minecraft?.execute {
                     fetchResult.fold(
@@ -1418,7 +1421,7 @@ class GlintMainScreen(
         CompletableFuture
             .supplyAsync {
                 val localCollections = SceneManager.discoverAllCollections()
-                val apiResult = GlintApi.listWorlds(config.apiUrl, config.accessToken)
+                val apiResult = WorldClient.listWorlds(HttpClient(config.apiUrl, token = config.accessToken))
                 Pair(localCollections, apiResult)
             }.thenAccept { (localCollections, apiResult) ->
                 minecraft?.execute {

@@ -1,9 +1,10 @@
 package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.api.AgentApi
+import com.xevion.glint.api.AgentClient
 import com.xevion.glint.api.CreateRunItemRequest
 import com.xevion.glint.api.CreateRunRequest
+import com.xevion.glint.api.HttpClient
 import com.xevion.glint.api.WorkItem
 import com.xevion.glint.session.SessionRegistry
 import net.minecraft.client.Minecraft
@@ -26,6 +27,7 @@ class AutonomousRunner(
     private val workLimit: Int = 50,
 ) {
     private val log = Loggers.Orchestration.get()
+    private val client = HttpClient(apiUrl, token = apiToken)
     private val assetPreparer = AssetPreparer(Minecraft.getInstance().gameDirectory)
 
     private val isForceMode: Boolean = forceScenes != null || forceShaders != null
@@ -91,9 +93,8 @@ class AutonomousRunner(
         state = State.FetchingWork
         pendingFuture =
             CompletableFuture.supplyAsync {
-                AgentApi.fetchWork(
-                    apiUrl,
-                    apiToken,
+                AgentClient.fetchWork(
+                    client,
                     limit = workLimit,
                     force = isForceMode,
                     shaders = forceShaders,
@@ -144,10 +145,10 @@ class AutonomousRunner(
                             },
                     )
 
-                val runResult = AgentApi.createRun(apiUrl, apiToken, createRequest)
+                val runResult = AgentClient.createRun(client, createRequest)
                 val run = runResult.getOrThrow()
 
-                val itemsResult = AgentApi.listRunItems(apiUrl, apiToken, run.id)
+                val itemsResult = AgentClient.listRunItems(client, run.id)
                 val runItems = itemsResult.getOrThrow()
 
                 Triple(run.id, runItems, workItems)
@@ -319,7 +320,7 @@ class AutonomousRunner(
         pendingFuture =
             CompletableFuture.supplyAsync {
                 uploader?.drainAndShutdown()
-                AgentApi.completeRun(apiUrl, apiToken, runId)
+                AgentClient.completeRun(client, runId)
             }
     }
 
