@@ -3,30 +3,41 @@ import { goto, invalidateAll } from '$app/navigation';
 import { untrack } from 'svelte';
 import { api } from '$lib/api';
 import type { UpdateShaderRequest } from '$lib/api/endpoints/admin';
-import type { CaptureWithContext, ShaderVersion, ShaderWithCaptures } from '$lib/bindings';
+import type { CaptureWithContext, ShaderVersionDetail, ShaderWithCaptures } from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
+import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
+import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
 import * as Table from '$lib/components/ui/table';
 import { Alert } from '$lib/components/ui/alert';
 import { formatGameVersions } from '$lib/utils/display';
-import { Trash2 } from '@lucide/svelte';
+import { CircleAlert, Link, LoaderCircle, RefreshCw, Trash2 } from '@lucide/svelte';
 import type { PageData } from './$types';
+
+const PLATFORM_URL_PATTERN =
+	/^https?:\/\/(www\.)?(modrinth\.com\/shader\/|curseforge\.com\/minecraft\/shaders\/)/i;
 
 let { data } = $props<{ data: PageData }>();
 let shader: ShaderWithCaptures = $derived(data.shader);
-let versions: ShaderVersion[] = $derived(data.shader.versions);
+let versions: ShaderVersionDetail[] = $derived(data.shader.versions);
 let captures: CaptureWithContext[] = $derived(data.shader.captures);
 
 let saving = $state(false);
+let syncing = $state(false);
 let actionLoading = $state(false);
 let error = $state<string | null>(null);
+let syncSuccess = $state(false);
 let showDeleteConfirm = $state(false);
+let linkDialogOpen = $state(false);
+let linkUrl = $state('');
+let linkError = $state<string | null>(null);
+let linking = $state(false);
 
 let editName = $state('');
 let editDescription = $state('');
@@ -41,6 +52,24 @@ let isDirty = $derived(
 		editCurseforgeId !== (shader.curseforge_id ?? '') ||
 		editWebsiteUrl !== (shader.website_url ?? '')
 );
+
+let hasLinkedPlatform = $derived(!!shader.modrinth_id || !!shader.curseforge_id);
+let canLinkMorePlatforms = $derived(!shader.modrinth_id || !shader.curseforge_id);
+
+/** Compute sync staleness: how old the last sync is */
+let syncAge = $derived.by(() => {
+	if (!shader.last_synced_at) return null;
+	const ms = Date.now() - new Date(shader.last_synced_at).getTime();
+	return { hours: ms / (1000 * 60 * 60), days: ms / (1000 * 60 * 60 * 24) };
+});
+
+let syncStatus = $derived.by<'never' | 'fresh' | 'stale' | 'very-stale'>(() => {
+	if (!hasLinkedPlatform) return 'never';
+	if (!syncAge) return 'never';
+	if (syncAge.days > 7) return 'very-stale';
+	if (syncAge.days > 1) return 'stale';
+	return 'fresh';
+});
 
 $effect(() => {
 	void shader.id;
@@ -85,6 +114,81 @@ async function handleSave() {
 	}
 }
 
+async function handleSync() {
+	syncing = true;
+	error = null;
+	syncSuccess = false;
+
+	try {
+		const result = await api.admin.syncShader(shader.id);
+		result.match({
+			Ok: () => {
+				syncSuccess = true;
+				void invalidateAll();
+				setTimeout(() => (syncSuccess = false), 3000);
+			},
+			Err: (err) => {
+				error = err.message;
+			}
+		});
+	} finally {
+		syncing = false;
+	}
+}
+
+function isValidPlatformUrl(input: string): boolean {
+	return PLATFORM_URL_PATTERN.test(input.trim());
+}
+
+async function handleLink() {
+	const trimmed = linkUrl.trim();
+	if (!trimmed) return;
+
+	if (!isValidPlatformUrl(trimmed)) {
+		linkError = 'Please enter a valid Modrinth or CurseForge shader URL.';
+		return;
+	}
+
+	linking = true;
+	linkError = null;
+
+	try {
+		const result = await api.admin.linkShaderPlatform(shader.id, trimmed);
+		result.match({
+			Ok: () => {
+				linkDialogOpen = false;
+				linkUrl = '';
+				linkError = null;
+				void invalidateAll();
+			},
+			Err: (err) => {
+				if (err.statusCode === 409) {
+					linkError = 'This platform is already linked to this shader.';
+				} else {
+					linkError = err.message;
+				}
+			}
+		});
+	} finally {
+		linking = false;
+	}
+}
+
+function handleLinkDialogChange(newOpen: boolean) {
+	linkDialogOpen = newOpen;
+	if (!newOpen) {
+		linkUrl = '';
+		linkError = null;
+		linking = false;
+	}
+}
+
+function handleLinkKeydown(e: KeyboardEvent) {
+	if (e.key === 'Enter' && !linking) {
+		void handleLink();
+	}
+}
+
 async function confirmDelete() {
 	actionLoading = true;
 	try {
@@ -125,6 +229,120 @@ async function confirmDelete() {
 
 	{#if error}
 		<Alert variant="destructive">{error}</Alert>
+	{/if}
+
+	{#if syncSuccess}
+		<Alert>Shader synced successfully from upstream.</Alert>
+	{/if}
+
+	<!-- Upstream Sync Section -->
+	{#if hasLinkedPlatform}
+		<div class="rounded-lg border bg-card p-4">
+			<div class="flex items-center justify-between">
+				<div class="space-y-1">
+					<h3 class="text-sm font-medium">Upstream Sync</h3>
+					<div class="flex items-center gap-2 text-sm text-muted-foreground">
+						{#if syncStatus === 'never'}
+							<Badge variant="outline" class="text-warning border-warning/30">Never synced</Badge>
+						{:else if syncStatus === 'very-stale'}
+							<Badge variant="outline" class="text-destructive border-destructive/30">Stale</Badge>
+							<span>Last synced <TimeAgo timestamp={shader.last_synced_at!} /></span>
+						{:else if syncStatus === 'stale'}
+							<Badge variant="outline" class="text-warning border-warning/30">Due for sync</Badge>
+							<span>Last synced <TimeAgo timestamp={shader.last_synced_at!} /></span>
+						{:else}
+							<Badge variant="outline" class="text-green-600 border-green-600/30 dark:text-green-400 dark:border-green-400/30">Synced</Badge>
+							<span>Last synced <TimeAgo timestamp={shader.last_synced_at!} /></span>
+						{/if}
+					</div>
+					<div class="flex items-center gap-3 text-xs text-muted-foreground">
+						{#if shader.modrinth_id}
+							<a
+								href="https://modrinth.com/shader/{shader.modrinth_id}"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="hover:text-foreground"
+							>Modrinth</a>
+						{/if}
+						{#if shader.curseforge_id}
+							<a
+								href="https://www.curseforge.com/minecraft/shaders/{shader.curseforge_id}"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="hover:text-foreground"
+							>CurseForge</a>
+						{/if}
+					</div>
+				</div>
+				<div class="flex items-center gap-2">
+					{#if canLinkMorePlatforms}
+						<Dialog.Root open={linkDialogOpen} onOpenChange={handleLinkDialogChange}>
+							<Dialog.Trigger>
+								{#snippet child({ props })}
+									<Button variant="outline" size="sm" {...props}>
+										<Link class="mr-2 h-4 w-4" />
+										Link Platform
+									</Button>
+								{/snippet}
+							</Dialog.Trigger>
+							<Dialog.Content class="sm:max-w-md">
+								<Dialog.Header>
+									<Dialog.Title>Link Platform</Dialog.Title>
+									<Dialog.Description>
+										Link an additional platform ({shader.modrinth_id ? 'CurseForge' : 'Modrinth'}) to this shader.
+									</Dialog.Description>
+								</Dialog.Header>
+
+								{#if linkError}
+									<Alert variant="destructive">
+										<CircleAlert class="h-4 w-4" />
+										<div>{linkError}</div>
+									</Alert>
+								{/if}
+
+								<div class="grid gap-4 py-4">
+									<div class="grid gap-2">
+										<Label for="link-url">Platform URL</Label>
+										<Input
+											id="link-url"
+											placeholder={shader.modrinth_id
+												? 'https://www.curseforge.com/minecraft/shaders/...'
+												: 'https://modrinth.com/shader/...'}
+											bind:value={linkUrl}
+											onkeydown={handleLinkKeydown}
+											disabled={linking}
+										/>
+										<p class="text-xs text-muted-foreground">
+											Paste the {shader.modrinth_id ? 'CurseForge' : 'Modrinth'} URL for this shader
+										</p>
+									</div>
+								</div>
+
+								<Dialog.Footer>
+									<Button variant="outline" onclick={() => (linkDialogOpen = false)}>Cancel</Button>
+									<Button onclick={handleLink} disabled={linking || !linkUrl.trim()}>
+										{#if linking}
+											<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+										{:else}
+											<Link class="mr-2 h-4 w-4" />
+										{/if}
+										Link
+									</Button>
+								</Dialog.Footer>
+							</Dialog.Content>
+						</Dialog.Root>
+					{/if}
+					<Button variant="outline" size="sm" onclick={handleSync} disabled={syncing}>
+						{#if syncing}
+							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+						{:else}
+							<RefreshCw class="mr-2 h-4 w-4" />
+						{/if}
+						Sync Now
+					</Button>
+				</div>
+			</div>
+		</div>
 	{/if}
 
 	<!-- Edit Section -->
@@ -184,9 +402,9 @@ async function confirmDelete() {
 					{shader.upstream_downloads.toLocaleString()}
 				</AdminDetailField>
 			{/if}
-			{#if shader.last_synced_at}
-				<AdminDetailField label="Last Synced">
-					<TimeAgo timestamp={shader.last_synced_at} />
+			{#if shader.upstream_updated_at}
+				<AdminDetailField label="Upstream Updated">
+					<TimeAgo timestamp={shader.upstream_updated_at} />
 				</AdminDetailField>
 			{/if}
 			<AdminDetailField label="Created">

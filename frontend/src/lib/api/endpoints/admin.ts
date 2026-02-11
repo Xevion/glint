@@ -72,6 +72,14 @@ export class AdminEndpoints extends ApiClient {
 		return this.delete<null>(`/api/shaders/${encodeURIComponent(id)}`);
 	}
 
+	syncShader(id: string): Promise<Result<Shader, ApiError>> {
+		return this.post<Shader>(`/api/shaders/${encodeURIComponent(id)}/sync`, {});
+	}
+
+	linkShaderPlatform(id: string, url: string): Promise<Result<Shader, ApiError>> {
+		return this.post<Shader>(`/api/shaders/${encodeURIComponent(id)}/link`, { url });
+	}
+
 	// ============== Worlds ==============
 
 	getWorld(id: string): Promise<Result<WorldWithDetails, ApiError>> {

@@ -16,8 +16,22 @@ const columns = [
 	{ id: 'name', key: 'name', name: 'Name' },
 	{ id: 'slug', key: 'slug', name: 'Slug' },
 	{ id: 'description', key: 'description', name: 'Description' },
+	{ id: 'sync_status', key: 'last_synced_at', name: 'Sync' },
 	{ id: 'created_at', key: 'created_at', name: 'Created', component: 'time' as const }
 ];
+
+function getSyncStatus(shader: Shader): { label: string; class: string } {
+	const hasLink = !!shader.modrinth_id || !!shader.curseforge_id;
+	if (!hasLink) return { label: 'No link', class: 'text-muted-foreground' };
+	if (!shader.last_synced_at) return { label: 'Never', class: 'text-warning' };
+
+	const days = (Date.now() - new Date(shader.last_synced_at).getTime()) / (1000 * 60 * 60 * 24);
+	if (days > 7) return { label: `${Math.floor(days)}d ago`, class: 'text-destructive' };
+	if (days > 1) return { label: `${Math.floor(days)}d ago`, class: 'text-warning' };
+	if (days * 24 > 1)
+		return { label: `${Math.floor(days * 24)}h ago`, class: 'text-green-600 dark:text-green-400' };
+	return { label: 'Just now', class: 'text-green-600 dark:text-green-400' };
+}
 
 async function refresh() {
 	refreshing = true;
@@ -46,7 +60,7 @@ async function refresh() {
 			onRowClick={(shader: Shader) => goto(`/admin/shaders/${shader.id}`)}
 			getRowId={(s: Shader) => s.id}
 		>
-			{#snippet cell({ columnId, value })}
+			{#snippet cell({ columnId, value, row })}
 				{#if columnId === 'name'}
 					<span class="font-medium">{value}</span>
 				{:else if columnId === 'description'}
@@ -55,6 +69,9 @@ async function refresh() {
 					{:else}
 						<span class="text-muted-foreground">-</span>
 					{/if}
+				{:else if columnId === 'sync_status'}
+					{@const status = getSyncStatus(row as Shader)}
+					<span class="text-xs font-medium {status.class}">{status.label}</span>
 				{:else}
 					{value ?? '-'}
 				{/if}
