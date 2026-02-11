@@ -153,6 +153,49 @@ if (fix) {
 	}
 }
 
+// Regenerate SQLx query metadata if Rust sources or migrations are newer.
+{
+	const SQLX_DIR = 'backend/.sqlx';
+
+	let newestSrcMtime = 0;
+	for (const file of new Bun.Glob('**/*.rs').scanSync('backend/src')) {
+		const mt = statSync(`backend/src/${file}`).mtimeMs;
+		if (mt > newestSrcMtime) newestSrcMtime = mt;
+	}
+	for (const file of new Bun.Glob('*.sql').scanSync('backend/migrations')) {
+		const mt = statSync(`backend/migrations/${file}`).mtimeMs;
+		if (mt > newestSrcMtime) newestSrcMtime = mt;
+	}
+
+	let newestSqlxMtime = 0;
+	if (existsSync(SQLX_DIR)) {
+		for (const file of new Bun.Glob('*.json').scanSync(SQLX_DIR)) {
+			const mt = statSync(`${SQLX_DIR}/${file}`).mtimeMs;
+			if (mt > newestSqlxMtime) newestSqlxMtime = mt;
+		}
+	}
+
+	const stale = newestSqlxMtime === 0 || newestSrcMtime > newestSqlxMtime;
+	if (stale) {
+		const t = Date.now();
+		process.stdout.write(c('1;36', '→ Regenerating SQLx query metadata (sources changed)...') + '\n');
+		const result = runPiped(['cargo', 'sqlx', 'prepare'], { cwd: 'backend' });
+		if (result.exitCode !== 0) {
+			process.stdout.write(
+				c('33', '⚠ sqlx prepare failed (is the database running?)') + ` (${elapsed(t)}s)\n`
+			);
+			if (result.stderr) process.stderr.write(result.stderr);
+		} else {
+			const count = existsSync(SQLX_DIR)
+				? readdirSync(SQLX_DIR).filter((f) => f.endsWith('.json')).length
+				: 0;
+			process.stdout.write(c('32', '✓ sqlx') + ` (${elapsed(t)}s, ${count} queries)\n`);
+		}
+	} else {
+		process.stdout.write(c('2', '· sqlx metadata up-to-date, skipped') + '\n');
+	}
+}
+
 interface Check {
 	name: string;
 	cmd: string[];
@@ -203,13 +246,6 @@ const checks: Check[] = [
 			'-E',
 			'not test(export_bindings)'
 		]
-	},
-	{
-		name: 'backend-sqlx',
-		subsystem: 'backend',
-		cmd: ['cargo', 'sqlx', 'prepare', '--check'],
-		cwd: 'backend',
-		hint: "Run 'cd backend && cargo sqlx prepare' to update query metadata."
 	},
 	// Mod checks (4)
 	{
