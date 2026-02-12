@@ -8,7 +8,7 @@ import * as Table from '$lib/components/ui/table';
 import * as Tabs from '$lib/components/ui/tabs';
 import * as Tooltip from '$lib/components/ui/tooltip';
 import { Activity, Grid3x3 } from '@lucide/svelte';
-import { SvelteMap } from 'svelte/reactivity';
+
 import type { PageData } from './$types';
 
 interface Props {
@@ -23,7 +23,8 @@ let selectedCell = $state<{ shaderSlug: string; sceneSlug: string } | null>(null
 
 // Derive unique shaders and scenes for grid axes
 let shaders = $derived.by(() => {
-	const seen = new SvelteMap<string, { id: string; name: string; slug: string; version: string }>();
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- ephemeral map inside $derived.by
+	const seen = new Map<string, { id: string; name: string; slug: string; version: string }>();
 	for (const t of health.targets) {
 		if (!seen.has(t.shader_slug)) {
 			seen.set(t.shader_slug, {
@@ -38,7 +39,8 @@ let shaders = $derived.by(() => {
 });
 
 let scenes = $derived.by(() => {
-	const seen = new SvelteMap<string, { id: string; name: string; slug: string }>();
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- ephemeral map inside $derived.by
+	const seen = new Map<string, { id: string; name: string; slug: string }>();
 	for (const t of health.targets) {
 		if (!seen.has(t.scene_slug)) {
 			seen.set(t.scene_slug, {
@@ -53,7 +55,8 @@ let scenes = $derived.by(() => {
 
 // Build lookup: (shaderSlug, sceneSlug) -> CaptureTargetHealth[]
 let targetsByCell = $derived.by(() => {
-	const map = new SvelteMap<string, CaptureTargetHealth[]>();
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- ephemeral map inside $derived.by
+	const map = new Map<string, CaptureTargetHealth[]>();
 	for (const t of health.targets) {
 		const key = `${t.shader_slug}:${t.scene_slug}`;
 		const list = map.get(key) ?? [];

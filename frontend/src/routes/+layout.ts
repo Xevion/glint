@@ -1,15 +1,20 @@
 import { createApiClient } from '$lib/api';
-import type { User } from '$lib/bindings';
+import type { Background, User } from '$lib/bindings';
 import type { LayoutLoad } from './$types';
 
-export const load: LayoutLoad = async ({ fetch, data }) => {
+export const load: LayoutLoad = async ({ fetch }) => {
 	const api = createApiClient(fetch);
-	const result = await api.user.me();
+	const [userResult, bgResult] = await Promise.all([api.user.me(), api.backgrounds.list()]);
 
-	const user: User | null = result.match({
+	const user: User | null = userResult.match({
 		Ok: (u) => u,
 		Err: () => null
 	});
 
-	return { ...data, user };
+	const backgrounds: Background[] = bgResult.match({
+		Ok: (bgs) => bgs,
+		Err: () => []
+	});
+
+	return { user, backgrounds };
 };

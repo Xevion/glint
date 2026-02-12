@@ -2,7 +2,7 @@
  * Format a byte count into a human-readable string using binary units (e.g., "1.23 GiB").
  */
 export function formatBytes(bytes: number, decimals = 2): string {
-	if (bytes === 0) return '0 B';
+	if (bytes <= 0) return '0 B';
 	const k = 1024;
 	const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
 	const i = Math.floor(Math.log(bytes) / Math.log(k));

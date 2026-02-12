@@ -6,7 +6,7 @@ import CaptureGallery from '$lib/components/CaptureGallery.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
-import { SvelteMap } from 'svelte/reactivity';
+
 import { fly } from 'svelte/transition';
 
 interface Props {
@@ -29,7 +29,8 @@ $effect(() => {
 
 // Group captures by shader
 const capturesByShader = $derived.by(() => {
-	const map = new SvelteMap<string, CaptureWithContext>();
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- ephemeral map inside $derived.by
+	const map = new Map<string, CaptureWithContext>();
 	for (const capture of captures) {
 		if (!map.has(capture.shader_slug)) {
 			map.set(capture.shader_slug, capture);

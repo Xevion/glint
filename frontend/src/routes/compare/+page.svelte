@@ -44,16 +44,15 @@ let mode = $state<CompareMode>('slider');
 let leftImage = $state<string | undefined>(undefined);
 let rightImage = $state<string | undefined>(undefined);
 
+// Set defaults only on initial load — don't clobber user selections on re-derive
 $effect(() => {
+	if (leftImage !== undefined && rightImage !== undefined) return;
 	if (images.length >= 2) {
-		leftImage = images[0].url;
-		rightImage = images[1].url;
+		leftImage ??= images[0].url;
+		rightImage ??= images[1].url;
 	} else if (images.length === 1) {
-		leftImage = images[0].url;
-		rightImage = images[0].url;
-	} else {
-		leftImage = undefined;
-		rightImage = undefined;
+		leftImage ??= images[0].url;
+		rightImage ??= images[0].url;
 	}
 });
 
