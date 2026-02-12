@@ -1,9 +1,12 @@
 <script lang="ts">
+import { api } from '$lib/api';
+import { useRetry } from '$lib/api/retry.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
-import { Search } from '@lucide/svelte';
+import { AlertTriangle, LoaderCircle, Search } from '@lucide/svelte';
+import { untrack } from 'svelte';
 import { fly, scale } from 'svelte/transition';
 import type { PageData } from './$types';
 
@@ -11,7 +14,18 @@ interface Props {
 	data: PageData;
 }
 let { data }: Props = $props();
-const shaders = $derived(data.shaders);
+
+const shaderRetry = untrack(() =>
+	useRetry(() => api.shaders.list(), {
+		initial: data.error
+			? undefined
+			: { items: data.shaders, total: data.total, page: 1, page_size: data.total }
+	})
+);
+
+const shaders = $derived(shaderRetry.data?.items ?? []);
+const loadError = $derived(data.error);
+const hasError = $derived(!!shaderRetry.error || (!!loadError && !shaderRetry.data));
 
 // Filter state
 let searchQuery = $state('');
@@ -63,7 +77,9 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 		<!-- Title with count -->
 		<h1 class="text-2xl font-semibold tracking-tight">
 			Shaders
-			<span class="ml-1 text-lg font-normal text-muted-foreground">({filteredShaders.length})</span>
+			{#if !hasError}
+				<span class="ml-1 text-lg font-normal text-muted-foreground">({filteredShaders.length})</span>
+			{/if}
 		</h1>
 
 		<div class="flex w-full flex-wrap items-center gap-3 sm:ml-auto sm:w-auto">
@@ -77,6 +93,7 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 				type="text"
 				placeholder="Search..."
 				bind:value={searchQuery}
+				disabled={hasError}
 				class="w-full bg-background/50 pr-3 pl-9 backdrop-blur-sm transition-all focus:w-full sm:w-48 sm:focus:w-64"
 			/>
 			</div>
@@ -84,7 +101,8 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 			<!-- Sort -->
 		<select
 			bind:value={sortBy}
-			class="h-9 rounded-md border border-input bg-background/50 px-3 text-sm shadow-xs backdrop-blur-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+			disabled={hasError}
+			class="h-9 rounded-md border border-input bg-background/50 px-3 text-sm shadow-xs backdrop-blur-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
 		>
 				<option value="popular">Popular</option>
 				<option value="updated">Recent</option>
@@ -105,8 +123,32 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 		</div>
 	</div>
 
-	<!-- Shader Grid -->
-	{#if filteredShaders.length > 0}
+	<!-- Error State -->
+	{#if hasError}
+		<div class="flex flex-col items-center justify-center py-16 text-center">
+			<div class="mb-6 rounded-full bg-destructive/10 p-4">
+				<AlertTriangle class="h-8 w-8 text-destructive" strokeWidth={1.5} />
+			</div>
+			<h3 class="text-lg font-semibold text-foreground">Failed to load shaders</h3>
+			<p class="mt-1 max-w-md text-sm text-foreground/70">
+				{shaderRetry.error?.message ?? loadError ?? 'Something went wrong'}
+			</p>
+			<Button
+				variant="outline"
+				class="mt-4"
+				disabled={shaderRetry.loading}
+				onclick={() => shaderRetry.retry()}
+			>
+				{#if shaderRetry.loading}
+					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+					Retrying...
+				{:else}
+					Try again
+				{/if}
+			</Button>
+		</div>
+	{:else if filteredShaders.length > 0}
+		<!-- Shader Grid -->
 		<div class="grid grid-cols-1 gap-6 sm:[grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
 			{#each filteredShaders as shader, i (shader.id)}
 				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>

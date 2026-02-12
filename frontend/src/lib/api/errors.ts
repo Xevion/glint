@@ -74,6 +74,14 @@ export class ApiError extends Error {
 		});
 	}
 
+	get isRetryable(): boolean {
+		if (this.type === ApiErrorType.Network) return true;
+		if (this.type === ApiErrorType.ServerError) {
+			return this.statusCode === 502 || this.statusCode === 503 || this.statusCode === 504;
+		}
+		return false;
+	}
+
 	private static statusCodeForType(type: ApiErrorType): number {
 		switch (type) {
 			case ApiErrorType.BadRequest:

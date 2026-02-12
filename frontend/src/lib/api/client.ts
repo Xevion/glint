@@ -112,6 +112,31 @@ export class ApiClient {
 	}
 
 	/**
+	 * Retry wrapper for read-only requests. Retries up to 2 times on
+	 * retryable errors (network failures, 502/503/504) with exponential
+	 * backoff + jitter.
+	 */
+	private async fetchWithRetry<T>(
+		fetcher: () => Promise<Result<T, ApiError>>,
+		attempt = 0
+	): Promise<Result<T, ApiError>> {
+		const result = await fetcher();
+
+		if (result.isErr && result.error.isRetryable && attempt < 2) {
+			const delay = 500 * 2 ** attempt + Math.random() * 250;
+			const logger = getApiLogger();
+			logger?.warn('Retrying request (attempt {attempt}), waiting {delay}ms', {
+				attempt: attempt + 1,
+				delay: Math.round(delay)
+			});
+			await new Promise((r) => setTimeout(r, delay));
+			return this.fetchWithRetry(fetcher, attempt + 1);
+		}
+
+		return result;
+	}
+
+	/**
 	 * Fetch wrapper for endpoints that return no body (204 No Content).
 	 * Type-safe alternative to fetchJson<null> — prevents accidental use
 	 * with non-null type parameters.
@@ -121,16 +146,20 @@ export class ApiClient {
 	}
 
 	/**
-	 * GET request
+	 * GET request (retries on transient failures)
 	 */
 	protected get<T>(path: string): Promise<Result<T, ApiError>> {
-		return this.fetchJson<T>(path, { method: 'GET' });
+		return this.fetchWithRetry(() => this.fetchJson<T>(path, { method: 'GET' }));
 	}
 
 	/**
-	 * GET request for plain text response
+	 * GET request for plain text response (retries on transient failures)
 	 */
-	protected async getText(path: string): Promise<Result<string, ApiError>> {
+	protected getText(path: string): Promise<Result<string, ApiError>> {
+		return this.fetchWithRetry(() => this.fetchText(path));
+	}
+
+	private async fetchText(path: string): Promise<Result<string, ApiError>> {
 		const url = `${this.baseUrl}${path}`;
 
 		try {

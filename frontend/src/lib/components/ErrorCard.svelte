@@ -1,5 +1,5 @@
 <script lang="ts">
-import type { Snippet } from 'svelte';
+import { untrack, type Snippet } from 'svelte';
 import { dev } from '$app/environment';
 import { Button } from '$lib/components/ui/button';
 import * as Collapsible from '$lib/components/ui/collapsible';
@@ -38,7 +38,7 @@ let {
 	class: className
 }: Props = $props();
 
-let stackOpen = $state(defaultStackOpen);
+let stackOpen = $state(untrack(() => defaultStackOpen));
 let copied = $state(false);
 let idCopied = $state(false);
 
