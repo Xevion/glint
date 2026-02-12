@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT sa.name, MAX(s.updated_at) AS \"last_modified!\"\n            FROM shader_authors sa\n            JOIN shaders s ON s.id = sa.shader_id\n            GROUP BY sa.name\n            ORDER BY sa.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "last_modified!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "e1d2626b05de940d7dd7c95a651c89507442362f2251f8a6b03e11ff1c373b7d"
+}

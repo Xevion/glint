@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                s.slug,\n                GREATEST(s.updated_at, COALESCE(MAX(c.created_at), s.updated_at))\n                    AS \"last_modified!\"\n            FROM shaders s\n            LEFT JOIN shader_versions sv ON sv.shader_id = s.id\n            LEFT JOIN captures c ON c.shader_version_id = sv.id AND c.status = 'completed'\n            GROUP BY s.id, s.slug, s.updated_at\n            ORDER BY s.slug\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "last_modified!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "d1acff237e17cc6b158d1c5645f36affe6940c00f991067362df53c368f71ae4"
+}

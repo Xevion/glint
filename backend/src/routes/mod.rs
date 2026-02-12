@@ -9,6 +9,7 @@ mod featured;
 mod runs;
 mod scenes;
 mod shaders;
+mod sitemap;
 mod storage;
 mod user;
 mod users;
@@ -33,6 +34,8 @@ pub fn router(
         // Health endpoint lives outside api_router so it's not subject to any
         // rate limiting — load balancers and monitoring probes must never get 429'd.
         .route("/api/health", get(health))
+        // Sitemap is outside rate limiting — crawlers should never be throttled.
+        .route("/api/sitemap.xml", get(sitemap::sitemap))
         .nest("/api", api_router(rate_limit, analytics))
         .with_state(state)
 }
