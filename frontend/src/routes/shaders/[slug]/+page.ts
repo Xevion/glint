@@ -5,13 +5,10 @@ import { pick } from '$lib/utils';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
-export type ShaderDetailVersion = Pick<
-	ShaderVersionDetail,
-	'id' | 'version' | 'capture_count' | 'supported_profiles'
->;
+export type ShaderDetailVersion = Pick<ShaderVersionDetail, 'id' | 'version' | 'capture_count'>;
 export type ShaderDetailCapture = Pick<
 	CaptureWithContext,
-	'id' | 'image_url' | 'thumbhash' | 'scene_name' | 'profile' | 'shader_version' | 'shader_name'
+	'id' | 'image_url' | 'thumbhash' | 'scene_name' | 'profile_name' | 'shader_version' | 'shader_name'
 >;
 export type ShaderDetail = Pick<
 	ShaderWithCaptures,
@@ -44,16 +41,14 @@ export function _trimShader(s: ShaderWithCaptures): ShaderDetail {
 			'upstream_downloads',
 			'view_count'
 		]),
-		versions: s.versions.map((v) =>
-			pick(v, ['id', 'version', 'capture_count', 'supported_profiles'])
-		),
+		versions: s.versions.map((v) => pick(v, ['id', 'version', 'capture_count'])),
 		captures: s.captures.map((c) =>
 			pick(c, [
 				'id',
 				'image_url',
 				'thumbhash',
 				'scene_name',
-				'profile',
+				'profile_name',
 				'shader_version',
 				'shader_name'
 			])

@@ -71,7 +71,8 @@ pub struct CaptureTargetHealth {
     pub scene_id: SceneId,
     pub scene_name: String,
     pub scene_slug: String,
-    pub profile: Option<String>,
+    pub profile_id: Option<String>,
+    pub profile_name: Option<String>,
     pub status: TargetHealth,
     pub stale_reason: Option<StaleReason>,
     #[ts(as = "Option<String>")]
@@ -108,7 +109,8 @@ struct CaptureHealthRow {
     scene_id: SceneId,
     scene_name: String,
     scene_slug: String,
-    profile: Option<String>,
+    profile_id: Option<String>,
+    profile_name: Option<String>,
     capture_failure_count: i32,
     last_capture_at: Option<DateTime<Utc>>,
     status: TargetHealth,
@@ -134,17 +136,17 @@ impl CaptureHealthRepo {
             CaptureHealthRow,
             r#"
             WITH best_captures AS (
-                SELECT DISTINCT ON (shader_version_id, scene_id, profile)
+                SELECT DISTINCT ON (shader_version_id, scene_id, profile_id)
                     shader_version_id,
                     scene_id,
-                    profile,
+                    profile_id,
                     captured_at,
                     freshness,
                     world_version_id,
                     scene_version_id
                 FROM captures_with_freshness
                 WHERE status IN ('completed', 'uploading')
-                ORDER BY shader_version_id, scene_id, profile, captured_at DESC
+                ORDER BY shader_version_id, scene_id, profile_id, captured_at DESC
             )
             SELECT
                 sh.id AS "shader_id!: ShaderId",
@@ -155,7 +157,8 @@ impl CaptureHealthRepo {
                 sc.id AS "scene_id!: SceneId",
                 sc.name AS "scene_name!",
                 sc.slug AS "scene_slug!",
-                tm.profile,
+                tm.profile_id,
+                svp.name AS profile_name,
                 sv.capture_failure_count AS "capture_failure_count!",
                 bc.captured_at AS last_capture_at,
                 CASE
@@ -173,10 +176,11 @@ impl CaptureHealthRepo {
             LEFT JOIN best_captures bc
                 ON bc.shader_version_id = tm.shader_version_id
                 AND bc.scene_id = tm.scene_id
-                AND (bc.profile IS NOT DISTINCT FROM tm.profile)
+                AND (bc.profile_id IS NOT DISTINCT FROM tm.profile_id)
+            LEFT JOIN shader_version_profiles svp ON svp.id = tm.profile_id
             LEFT JOIN latest_world_versions lwv ON lwv.world_id = sc.world_id
             LEFT JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id
-            ORDER BY sh.name ASC, sv.version DESC, sc.name ASC, tm.profile NULLS LAST
+            ORDER BY sh.name ASC, sv.version DESC, sc.name ASC, tm.profile_id NULLS LAST
             "#
         )
         .fetch_all(&mut *tx)
@@ -208,7 +212,8 @@ impl CaptureHealthRepo {
                     scene_id: row.scene_id,
                     scene_name: row.scene_name,
                     scene_slug: row.scene_slug,
-                    profile: row.profile,
+                    profile_id: row.profile_id,
+                    profile_name: row.profile_name,
                     status: row.status,
                     stale_reason,
                     last_capture_at: row.last_capture_at,

@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use crate::{
     auth::AdminUser,
     error::{AppError, AppResult, OptionNotFoundExt},
-    id::{self, ShaderVersionId},
+    id::{self, ShaderVersionId, ShaderVersionProfileId},
     middleware::client_ip::ClientIp,
     models::pagination::normalize_pagination,
     models::{
@@ -90,8 +90,8 @@ fn build_shader_redirect_url(slug: &str, query: &ShaderDetailQuery) -> String {
     if let Some(ref v) = query.version_id {
         params.push(format!("versionId={v}"));
     }
-    if let Some(ref p) = query.profile {
-        params.push(format!("profile={p}"));
+    if let Some(ref p) = query.profile_id {
+        params.push(format!("profile_id={p}"));
     }
     if !params.is_empty() {
         url.push('?');
@@ -138,7 +138,7 @@ async fn list_shaders(
 #[derive(Debug, Deserialize)]
 struct ShaderDetailQuery {
     version_id: Option<String>,
-    profile: Option<String>,
+    profile_id: Option<ShaderVersionProfileId>,
 }
 
 /// Check `If-None-Match` against an ETag value; return `true` if the client's
@@ -209,7 +209,7 @@ async fn get_shader(
     let filters = CaptureFilters {
         shader_id: Some(shader.id.clone()),
         version_id: effective_version_id,
-        profile: query.profile,
+        profile_id: query.profile_id.map(|id| id.0),
         status: Some(CaptureStatus::Completed),
         scene_active: Some(true),
         ..Default::default()

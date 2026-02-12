@@ -53,7 +53,7 @@ const columns = [
 	{ id: 'preview', key: 'image_url', name: 'Preview' },
 	{ id: 'shader', key: 'shader_name', name: 'Shader' },
 	{ id: 'scene', key: 'scene_name', name: 'Scene' },
-	{ id: 'profile', key: 'profile', name: 'Profile' },
+	{ id: 'profile', key: 'profile_name', name: 'Profile' },
 	{ id: 'resolution', key: 'resolution_width', name: 'Resolution' },
 	{ id: 'file_size', key: 'file_size_bytes', name: 'Size' },
 	{ id: 'captured_at', key: 'captured_at', name: 'Captured', component: 'time' as const },

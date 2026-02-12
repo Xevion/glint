@@ -2,7 +2,10 @@ use schemars::JsonSchema;
 use serde_with::skip_serializing_none;
 use ts_rs::TS;
 
-use crate::id::{SceneId, SceneVersionId, ShaderId, ShaderVersionId, WorldId, WorldVersionId};
+use crate::id::{
+    SceneId, SceneVersionId, ShaderId, ShaderVersionId, ShaderVersionProfileId, WorldId,
+    WorldVersionId,
+};
 
 /// A single work item: one (shader_version, scene, profile) triple to capture
 #[skip_serializing_none]
@@ -38,5 +41,5 @@ pub struct WorkItem {
     pub world_size_bytes: Option<i64>,
     pub world_version_id: Option<WorldVersionId>,
     pub scene_version_id: Option<SceneVersionId>,
-    pub profile: Option<String>,
+    pub profile_id: Option<ShaderVersionProfileId>,
 }

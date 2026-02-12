@@ -353,9 +353,9 @@ onDestroy(() => {
 							</div>
 							<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
 								<span>{capture.shader_version}</span>
-								{#if capture.profile}
-									<span>&middot; {capture.profile}</span>
-								{/if}
+							{#if capture.profile_name}
+								<span>&middot; {capture.profile_name}</span>
+							{/if}
 								{#if capture.resolution_width && capture.resolution_height}
 									<span>&middot; {capture.resolution_width}&times;{capture.resolution_height}</span>
 								{/if}

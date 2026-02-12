@@ -3,6 +3,7 @@ pub mod agent;
 pub mod background;
 pub mod capture;
 pub mod device;
+pub mod extraction;
 pub mod featured;
 pub mod pagination;
 pub mod scene;
@@ -17,7 +18,7 @@ pub mod world;
 // Re-export ID types for convenience
 pub use crate::id::{
     BackgroundId, CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderId, ShaderVersionId,
-    WorldId, WorldVersionId,
+    ShaderVersionProfileId, WorldId, WorldVersionId,
 };
 
 // Re-export all public types so existing `use crate::models::Foo` imports continue to work.
@@ -32,6 +33,7 @@ pub use capture::{
     CaptureRunItemStatus, CaptureRunItemWithContext, CaptureRunStatus, CaptureStatus,
     CaptureWithContext,
 };
+pub use extraction::{ExtractionStatus, ShaderVersionMetadata, ShaderVersionProfile};
 pub use featured::FeaturedPair;
 pub use pagination::{Paginated, PaginationParams};
 pub use scene::{

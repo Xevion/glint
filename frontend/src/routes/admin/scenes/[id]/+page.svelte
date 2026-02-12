@@ -243,9 +243,9 @@ async function handleReactivate() {
 				</div>
 				<div class="text-xs text-muted-foreground">
 					{capture.shader_version}
-					{#if capture.profile}
-						&middot; {capture.profile}
-					{/if}
+				{#if capture.profile_name}
+					&middot; {capture.profile_name}
+				{/if}
 				</div>
 			</div>
 		{/snippet}

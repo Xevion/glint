@@ -6,6 +6,7 @@ use tracing::{debug, instrument};
 
 use crate::error::{AppResult, OptionNotFoundExt};
 use crate::id::{ShaderId, ShaderVersionId};
+use crate::models::extraction::ExtractionStatus;
 use crate::models::{CreateShaderVersionRequest, ShaderVersion, ShaderVersionDetail};
 use crate::platform::PlatformVersion;
 
@@ -22,11 +23,13 @@ struct ShaderVersionWithCount {
     file_size: Option<i64>,
     game_versions: Option<Json<Vec<String>>>,
     release_channel: Option<String>,
-    supported_profiles: Option<Json<Vec<String>>>,
     upstream_published_at: Option<chrono::DateTime<chrono::Utc>>,
     created_at: chrono::DateTime<chrono::Utc>,
     capture_failure_count: i32,
     last_capture_error: Option<String>,
+    extraction_status: ExtractionStatus,
+    extraction_error: Option<String>,
+    extracted_at: Option<chrono::DateTime<chrono::Utc>>,
     capture_count: i64,
 }
 
@@ -44,8 +47,9 @@ impl ShaderVersionRepo {
                 download_url, file_hash, file_size,
                 game_versions as "game_versions: Json<Vec<String>>",
                 release_channel,
-                supported_profiles as "supported_profiles: Json<Vec<String>>",
-                upstream_published_at, created_at, capture_failure_count, last_capture_error
+                upstream_published_at, created_at, capture_failure_count, last_capture_error,
+                extraction_status AS "extraction_status!: ExtractionStatus",
+                extraction_error, extracted_at
             FROM shader_versions WHERE shader_id = $1
             ORDER BY upstream_published_at DESC NULLS LAST, created_at DESC"#,
             shader_id
@@ -74,8 +78,9 @@ impl ShaderVersionRepo {
                 sv.download_url, sv.file_hash, sv.file_size,
                 sv.game_versions as "game_versions: Json<Vec<String>>",
                 sv.release_channel,
-                sv.supported_profiles as "supported_profiles: Json<Vec<String>>",
                 sv.upstream_published_at, sv.created_at, sv.capture_failure_count, sv.last_capture_error,
+                sv.extraction_status AS "extraction_status!: ExtractionStatus",
+                sv.extraction_error, sv.extracted_at,
                 COUNT(c.id) FILTER (WHERE c.status = 'completed') as "capture_count!: i64"
             FROM shader_versions sv
             LEFT JOIN captures c ON c.shader_version_id = sv.id
@@ -106,11 +111,13 @@ impl ShaderVersionRepo {
                     file_size: r.file_size,
                     game_versions: r.game_versions,
                     release_channel: r.release_channel,
-                    supported_profiles: r.supported_profiles,
                     upstream_published_at: r.upstream_published_at,
                     created_at: r.created_at,
                     capture_failure_count: r.capture_failure_count,
                     last_capture_error: r.last_capture_error,
+                    extraction_status: r.extraction_status,
+                    extraction_error: r.extraction_error,
+                    extracted_at: r.extracted_at,
                 },
                 capture_count: r.capture_count,
             })
@@ -128,8 +135,9 @@ impl ShaderVersionRepo {
                 download_url, file_hash, file_size,
                 game_versions as "game_versions: Json<Vec<String>>",
                 release_channel,
-                supported_profiles as "supported_profiles: Json<Vec<String>>",
-                upstream_published_at, created_at, capture_failure_count, last_capture_error
+                upstream_published_at, created_at, capture_failure_count, last_capture_error,
+                extraction_status AS "extraction_status!: ExtractionStatus",
+                extraction_error, extracted_at
             FROM shader_versions WHERE id = $1"#,
             id
         )
@@ -164,8 +172,9 @@ impl ShaderVersionRepo {
                 download_url, file_hash, file_size,
                 game_versions as "game_versions: Json<Vec<String>>",
                 release_channel,
-                supported_profiles as "supported_profiles: Json<Vec<String>>",
-                upstream_published_at, created_at, capture_failure_count, last_capture_error
+                upstream_published_at, created_at, capture_failure_count, last_capture_error,
+                extraction_status AS "extraction_status!: ExtractionStatus",
+                extraction_error, extracted_at
             "#,
             id,
             shader_id,
@@ -178,27 +187,6 @@ impl ShaderVersionRepo {
         .await
         .context(format!("failed to create shader version '{}'", req.version))
         .map_err(Into::into)
-    }
-
-    #[instrument(skip(executor, profiles), level = "debug")]
-    pub async fn update_supported_profiles(
-        executor: impl sqlx::PgExecutor<'_>,
-        id: &str,
-        profiles: &[String],
-    ) -> AppResult<()> {
-        let json_value = Json(profiles.to_vec());
-        sqlx::query!(
-            "UPDATE shader_versions SET supported_profiles = $1 WHERE id = $2",
-            json_value as Json<Vec<String>>,
-            id
-        )
-        .execute(executor)
-        .await
-        .context(format!(
-            "failed to update supported profiles for version '{}'",
-            id
-        ))?;
-        Ok(())
     }
 
     /// Get the parent shader's slug for a given shader version ID.
@@ -237,8 +225,9 @@ impl ShaderVersionRepo {
                 download_url, file_hash, file_size,
                 game_versions as "game_versions: Json<Vec<String>>",
                 release_channel,
-                supported_profiles as "supported_profiles: Json<Vec<String>>",
-                upstream_published_at, created_at, capture_failure_count, last_capture_error
+                upstream_published_at, created_at, capture_failure_count, last_capture_error,
+                extraction_status AS "extraction_status!: ExtractionStatus",
+                extraction_error, extracted_at
             FROM shader_versions
             ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC
             "#
@@ -452,8 +441,9 @@ impl ShaderVersionRepo {
                 download_url, file_hash, file_size,
                 game_versions as "game_versions: Json<Vec<String>>",
                 release_channel,
-                supported_profiles as "supported_profiles: Json<Vec<String>>",
-                upstream_published_at, created_at, capture_failure_count, last_capture_error
+                upstream_published_at, created_at, capture_failure_count, last_capture_error,
+                extraction_status AS "extraction_status!: ExtractionStatus",
+                extraction_error, extracted_at
             FROM shader_versions WHERE shader_id = $1
             ORDER BY upstream_published_at DESC NULLS LAST, created_at DESC LIMIT 1"#,
             shader_id

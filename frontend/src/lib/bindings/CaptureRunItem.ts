@@ -4,5 +4,6 @@ import type { CaptureRunId } from "./CaptureRunId";
 import type { CaptureRunItemStatus } from "./CaptureRunItemStatus";
 import type { SceneId } from "./SceneId";
 import type { ShaderVersionId } from "./ShaderVersionId";
+import type { ShaderVersionProfileId } from "./ShaderVersionProfileId";
 
-export type CaptureRunItem = { id: string, run_id: CaptureRunId, shader_version_id: ShaderVersionId, scene_id: SceneId, profile?: string, status: CaptureRunItemStatus, capture_id?: CaptureId, error_message?: string, error_log?: string, duration_ms?: number, started_at?: string, completed_at?: string, };
+export type CaptureRunItem = { id: string, run_id: CaptureRunId, shader_version_id: ShaderVersionId, scene_id: SceneId, profile_id?: ShaderVersionProfileId, status: CaptureRunItemStatus, capture_id?: CaptureId, error_message?: string, error_log?: string, duration_ms?: number, started_at?: string, completed_at?: string, };

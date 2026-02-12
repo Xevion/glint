@@ -29,7 +29,7 @@ pub struct WorldInfo {
 pub struct PrepareUploadFile {
     pub local_path: String,
     pub scene_id: String,
-    pub profile: Option<String>,
+    pub profile_id: Option<String>,
 }
 
 /// Request to prepare upload URLs
@@ -58,7 +58,7 @@ pub struct PrepareUploadResponse {
 pub struct CaptureRecord {
     pub capture_id: String,
     pub scene_id: String,
-    pub profile: Option<String>,
+    pub profile_id: Option<String>,
     pub image_path: String,
     pub resolution_width: i32,
     pub resolution_height: i32,
@@ -132,7 +132,7 @@ pub struct ShaderMetadata {
     pub filename: String,
     pub id: String,
     pub version: String,
-    pub profile: Option<String>,
+    pub profile_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

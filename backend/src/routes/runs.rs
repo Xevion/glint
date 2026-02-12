@@ -51,7 +51,7 @@ pub struct CreateRunRequest {
 pub struct CreateRunItemRequest {
     pub shader_version_id: String,
     pub scene_id: String,
-    pub profile: Option<String>,
+    pub profile_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -142,7 +142,7 @@ async fn create_run(
                 run_id.clone(),
                 item.shader_version_id.clone(),
                 item.scene_id.clone(),
-                item.profile.clone(),
+                item.profile_id.clone(),
             )
         })
         .collect();
@@ -274,7 +274,7 @@ async fn claim_item(
         &capture_id,
         item.shader_version_id.as_ref(),
         item.scene_id.as_ref(),
-        item.profile.as_deref(),
+        item.profile_id.as_ref().map(AsRef::as_ref),
         None,
         Some(&image_url),
         Some(request.resolution_width),

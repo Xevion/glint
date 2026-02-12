@@ -32,10 +32,11 @@ ORDER BY scene_id, created_at DESC, id DESC;
 -- Replaces the latest_versions CTE in health and work queries.
 CREATE OR REPLACE VIEW latest_shader_versions AS
 SELECT DISTINCT ON (shader_id)
-    id, shader_id, version, capture_failure_count, supported_profiles,
+    id, shader_id, version, capture_failure_count,
     download_url, file_hash, file_size, game_versions, release_channel,
     modrinth_version_id, curseforge_file_id,
-    upstream_published_at, created_at, last_capture_error
+    upstream_published_at, created_at, last_capture_error,
+    extraction_status, extraction_error, extracted_at
 FROM shader_versions
 ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC;
 
@@ -43,8 +44,8 @@ ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC;
 -- Layer 2: Composed views
 -- =============================================================================
 
--- Every (shader_version, scene, profile) triple that should have a capture.
--- Expands shader profiles via JSONB lateral join. Used by health and work queries.
+-- Every (shader_version, scene, profile_id) triple that should have a capture.
+-- Expands shader profiles via the shader_version_profiles table. Used by health and work queries.
 -- Replaces the target_matrix / needed CTE in capture_health.rs and work.rs.
 CREATE OR REPLACE VIEW capture_target_matrix AS
 -- Branch 1: shader versions WITH profiles
@@ -52,16 +53,10 @@ SELECT
     sv.id AS shader_version_id,
     s.id AS scene_id,
     s.world_id,
-    p.profile AS profile
+    svp.id AS profile_id
 FROM latest_shader_versions sv
+JOIN shader_version_profiles svp ON svp.shader_version_id = sv.id
 CROSS JOIN scenes s
-CROSS JOIN LATERAL jsonb_array_elements_text(
-    CASE
-        WHEN sv.supported_profiles IS NOT NULL AND sv.supported_profiles != '[]'
-        THEN sv.supported_profiles::jsonb
-        ELSE '[]'::jsonb
-    END
-) AS p(profile)
 WHERE s.active = TRUE
 
 UNION ALL
@@ -71,11 +66,14 @@ SELECT
     sv.id AS shader_version_id,
     s.id AS scene_id,
     s.world_id,
-    NULL AS profile
+    NULL AS profile_id
 FROM latest_shader_versions sv
 CROSS JOIN scenes s
 WHERE s.active = TRUE
-  AND (sv.supported_profiles IS NULL OR sv.supported_profiles = '[]');
+  AND NOT EXISTS (
+      SELECT 1 FROM shader_version_profiles svp
+      WHERE svp.shader_version_id = sv.id
+  );
 
 -- Captures augmented with a computed freshness column.
 -- Freshness is 'superseded' | 'stale' | 'fresh' based on:
@@ -93,7 +91,7 @@ SELECT
             SELECT 1 FROM captures c2
             WHERE c2.shader_version_id = c.shader_version_id
               AND c2.scene_id = c.scene_id
-              AND c2.profile IS NOT DISTINCT FROM c.profile
+              AND c2.profile_id IS NOT DISTINCT FROM c.profile_id
               AND c2.status IN ('completed', 'uploading')
               AND c2.captured_at > c.captured_at
         ) THEN 'superseded'
@@ -122,7 +120,8 @@ SELECT
     s.slug AS shader_slug,
     s.name AS shader_name,
     sv.version AS shader_version,
-    c.profile,
+    c.profile_id,
+    svp.name AS profile_name,
     c.image_path,
     c.image_url,
     c.thumbhash,
@@ -161,6 +160,7 @@ SELECT
 FROM captures_with_freshness c
 JOIN shader_versions sv ON c.shader_version_id = sv.id
 JOIN shaders s ON sv.shader_id = s.id
+LEFT JOIN shader_version_profiles svp ON c.profile_id = svp.id
 LEFT JOIN capture_run_items cri ON cri.capture_id = c.id
 LEFT JOIN capture_runs cr ON cri.run_id = cr.id
 LEFT JOIN scenes sc ON c.scene_id = sc.id;
@@ -177,8 +177,10 @@ SELECT
     cc.shader_name,
     cc.shader_version,
     cc.shader_version_id,
-    cc.profile,
+    cc.profile_id,
+    cc.profile_name,
     cc.image_path,
+
     cc.image_url,
     cc.thumbhash,
     cc.captured_at,

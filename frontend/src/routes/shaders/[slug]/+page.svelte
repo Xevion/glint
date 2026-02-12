@@ -46,8 +46,10 @@ const selectedVersion = $derived(
 	versions.find((v) => v.id === selectedVersionId) ?? versions[0] ?? null
 );
 
-// Profiles from selected version
-const profiles = $derived(selectedVersion?.supported_profiles ?? []);
+// Unique profile names from loaded captures
+const profiles = $derived([
+	...new Set(captures.map((c) => c.profile_name).filter(Boolean))
+] as string[]);
 
 // Hero: derived from user selection, falling back to first capture
 let selectedCaptureId = $state<string | null>(null);
@@ -279,13 +281,13 @@ const ogDescription = $derived.by(() => {
 							class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
 						>
 							<div class="absolute right-0 bottom-0 left-0 p-4">
-								<CaptureBadges
-									sceneName={heroCapture.scene_name}
-									profile={heroCapture.profile}
-									version={heroCapture.shader_version}
-									formatVersion={formatVersion}
-									size="sm"
-								/>
+							<CaptureBadges
+								sceneName={heroCapture.scene_name}
+								profileName={heroCapture.profile_name}
+								version={heroCapture.shader_version}
+								formatVersion={formatVersion}
+								size="sm"
+							/>
 							</div>
 						</div>
 					</button>
@@ -331,12 +333,12 @@ const ogDescription = $derived.by(() => {
 								class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
 							>
 								<div class="absolute right-0 bottom-0 left-0 p-3">
-									<CaptureBadges
-										sceneName={capture.scene_name}
-										profile={capture.profile}
-										version={capture.shader_version}
-										formatVersion={formatVersion}
-									/>
+								<CaptureBadges
+									sceneName={capture.scene_name}
+									profileName={capture.profile_name}
+									version={capture.shader_version}
+									formatVersion={formatVersion}
+								/>
 								</div>
 							</div>
 							</button>

@@ -14,7 +14,7 @@
     "image_path": {
       "type": "string"
     },
-    "profile": {
+    "profile_id": {
       "type": [
         "string",
         "null"

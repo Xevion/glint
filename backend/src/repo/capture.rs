@@ -8,7 +8,8 @@ use tracing::{debug, instrument};
 use crate::db::DbPool;
 use crate::error::{AppResult, OptionNotFoundExt};
 use crate::id::{
-    CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderId, ShaderVersionId, WorldVersionId,
+    CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderId, ShaderVersionId,
+    ShaderVersionProfileId, WorldVersionId,
 };
 use crate::models::{
     Capture, CaptureDetail, CaptureFreshness, CaptureListItem, CaptureRunStatus, CaptureStatus,
@@ -27,7 +28,7 @@ pub struct CaptureFilters {
     pub shader_slug: Option<String>,
     pub scene_id: Option<SceneId>,
     pub version_id: Option<ShaderVersionId>,
-    pub profile: Option<String>,
+    pub profile_id: Option<String>,
     pub status: Option<CaptureStatus>,
     pub run_id: Option<CaptureRunId>,
     pub scene_active: Option<bool>,
@@ -64,7 +65,7 @@ impl CaptureRepo {
                 id AS "id: CaptureId",
                 shader_version_id AS "shader_version_id: ShaderVersionId",
                 scene_id AS "scene_id: SceneId",
-                profile, image_url, image_path,
+                profile_id AS "profile_id: ShaderVersionProfileId", image_url, image_path,
                 video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
                 minecraft_version, iris_version, gpu_model, resolution_width,
                 resolution_height, captured_at,
@@ -99,7 +100,7 @@ impl CaptureRepo {
             shader_version_id: ShaderVersionId,
             scene_id: SceneId,
             status: CaptureStatus,
-            profile: Option<String>,
+            profile_id: Option<String>,
             image_url: Option<String>,
             thumbhash: Option<String>,
             captured_at: Option<DateTime<Utc>>,
@@ -116,7 +117,7 @@ impl CaptureRepo {
                 c.shader_version_id AS "shader_version_id: ShaderVersionId",
                 c.scene_id AS "scene_id: SceneId",
                 c.status AS "status!: CaptureStatus",
-                c.profile,
+                c.profile_id,
                 c.image_url,
                 c.thumbhash,
                 c.captured_at,
@@ -144,7 +145,7 @@ impl CaptureRepo {
                 shader_version_id: r.shader_version_id,
                 scene_id: r.scene_id,
                 status: r.status,
-                profile: r.profile,
+                profile_id: r.profile_id.map(ShaderVersionProfileId),
                 image_url: r.image_url,
                 thumbhash: r.thumbhash,
                 captured_at: r.captured_at,
@@ -169,7 +170,7 @@ impl CaptureRepo {
                 id AS "id: CaptureId",
                 shader_version_id AS "shader_version_id: ShaderVersionId",
                 scene_id AS "scene_id: SceneId",
-                profile, image_url, image_path,
+                profile_id AS "profile_id: ShaderVersionProfileId", image_url, image_path,
                 video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
                 minecraft_version, iris_version, gpu_model, resolution_width,
                 resolution_height, captured_at,
@@ -204,7 +205,7 @@ impl CaptureRepo {
                 id AS "id: CaptureId",
                 shader_version_id AS "shader_version_id: ShaderVersionId",
                 scene_id AS "scene_id: SceneId",
-                profile, image_url, image_path,
+                profile_id AS "profile_id: ShaderVersionProfileId", image_url, image_path,
                 video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
                 minecraft_version, iris_version, gpu_model, resolution_width,
                 resolution_height, captured_at,
@@ -255,7 +256,7 @@ impl CaptureRepo {
                             id AS "id!", scene_id AS "scene_id!",
                             shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                             shader_version AS "shader_version!",
-                            profile, image_path, image_url, thumbhash, captured_at,
+                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, image_path, image_url, thumbhash, captured_at,
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
@@ -265,7 +266,7 @@ impl CaptureRepo {
                           AND ($2::text IS NULL OR shader_slug = $2)
                           AND ($3::text IS NULL OR scene_id = $3)
                           AND ($4::text IS NULL OR shader_version_id = $4)
-                          AND ($5::text IS NULL OR profile = $5)
+                          AND ($5::text IS NULL OR profile_id = $5)
                           AND ($6::text IS NULL OR capture_status = $6)
                           AND ($7::text IS NULL OR run_id = $7)
                           AND ($8::bool IS NULL OR scene_active = $8)
@@ -276,7 +277,7 @@ impl CaptureRepo {
                         filters.shader_slug,
                         scene_id,
                         version_id,
-                        filters.profile,
+                        filters.profile_id,
                         status_str,
                         run_id,
                         filters.scene_active,
@@ -294,7 +295,7 @@ impl CaptureRepo {
                             id AS "id!", scene_id AS "scene_id!",
                             shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                             shader_version AS "shader_version!",
-                            profile, image_path, image_url, thumbhash, captured_at,
+                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, image_path, image_url, thumbhash, captured_at,
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
@@ -304,7 +305,7 @@ impl CaptureRepo {
                           AND ($2::text IS NULL OR shader_slug = $2)
                           AND ($3::text IS NULL OR scene_id = $3)
                           AND ($4::text IS NULL OR shader_version_id = $4)
-                          AND ($5::text IS NULL OR profile = $5)
+                          AND ($5::text IS NULL OR profile_id = $5)
                           AND ($6::text IS NULL OR capture_status = $6)
                           AND ($7::text IS NULL OR run_id = $7)
                           AND ($8::bool IS NULL OR scene_active = $8)
@@ -314,7 +315,7 @@ impl CaptureRepo {
                         filters.shader_slug,
                         scene_id,
                         version_id,
-                        filters.profile,
+                        filters.profile_id,
                         status_str,
                         run_id,
                         filters.scene_active,
@@ -331,7 +332,7 @@ impl CaptureRepo {
                         id AS "id!", scene_id AS "scene_id!",
                         shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                         shader_version AS "shader_version!",
-                        profile, image_path, image_url, thumbhash, captured_at,
+                        profile_id AS "profile_id: ShaderVersionProfileId", profile_name, image_path, image_url, thumbhash, captured_at,
                         resolution_width, resolution_height, file_size_bytes,
                         run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                         shader_author, scene_name, scene_slug,
@@ -341,7 +342,7 @@ impl CaptureRepo {
                       AND ($2::text IS NULL OR shader_slug = $2)
                       AND ($3::text IS NULL OR scene_id = $3)
                       AND ($4::text IS NULL OR shader_version_id = $4)
-                      AND ($5::text IS NULL OR profile = $5)
+                      AND ($5::text IS NULL OR profile_id = $5)
                       AND ($6::text IS NULL OR capture_status = $6)
                       AND ($7::text IS NULL OR run_id = $7)
                       AND ($8::bool IS NULL OR scene_active = $8)
@@ -351,7 +352,7 @@ impl CaptureRepo {
                 filters.shader_slug,
                 scene_id,
                 version_id,
-                filters.profile,
+                filters.profile_id,
                 status_str,
                 run_id,
                 filters.scene_active,
@@ -366,7 +367,7 @@ impl CaptureRepo {
                         id AS "id!", scene_id AS "scene_id!",
                         shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                         shader_version AS "shader_version!",
-                        profile, image_path, image_url, thumbhash, captured_at,
+                        profile_id AS "profile_id: ShaderVersionProfileId", profile_name, image_path, image_url, thumbhash, captured_at,
                         resolution_width, resolution_height, file_size_bytes,
                         run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                         shader_author, scene_name, scene_slug,
@@ -376,7 +377,7 @@ impl CaptureRepo {
                       AND ($2::text IS NULL OR shader_slug = $2)
                       AND ($3::text IS NULL OR scene_id = $3)
                       AND ($4::text IS NULL OR shader_version_id = $4)
-                      AND ($5::text IS NULL OR profile = $5)
+                      AND ($5::text IS NULL OR profile_id = $5)
                       AND ($6::text IS NULL OR capture_status = $6)
                       AND ($7::text IS NULL OR run_id = $7)
                       AND ($8::bool IS NULL OR scene_active = $8)
@@ -386,7 +387,7 @@ impl CaptureRepo {
                 filters.shader_slug,
                 scene_id,
                 version_id,
-                filters.profile,
+                filters.profile_id,
                 status_str,
                 run_id,
                 filters.scene_active,
@@ -405,7 +406,7 @@ impl CaptureRepo {
                   AND ($2::text IS NULL OR shader_slug = $2)
                   AND ($3::text IS NULL OR scene_id = $3)
                   AND ($4::text IS NULL OR shader_version_id = $4)
-                  AND ($5::text IS NULL OR profile = $5)
+                  AND ($5::text IS NULL OR profile_id = $5)
                   AND ($6::text IS NULL OR capture_status = $6)
                   AND ($7::text IS NULL OR run_id = $7)
                   AND ($8::bool IS NULL OR scene_active = $8)
@@ -414,7 +415,7 @@ impl CaptureRepo {
                 filters.shader_slug,
                 scene_id,
                 version_id,
-                filters.profile,
+                filters.profile_id,
                 status_str,
                 run_id,
                 filters.scene_active,
@@ -439,7 +440,7 @@ impl CaptureRepo {
         id: &str,
         shader_version_id: &str,
         scene_id: &str,
-        profile: Option<&str>,
+        profile_id: Option<&str>,
         image_path: Option<&str>,
         image_url: Option<&str>,
         resolution_width: Option<i32>,
@@ -452,7 +453,7 @@ impl CaptureRepo {
         sqlx::query!(
             r#"
             INSERT INTO captures (
-                id, shader_version_id, scene_id, profile, image_path, image_url,
+                id, shader_version_id, scene_id, profile_id, image_path, image_url,
                 resolution_width, resolution_height, world_version_id, scene_version_id,
                 status, created_at, updated_at, captured_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12, $12)
@@ -460,7 +461,7 @@ impl CaptureRepo {
             id,
             shader_version_id,
             scene_id,
-            profile,
+            profile_id,
             image_path,
             image_url,
             resolution_width,
@@ -520,7 +521,7 @@ impl CaptureRepo {
                 id AS "id!", scene_id AS "scene_id!",
                 shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                 shader_version AS "shader_version!",
-                profile, image_path, image_url, thumbhash, captured_at,
+                profile_id AS "profile_id: ShaderVersionProfileId", profile_name, image_path, image_url, thumbhash, captured_at,
                 resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
@@ -550,7 +551,8 @@ impl CaptureRepo {
             shader_name: String,
             shader_version: String,
             shader_version_id: ShaderVersionId,
-            profile: Option<String>,
+            profile_id: Option<String>,
+            profile_name: Option<String>,
             image_path: Option<String>,
             image_url: Option<String>,
             thumbhash: Option<String>,
@@ -591,7 +593,7 @@ impl CaptureRepo {
                 shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                 shader_version AS "shader_version!",
                 shader_version_id AS "shader_version_id!: ShaderVersionId",
-                profile, image_path, image_url, thumbhash,
+                profile_id, profile_name, image_path, image_url, thumbhash,
                 captured_at, resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId",
                 run_status AS "run_status: CaptureRunStatus",
@@ -627,7 +629,7 @@ impl CaptureRepo {
                 id AS "id!", scene_id AS "scene_id!",
                 shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                 shader_version AS "shader_version!",
-                profile, image_path, image_url, thumbhash, captured_at,
+                profile_id AS "profile_id: ShaderVersionProfileId", profile_name, image_path, image_url, thumbhash, captured_at,
                 resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
@@ -654,7 +656,7 @@ impl CaptureRepo {
                 id AS "id!", scene_id AS "scene_id!",
                 shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                 shader_version AS "shader_version!",
-                profile, image_path, image_url, thumbhash, captured_at,
+                profile_id AS "profile_id: ShaderVersionProfileId", profile_name, image_path, image_url, thumbhash, captured_at,
                 resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
@@ -681,7 +683,7 @@ impl CaptureRepo {
                     id AS "id!", scene_id AS "scene_id!",
                     shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                     shader_version AS "shader_version!",
-                    profile, image_path, image_url, thumbhash, captured_at,
+                    profile_id AS "profile_id: ShaderVersionProfileId", profile_name, image_path, image_url, thumbhash, captured_at,
                     resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
@@ -714,7 +716,8 @@ impl CaptureRepo {
             shader_slug: row.shader_slug,
             shader_name: row.shader_name,
             shader_version: row.shader_version,
-            profile: row.profile,
+            profile_id: row.profile_id.map(ShaderVersionProfileId),
+            profile_name: row.profile_name,
             image_path: row.image_path,
             image_url: row.image_url,
             thumbhash: row.thumbhash,
@@ -1179,7 +1182,7 @@ impl CaptureRepo {
                 id AS "id: CaptureId",
                 shader_version_id AS "shader_version_id: ShaderVersionId",
                 scene_id AS "scene_id: SceneId",
-                profile, image_url, image_path,
+                profile_id AS "profile_id: ShaderVersionProfileId", image_url, image_path,
                 video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
                 minecraft_version, iris_version, gpu_model, resolution_width,
                 resolution_height, captured_at,
@@ -1220,7 +1223,7 @@ impl CaptureRepo {
                 id AS "id: CaptureId",
                 shader_version_id AS "shader_version_id: ShaderVersionId",
                 scene_id AS "scene_id: SceneId",
-                profile, image_url, image_path,
+                profile_id AS "profile_id: ShaderVersionProfileId", image_url, image_path,
                 video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
                 minecraft_version, iris_version, gpu_model, resolution_width,
                 resolution_height, captured_at,

@@ -6,6 +6,7 @@ use sqlx::types::Json;
 use ts_rs::TS;
 
 use super::capture::CaptureWithContext;
+use super::extraction::ExtractionStatus;
 use super::taxonomy::{Category, Feature};
 use crate::id::{ShaderId, ShaderVersionId};
 
@@ -52,15 +53,16 @@ pub struct ShaderVersion {
     #[ts(optional, type = "Array<string>")]
     pub game_versions: Option<Json<Vec<String>>>,
     pub release_channel: Option<String>,
-    /// Array of profile names, discovered after first capture
-    #[ts(optional, type = "Array<string>")]
-    pub supported_profiles: Option<Json<Vec<String>>>,
     #[ts(as = "Option<String>")]
     pub upstream_published_at: Option<DateTime<Utc>>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
     pub capture_failure_count: i32,
     pub last_capture_error: Option<String>,
+    pub extraction_status: ExtractionStatus,
+    pub extraction_error: Option<String>,
+    #[ts(as = "Option<String>")]
+    pub extracted_at: Option<DateTime<Utc>>,
 }
 
 #[skip_serializing_none]

@@ -5,7 +5,7 @@ import type { ApiError } from '../errors';
 
 export interface GetShaderParams {
 	versionId?: string;
-	profile?: string;
+	profile_id?: string;
 }
 
 export class ShaderEndpoints extends ApiClient {
@@ -32,7 +32,7 @@ export class ShaderEndpoints extends ApiClient {
 	): Promise<Result<ShaderWithCaptures, ApiError>> {
 		const searchParams = new URLSearchParams();
 		if (params?.versionId) searchParams.set('version_id', params.versionId);
-		if (params?.profile) searchParams.set('profile', params.profile);
+		if (params?.profile_id) searchParams.set('profile_id', params.profile_id);
 		const query = searchParams.toString();
 		const url = `/api/shaders/${encodeURIComponent(idOrSlug)}${query ? `?${query}` : ''}`;
 		return this.get<ShaderWithCaptures>(url);

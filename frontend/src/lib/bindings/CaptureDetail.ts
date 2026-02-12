@@ -8,10 +8,11 @@ import type { CaptureWithContext } from "./CaptureWithContext";
 import type { SceneId } from "./SceneId";
 import type { SceneVersionId } from "./SceneVersionId";
 import type { ShaderVersionId } from "./ShaderVersionId";
+import type { ShaderVersionProfileId } from "./ShaderVersionProfileId";
 import type { WorldVersionId } from "./WorldVersionId";
 
 /**
  * Full capture details for admin detail view, including technical metadata
  * and related captures for cross-referencing.
  */
-export type CaptureDetail = { shader_version_id: ShaderVersionId, status: CaptureStatus, error_message?: string, video_url?: string, avg_fps?: number, min_fps?: number, max_fps?: number, frame_time_avg?: number, frame_time_p99?: number, minecraft_version?: string, iris_version?: string, gpu_model?: string, content_type?: string, world_version_id?: WorldVersionId, scene_version_id?: SceneVersionId, created_at: string, updated_at: string, same_shader_scene: Array<CaptureWithContext>, same_scene: Array<CaptureWithContext>, same_run: Array<CaptureWithContext>, id: CaptureId, scene_id: SceneId, shader_slug: string, shader_name: string, shader_version: string, profile?: string, image_path?: string, image_url?: string, thumbhash?: string, captured_at?: string, resolution_width?: number, resolution_height?: number, file_size_bytes?: number, run_id?: CaptureRunId, run_status?: CaptureRunStatus, shader_author?: string, scene_name?: string, scene_slug?: string, freshness: CaptureFreshness, };
+export type CaptureDetail = { shader_version_id: ShaderVersionId, status: CaptureStatus, error_message?: string, video_url?: string, avg_fps?: number, min_fps?: number, max_fps?: number, frame_time_avg?: number, frame_time_p99?: number, minecraft_version?: string, iris_version?: string, gpu_model?: string, content_type?: string, world_version_id?: WorldVersionId, scene_version_id?: SceneVersionId, created_at: string, updated_at: string, same_shader_scene: Array<CaptureWithContext>, same_scene: Array<CaptureWithContext>, same_run: Array<CaptureWithContext>, id: CaptureId, scene_id: SceneId, shader_slug: string, shader_name: string, shader_version: string, profile_id?: ShaderVersionProfileId, profile_name?: string, image_path?: string, image_url?: string, thumbhash?: string, captured_at?: string, resolution_width?: number, resolution_height?: number, file_size_bytes?: number, run_id?: CaptureRunId, run_status?: CaptureRunStatus, shader_author?: string, scene_name?: string, scene_slug?: string, freshness: CaptureFreshness, };

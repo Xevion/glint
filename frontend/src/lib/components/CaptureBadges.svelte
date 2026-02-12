@@ -2,12 +2,19 @@
 interface Props {
 	sceneName?: string | null;
 	shaderName?: string | null;
-	profile?: string | null;
+	profileName?: string | null;
 	version?: string | null;
 	formatVersion?: (v: string) => string;
 	size?: 'sm' | 'xs';
 }
-let { sceneName, shaderName, profile, version, formatVersion: fmt, size = 'xs' }: Props = $props();
+let {
+	sceneName,
+	shaderName,
+	profileName,
+	version,
+	formatVersion: fmt,
+	size = 'xs'
+}: Props = $props();
 
 const py = $derived(size === 'sm' ? 'py-1 text-sm' : 'py-0.5 text-xs');
 </script>
@@ -21,9 +28,9 @@ const py = $derived(size === 'sm' ? 'py-1 text-sm' : 'py-0.5 text-xs');
 			{sceneName}
 		</span>
 	{/if}
-	{#if profile}
+	{#if profileName}
 		<span class="rounded bg-primary px-2 {py} font-medium text-white">
-			{profile}
+			{profileName}
 		</span>
 	{/if}
 	{#if version}

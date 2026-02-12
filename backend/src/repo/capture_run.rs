@@ -2,7 +2,7 @@ use anyhow::Context;
 use tracing::{debug, instrument, warn};
 
 use crate::error::{AppResult, OptionNotFoundExt};
-use crate::id::{CaptureId, CaptureRunId, SceneId, ShaderVersionId};
+use crate::id::{CaptureId, CaptureRunId, SceneId, ShaderVersionId, ShaderVersionProfileId};
 use crate::models::{
     CaptureRun, CaptureRunItem, CaptureRunItemStatus, CaptureRunItemWithContext, CaptureRunStatus,
 };
@@ -156,7 +156,7 @@ impl CaptureRunRepo {
     #[instrument(skip(executor, items), level = "debug")]
     pub async fn insert_items(
         executor: impl sqlx::PgExecutor<'_>,
-        items: &[(&str, &str, &str, &str, Option<&str>)], // (id, run_id, shader_version_id, scene_id, profile)
+        items: &[(&str, &str, &str, &str, Option<&str>)], // (id, run_id, shader_version_id, scene_id, profile_id)
     ) -> AppResult<()> {
         if items.is_empty() {
             return Ok(());
@@ -170,7 +170,7 @@ impl CaptureRunRepo {
 
         sqlx::query!(
             r#"
-            INSERT INTO capture_run_items (id, run_id, shader_version_id, scene_id, profile, status)
+            INSERT INTO capture_run_items (id, run_id, shader_version_id, scene_id, profile_id, status)
             SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::text[]), unnest($4::text[]), unnest($5::text[]), 'pending'
             "#,
             &ids as &[&str],
@@ -251,7 +251,7 @@ impl CaptureRunRepo {
                 run_id AS "run_id: CaptureRunId",
                 shader_version_id AS "shader_version_id: ShaderVersionId",
                 scene_id AS "scene_id: SceneId",
-                profile,
+                profile_id AS "profile_id: ShaderVersionProfileId",
                 status AS "status!: CaptureRunItemStatus",
                 capture_id AS "capture_id: CaptureId",
                 error_message, error_log, duration_ms,
@@ -295,7 +295,7 @@ impl CaptureRunRepo {
                 run_id AS "run_id: CaptureRunId",
                 shader_version_id AS "shader_version_id: ShaderVersionId",
                 scene_id AS "scene_id: SceneId",
-                profile,
+                profile_id AS "profile_id: ShaderVersionProfileId",
                 status AS "status!: CaptureRunItemStatus",
                 capture_id AS "capture_id: CaptureId",
                 error_message, error_log, duration_ms,
@@ -324,7 +324,8 @@ impl CaptureRunRepo {
                 cri.run_id AS "run_id: CaptureRunId",
                 cri.shader_version_id AS "shader_version_id: ShaderVersionId",
                 cri.scene_id AS "scene_id: SceneId",
-                cri.profile,
+                cri.profile_id AS "profile_id: ShaderVersionProfileId",
+                svp.name as profile_name,
                 cri.status AS "status!: CaptureRunItemStatus",
                 cri.capture_id AS "capture_id: CaptureId",
                 cri.error_message, cri.error_log, cri.duration_ms,
@@ -337,6 +338,7 @@ impl CaptureRunRepo {
             JOIN shader_versions sv ON cri.shader_version_id = sv.id
             JOIN shaders s ON sv.shader_id = s.id
             JOIN scenes sc ON cri.scene_id = sc.id
+            LEFT JOIN shader_version_profiles svp ON cri.profile_id = svp.id
             WHERE cri.run_id = $1
             ORDER BY cri.started_at ASC NULLS LAST
             "#,

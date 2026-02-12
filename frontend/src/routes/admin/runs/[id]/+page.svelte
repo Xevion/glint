@@ -137,7 +137,7 @@ class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {st
 							</div>
 						</Table.Cell>
 						<Table.Cell class="px-4 py-2">{item.scene_name}</Table.Cell>
-						<Table.Cell class="px-4 py-2">{item.profile ?? '\u2014'}</Table.Cell>
+						<Table.Cell class="px-4 py-2">{item.profile_name ?? '\u2014'}</Table.Cell>
 						<Table.Cell class="px-4 py-2">{formatMs(item.duration_ms)}</Table.Cell>
 					<Table.Cell class="max-w-sm px-4 py-2" title={item.error_message ?? ''}>
 						<span class="line-clamp-2">{item.error_message ?? '\u2014'}</span>

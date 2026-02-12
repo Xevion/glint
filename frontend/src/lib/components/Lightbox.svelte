@@ -9,7 +9,7 @@ interface CaptureItem {
 	id: string;
 	image_url?: string | null;
 	thumbhash?: string | null;
-	profile?: string | null;
+	profile_name?: string | null;
 	shader_version?: string | null;
 	scene_id?: string;
 	scene_name?: string | null;
@@ -255,11 +255,11 @@ function handlePointerUp() {
 										{currentCapture.scene_name}
 									</span>
 								{/if}
-								{#if currentCapture.profile}
-									<span class="rounded bg-primary px-2 py-1 text-sm font-medium text-white">
-										{currentCapture.profile}
-									</span>
-								{/if}
+							{#if currentCapture.profile_name}
+								<span class="rounded bg-primary px-2 py-1 text-sm font-medium text-white">
+									{currentCapture.profile_name}
+								</span>
+							{/if}
 								{#if currentCapture.shader_version}
 									<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
 										v{currentCapture.shader_version}

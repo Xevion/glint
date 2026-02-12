@@ -4,7 +4,7 @@ import type { Shader } from '$lib/bindings';
 export type ShaderDisplayInfo = Pick<Shader, 'name'> & {
 	version: string;
 	author?: string | null;
-	profile?: string | null;
+	profile_name?: string | null;
 };
 
 /** Comparison display modes */

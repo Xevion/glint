@@ -4,13 +4,16 @@ use tracing::{debug, instrument};
 
 use crate::db::DbPool;
 use crate::error::AppResult;
-use crate::id::{SceneId, SceneVersionId, ShaderId, ShaderVersionId, WorldId, WorldVersionId};
+use crate::id::{
+    SceneId, SceneVersionId, ShaderId, ShaderVersionId, ShaderVersionProfileId, WorldId,
+    WorldVersionId,
+};
 use crate::models::WorkItem;
 
 pub struct WorkRepo;
 
 impl WorkRepo {
-    /// Compute the list of (shader_version, scene, profile) triples that still
+    /// Compute the list of (shader_version, scene, profile_id) triples that still
     /// need captures. JIT compilation is disabled for this query because the
     /// planner's inflated cost estimate (cross-join fanout) triggers LLVM JIT
     /// that takes ~750ms on a query that executes in <30ms.
@@ -40,11 +43,11 @@ impl WorkRepo {
                 WHERE status = 'completed'
             ),
             best_captures AS (
-                SELECT DISTINCT ON (shader_version_id, scene_id, profile)
-                    shader_version_id, scene_id, profile, freshness
+                SELECT DISTINCT ON (shader_version_id, scene_id, profile_id)
+                    shader_version_id, scene_id, profile_id, freshness
                 FROM captures_with_freshness
                 WHERE status IN ('completed', 'uploading')
-                ORDER BY shader_version_id, scene_id, profile, captured_at DESC
+                ORDER BY shader_version_id, scene_id, profile_id, captured_at DESC
             )
             SELECT
                 tm.shader_version_id AS "shader_version_id!: ShaderVersionId",
@@ -76,7 +79,7 @@ impl WorkRepo {
                 lwv.size_bytes AS world_size_bytes,
                 lwv.id AS "world_version_id: WorldVersionId",
                 lsv.id AS "scene_version_id: SceneVersionId",
-                tm.profile
+                tm.profile_id AS "profile_id: ShaderVersionProfileId"
             FROM capture_target_matrix tm
             JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id
             JOIN shaders sh ON sh.id = sv.shader_id
@@ -88,7 +91,7 @@ impl WorkRepo {
             LEFT JOIN best_captures bc
                 ON bc.shader_version_id = tm.shader_version_id
                 AND bc.scene_id = tm.scene_id
-                AND (bc.profile IS NOT DISTINCT FROM tm.profile)
+                AND (bc.profile_id IS NOT DISTINCT FROM tm.profile_id)
             WHERE ($2 OR sv.capture_failure_count < 3)
               AND ($2 OR bc.shader_version_id IS NULL OR bc.freshness != 'fresh')
               AND ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))
@@ -99,7 +102,7 @@ impl WorkRepo {
                 sv.upstream_published_at DESC NULLS LAST,
                 sh.name ASC,
                 sc.name ASC,
-                tm.profile NULLS LAST
+                tm.profile_id NULLS LAST
             LIMIT $1
             "#,
             limit,

@@ -8,7 +8,8 @@ use sqlx::FromRow;
 use ts_rs::TS;
 
 use crate::id::{
-    CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderVersionId, WorldVersionId,
+    CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderVersionId, ShaderVersionProfileId,
+    WorldVersionId,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
@@ -186,7 +187,7 @@ pub struct Capture {
     pub id: CaptureId,
     pub shader_version_id: ShaderVersionId,
     pub scene_id: SceneId,
-    pub profile: Option<String>,
+    pub profile_id: Option<ShaderVersionProfileId>,
     pub image_url: Option<String>,
     pub image_path: Option<String>,
     pub video_url: Option<String>,
@@ -242,7 +243,7 @@ pub struct CaptureRunItem {
     pub run_id: CaptureRunId,
     pub shader_version_id: ShaderVersionId,
     pub scene_id: SceneId,
-    pub profile: Option<String>,
+    pub profile_id: Option<ShaderVersionProfileId>,
     pub status: CaptureRunItemStatus,
     pub capture_id: Option<CaptureId>,
     pub error_message: Option<String>,
@@ -263,7 +264,8 @@ pub struct CaptureRunItemWithContext {
     pub run_id: CaptureRunId,
     pub shader_version_id: ShaderVersionId,
     pub scene_id: SceneId,
-    pub profile: Option<String>,
+    pub profile_id: Option<ShaderVersionProfileId>,
+    pub profile_name: Option<String>,
     pub status: CaptureRunItemStatus,
     pub capture_id: Option<CaptureId>,
     pub error_message: Option<String>,
@@ -321,7 +323,8 @@ pub struct CaptureWithContext {
     pub shader_slug: String,
     pub shader_name: String,
     pub shader_version: String,
-    pub profile: Option<String>,
+    pub profile_id: Option<ShaderVersionProfileId>,
+    pub profile_name: Option<String>,
     pub image_path: Option<String>,
     pub image_url: Option<String>,
     pub thumbhash: Option<String>,
@@ -388,7 +391,7 @@ pub struct CaptureListItem {
     pub shader_version_id: ShaderVersionId,
     pub scene_id: SceneId,
     pub status: CaptureStatus,
-    pub profile: Option<String>,
+    pub profile_id: Option<ShaderVersionProfileId>,
     pub image_url: Option<String>,
     pub thumbhash: Option<String>,
     #[ts(as = "Option<String>")]

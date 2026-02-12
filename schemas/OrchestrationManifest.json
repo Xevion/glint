@@ -249,7 +249,7 @@
         "id": {
           "type": "string"
         },
-        "profile": {
+        "profile_id": {
           "type": [
             "string",
             "null"

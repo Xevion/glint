@@ -147,11 +147,11 @@ function tooltipSummary(shaderSlug: string, sceneSlug: string): string {
 	if (targets.length === 1) {
 		const t = targets[0];
 		const detail = targetDetail(t);
-		return t.profile ? `${detail} (${t.profile})` : detail;
+		return t.profile_name ? `${detail} (${t.profile_name})` : detail;
 	}
 	return targets
 		.map((t) => {
-			const label = t.profile ?? 'Default';
+			const label = t.profile_name ?? 'Default';
 			return `${label}: ${targetDetail(t)}`;
 		})
 		.join('\n');
@@ -300,12 +300,12 @@ async function refresh() {
 								{selectedTargets[0].shader_name} / {selectedTargets[0].scene_name}
 							</h3>
 							<div class="space-y-2">
-								{#each selectedTargets as target (target.profile ?? '__default')}
+								{#each selectedTargets as target (target.profile_name ?? '__default')}
 									<div class="rounded border p-2 text-sm">
 										<div class="flex items-center justify-between">
-											<span class="text-muted-foreground">
-												{target.profile ?? 'Default'}
-											</span>
+										<span class="text-muted-foreground">
+											{target.profile_name ?? 'Default'}
+										</span>
 											<Badge variant={BADGE_VARIANTS[target.status]} class="text-xs">
 												{STATUS_LABELS[target.status]}
 											</Badge>
@@ -357,7 +357,7 @@ async function refresh() {
 							<Table.Cell class="p-3">
 								<a href="/admin/scenes/{item.scene_id}" class="hover:underline">{item.scene_name}</a>
 							</Table.Cell>
-							<Table.Cell class="p-3 text-muted-foreground">{item.profile ?? '—'}</Table.Cell>
+							<Table.Cell class="p-3 text-muted-foreground">{item.profile_id ?? '—'}</Table.Cell>
 							<Table.Cell class="p-3 text-muted-foreground">
 								<a href="/admin/worlds/{item.world_id}" class="hover:underline">{item.world_name}</a>
 							</Table.Cell>

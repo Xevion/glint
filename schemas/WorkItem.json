@@ -16,7 +16,7 @@
         "null"
       ]
     },
-    "profile": {
+    "profile_id": {
       "type": [
         "string",
         "null"
