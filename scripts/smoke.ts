@@ -1,491 +1,285 @@
 #!/usr/bin/env bun
 
-import { spawn, type Subprocess } from 'bun';
-import * as fs from 'fs/promises';
-import { existsSync } from 'fs';
-import { randomUUID } from 'crypto';
+/**
+ * Minecraft smoke test — launches the game and verifies it starts.
+ *
+ * Spawns the Minecraft client via Gradle, monitors output for success
+ * markers (OpenGL, mods loaded) and fatal errors (mixin crashes, build
+ * failures), and exits with appropriate codes.
+ *
+ * Usage: bun scripts/smoke.ts [flags]
+ *
+ * Flags:
+ *   -p, --platform    Mod platform: fabric (default) or neoforge
+ *   -v, --verbose     Show full Minecraft output (default: env VERBOSE=1)
+ *   -h, --help        Show this help message and exit
+ *
+ * Exit codes:
+ *   0 — Success (game started, mixins loaded)
+ *   1 — Build failed
+ *   2 — Fatal mixin error
+ *   3 — Timeout
+ *   4 — Process died unexpectedly
+ *   5 — Early crash (ClassNotFoundException, etc.)
+ */
 
-// Configuration
-const PLATFORM = Bun.argv[2] || 'fabric';
+import { existsSync } from "fs";
+import * as fs from "fs/promises";
+import { randomUUID } from "crypto";
+import { parseFlags, c } from "./lib/fmt";
+import {
+	GAME_STARTED_MARKERS,
+	BUILD_ERROR_PATTERNS,
+	FATAL_MIXIN_ERRORS,
+	EARLY_CRASH_PATTERNS,
+	isProcessAlive,
+	sleep,
+	extractErrorContext,
+	ensureQuietOptions,
+	monitorStream,
+	spawnMinecraft,
+	registerSignalHandlers,
+	printFailureTail,
+	type StreamBuffers,
+	type PatternAction,
+} from "./lib/minecraft";
+
+// ── CLI ──────────────────────────────────────────────────────────────
+
+const { flags } = parseFlags(
+	process.argv.slice(2),
+	{
+		platform: "string",
+		verbose: "bool",
+		help: "bool",
+	} as const,
+	{ p: "platform", v: "verbose", h: "help" },
+	{ platform: "fabric", verbose: false, help: false },
+);
+
+if (flags.help) {
+	console.log(`Usage: bun scripts/smoke.ts [flags]
+
+Launches Minecraft and verifies the game starts successfully.
+
+Flags:
+  -p, --platform <name>   Mod platform: fabric (default) or neoforge
+  -v, --verbose            Show full Minecraft output (also: VERBOSE=1 env)
+  -h, --help               Show this help message and exit
+
+Exit codes:
+  0  Success (game started, mixins loaded)
+  1  Build failed
+  2  Fatal mixin error
+  3  Timeout
+  4  Process died unexpectedly
+  5  Early crash`);
+	process.exit(0);
+}
+
+const platform = flags.platform as string;
+const verbose = flags.verbose || !!process.env.VERBOSE;
+
+if (platform !== "fabric" && platform !== "neoforge") {
+	console.error(c("31", `Invalid platform: ${platform} (must be 'fabric' or 'neoforge')`));
+	process.exit(1);
+}
+
+// ── Configuration ────────────────────────────────────────────────────
+
 const SESSION_ID = randomUUID();
 const SESSION_FILE = `/tmp/glint-smoke-${SESSION_ID}.session`;
 
-// Paths
-const OPTIONS_PATH = `mod/${PLATFORM}/run/options.txt`;
-
-// Timeout detection
-const ASSETS_PATH = `mod/${PLATFORM}/run/.minecraft/assets`;
+const ASSETS_PATH = `mod/${platform}/run/.minecraft/assets`;
 const hasAssets = existsSync(ASSETS_PATH);
 const TIMEOUT = hasAssets ? 120 : 300;
-// Shorter timeout for early crash detection (gradle startup + initial launch)
 const EARLY_TIMEOUT = 60;
-
-// Error patterns - split into fatal errors and warnings
-const FATAL_MIXIN_ERRORS = [
-	/critical injection/i,
-	/@Shadow.*not located/i,
-	/transformation.*failed/i,
-	/mixin apply.*failed/i,
-	/Target method.*not found/i,
-	/Mixin.*crashed/i
-];
-
-const MIXIN_WARNINGS: RegExp[] = [
-	// Add warning patterns here for non-fatal mixin issues that should be reported
-];
-
-const BUILD_ERROR_PATTERNS = [
-	/BUILD FAILED/,
-	/compilation failed/i,
-	/error: cannot find symbol/i,
-	/Execution failed for task/i
-];
-
-// Early crash patterns - process will likely die immediately after these
-// NOTE: ClassNotFoundException/NoClassDefFoundError require "Caused by:" context
-// because the mixin system logs benign warnings when probing optional classes:
-//   [WARN] (FabricLoader/Mixin) Error loading class: ... (java.lang.ClassNotFoundException: ...)
-const EARLY_CRASH_PATTERNS = [
-	/Caused by:.*ClassNotFoundException/,
-	/Caused by:.*NoClassDefFoundError/,
-	/Exception in thread "main"/,
-	/Error: Could not find or load main class/,
-];
 
 const SUCCESS_MARKERS = [
 	/Setting user:/,
 	/OpenGL:/,
 	/Backend library:/,
 	/Narrator library:/,
-	/Loaded \d+ mods/
-];
-
-// Markers indicating game has started loading (but not yet passed)
-const GAME_STARTED_MARKERS = [
 	/Loaded \d+ mods/,
-	/FabricLoader\//,
-	/Loading Minecraft/,
-	/Mixin Subsystem/,
-	/NeoForge/,
-	/Architectury/
 ];
 
-// State
-let gradleProc: Subprocess | null = null;
-let gradlePid: number | null = null;
-let cleanupDone = false;
-let stderrBuffer = '';
+const MIXIN_WARNINGS: RegExp[] = [];
 
-// Utilities
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// ── State ────────────────────────────────────────────────────────────
 
-function isProcessAlive(pid: number): boolean {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function extractErrorContext(logContent: string, pattern: RegExp): string {
-	const lines = logContent.split('\n');
-	for (let i = 0; i < lines.length; i++) {
-		if (pattern.test(lines[i])) {
-			const start = Math.max(0, i - 5);
-			const end = Math.min(lines.length, i + 6);
-			return lines.slice(start, end).join('\n');
-		}
-	}
-	return 'Error context not found';
-}
-
-// Stream monitoring state
-let outputBuffer = '';
 let testPassed = false;
 let testFailed = false;
-let failureReason = '';
+let failureReason = "";
 let failureExitCode = 1;
 let warningCount = 0;
 const warnings: string[] = [];
-let gameStarted = false; // True once game loading has begun
+let gameStarted = false;
 
-// Cleanup handler
-async function cleanup(): Promise<void> {
-	if (cleanupDone) return;
-	cleanupDone = true;
+const buffers: StreamBuffers = { stdout: "", stderr: "" };
 
-	console.log('[cleanup] Cleaning up...');
+// ── Stream monitoring setup ──────────────────────────────────────────
 
-	if (gradlePid && isProcessAlive(gradlePid)) {
-		try {
-			// Graceful shutdown
-			process.kill(gradlePid, 'SIGTERM');
-			await sleep(5000);
+const actions: PatternAction[] = [
+	{
+		patterns: BUILD_ERROR_PATTERNS,
+		onMatch: (data) => {
+			testFailed = true;
+			failureReason = `Build failed:\n${data}`;
+			failureExitCode = 1;
+			return "stop";
+		},
+	},
+	{
+		patterns: FATAL_MIXIN_ERRORS,
+		onMatch: (_data, pattern) => {
+			testFailed = true;
+			failureReason = `Fatal mixin error:\n${extractErrorContext(buffers.stdout + buffers.stderr, pattern)}`;
+			failureExitCode = 2;
+			return "stop";
+		},
+	},
+	{
+		patterns: EARLY_CRASH_PATTERNS,
+		onMatch: (_data, pattern) => {
+			testFailed = true;
+			failureReason = `Early crash detected:\n${extractErrorContext(buffers.stdout + buffers.stderr, pattern)}`;
+			failureExitCode = 5;
+			return "stop";
+		},
+	},
+	{
+		patterns: MIXIN_WARNINGS,
+		onMatch: (_data, pattern) => {
+			warningCount++;
+			const context = extractErrorContext(buffers.stdout + buffers.stderr, pattern);
+			if (!warnings.includes(context)) warnings.push(context);
+			return "continue";
+		},
+	},
+	{
+		patterns: GAME_STARTED_MARKERS,
+		onMatch: () => {
+			gameStarted = true;
+			return "continue";
+		},
+	},
+	{
+		patterns: SUCCESS_MARKERS,
+		onMatch: () => {
+			testPassed = true;
+			return "stop";
+		},
+	},
+];
 
-			// Force kill if still alive
-			if (isProcessAlive(gradlePid)) {
-				console.log('   Force killing process...');
-				process.kill(gradlePid, 'SIGKILL');
-			}
+// ── Main ─────────────────────────────────────────────────────────────
 
-			// Kill process group
-			try {
-				process.kill(-gradlePid, 'SIGTERM');
-			} catch {
-				// Process group may not exist
-			}
-		} catch (e) {
-			// Process already dead
-		}
-	}
+console.log(c("1;36", `→ Starting Minecraft ${platform} client...`));
+console.log(`   Session: ${SESSION_ID}`);
 
-	// Remove session file
-	try {
-		await fs.unlink(SESSION_FILE);
-	} catch {
-		// File may not exist
-	}
-}
+await fs.writeFile(SESSION_FILE, SESSION_ID);
+await ensureQuietOptions(platform);
 
-// Register cleanup handlers
-process.on('exit', () => {
-	if (!cleanupDone) {
-		cleanup();
-	}
+const mc = spawnMinecraft({
+	platform,
+	env: { ...process.env, GLINT_SESSION: SESSION_ID } as Record<string, string>,
 });
 
-process.on('SIGINT', async () => {
-	await cleanup();
-	process.exit(130);
-});
+const cleanupAll = async () => {
+	await mc.cleanup();
+	try { await fs.unlink(SESSION_FILE); } catch { /* may not exist */ }
+};
 
-process.on('SIGTERM', async () => {
-	await cleanup();
-	process.exit(143);
-});
+registerSignalHandlers(cleanupAll);
 
-// Pre-flight checks
-async function createQuietOptions(): Promise<void> {
-	// Only create if doesn't exist (don't overwrite user settings)
-	if (existsSync(OPTIONS_PATH)) {
-		return;
-	}
+// Start monitoring streams
+if (mc.proc.stdout) monitorStream(mc.proc.stdout, false, buffers, verbose, actions);
+if (mc.proc.stderr) monitorStream(mc.proc.stderr, true, buffers, verbose, actions);
 
-	const quietOptions = `soundCategory_master:0.0
-soundCategory_music:0.0
-soundCategory_record:0.0
-soundCategory_weather:0.0
-soundCategory_block:0.0
-soundCategory_hostile:0.0
-soundCategory_neutral:0.0
-soundCategory_player:0.0
-soundCategory_ambient:0.0
-soundCategory_voice:0.0
-particles:0
-renderDistance:2
-graphicsMode:1
-chatVisibility:2
-narrator:0
-showSubtitles:false
-fullscreen:false`;
+// ── Wait loop ────────────────────────────────────────────────────────
 
-	await fs.mkdir(`mod/${PLATFORM}/run`, { recursive: true });
-	await fs.writeFile(OPTIONS_PATH, quietOptions);
-}
+console.log(c("2", `[wait] Timeout: ${EARLY_TIMEOUT}s (early), ${TIMEOUT}s (${hasAssets ? "assets cached" : "first run"})`));
 
-// Monitor output stream (stdout or stderr)
-async function monitorOutputStream(
-	stream: ReadableStream,
-	isStderr: boolean = false
-): Promise<void> {
-	try {
-		const reader = stream.getReader();
-		const decoder = new TextDecoder();
+const startTime = Date.now();
 
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
+try {
+	while (true) {
+		const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
 
-			const data = decoder.decode(value, { stream: true });
-
-			// Add to appropriate buffer
-			if (isStderr) {
-				stderrBuffer += data;
-			} else {
-				outputBuffer += data;
-			}
-
-			// Show in verbose mode
-			if (process.env.VERBOSE) {
-				if (isStderr) {
-					process.stderr.write(data);
-				} else {
-					process.stdout.write(data);
-				}
-			}
-
-			// Check for build errors (fail fast)
-			for (const pattern of BUILD_ERROR_PATTERNS) {
-				if (pattern.test(data)) {
-					testFailed = true;
-					failureReason = `Build failed:\n${data}`;
-					failureExitCode = 1;
-					return;
-				}
-			}
-
-			// Check for fatal mixin errors (fail fast)
-			for (const pattern of FATAL_MIXIN_ERRORS) {
-				if (pattern.test(data)) {
-					testFailed = true;
-					failureReason = `Fatal mixin error:\n${extractErrorContext(outputBuffer + stderrBuffer, pattern)}`;
-					failureExitCode = 2;
-					return;
-				}
-			}
-
-			// Check for early crash patterns (process death imminent)
-			for (const pattern of EARLY_CRASH_PATTERNS) {
-				if (pattern.test(data)) {
-					testFailed = true;
-					failureReason = `Early crash detected:\n${extractErrorContext(outputBuffer + stderrBuffer, pattern)}`;
-					failureExitCode = 5;
-					return;
-				}
-			}
-
-			// Check for mixin warnings (track but don't fail)
-			for (const pattern of MIXIN_WARNINGS) {
-				if (pattern.test(data)) {
-					warningCount++;
-					const context = extractErrorContext(outputBuffer + stderrBuffer, pattern);
-					if (!warnings.includes(context)) {
-						warnings.push(context);
-					}
-					// Don't return - continue monitoring
-				}
-			}
-
-			// Check for game started markers (extends timeout)
-			if (!gameStarted) {
-				for (const marker of GAME_STARTED_MARKERS) {
-					if (marker.test(data)) {
-						gameStarted = true;
-						break;
-					}
-				}
-			}
-
-			// Check for success markers
-			for (const marker of SUCCESS_MARKERS) {
-				if (marker.test(data)) {
-					testPassed = true;
-					return;
-				}
-			}
-		}
-	} catch (err) {
-		// Stream closed or error - this is normal on process exit
-	}
-}
-
-// Process spawning
-function spawnMinecraft(): Subprocess {
-	const args = [`:${PLATFORM}:runClient`, '--no-daemon', '--args=--nogui --width=854 --height=480'];
-
-	const proc = spawn(['./gradlew', ...args], {
-		cwd: 'mod',
-		stdio: ['ignore', 'pipe', 'pipe'],
-		env: {
-			...process.env,
-			GLINT_SESSION: SESSION_ID
-		}
-	});
-
-	// Monitor both stdout and stderr for game output
-	if (proc.stdout) {
-		monitorOutputStream(proc.stdout, false);
-	}
-
-	if (proc.stderr) {
-		monitorOutputStream(proc.stderr, true);
-	}
-
-	return proc;
-}
-
-// Wait for test completion by monitoring stream state
-async function waitForCompletion(): Promise<void> {
-	console.log('[wait] Waiting for game to start...');
-	console.log('[wait] Monitoring output streams...');
-	console.log(
-		`[wait] Timeout: ${EARLY_TIMEOUT}s (early), ${TIMEOUT}s (${hasAssets ? 'assets cached' : 'first run'})`
-	);
-
-	const startTime = Date.now();
-
-	try {
-		while (true) {
-			const elapsed = Math.floor((Date.now() - startTime) / 1000);
-
-			// Check if test passed
-			if (testPassed) {
-				// Wait a moment for any late errors
-				await sleep(2000);
-
-				if (testFailed) {
-					console.error('[FAIL] Late error detected!');
-					console.error('');
-					console.error(failureReason);
-					console.error('');
-					await cleanup();
-					process.exit(failureExitCode);
-				}
-
-				console.log(`[PASS] Smoke test passed! (elapsed: ${elapsed}s)`);
-
-				// Show warnings if any were detected
-				if (warningCount > 0) {
-					console.warn(`[WARN] ${warningCount} warning(s) detected`);
-					if (process.env.VERBOSE) {
-						console.warn('\nWarning details:');
-						warnings.forEach((warning, idx) => {
-							console.warn(`\nWarning ${idx + 1}:`);
-							console.warn(warning);
-						});
-					} else {
-						console.warn('   Run with VERBOSE=1 to see details');
-					}
-				}
-
-				await cleanup();
-				process.exit(0);
-			}
-
-			// Check if test failed
+		if (testPassed) {
+			await sleep(2000);
 			if (testFailed) {
-				console.error('[FAIL] Test failed!');
-				console.error('');
+				console.error(c("31", "[FAIL] Late error detected!"));
 				console.error(failureReason);
-				console.error('');
-				if (!process.env.VERBOSE) {
-					console.error('[hint] Run with VERBOSE=1 for full output:');
-					console.error('   VERBOSE=1 just smoke');
-					console.error('');
-					console.error('[hint] Or check the log file for errors:');
-					console.error(
-						`   grep -i "error\\|exception\\|fatal" mod/${PLATFORM}/run/logs/latest.log | tail -50`
-					);
-					console.error('');
-				}
-				await cleanup();
+				await cleanupAll();
 				process.exit(failureExitCode);
 			}
 
-			// Check timeout (use shorter timeout if game hasn't started loading)
-			const currentTimeout = gameStarted ? TIMEOUT : EARLY_TIMEOUT;
-			if (elapsed > currentTimeout) {
-				console.error(
-					`[FAIL] Timeout exceeded (${currentTimeout}s, game ${gameStarted ? 'started' : 'not started'})!`
-				);
-				console.error('');
-				if (process.env.VERBOSE) {
-					console.error('Full output:');
-					const allOutput = outputBuffer + stderrBuffer;
-					console.error(allOutput);
+			console.log(c("32", `[PASS] Smoke test passed! (elapsed: ${elapsedSec}s)`));
+
+			if (warningCount > 0) {
+				console.warn(c("33", `[WARN] ${warningCount} warning(s) detected`));
+				if (verbose) {
+					warnings.forEach((warning, idx) => {
+						console.warn(`\nWarning ${idx + 1}:`);
+						console.warn(warning);
+					});
 				} else {
-					console.error('Last 100 lines of output:');
-					const allOutput = outputBuffer + stderrBuffer;
-					const lines = allOutput.split('\n');
-					console.error(lines.slice(-100).join('\n'));
-					console.error('');
-					console.error('[hint] Run with VERBOSE=1 for full output:');
-					console.error('   VERBOSE=1 just smoke');
-					console.error('');
-					console.error('[hint] Or check the log file for errors:');
-					console.error(
-						`   grep -i "error\\|exception\\|fatal" mod/${PLATFORM}/run/logs/latest.log | tail -50`
-					);
+					console.warn("   Run with -v to see details");
 				}
-				await cleanup();
-				process.exit(3);
 			}
 
-			// Check if process died without passing or failing
-			if (gradlePid && !isProcessAlive(gradlePid)) {
-				console.error('[FAIL] Process died unexpectedly!');
-				console.error('');
-				if (process.env.VERBOSE) {
-					if (stderrBuffer) {
-						console.error('Full stderr output:');
-						console.error(stderrBuffer);
-					}
-					console.error('Full stdout output:');
-					console.error(outputBuffer);
-				} else {
-					if (stderrBuffer) {
-						console.error('Last 100 lines of stderr:');
-						console.error(stderrBuffer.split('\n').slice(-100).join('\n'));
-					} else {
-						console.error('Last 100 lines of output:');
-						const allOutput = outputBuffer + stderrBuffer;
-						const lines = allOutput.split('\n');
-						console.error(lines.slice(-100).join('\n'));
-					}
-					console.error('');
-					console.error('[hint] Run with VERBOSE=1 for full output:');
-					console.error('   VERBOSE=1 just smoke');
-					console.error('');
-					console.error('[hint] Or check the log file for errors:');
-					console.error(
-						`   grep -i "error\\|exception\\|fatal" mod/${PLATFORM}/run/logs/latest.log | tail -50`
-					);
-				}
-				await cleanup();
-				process.exit(4);
-			}
-
-			await sleep(500);
+			await cleanupAll();
+			process.exit(0);
 		}
-	} catch (err) {
-		console.error('[FAIL] Error during monitoring:', err);
-		await cleanup();
-		process.exit(4);
+
+		if (testFailed) {
+			console.error(c("31", "[FAIL] Test failed!"));
+			console.error("");
+			console.error(failureReason);
+			console.error("");
+			if (!verbose) printFailureTail(buffers, 100, "-v or VERBOSE=1", platform);
+			await cleanupAll();
+			process.exit(failureExitCode);
+		}
+
+		const currentTimeout = gameStarted ? TIMEOUT : EARLY_TIMEOUT;
+		if (elapsedSec > currentTimeout) {
+			console.error(
+				c("31", `[FAIL] Timeout exceeded (${currentTimeout}s, game ${gameStarted ? "started" : "not started"})!`),
+			);
+			console.error("");
+			if (verbose) {
+				console.error("Full output:");
+				console.error(buffers.stdout + buffers.stderr);
+			} else {
+				printFailureTail(buffers, 100, "-v or VERBOSE=1", platform);
+			}
+			await cleanupAll();
+			process.exit(3);
+		}
+
+		if (!isProcessAlive(mc.pid)) {
+			console.error(c("31", "[FAIL] Process died unexpectedly!"));
+			console.error("");
+			if (verbose) {
+				if (buffers.stderr) {
+					console.error("Full stderr output:");
+					console.error(buffers.stderr);
+				}
+				console.error("Full stdout output:");
+				console.error(buffers.stdout);
+			} else {
+				printFailureTail(buffers, 100, "-v or VERBOSE=1", platform);
+			}
+			await cleanupAll();
+			process.exit(4);
+		}
+
+		await sleep(500);
 	}
+} catch (err) {
+	console.error(c("31", `[FAIL] Error during monitoring: ${err}`));
+	await cleanupAll();
+	process.exit(4);
 }
-
-// Main
-async function main(): Promise<void> {
-	try {
-		console.log(`[start] Starting Minecraft ${PLATFORM} client...`);
-		console.log(`   Session: ${SESSION_ID}`);
-
-		// Write session file
-		await fs.writeFile(SESSION_FILE, SESSION_ID);
-
-		// Pre-flight setup (still create options.txt for quiet mode)
-		await fs.mkdir(`mod/${PLATFORM}/run`, { recursive: true });
-		await createQuietOptions();
-
-		// Launch Minecraft
-		gradleProc = spawnMinecraft();
-		gradlePid = gradleProc.pid!;
-
-		// Wait for completion (monitors stdout/stderr)
-		await waitForCompletion();
-	} catch (err) {
-		console.error('[FAIL] Error in main:', err);
-		await cleanup();
-		process.exit(1);
-	}
-}
-
-main().catch(async (err) => {
-	console.error('[FAIL] Unexpected error:', err.message);
-	if (err.stack) {
-		console.error(err.stack);
-	}
-	await cleanup();
-	process.exit(1);
-});

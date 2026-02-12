@@ -22,10 +22,25 @@
  *   --shaders SEL     Shader filter: slug to capture specific shader
  */
 
-import { spawn, type Subprocess } from "bun";
-import * as fs from "fs/promises";
 import { existsSync, readFileSync } from "fs";
 import { parseFlags, c } from "./lib/fmt";
+import {
+	GAME_STARTED_MARKERS,
+	BUILD_ERROR_PATTERNS,
+	FATAL_MIXIN_ERRORS,
+	EARLY_CRASH_PATTERNS,
+	isProcessAlive,
+	sleep,
+	ensureQuietOptions,
+	monitorStream,
+	spawnMinecraft,
+	registerSignalHandlers,
+	printFailureTail,
+	type StreamBuffers,
+	type PatternAction,
+} from "./lib/minecraft";
+
+// ── CLI ──────────────────────────────────────────────────────────────
 
 const { flags } = parseFlags(
 	process.argv.slice(2),
@@ -90,7 +105,7 @@ if (platform !== "fabric" && platform !== "neoforge") {
 	process.exit(1);
 }
 
-// ── Resolve API configuration ──
+// ── Resolve API configuration ────────────────────────────────────────
 
 interface ModConfig {
 	apiUrl?: string;
@@ -98,7 +113,6 @@ interface ModConfig {
 	tokenExpiresAt?: number;
 }
 
-/** Read the mod's saved config from .minecraft/glint/config.json */
 function readModConfig(): ModConfig | null {
 	const configPath = `mod/${platform}/run/glint/config.json`;
 	if (!existsSync(configPath)) return null;
@@ -110,13 +124,9 @@ function readModConfig(): ModConfig | null {
 }
 
 function resolveApiToken(): string {
-	// 1. CLI flag
 	if (flags.token) return flags.token as string;
-
-	// 2. Environment variable
 	if (process.env.GLINT_API_TOKEN) return process.env.GLINT_API_TOKEN;
 
-	// 3. Saved mod config (from device auth flow)
 	const config = readModConfig();
 	if (config?.accessToken) {
 		if (config.tokenExpiresAt && config.tokenExpiresAt < Date.now()) {
@@ -139,7 +149,6 @@ function resolveApiUrl(): string {
 	if (flags.url) return flags.url as string;
 	if (process.env.GLINT_API_URL) return process.env.GLINT_API_URL;
 
-	// Fall back to mod config URL if available
 	const config = readModConfig();
 	if (config?.apiUrl) return config.apiUrl;
 
@@ -149,7 +158,7 @@ function resolveApiUrl(): string {
 const apiUrl = resolveApiUrl();
 const apiToken = resolveApiToken();
 
-// ── Pre-flight checks ──
+// ── Pre-flight checks ────────────────────────────────────────────────
 
 async function checkBackend(): Promise<boolean> {
 	console.log(`[preflight] Checking backend at ${apiUrl}...`);
@@ -158,7 +167,7 @@ async function checkBackend(): Promise<boolean> {
 			signal: AbortSignal.timeout(5000),
 		});
 		if (resp.ok) {
-			console.log(c("32", `[preflight] ✓ Backend reachable`));
+			console.log(c("32", "[preflight] ✓ Backend reachable"));
 			return true;
 		}
 		console.error(c("31", `[preflight] ✗ Backend returned HTTP ${resp.status}`));
@@ -167,7 +176,7 @@ async function checkBackend(): Promise<boolean> {
 		const msg = err instanceof Error ? err.message : String(err);
 		console.error(c("31", `[preflight] ✗ Backend unreachable at ${apiUrl}`));
 		console.error(`   ${msg}`);
-		console.error(`   Start the backend with: just dev -b`);
+		console.error("   Start the backend with: just dev -b");
 		return false;
 	}
 }
@@ -176,85 +185,14 @@ if (!(await checkBackend())) {
 	process.exit(1);
 }
 
-// ── Process lifecycle ──
+// ── Orchestration-specific patterns ──────────────────────────────────
 
-let proc: Subprocess | null = null;
-let procPid: number | null = null;
-let cleanupDone = false;
-
-function isProcessAlive(pid: number): boolean {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function cleanup(): Promise<void> {
-	if (cleanupDone) return;
-	cleanupDone = true;
-
-	if (procPid && isProcessAlive(procPid)) {
-		console.log("[cleanup] Stopping Minecraft process...");
-		try {
-			process.kill(procPid, "SIGTERM");
-			await sleep(5000);
-
-			if (isProcessAlive(procPid)) {
-				console.log("[cleanup] Force killing...");
-				process.kill(procPid, "SIGKILL");
-			}
-
-			// Kill process group
-			try {
-				process.kill(-procPid, "SIGTERM");
-			} catch {
-				// Process group may not exist
-			}
-		} catch {
-			// Process already dead
-		}
-	}
-}
-
-process.on("exit", () => {
-	if (!cleanupDone) cleanup();
-});
-process.on("SIGINT", async () => {
-	console.log("\n[signal] Received SIGINT, cleaning up...");
-	await cleanup();
-	process.exit(130);
-});
-process.on("SIGTERM", async () => {
-	await cleanup();
-	process.exit(143);
-});
-
-// ── Output monitoring ──
-
-// Terminal markers - orchestration is done (game should be exiting)
 const TERMINAL_MARKERS = [
 	/Autonomous runner shutting down/,
 	/No work available, shutting down/,
 	/Cannot start autonomous mode/,
 ];
 
-// Error markers that indicate the game won't recover
-const FATAL_PATTERNS = [
-	/BUILD FAILED/,
-	/compilation failed/i,
-	/Execution failed for task/i,
-	/critical injection/i,
-	/mixin apply.*failed/i,
-	/Caused by:.*ClassNotFoundException/,
-	/Caused by:.*NoClassDefFoundError/,
-	/Exception in thread "main"/,
-];
-
-// Informational markers
 const PROGRESS_MARKERS = [
 	{ pattern: /Autonomous runner started/, msg: "Runner started" },
 	{ pattern: /Fetched work/, msg: "Work fetched" },
@@ -268,16 +206,6 @@ const PROGRESS_MARKERS = [
 	{ pattern: /No work available/, msg: "No work available" },
 ];
 
-let outputBuffer = "";
-let stderrBuffer = "";
-let terminated = false;
-let terminateReason = "";
-let terminateCode = 0;
-let gameStarted = false;
-let runFailed = false;
-let lastActivity = Date.now();
-
-// Patterns that indicate work failed (not fatal to the process, but the work wasn't done)
 const RUN_ERROR_MARKERS = [
 	/Failed to upload\/complete item/,
 	/Failed to fetch work/,
@@ -289,132 +217,88 @@ const RUN_ERROR_MARKERS = [
 	/Group upload failed/,
 ];
 
-const GAME_STARTED_MARKERS = [
-	/Loaded \d+ mods/,
-	/FabricLoader\//,
-	/Loading Minecraft/,
-	/NeoForge/,
-	/Architectury/,
-];
+// ── State ────────────────────────────────────────────────────────────
 
-async function monitorStream(stream: ReadableStream, isStderr: boolean): Promise<void> {
-	try {
-		const reader = stream.getReader();
-		const decoder = new TextDecoder();
+let terminated = false;
+let terminateReason = "";
+let terminateCode = 0;
+let gameStarted = false;
+let runFailed = false;
+let lastActivity = Date.now();
 
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
+const buffers: StreamBuffers = { stdout: "", stderr: "" };
 
-			const data = decoder.decode(value, { stream: true });
+// Combine shared fatal patterns with orchestration-specific ones
+const FATAL_PATTERNS = [...BUILD_ERROR_PATTERNS, ...FATAL_MIXIN_ERRORS, ...EARLY_CRASH_PATTERNS];
 
-			if (isStderr) {
-				stderrBuffer += data;
-			} else {
-				outputBuffer += data;
-			}
+// ── Stream monitoring setup ──────────────────────────────────────────
 
-			if (verbose) {
-				if (isStderr) {
-					process.stderr.write(data);
-				} else {
-					process.stdout.write(data);
-				}
-			}
-
-			// Check for fatal errors (fail fast)
-			for (const pattern of FATAL_PATTERNS) {
-				if (pattern.test(data)) {
-					terminated = true;
-					terminateReason = `Fatal error: ${data.trim().slice(0, 200)}`;
-					terminateCode = 1;
-					return;
-				}
-			}
-
-			// Check for game started markers
+const actions: PatternAction[] = [
+	{
+		patterns: FATAL_PATTERNS,
+		onMatch: (data) => {
+			terminated = true;
+			terminateReason = `Fatal error: ${data.trim().slice(0, 200)}`;
+			terminateCode = 1;
+			return "stop";
+		},
+	},
+	{
+		patterns: GAME_STARTED_MARKERS,
+		onMatch: () => {
 			if (!gameStarted) {
-				for (const marker of GAME_STARTED_MARKERS) {
-					if (marker.test(data)) {
-						gameStarted = true;
-						lastActivity = Date.now();
-						if (!verbose) {
-							console.log(c("36", "[orchestrate] Game loaded"));
-						}
-						break;
-					}
-				}
+				gameStarted = true;
+				lastActivity = Date.now();
+				if (!verbose) console.log(c("36", "[orchestrate] Game loaded"));
 			}
-
-			// Check progress markers (reset inactivity timer)
-			for (const { pattern, msg } of PROGRESS_MARKERS) {
-				if (pattern.test(data)) {
-					lastActivity = Date.now();
-					if (!verbose) {
+			return "continue";
+		},
+	},
+	{
+		patterns: PROGRESS_MARKERS.map((m) => m.pattern),
+		onMatch: (data) => {
+			lastActivity = Date.now();
+			if (!verbose) {
+				for (const { pattern, msg } of PROGRESS_MARKERS) {
+					if (pattern.test(data)) {
 						console.log(c("36", `[orchestrate] ${msg}`));
 					}
 				}
 			}
-
-			// Check for run-level errors
-			for (const pattern of RUN_ERROR_MARKERS) {
-				if (pattern.test(data)) {
-					runFailed = true;
-					if (!verbose) {
-						for (const line of data.split("\n")) {
-							if (pattern.test(line)) {
-								console.error(c("31", `[orchestrate] ${line.trim().slice(0, 200)}`));
-							}
+			return "continue";
+		},
+	},
+	{
+		patterns: RUN_ERROR_MARKERS,
+		onMatch: (data) => {
+			runFailed = true;
+			if (!verbose) {
+				for (const line of data.split("\n")) {
+					for (const pattern of RUN_ERROR_MARKERS) {
+						if (pattern.test(line)) {
+							console.error(c("31", `[orchestrate] ${line.trim().slice(0, 200)}`));
 						}
 					}
-					break;
 				}
 			}
+			return "continue";
+		},
+	},
+	{
+		patterns: TERMINAL_MARKERS,
+		onMatch: () => {
+			terminated = true;
+			terminateReason = "Orchestration finished";
+			terminateCode = 0;
+			return "stop";
+		},
+	},
+];
 
-			// Check terminal markers (orchestration finished, wait for process to exit)
-			for (const pattern of TERMINAL_MARKERS) {
-				if (pattern.test(data)) {
-					terminated = true;
-					terminateReason = "Orchestration finished";
-					terminateCode = 0;
-					return;
-				}
-			}
-		}
-	} catch {
-		// Stream closed - normal on process exit
-	}
-}
+// ── Spawn and monitor ────────────────────────────────────────────────
 
-// ── Spawn and monitor ──
+await ensureQuietOptions(platform);
 
-// Create quiet options if needed
-const OPTIONS_PATH = `mod/${platform}/run/options.txt`;
-if (!existsSync(OPTIONS_PATH)) {
-	await fs.mkdir(`mod/${platform}/run`, { recursive: true });
-	await fs.writeFile(
-		OPTIONS_PATH,
-		`soundCategory_master:0.0
-soundCategory_music:0.0
-soundCategory_record:0.0
-soundCategory_weather:0.0
-soundCategory_block:0.0
-soundCategory_hostile:0.0
-soundCategory_neutral:0.0
-soundCategory_player:0.0
-soundCategory_ambient:0.0
-soundCategory_voice:0.0
-particles:0
-renderDistance:2
-graphicsMode:1
-chatVisibility:2
-narrator:0
-showSubtitles:false
-fullscreen:false`,
-	);
-}
-
-// Resolve force mode — --scenes or --shaders implies --force
 const forceMode = flags.force || !!flags.scenes || !!flags.shaders;
 const forceScenes = (flags.scenes as string) || undefined;
 const forceShaders = (flags.shaders as string) || undefined;
@@ -426,10 +310,10 @@ console.log(c("1;36", `→ Launching Minecraft (${platform}) in autonomous mode.
 console.log(`   API: ${apiUrl}`);
 console.log(`   Token: ${apiToken.slice(0, 4)}...`);
 
-const gradleArgs = [`:${platform}:runClient`, "--no-daemon", "--args=--nogui --width=854 --height=480"];
-
 const modEnv: Record<string, string> = {
-	...process.env as Record<string, string>,
+	...(Object.fromEntries(
+		Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] != null),
+	)),
 	GLINT_AUTONOMOUS: "true",
 	GLINT_API_URL: apiUrl,
 	GLINT_API_TOKEN: apiToken,
@@ -440,93 +324,66 @@ if (forceMode) {
 	modEnv.GLINT_FORCE_SHADERS = forceShaders ?? "+";
 }
 
-proc = spawn(["./gradlew", ...gradleArgs], {
-	cwd: "mod",
-	stdio: ["ignore", "pipe", "pipe"],
-	env: modEnv,
-});
-procPid = proc.pid!;
+const mc = spawnMinecraft({ platform, env: modEnv });
+registerSignalHandlers(mc.cleanup);
 
-if (proc.stdout) monitorStream(proc.stdout, false);
-if (proc.stderr) monitorStream(proc.stderr, true);
+if (mc.proc.stdout) monitorStream(mc.proc.stdout, false, buffers, verbose, actions);
+if (mc.proc.stderr) monitorStream(mc.proc.stderr, true, buffers, verbose, actions);
 
-// Wait loop
+// ── Wait loop ────────────────────────────────────────────────────────
+
 const startTime = Date.now();
-const EARLY_TIMEOUT = 120; // 2 min for game to start
-const INACTIVITY_TIMEOUT = 180; // 3 min without progress before assuming hang
+const EARLY_TIMEOUT = 120;
+const INACTIVITY_TIMEOUT = 180;
 
 try {
 	while (true) {
-		const elapsed = Math.floor((Date.now() - startTime) / 1000);
+		const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
 
 		// Orchestration completed normally
 		if (terminated && terminateCode === 0) {
 			if (runFailed) {
-				console.error(c("31", `[orchestrate] Run failed (${elapsed}s)`));
-				if (!verbose) {
-					const allOutput = outputBuffer + stderrBuffer;
-					console.error("");
-					console.error("Last 30 lines of output:");
-					console.error(allOutput.split("\n").slice(-30).join("\n"));
-					console.error("");
-					console.error(`[hint] Run with -v for full output`);
-				}
-				await cleanup();
+				console.error(c("31", `[orchestrate] Run failed (${elapsedSec}s)`));
+				if (!verbose) printFailureTail(buffers, 30, "-v");
+				await mc.cleanup();
 				process.exit(1);
 			}
-			// Give the process a moment to exit cleanly
-			console.log(c("32", `[orchestrate] Orchestration complete (${elapsed}s)`));
+			console.log(c("32", `[orchestrate] Orchestration complete (${elapsedSec}s)`));
 			await sleep(3000);
-			await cleanup();
+			await mc.cleanup();
 			process.exit(0);
 		}
 
 		// Fatal error detected
 		if (terminated && terminateCode !== 0) {
 			console.error(c("31", `[orchestrate] ${terminateReason}`));
-			if (!verbose) {
-				console.error("");
-				console.error("Last 50 lines of output:");
-				const allOutput = outputBuffer + stderrBuffer;
-				console.error(allOutput.split("\n").slice(-50).join("\n"));
-				console.error("");
-				console.error(`[hint] Run with -v for full output`);
-			}
-			await cleanup();
+			if (!verbose) printFailureTail(buffers, 50, "-v");
+			await mc.cleanup();
 			process.exit(terminateCode);
 		}
 
 		// Process died
-		if (procPid && !isProcessAlive(procPid)) {
-			const exitCode = await proc!.exited;
+		if (!isProcessAlive(mc.pid)) {
+			const exitCode = await mc.proc.exited;
 			if (exitCode === 0) {
-				console.log(c("32", `[orchestrate] Process exited cleanly (${elapsed}s)`));
+				console.log(c("32", `[orchestrate] Process exited cleanly (${elapsedSec}s)`));
 			} else {
 				console.error(c("31", `[orchestrate] Process exited with code ${exitCode}`));
-				if (!verbose) {
-					console.error("");
-					console.error("Last 50 lines of output:");
-					const allOutput = outputBuffer + stderrBuffer;
-					console.error(allOutput.split("\n").slice(-50).join("\n"));
-				}
+				if (!verbose) printFailureTail(buffers, 50, "-v");
 			}
 			process.exit(exitCode);
 		}
 
-		// Timeout: before game starts, use absolute timeout; after, use inactivity timeout
+		// Timeout
 		const idleSeconds = Math.floor((Date.now() - lastActivity) / 1000);
-		const timedOut = gameStarted ? idleSeconds > INACTIVITY_TIMEOUT : elapsed > EARLY_TIMEOUT;
+		const timedOut = gameStarted ? idleSeconds > INACTIVITY_TIMEOUT : elapsedSec > EARLY_TIMEOUT;
 		if (timedOut) {
 			const reason = gameStarted
 				? `No activity for ${idleSeconds}s (limit: ${INACTIVITY_TIMEOUT}s)`
 				: `Game did not start within ${EARLY_TIMEOUT}s`;
 			console.error(c("31", `[orchestrate] Timeout: ${reason}`));
-			if (!verbose) {
-				const allOutput = outputBuffer + stderrBuffer;
-				console.error("Last 50 lines:");
-				console.error(allOutput.split("\n").slice(-50).join("\n"));
-			}
-			await cleanup();
+			if (!verbose) printFailureTail(buffers, 50, "-v");
+			await mc.cleanup();
 			process.exit(3);
 		}
 
@@ -534,6 +391,6 @@ try {
 	}
 } catch (err) {
 	console.error(c("31", `[orchestrate] Monitoring error: ${err}`));
-	await cleanup();
+	await mc.cleanup();
 	process.exit(1);
 }

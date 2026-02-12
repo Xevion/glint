@@ -1,26 +1,44 @@
 /**
  * Run all project checks in parallel. Auto-fixes formatting when safe.
  *
- * Usage: bun scripts/check.ts [--fix|-f]
+ * Usage: bun scripts/check.ts [--fix|-f] [--help|-h]
  */
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { c, elapsed, isStderrTTY } from './lib/fmt';
+import { c, elapsed, isStderrTTY, parseFlags } from './lib/fmt';
 import { type CollectResult, raceInOrder, run, runPiped, spawnCollect } from './lib/proc';
 
-const args = process.argv.slice(2);
-let fix = false;
-
-for (const arg of args) {
-	if (arg === '-f' || arg === '--fix') {
-		fix = true;
-	} else {
-		console.error(`Unknown flag: ${arg}`);
-		process.exit(1);
+/** Scan files matching a glob pattern and return the newest mtime (ms). */
+function newestMtime(dir: string, pattern: string): number {
+	let newest = 0;
+	for (const file of new Bun.Glob(pattern).scanSync(dir)) {
+		const mt = statSync(`${dir}/${file}`).mtimeMs;
+		if (mt > newest) newest = mt;
 	}
+	return newest;
 }
+
+const { flags } = parseFlags(
+	process.argv.slice(2),
+	{ fix: 'bool', help: 'bool' } as const,
+	{ f: 'fix', h: 'help' },
+	{ fix: false, help: false },
+);
+
+if (flags.help) {
+	console.log(`Usage: bun scripts/check.ts [flags]
+
+Runs all project checks in parallel. Auto-fixes formatting when safe.
+
+Flags:
+  -f, --fix     Format code first, then verify
+  -h, --help    Show this help message and exit`);
+	process.exit(0);
+}
+
+const fix = flags.fix;
 
 if (fix) {
 	console.log(c('1;36', '→ Fixing...'));
@@ -30,30 +48,21 @@ if (fix) {
 	console.log(c('1;36', '→ Verifying...'));
 }
 
+const rustSrcMtime = Math.max(
+	newestMtime('backend/src', '**/*.rs'),
+	...['backend/Cargo.toml', 'backend/Cargo.lock']
+		.filter(existsSync)
+		.map((f) => statSync(f).mtimeMs),
+);
+
 {
 	const BINDINGS_DIR = 'frontend/src/lib/bindings';
 
-	let newestSrcMtime = 0;
-	for (const file of new Bun.Glob('**/*.rs').scanSync('backend/src')) {
-		const mt = statSync(`backend/src/${file}`).mtimeMs;
-		if (mt > newestSrcMtime) newestSrcMtime = mt;
-	}
-	for (const f of ['backend/Cargo.toml', 'backend/Cargo.lock']) {
-		if (existsSync(f)) {
-			const mt = statSync(f).mtimeMs;
-			if (mt > newestSrcMtime) newestSrcMtime = mt;
-		}
-	}
+	const newestBindingMtime = existsSync(BINDINGS_DIR)
+		? newestMtime(BINDINGS_DIR, '**/*')
+		: 0;
 
-	let newestBindingMtime = 0;
-	if (existsSync(BINDINGS_DIR)) {
-		for (const file of new Bun.Glob('**/*').scanSync(BINDINGS_DIR)) {
-			const mt = statSync(`${BINDINGS_DIR}/${file}`).mtimeMs;
-			if (mt > newestBindingMtime) newestBindingMtime = mt;
-		}
-	}
-
-	const stale = newestBindingMtime === 0 || newestSrcMtime > newestBindingMtime;
+	const stale = newestBindingMtime === 0 || rustSrcMtime > newestBindingMtime;
 	if (stale) {
 		const t = Date.now();
 		process.stdout.write(
@@ -126,21 +135,11 @@ if (fix) {
 {
 	const SCHEMAS_DIR = 'schemas';
 
-	let newestSrcMtime = 0;
-	for (const file of new Bun.Glob('**/*.rs').scanSync('backend/src')) {
-		const mt = statSync(`backend/src/${file}`).mtimeMs;
-		if (mt > newestSrcMtime) newestSrcMtime = mt;
-	}
+	const newestSchemaMtime = existsSync(SCHEMAS_DIR)
+		? newestMtime(SCHEMAS_DIR, '*.json')
+		: 0;
 
-	let newestSchemaMtime = 0;
-	if (existsSync(SCHEMAS_DIR)) {
-		for (const file of new Bun.Glob('*.json').scanSync(SCHEMAS_DIR)) {
-			const mt = statSync(`${SCHEMAS_DIR}/${file}`).mtimeMs;
-			if (mt > newestSchemaMtime) newestSchemaMtime = mt;
-		}
-	}
-
-	const stale = newestSchemaMtime === 0 || newestSrcMtime > newestSchemaMtime;
+	const stale = newestSchemaMtime === 0 || rustSrcMtime > newestSchemaMtime;
 	if (stale) {
 		const t = Date.now();
 		process.stdout.write(c('1;36', '→ Regenerating JSON schemas (Rust sources changed)...') + '\n');
@@ -157,25 +156,13 @@ if (fix) {
 {
 	const SQLX_DIR = 'backend/.sqlx';
 
-	let newestSrcMtime = 0;
-	for (const file of new Bun.Glob('**/*.rs').scanSync('backend/src')) {
-		const mt = statSync(`backend/src/${file}`).mtimeMs;
-		if (mt > newestSrcMtime) newestSrcMtime = mt;
-	}
-	for (const file of new Bun.Glob('*.sql').scanSync('backend/migrations')) {
-		const mt = statSync(`backend/migrations/${file}`).mtimeMs;
-		if (mt > newestSrcMtime) newestSrcMtime = mt;
-	}
+	const sqlxSrcMtime = Math.max(rustSrcMtime, newestMtime('backend/migrations', '*.sql'));
 
-	let newestSqlxMtime = 0;
-	if (existsSync(SQLX_DIR)) {
-		for (const file of new Bun.Glob('*.json').scanSync(SQLX_DIR)) {
-			const mt = statSync(`${SQLX_DIR}/${file}`).mtimeMs;
-			if (mt > newestSqlxMtime) newestSqlxMtime = mt;
-		}
-	}
+	const newestSqlxMtime = existsSync(SQLX_DIR)
+		? newestMtime(SQLX_DIR, '*.json')
+		: 0;
 
-	const stale = newestSqlxMtime === 0 || newestSrcMtime > newestSqlxMtime;
+	const stale = newestSqlxMtime === 0 || sqlxSrcMtime > newestSqlxMtime;
 	if (stale) {
 		const t = Date.now();
 		process.stdout.write(c('1;36', '→ Regenerating SQLx query metadata (sources changed)...') + '\n');
