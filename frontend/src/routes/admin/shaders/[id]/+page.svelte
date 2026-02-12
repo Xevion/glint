@@ -4,16 +4,18 @@ import { api } from '$lib/api';
 import type {
 	CaptureWithContext,
 	ShaderVersionDetail,
+	ShaderVersionMetadata,
+	ShaderVersionProfile,
 	ShaderWithCaptures,
 	UpdateShaderRequest
 } from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
-import { freshnessColors } from '$lib/utils/status';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
+import * as Collapsible from '$lib/components/ui/collapsible';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
@@ -21,7 +23,24 @@ import { Label } from '$lib/components/ui/label';
 import * as Table from '$lib/components/ui/table';
 import { Textarea } from '$lib/components/ui/textarea';
 import { formatGameVersions } from '$lib/utils/display';
-import { CircleAlert, Link, LoaderCircle, RefreshCw, Trash2 } from '@lucide/svelte';
+import { formatBytes } from '$lib/utils/format';
+import { freshnessColors } from '$lib/utils/status';
+import {
+	AlertTriangle,
+	Check,
+	ChevronDown,
+	CircleAlert,
+	Clock,
+	Download,
+	FlaskConical,
+	Link,
+	LoaderCircle,
+	PackageCheck,
+	PackageX,
+	RefreshCw,
+	SkipForward,
+	Trash2
+} from '@lucide/svelte';
 import { untrack } from 'svelte';
 import type { PageData } from './$types';
 
@@ -35,6 +54,19 @@ let { data }: Props = $props();
 let shader: ShaderWithCaptures = $derived(data.shader);
 let versions: ShaderVersionDetail[] = $derived(data.shader.versions);
 let captures: CaptureWithContext[] = $derived(data.shader.captures);
+let profiles: ShaderVersionProfile[] = $derived(data.shader.profiles);
+let metadata: ShaderVersionMetadata | undefined = $derived(data.shader.metadata);
+
+/** The effective (latest) version — matches what the backend returns profiles/metadata for */
+let effectiveVersion = $derived(versions.length > 0 ? versions[0] : null);
+
+/** Humanize a camelCase or snake_case key into words */
+function humanize(key: string): string {
+	return key
+		.replace(/([a-z])([A-Z])/g, '$1 $2')
+		.replace(/_/g, ' ')
+		.replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 let saving = $state(false);
 let syncing = $state(false);
@@ -436,18 +468,73 @@ async function confirmDelete() {
 					<Table.Head class="px-4 py-2">Version</Table.Head>
 					<Table.Head class="px-4 py-2">Game Versions</Table.Head>
 					<Table.Head class="px-4 py-2">Channel</Table.Head>
+					<Table.Head class="px-4 py-2">Extraction</Table.Head>
+					<Table.Head class="px-4 py-2">File</Table.Head>
 					<Table.Head class="px-4 py-2">Created</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
 				{#each versions as version (version.id)}
-					<Table.Row class="last:border-0">
-						<Table.Cell class="px-4 py-2 font-medium">{version.version}</Table.Cell>
+					{@const isEffective = effectiveVersion?.id === version.id}
+					{@const isFailed = version.extraction_status === 'failed'}
+					<Table.Row class="last:border-0 {isFailed ? 'bg-destructive/5' : ''} {isEffective ? 'bg-primary/5' : ''}">
+						<Table.Cell class="px-4 py-2 font-medium">
+							{version.version}
+							{#if isEffective}
+								<Badge variant="outline" class="ml-1.5 text-[10px] px-1 py-0">latest</Badge>
+							{/if}
+						</Table.Cell>
 						<Table.Cell class="px-4 py-2 text-xs text-muted-foreground">
 							{formatGameVersions(version.game_versions)}
 						</Table.Cell>
 						<Table.Cell class="px-4 py-2 text-xs capitalize">
 							{version.release_channel ?? '-'}
+						</Table.Cell>
+						<Table.Cell class="px-4 py-2">
+							<div class="flex flex-col gap-0.5">
+								{#if version.extraction_status === 'completed'}
+									<Badge variant="default" class="w-fit gap-1 bg-green-600 hover:bg-green-600 text-[11px] px-1.5 py-0">
+										<Check class="h-3 w-3" />Extracted
+									</Badge>
+								{:else if version.extraction_status === 'failed'}
+									<Badge variant="destructive" class="w-fit gap-1 text-[11px] px-1.5 py-0">
+										<AlertTriangle class="h-3 w-3" />Failed
+									</Badge>
+								{:else if version.extraction_status === 'pending'}
+									<Badge variant="secondary" class="w-fit gap-1 text-[11px] px-1.5 py-0">
+										<Clock class="h-3 w-3" />Pending
+									</Badge>
+								{:else}
+									<Badge variant="outline" class="w-fit gap-1 text-[11px] px-1.5 py-0">
+										<SkipForward class="h-3 w-3" />Skipped
+									</Badge>
+								{/if}
+								{#if version.extracted_at}
+									<span class="text-[10px] text-muted-foreground"><TimeAgo timestamp={version.extracted_at} /></span>
+								{/if}
+								{#if version.extraction_error}
+									<span
+										class="max-w-[200px] truncate text-[10px] font-mono text-destructive"
+										title={version.extraction_error}
+									>{version.extraction_error}</span>
+								{/if}
+							</div>
+						</Table.Cell>
+						<Table.Cell class="px-4 py-2">
+							<div class="flex flex-col gap-0.5 text-xs text-muted-foreground">
+								{#if version.file_size}
+									<span>{formatBytes(version.file_size)}</span>
+								{/if}
+								{#if version.file_hash}
+									<span class="font-mono text-[10px]" title={version.file_hash}>{version.file_hash.slice(0, 8)}</span>
+								{/if}
+								{#if version.download_url}
+									<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+									<a href={version.download_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-0.5 hover:text-foreground" title="Download">
+										<Download class="h-3 w-3" />
+									</a>
+								{/if}
+							</div>
 						</Table.Cell>
 						<Table.Cell class="px-4 py-2">
 							<TimeAgo timestamp={version.created_at} />
@@ -458,6 +545,209 @@ async function confirmDelete() {
 		</Table.Root>
 		{/if}
 	</div>
+
+	<!-- Extraction Data Section -->
+	{#if effectiveVersion}
+		{@const estatus = effectiveVersion.extraction_status}
+		{#if estatus === 'completed' && (profiles.length > 0 || metadata)}
+			<div class="space-y-4">
+				<div class="flex items-center gap-3">
+					<FlaskConical class="h-5 w-5 text-muted-foreground" />
+					<h2 class="text-lg font-medium">Extraction Data</h2>
+					<Badge variant="outline" class="text-xs">{effectiveVersion.version}</Badge>
+				</div>
+
+				<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+					<!-- Profiles Card -->
+					{#if profiles.length > 0}
+						<div class="rounded-lg border bg-card">
+							<div class="flex items-center justify-between border-b px-4 py-3">
+								<h3 class="text-sm font-medium">Profiles</h3>
+								<Badge variant="secondary" class="text-xs">{profiles.length} profile{profiles.length !== 1 ? 's' : ''}</Badge>
+							</div>
+							<div class="divide-y">
+								{#each profiles as profile (profile.id)}
+									{@const optionEntries = Object.entries(profile.options ?? {})}
+									<Collapsible.Root class="group">
+										<Collapsible.Trigger class="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50">
+											<span class="shrink-0 text-xs text-muted-foreground tabular-nums">#{profile.sort_order + 1}</span>
+											<div class="min-w-0 flex-1">
+												<span class="font-medium text-sm">{profile.label ?? profile.name}</span>
+												{#if profile.label && profile.label !== profile.name}
+													<span class="ml-1.5 font-mono text-xs text-muted-foreground">{profile.name}</span>
+												{/if}
+											</div>
+											<Badge variant="outline" class="shrink-0 text-[10px]">{optionEntries.length} opt{optionEntries.length !== 1 ? 's' : ''}</Badge>
+											<ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+										</Collapsible.Trigger>
+										<Collapsible.Content>
+											<div class="border-t px-4 py-3">
+												{#if profile.description}
+													<p class="mb-3 text-sm text-muted-foreground">{profile.description}</p>
+												{/if}
+												{#if optionEntries.length > 0}
+													<div class="rounded border">
+														{#each optionEntries.slice(0, 20) as [key, val], i (key)}
+															<div class="flex items-center justify-between gap-4 px-3 py-1.5 text-xs {i % 2 === 0 ? '' : 'bg-muted/50'}">
+																<span class="min-w-0 truncate font-mono text-muted-foreground">{key}</span>
+																<span class="shrink-0 font-mono">{val}</span>
+															</div>
+														{/each}
+														{#if optionEntries.length > 20}
+															<details class="border-t">
+																<summary class="cursor-pointer px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+																	Show all {optionEntries.length} options
+																</summary>
+																{#each optionEntries.slice(20) as [key, val], i (key)}
+																	<div class="flex items-center justify-between gap-4 px-3 py-1.5 text-xs {(i + 20) % 2 === 0 ? '' : 'bg-muted/50'}">
+																		<span class="min-w-0 truncate font-mono text-muted-foreground">{key}</span>
+																		<span class="shrink-0 font-mono">{val}</span>
+																	</div>
+																{/each}
+															</details>
+														{/if}
+													</div>
+												{:else}
+													<p class="text-xs text-muted-foreground">No option overrides (inherits defaults)</p>
+												{/if}
+											</div>
+										</Collapsible.Content>
+									</Collapsible.Root>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Metadata Card -->
+					{#if metadata}
+						<div class="rounded-lg border bg-card">
+							<div class="flex items-center justify-between border-b px-4 py-3">
+								<h3 class="text-sm font-medium">Metadata</h3>
+								<span class="text-xs text-muted-foreground"><TimeAgo timestamp={metadata.extracted_at} /></span>
+							</div>
+							<div class="space-y-4 px-4 py-3">
+								<!-- Pipeline Features -->
+								{#if metadata.pipeline_features && Object.keys(metadata.pipeline_features).length > 0}
+									<div>
+										<div class="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pipeline Features</div>
+										<div class="flex flex-wrap gap-1.5">
+											{#each Object.entries(metadata.pipeline_features) as [key, val] (key)}
+												{#if val === true}
+													<Badge variant="default" class="text-[11px] bg-green-600 hover:bg-green-600">{humanize(key)}</Badge>
+												{:else if val === false}
+													<Badge variant="outline" class="text-[11px] line-through opacity-50">{humanize(key)}</Badge>
+												{:else}
+													<Badge variant="secondary" class="text-[11px]">{humanize(key)}: {val}</Badge>
+												{/if}
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								<!-- Iris Features -->
+								{#if (metadata.iris_features_required?.length ?? 0) > 0 || (metadata.iris_features_optional?.length ?? 0) > 0}
+									<div>
+										<div class="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Iris Features</div>
+										{#if metadata.iris_features_required && metadata.iris_features_required.length > 0}
+											<div class="mb-1">
+												<span class="mr-1.5 text-[10px] text-muted-foreground">Required:</span>
+												{#each metadata.iris_features_required as feat (feat)}
+													<Badge variant="default" class="mr-1 mb-1 text-[11px]">{feat}</Badge>
+												{/each}
+											</div>
+										{/if}
+										{#if metadata.iris_features_optional && metadata.iris_features_optional.length > 0}
+											<div>
+												<span class="mr-1.5 text-[10px] text-muted-foreground">Optional:</span>
+												{#each metadata.iris_features_optional as feat (feat)}
+													<Badge variant="outline" class="mr-1 mb-1 text-[11px]">{feat}</Badge>
+												{/each}
+											</div>
+										{/if}
+									</div>
+								{/if}
+
+								<!-- Dimension Support -->
+								{#if metadata.dimension_support && metadata.dimension_support.length > 0}
+									<div>
+										<div class="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Dimension Support</div>
+										<div class="flex flex-wrap gap-1.5">
+											{#each metadata.dimension_support as dim (dim)}
+												<Badge variant="secondary" class="text-[11px]">{humanize(dim.replace('the_', ''))}</Badge>
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								<!-- Custom Textures -->
+								{#if metadata.has_custom_textures != null}
+									<div>
+										<div class="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Custom Textures</div>
+										<div class="flex items-center gap-1.5 text-sm">
+											{#if metadata.has_custom_textures}
+												<PackageCheck class="h-4 w-4 text-green-600" />
+												<span>Uses custom textures</span>
+											{:else}
+												<PackageX class="h-4 w-4 text-muted-foreground" />
+												<span class="text-muted-foreground">No custom textures</span>
+											{/if}
+										</div>
+									</div>
+								{/if}
+
+								<!-- File Paths -->
+								{#if metadata.file_paths && metadata.file_paths.length > 0}
+									<Collapsible.Root>
+										<Collapsible.Trigger class="flex w-full items-center gap-2 text-left">
+											<div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">File Paths</div>
+											<Badge variant="secondary" class="text-[10px]">{metadata.file_paths.length} files</Badge>
+											<ChevronDown class="ml-auto h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=open]>&]:rotate-180" />
+										</Collapsible.Trigger>
+										<Collapsible.Content>
+											<div class="mt-2 max-h-64 overflow-y-auto rounded border bg-muted/30 p-2">
+												{#each metadata.file_paths as path, i (path)}
+													<div class="px-1 py-0.5 font-mono text-[11px] {i % 2 === 0 ? '' : 'bg-muted/50'}">{path}</div>
+												{/each}
+											</div>
+										</Collapsible.Content>
+									</Collapsible.Root>
+								{/if}
+
+								<!-- Settings Screen -->
+								{#if metadata.settings_screen && metadata.settings_screen.length > 0}
+									<Collapsible.Root>
+										<Collapsible.Trigger class="flex w-full items-center gap-2 text-left">
+											<div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Settings Screen Layout</div>
+											<Badge variant="secondary" class="text-[10px]">{metadata.settings_screen.length} entries</Badge>
+											<ChevronDown class="ml-auto h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=open]>&]:rotate-180" />
+										</Collapsible.Trigger>
+										<Collapsible.Content>
+											<pre class="mt-2 max-h-80 overflow-y-auto rounded-md bg-muted p-3 font-mono text-xs">{JSON.stringify(metadata.settings_screen, null, 2)}</pre>
+										</Collapsible.Content>
+									</Collapsible.Root>
+								{/if}
+							</div>
+						</div>
+					{/if}
+				</div>
+			</div>
+		{:else if estatus === 'failed'}
+			<Alert variant="destructive">
+				<AlertTriangle class="h-4 w-4" />
+				<div>Extraction failed for v{effectiveVersion.version}{effectiveVersion.extraction_error ? `: ${effectiveVersion.extraction_error}` : ''}</div>
+			</Alert>
+		{:else if estatus === 'pending'}
+			<div class="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+				<Clock class="h-4 w-4" />
+				Extraction pending for v{effectiveVersion.version}
+			</div>
+		{:else if estatus === 'skipped'}
+			<div class="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+				<SkipForward class="h-4 w-4" />
+				Extraction skipped for v{effectiveVersion.version}
+			</div>
+		{/if}
+	{/if}
 
 	<!-- Captures Section -->
 	<div class="space-y-3">

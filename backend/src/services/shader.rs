@@ -41,12 +41,13 @@ impl ShaderService {
         let shader_ids: Vec<String> = shaders.iter().map(|s| s.id.0.clone()).collect();
 
         // Fetch enrichment data in parallel (only for this page)
-        let (authors, categories, features, versions, thumbnails) = tokio::try_join!(
+        let (authors, categories, features, versions, thumbnails, mut extraction_summaries) = tokio::try_join!(
             ShaderAuthorRepo::list_all(db),
             CategoryRepo::list_all_for_shaders(db),
             FeatureRepo::list_all_for_shaders(db),
             ShaderVersionRepo::batch_latest_versions(db),
             CaptureRepo::batch_thumbnails_for_shaders(db, &shader_ids),
+            ShaderVersionRepo::batch_extraction_summaries(db),
         )?;
 
         // Group by shader_id
@@ -75,6 +76,8 @@ impl ShaderService {
                 let id_str: &str = id.as_ref();
                 let version = versions.get(id);
                 let thumb = thumbnails.get(id_str);
+                let summary = extraction_summaries.remove(id);
+                let version_count = summary.as_ref().map_or(0, |s| s.total);
                 ShaderListItem {
                     authors: authors_map.remove(id_str).unwrap_or_default(),
                     categories: categories_map.remove(id_str).unwrap_or_default(),
@@ -82,6 +85,8 @@ impl ShaderService {
                     latest_version: version.map(|v| v.version.clone()),
                     image_url: thumb.map(|t| t.image_url.clone()),
                     thumbhash: thumb.and_then(|t| t.thumbhash.clone()),
+                    version_count,
+                    extraction_summary: summary,
                     shader,
                 }
             })

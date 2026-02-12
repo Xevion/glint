@@ -6,7 +6,7 @@ use sqlx::types::Json;
 use ts_rs::TS;
 
 use super::capture::CaptureWithContext;
-use super::extraction::ExtractionStatus;
+use super::extraction::{ExtractionStatus, ShaderVersionMetadata, ShaderVersionProfile};
 use super::taxonomy::{Category, Feature};
 use crate::id::{ShaderId, ShaderVersionId};
 
@@ -65,6 +65,17 @@ pub struct ShaderVersion {
     pub extracted_at: Option<DateTime<Utc>>,
 }
 
+/// Aggregate extraction status counts for a shader's versions
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct ExtractionSummary {
+    pub completed: i64,
+    pub failed: i64,
+    pub pending: i64,
+    pub skipped: i64,
+    pub total: i64,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
 #[ts(export, optional_fields)]
@@ -77,6 +88,8 @@ pub struct ShaderListItem {
     pub latest_version: Option<String>,
     pub image_url: Option<String>,
     pub thumbhash: Option<String>,
+    pub version_count: i64,
+    pub extraction_summary: Option<ExtractionSummary>,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -104,6 +117,10 @@ pub struct ShaderWithCaptures {
     pub authors: Vec<ShaderAuthor>,
     pub versions: Vec<ShaderVersionDetail>,
     pub captures: Vec<CaptureWithContext>,
+    pub profiles: Vec<ShaderVersionProfile>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub metadata: Option<ShaderVersionMetadata>,
 }
 
 /// A shader that is currently trending (high view count in a recent time window).

@@ -243,6 +243,56 @@ impl ShaderVersionRepo {
             .collect())
     }
 
+    /// Batch-fetch extraction status summaries and version counts per shader.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn batch_extraction_summaries(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> AppResult<HashMap<ShaderId, crate::models::ExtractionSummary>> {
+        struct Row {
+            shader_id: String,
+            total: i64,
+            completed: i64,
+            failed: i64,
+            pending: i64,
+            skipped: i64,
+        }
+
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT
+                shader_id,
+                COUNT(*) AS "total!",
+                COUNT(*) FILTER (WHERE extraction_status = 'completed') AS "completed!",
+                COUNT(*) FILTER (WHERE extraction_status = 'failed') AS "failed!",
+                COUNT(*) FILTER (WHERE extraction_status = 'pending') AS "pending!",
+                COUNT(*) FILTER (WHERE extraction_status = 'skipped') AS "skipped!"
+            FROM shader_versions
+            GROUP BY shader_id
+            "#
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to batch fetch extraction summaries")?;
+
+        debug!(count = rows.len(), "Batch fetched extraction summaries");
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    ShaderId(r.shader_id),
+                    crate::models::ExtractionSummary {
+                        completed: r.completed,
+                        failed: r.failed,
+                        pending: r.pending,
+                        skipped: r.skipped,
+                        total: r.total,
+                    },
+                )
+            })
+            .collect())
+    }
+
     /// Get the parent shader's ID for a given shader version.
     #[instrument(skip(executor), level = "debug")]
     pub async fn get_shader_id(

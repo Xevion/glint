@@ -32,6 +32,7 @@ export type { DeviceConfirmResponse } from "./DeviceConfirmResponse";
 export type { DeviceTokenError } from "./DeviceTokenError";
 export type { DeviceTokenResponse } from "./DeviceTokenResponse";
 export type { ExtractionStatus } from "./ExtractionStatus";
+export type { ExtractionSummary } from "./ExtractionSummary";
 export type { Feature } from "./Feature";
 export type { FeaturedPair } from "./FeaturedPair";
 export type { Paginated } from "./Paginated";

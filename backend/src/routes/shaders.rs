@@ -11,8 +11,8 @@ use crate::{
         ShaderListItem, ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
     },
     repo::{
-        CaptureRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo, ShaderViewRepo,
-        SlugRedirectRepo,
+        CaptureRepo, ExtractionRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo,
+        ShaderViewRepo, SlugRedirectRepo,
         capture::{CaptureDistinct, CaptureFilters},
     },
     services::shader::ShaderService,
@@ -209,7 +209,7 @@ async fn get_shader(
 
     let filters = CaptureFilters {
         shader_id: Some(shader.id.clone()),
-        version_id: effective_version_id,
+        version_id: effective_version_id.clone(),
         profile_id: query.profile_id.map(|id| id.0),
         status: Some(CaptureStatus::Completed),
         scene_active: Some(true),
@@ -219,6 +219,15 @@ async fn get_shader(
         CaptureRepo::list_with_context(db, &filters, None, CaptureDistinct::PerScene).await?;
 
     let authors = ShaderAuthorRepo::list_by_shader(db, shader.id.as_ref()).await?;
+
+    // Fetch extraction data (profiles + metadata) for the effective version
+    let (profiles, metadata) = if let Some(ref vid) = effective_version_id {
+        let p = ExtractionRepo::list_profiles_by_version(db, vid.as_ref()).await?;
+        let m = ExtractionRepo::get_metadata_by_version(db, vid.as_ref()).await?;
+        (p, m)
+    } else {
+        (vec![], None)
+    };
 
     // Fire-and-forget view recording
     let hops = state.config().rate_limit.trusted_proxy_hops;
@@ -249,6 +258,8 @@ async fn get_shader(
             authors,
             versions,
             captures,
+            profiles,
+            metadata,
         })),
         etag,
     })

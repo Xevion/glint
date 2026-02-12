@@ -41,8 +41,8 @@ pub use scene::{
     SceneWithVersion, SceneWithWorld, UpdateSceneMetadataRequest, UpdateSceneRequest,
 };
 pub use shader::{
-    CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderAdopted, ShaderAuthor,
-    ShaderListItem, ShaderSearchRequest, ShaderSearchResponse, ShaderSearchResult,
+    CreateShaderRequest, CreateShaderVersionRequest, ExtractionSummary, Shader, ShaderAdopted,
+    ShaderAuthor, ShaderListItem, ShaderSearchRequest, ShaderSearchResponse, ShaderSearchResult,
     ShaderSearchSort, ShaderVersion, ShaderVersionDetail, ShaderWithCaptures, ShaderWithVersions,
     TrendingShader, UpdateShaderRequest,
 };

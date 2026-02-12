@@ -3,5 +3,7 @@ import type { CaptureWithContext } from "./CaptureWithContext";
 import type { ShaderAuthor } from "./ShaderAuthor";
 import type { ShaderId } from "./ShaderId";
 import type { ShaderVersionDetail } from "./ShaderVersionDetail";
+import type { ShaderVersionMetadata } from "./ShaderVersionMetadata";
+import type { ShaderVersionProfile } from "./ShaderVersionProfile";
 
-export type ShaderWithCaptures = { authors: Array<ShaderAuthor>, versions: Array<ShaderVersionDetail>, captures: Array<CaptureWithContext>, id: ShaderId, name: string, slug: string, description?: string, modrinth_id?: string, curseforge_id?: string, website_url?: string, icon_url?: string, source_url?: string, license_id?: string, upstream_downloads?: number, upstream_updated_at?: string, last_synced_at?: string, created_at: string, updated_at: string, view_count: number, };
+export type ShaderWithCaptures = { authors: Array<ShaderAuthor>, versions: Array<ShaderVersionDetail>, captures: Array<CaptureWithContext>, profiles: Array<ShaderVersionProfile>, metadata?: ShaderVersionMetadata, id: ShaderId, name: string, slug: string, description?: string, modrinth_id?: string, curseforge_id?: string, website_url?: string, icon_url?: string, source_url?: string, license_id?: string, upstream_downloads?: number, upstream_updated_at?: string, last_synced_at?: string, created_at: string, updated_at: string, view_count: number, };

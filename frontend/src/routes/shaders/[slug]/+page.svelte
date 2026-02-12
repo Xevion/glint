@@ -5,10 +5,11 @@ import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import Meta from '$lib/components/Meta.svelte';
+import * as Collapsible from '$lib/components/ui/collapsible';
 import * as Select from '$lib/components/ui/select';
 import { formatNumber, formatVersion } from '$lib/utils/display';
 import { preloadImage } from '$lib/utils/image';
-import { ChevronRight, Download, ExternalLink, ImageOff } from '@lucide/svelte';
+import { ChevronDown, ChevronRight, Download, ExternalLink, ImageOff } from '@lucide/svelte';
 import { fly } from 'svelte/transition';
 import type { PageData } from './$types';
 import { _trimShader, type ShaderDetail } from './+page.ts';
@@ -28,6 +29,7 @@ $effect(() => {
 	shaderOverride = null;
 	versionOverride = null;
 	selectedCaptureId = null;
+	selectedProfileId = null;
 });
 
 // Core data: prefer override (from version change), fall back to page data
@@ -46,10 +48,11 @@ const selectedVersion = $derived(
 	versions.find((v) => v.id === selectedVersionId) ?? versions[0] ?? null
 );
 
-// Unique profile names from loaded captures
-const profiles = $derived([
-	...new Set(captures.map((c) => c.profile_name).filter(Boolean))
-] as string[]);
+// Profiles from extraction data for the selected version
+const extractedProfiles = $derived(shader.profiles ?? []);
+
+// Active profile filter (null = show all captures)
+let selectedProfileId = $state<string | null>(null);
 
 // Hero: derived from user selection, falling back to first capture
 let selectedCaptureId = $state<string | null>(null);
@@ -68,6 +71,7 @@ let fetchGeneration = 0;
 async function onVersionChange(versionId: string) {
 	versionOverride = versionId;
 	selectedCaptureId = null;
+	selectedProfileId = null;
 	const generation = ++fetchGeneration;
 	const api = createApiClient(fetch);
 	const result = await api.shaders.getShader(shader.slug, { versionId });
@@ -78,6 +82,27 @@ async function onVersionChange(versionId: string) {
 		},
 		Err: (err) => {
 			console.warn('Failed to fetch shader version:', err.message);
+		}
+	});
+}
+
+// Profile filter change handler — re-fetch captures filtered by profile
+async function onProfileChange(profileId: string | null) {
+	selectedProfileId = profileId;
+	selectedCaptureId = null;
+	const generation = ++fetchGeneration;
+	const api = createApiClient(fetch);
+	const params: { versionId?: string; profile_id?: string } = {};
+	if (selectedVersionId) params.versionId = selectedVersionId;
+	if (profileId) params.profile_id = profileId;
+	const result = await api.shaders.getShader(shader.slug, params);
+	if (generation !== fetchGeneration) return;
+	result.match({
+		Ok: (updated) => {
+			shaderOverride = _trimShader(updated);
+		},
+		Err: (err) => {
+			console.warn('Failed to fetch shader captures for profile:', err.message);
 		}
 	});
 }
@@ -218,12 +243,30 @@ const ogDescription = $derived.by(() => {
 					</span>
 				{/if}
 
-					<!-- Profiles -->
-					{#each profiles as profile (profile)}
-						<span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-							{profile}
-						</span>
+					<!-- Profile filter pills -->
+				{#if extractedProfiles.length > 0}
+					<span class="text-border">|</span>
+					<button
+						type="button"
+						class="rounded-full px-3 py-1 text-xs font-medium transition-colors {selectedProfileId === null
+							? 'bg-primary text-primary-foreground'
+							: 'bg-primary/10 text-primary hover:bg-primary/20'}"
+						onclick={() => onProfileChange(null)}
+					>
+						All
+					</button>
+					{#each extractedProfiles as profile (profile.id)}
+						<button
+							type="button"
+							class="rounded-full px-3 py-1 text-xs font-medium transition-colors {selectedProfileId === profile.id
+								? 'bg-primary text-primary-foreground'
+								: 'bg-primary/10 text-primary hover:bg-primary/20'}"
+							onclick={() => onProfileChange(profile.id)}
+						>
+							{profile.label ?? profile.name}
+						</button>
 					{/each}
+				{/if}
 
 					<!-- Separator -->
 					{#if shader.website_url ?? shader.modrinth_id ?? shader.source_url}
@@ -266,6 +309,57 @@ const ogDescription = $derived.by(() => {
 				{/if}
 				</div>
 			</div>
+
+			<!-- Profile Details (collapsible) -->
+			{#if extractedProfiles.length > 0}
+				<div class="mt-4">
+					<Collapsible.Root>
+						<Collapsible.Trigger
+							class="flex items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-foreground/80"
+						>
+							<ChevronDown
+								class="h-4 w-4 transition-transform [[data-state=open]_&]:rotate-180"
+							/>
+							Profile settings
+							<span class="text-xs font-normal text-foreground/60"
+								>({extractedProfiles.length})</span
+							>
+						</Collapsible.Trigger>
+						<Collapsible.Content>
+							<div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+								{#each extractedProfiles as profile (profile.id)}
+									<div class="rounded-lg border border-border bg-card p-3">
+										<h3 class="mb-2 text-sm font-semibold text-card-foreground">
+											{profile.label ?? profile.name}
+											{#if profile.label && profile.label !== profile.name}
+												<span class="ml-1 text-xs font-normal text-muted-foreground"
+													>({profile.name})</span
+												>
+											{/if}
+										</h3>
+										{#if Object.keys(profile.options).length > 0}
+											<dl class="space-y-0.5 text-xs">
+												{#each Object.entries(profile.options) as [key, value] (key)}
+													<div class="flex justify-between gap-2">
+														<dt class="truncate font-mono text-muted-foreground">{key}</dt>
+														<dd class="shrink-0 font-mono font-medium text-card-foreground">
+															{value}
+														</dd>
+													</div>
+												{/each}
+											</dl>
+										{:else}
+											<p class="text-xs text-muted-foreground">
+												No overrides (default settings)
+											</p>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						</Collapsible.Content>
+					</Collapsible.Root>
+				</div>
+			{/if}
 
 			<!-- Hero Image -->
 			{#if heroCapture}

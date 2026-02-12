@@ -9,6 +9,7 @@ use crate::extraction::shader_props::{
     ParsedProfile, PipelineFeatures, ProfileOption, ScreenDefinition, ScreenEntry,
     ShaderPropertiesData,
 };
+use crate::models::extraction::{ShaderVersionMetadata, ShaderVersionProfile};
 
 pub struct ExtractionRepo;
 
@@ -157,6 +158,59 @@ impl ExtractionRepo {
 
         debug!(version_id, "Persisted extraction data");
         Ok(())
+    }
+
+    /// List all profiles for a shader version, ordered by sort_order.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_profiles_by_version(
+        executor: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
+        version_id: &str,
+    ) -> AppResult<Vec<ShaderVersionProfile>> {
+        let profiles = sqlx::query_as!(
+            ShaderVersionProfile,
+            r#"
+            SELECT id, shader_version_id, name, label, description, options, sort_order, created_at
+            FROM shader_version_profiles
+            WHERE shader_version_id = $1
+            ORDER BY sort_order
+            "#,
+            version_id,
+        )
+        .fetch_all(executor)
+        .await
+        .context(format!(
+            "failed to list profiles for version '{version_id}'"
+        ))?;
+
+        debug!(
+            count = profiles.len(),
+            version_id, "Listed profiles by version"
+        );
+        Ok(profiles)
+    }
+
+    /// Get extracted metadata for a shader version, if available.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn get_metadata_by_version(
+        executor: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
+        version_id: &str,
+    ) -> AppResult<Option<ShaderVersionMetadata>> {
+        let metadata = sqlx::query_as!(
+            ShaderVersionMetadata,
+            r#"
+            SELECT shader_version_id, pipeline_features, iris_features_required,
+                   iris_features_optional, settings_screen, file_paths,
+                   dimension_support, has_custom_textures, extracted_at
+            FROM shader_version_metadata
+            WHERE shader_version_id = $1
+            "#,
+            version_id,
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to get metadata for version '{version_id}'"))?;
+
+        Ok(metadata)
     }
 }
 

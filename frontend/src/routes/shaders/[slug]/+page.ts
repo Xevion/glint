@@ -4,6 +4,8 @@ import type {
 	CaptureWithContext,
 	ShaderAuthor,
 	ShaderVersionDetail,
+	ShaderVersionMetadata,
+	ShaderVersionProfile,
 	ShaderWithCaptures
 } from '$lib/bindings';
 import { pick } from '$lib/utils';
@@ -32,6 +34,8 @@ export type ShaderDetail = Pick<
 	authors: ShaderDetailAuthor[];
 	versions: ShaderDetailVersion[];
 	captures: ShaderDetailCapture[];
+	profiles: ShaderVersionProfile[];
+	metadata?: ShaderVersionMetadata;
 };
 
 /** Deduplicate authors by name, preferring entries that have a URL. */
@@ -72,7 +76,9 @@ export function _trimShader(s: ShaderWithCaptures): ShaderDetail {
 				'shader_version',
 				'shader_name'
 			])
-		)
+		),
+		profiles: s.profiles,
+		metadata: s.metadata
 	};
 }
 

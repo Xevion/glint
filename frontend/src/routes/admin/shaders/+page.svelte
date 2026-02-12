@@ -3,18 +3,21 @@ import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { api } from '$lib/api';
 import type { Shader, ShaderListItem, ShaderSearchResult, ShaderSearchSort } from '$lib/bindings';
-import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
-import { AdminPageHeader } from '$lib/components/admin';
 import AdminTable from '$lib/components/AdminTable.svelte';
+import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
+import { AdminPageHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
+import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
 import * as Tabs from '$lib/components/ui/tabs';
 import { cn } from '$lib/utils';
 import { formatNumber } from '$lib/utils/display';
 import {
+	Check,
 	CircleAlert,
+	Clock,
 	Download,
 	ExternalLink,
 	EyeOff,
@@ -22,8 +25,9 @@ import {
 	Link,
 	LoaderCircle,
 	Search,
+	SkipForward,
 	Sparkles,
-	X
+	X as XIcon
 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
@@ -61,8 +65,18 @@ const columns = [
 	{ id: 'name', key: 'name', name: 'Name', cardTitle: true },
 	{ id: 'description', key: 'description', name: 'Description' },
 	{ id: 'sync_status', key: 'last_synced_at', name: 'Sync' },
+	{ id: 'versions', key: 'version_count', name: 'Versions' },
+	{ id: 'extraction', key: 'extraction_summary', name: 'Extraction' },
 	{ id: 'created_at', key: 'created_at', name: 'Created' }
 ];
+
+function getExtractionRowBorder(shader: ShaderListItem): string {
+	const s = shader.extraction_summary;
+	if (!s) return '';
+	if (s.failed > 0) return 'border-l-2 border-l-destructive';
+	if (s.pending > 0) return 'border-l-2 border-l-warning';
+	return '';
+}
 
 function getSyncStatus(shader: ShaderListItem): { label: string; class: string } {
 	const hasLink = !!shader.modrinth_id || !!shader.curseforge_id;
@@ -312,17 +326,47 @@ function handleShaderAdopted(shader: Shader) {
 							<span class="text-sm font-medium {status.class}"
 								>{status.label}</span
 							>
-						{:else if columnId === 'created_at'}
-							{#if value}
-								<span class="text-sm tabular-nums text-muted-foreground"
-									>{formatTerseTime(value as string)}</span
-								>
-							{:else}
-								<span class="text-muted-foreground">-</span>
-							{/if}
+					{:else if columnId === 'versions'}
+						<span class="text-sm tabular-nums text-muted-foreground">{(row as ShaderListItem).version_count}</span>
+					{:else if columnId === 'extraction'}
+						{@const summary = (row as ShaderListItem).extraction_summary}
+						{#if !summary || summary.total === 0}
+							<span class="text-xs text-muted-foreground">No versions</span>
 						{:else}
-							{value ?? '-'}
+							<div class="flex items-center gap-1">
+								{#if summary.completed > 0}
+									<Badge variant="default" class="gap-0.5 px-1.5 py-0 text-[10px] bg-green-600 hover:bg-green-600">
+										<Check class="h-3 w-3" />{summary.completed}
+									</Badge>
+								{/if}
+								{#if summary.failed > 0}
+									<Badge variant="destructive" class="gap-0.5 px-1.5 py-0 text-[10px]">
+										<XIcon class="h-3 w-3" />{summary.failed}
+									</Badge>
+								{/if}
+								{#if summary.pending > 0}
+									<Badge variant="secondary" class="gap-0.5 px-1.5 py-0 text-[10px]">
+										<Clock class="h-3 w-3" />{summary.pending}
+									</Badge>
+								{/if}
+								{#if summary.skipped > 0}
+									<Badge variant="outline" class="gap-0.5 px-1.5 py-0 text-[10px]">
+										<SkipForward class="h-3 w-3" />{summary.skipped}
+									</Badge>
+								{/if}
+							</div>
 						{/if}
+					{:else if columnId === 'created_at'}
+						{#if value}
+							<span class="text-sm tabular-nums text-muted-foreground"
+								>{formatTerseTime(value as string)}</span
+							>
+						{:else}
+							<span class="text-muted-foreground">-</span>
+						{/if}
+					{:else}
+						{value ?? '-'}
+					{/if}
 					{/snippet}
 				</AdminTable>
 			{/if}
@@ -415,7 +459,7 @@ function handleShaderAdopted(shader: Shader) {
 							onclick={clearSearch}
 							class="ml-auto rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
 						>
-							<X class="h-4 w-4" />
+							<XIcon class="h-4 w-4" />
 						</button>
 					</div>
 				{/if}
