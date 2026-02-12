@@ -48,18 +48,18 @@ let devStack = $derived(dev ? page.error?.stack : null);
 
 		<p
 			in:fade={{ duration: 300, delay: 200 }}
-			class="mb-12 text-xl text-foreground"
+			class="mb-12 text-xl text-muted-foreground"
 		>
 			{message.description}
 		</p>
 
 		{#if devMessage}
 			<div in:fade={{ duration: 300, delay: 250 }} class="mx-auto mb-8 max-w-xl text-left">
-				<div class="rounded-lg border border-orange-500/30 bg-orange-500/5 p-4">
-					<div class="mb-2 text-xs font-semibold uppercase tracking-wider text-orange-400">
+				<div class="rounded-lg border border-warning/30 bg-warning/5 p-4">
+					<div class="mb-2 text-xs font-semibold uppercase tracking-wider text-warning">
 						Dev Error
 					</div>
-					<p class="text-sm text-foreground">{devMessage}</p>
+					<p class="text-sm text-muted-foreground">{devMessage}</p>
 					{#if devStack}
 						<pre class="mt-3 max-h-64 overflow-auto rounded bg-black/50 p-3 text-left font-mono text-xs text-muted-foreground">{devStack}</pre>
 					{/if}

@@ -81,9 +81,9 @@ function getSyncStatus(shader: ShaderListItem): { label: string; class: string }
 	if (days * 24 > 1)
 		return {
 			label: `${Math.floor(days * 24)}h`,
-			class: 'text-green-600 dark:text-green-400'
+			class: 'text-success'
 		};
-	return { label: 'Now', class: 'text-green-600 dark:text-green-400' };
+	return { label: 'Now', class: 'text-success' };
 }
 
 function formatTerseTime(dateStr: string): string {
@@ -270,11 +270,11 @@ function handleShaderAdopted(shader: Shader) {
 				<Alert variant="destructive">Error: {shadersError}</Alert>
 			{:else if shaders.length === 0}
 				<div class="py-12 text-center">
-					<Download class="mx-auto mb-3 h-10 w-10 text-foreground opacity-50" />
-					<p class="text-foreground">No shaders yet.</p>
-					<p class="mt-1 text-sm text-foreground">
-						Switch to the Discover tab to find and adopt shaders.
-					</p>
+				<Download class="mx-auto mb-3 h-10 w-10 text-muted-foreground opacity-50" />
+				<p class="text-muted-foreground">No shaders yet.</p>
+				<p class="mt-1 text-sm text-muted-foreground">
+					Switch to the Discover tab to find and adopt shaders.
+				</p>
 				</div>
 			{:else}
 				<AdminTable
@@ -327,7 +327,7 @@ function handleShaderAdopted(shader: Shader) {
 						{:else}
 							<div class="flex items-center gap-1">
 								{#if summary.completed > 0}
-									<Badge variant="default" class="gap-0.5 px-1.5 py-0 text-[10px] bg-green-600 hover:bg-green-600">
+									<Badge variant="default" class="gap-0.5 px-1.5 py-0 text-[10px] bg-success hover:bg-success">
 										<Check class="h-3 w-3" />{summary.completed}
 									</Badge>
 								{/if}
@@ -458,8 +458,8 @@ function handleShaderAdopted(shader: Shader) {
 
 				<!-- Result count -->
 				{#if discoverLoaded && !discoverLoading && discoverResults.length > 0}
-					<p class="text-xs text-foreground">
-						{totalModrinth} Modrinth{totalCurseforge != null
+				<p class="text-xs text-muted-foreground">
+					{totalModrinth} Modrinth{totalCurseforge != null
 							? ` · ${totalCurseforge} CurseForge`
 							: ''}
 						{#if hideAdopted && filteredResults.length < discoverResults.length}
@@ -499,7 +499,7 @@ function handleShaderAdopted(shader: Shader) {
 						{/each}
 					</div>
 				{:else if filteredResults.length === 0 && discoverLoaded && !discoverError}
-					<p class="py-8 text-center text-sm text-foreground">
+					<p class="py-8 text-center text-sm text-muted-foreground">
 						{#if searchActive}
 							No shaders found for "{searchQuery}".
 						{:else if hideAdopted && discoverResults.length > 0}
@@ -516,7 +516,7 @@ function handleShaderAdopted(shader: Shader) {
 						{#each filteredResults as result (result.platform + ':' + result.platform_id)}
 							<div
 								class="group relative flex flex-col rounded-lg border bg-card transition-colors hover:border-foreground/20 {result.adopted
-									? 'border-green-600/30 bg-green-50 dark:border-green-400/40 dark:bg-card'
+									? 'border-success/30 bg-success/10'
 									: ''}"
 							>
 								<div class="flex gap-3 p-4 pb-2">

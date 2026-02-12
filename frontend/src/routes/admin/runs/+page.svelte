@@ -39,7 +39,7 @@ async function refresh() {
 	{#if data.error}
 		<Alert variant="destructive">Error: {data.error}</Alert>
 	{:else if runs.length === 0}
-		<p class="text-foreground">No capture runs yet.</p>
+		<p class="text-muted-foreground">No capture runs yet.</p>
 	{:else}
 		<AdminTable
 			data={runs}

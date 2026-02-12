@@ -81,7 +81,7 @@ function handleKeyDown(e: KeyboardEvent) {
 		<!-- Time badge - top left -->
 		<div class="absolute top-3 left-3 flex">
 			<span
-				class="inline-flex items-center gap-1.5 rounded-md bg-blue-500/80 px-2 py-1 text-xs font-medium text-white capitalize shadow-theme-sm backdrop-blur-sm"
+				class="inline-flex items-center gap-1.5 rounded-md bg-info/80 px-2 py-1 text-xs font-medium text-white capitalize shadow-theme-sm backdrop-blur-sm"
 			>
 				<Sun class="h-3 w-3" strokeWidth={2} />
 				{timeOfDay}

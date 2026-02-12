@@ -205,9 +205,9 @@ async function loadVersions() {
 
 		{#if showVersions}
 			{#if loadingVersions}
-				<p class="text-sm text-foreground">Loading versions...</p>
+				<p class="text-sm text-muted-foreground">Loading versions...</p>
 			{:else if versions.length === 0}
-				<p class="text-sm text-foreground">No versions found.</p>
+				<p class="text-sm text-muted-foreground">No versions found.</p>
 			{:else}
 				<div class="space-y-2">
 					{#each versions as version, i (version.id)}
@@ -220,7 +220,7 @@ async function loadVersions() {
 										<TimeAgo timestamp={version.created_at} />
 										{#if i === 0}
 											<span
-												class="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+												class="rounded-full bg-info/15 px-2 py-0.5 text-xs text-info"
 											>
 												Latest
 											</span>
@@ -246,7 +246,7 @@ async function loadVersions() {
 	<div class="space-y-3">
 		<h2 class="text-lg font-medium">Scenes ({scenes.length})</h2>
 		{#if scenes.length === 0}
-			<p class="text-sm text-foreground">No scenes for this world.</p>
+			<p class="text-sm text-muted-foreground">No scenes for this world.</p>
 		{:else}
 			<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 				{#each scenes as scene (scene.id)}

@@ -310,7 +310,7 @@ const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
 							<!-- Enabled/Disabled Badge -->
 							<button
 								class="absolute right-2 top-2 rounded-full p-1.5 transition-colors {bg.enabled
-									? 'bg-green-500/80 text-white hover:bg-green-600'
+									? 'bg-success/80 text-white hover:bg-success'
 									: 'bg-black/50 text-white opacity-70 hover:bg-black/70 hover:opacity-100'}"
 								title={bg.enabled ? 'Enabled - click to disable' : 'Disabled - click to enable'}
 								onclick={() => toggleEnabled(bg)}

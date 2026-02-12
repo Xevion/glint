@@ -345,7 +345,7 @@ async function confirmDelete() {
                                     {:else}
                                         <Badge
                                             variant="outline"
-                                            class="text-green-600 border-green-600/30 dark:text-green-400 dark:border-green-400/30"
+                                            class="text-success border-success/30"
                                             >Synced</Badge
                                         >
                                         <span
@@ -659,7 +659,7 @@ async function confirmDelete() {
                                                 {#if version.extraction_status === "completed"}
                                                     <Badge
                                                         variant="default"
-                                                        class="w-fit gap-1 bg-green-600 hover:bg-green-600 text-[11px] px-1.5 py-0"
+                                                        class="w-fit gap-1 bg-success hover:bg-success text-[11px] px-1.5 py-0"
                                                     >
                                                         <Check
                                                             class="h-3 w-3"
@@ -954,7 +954,7 @@ async function confirmDelete() {
                                                             {#if val === true}
                                                                 <Badge
                                                                     variant="default"
-                                                                    class="text-[11px] bg-green-600 hover:bg-green-600"
+                                                                    class="text-[11px] bg-success hover:bg-success"
                                                                     >{humanize(
                                                                         key,
                                                                     )}</Badge
@@ -1059,7 +1059,7 @@ async function confirmDelete() {
                                                     >
                                                         {#if metadata.has_custom_textures}
                                                             <PackageCheck
-                                                                class="h-4 w-4 text-green-600"
+                                                                class="h-4 w-4 text-success"
                                                             />
                                                             <span
                                                                 >Uses custom

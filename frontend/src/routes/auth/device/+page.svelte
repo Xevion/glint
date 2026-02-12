@@ -124,7 +124,7 @@ onMount(() => {
 			</div>
 		{:else if state.type === 'expired'}
 			<div class="text-center" in:fade>
-				<Clock class="mx-auto mb-4 h-12 w-12 text-amber-500" />
+				<Clock class="mx-auto mb-4 h-12 w-12 text-warning" />
 				<h1 class="mb-2 text-2xl font-bold text-card-foreground">Code Expired</h1>
 				<p class="mb-6 text-muted-foreground">
 					This device code has expired. Please start the authorization process again in your
@@ -133,7 +133,7 @@ onMount(() => {
 			</div>
 		{:else if state.type === 'already_authorized'}
 			<div class="text-center" in:fade>
-				<CheckCircle class="mx-auto mb-4 h-12 w-12 text-green-500" />
+				<CheckCircle class="mx-auto mb-4 h-12 w-12 text-success" />
 				<h1 class="mb-2 text-2xl font-bold text-card-foreground">Already Authorized</h1>
 				<p class="text-muted-foreground">
 					This device has already been authorized. You can close this window.
@@ -167,7 +167,7 @@ onMount(() => {
 			</div>
 		{:else if state.type === 'success'}
 			<div class="text-center" in:fade>
-				<CheckCircle class="mx-auto mb-4 h-12 w-12 text-green-500" />
+				<CheckCircle class="mx-auto mb-4 h-12 w-12 text-success" />
 				<h1 class="mb-2 text-2xl font-bold text-card-foreground">Device Authorized!</h1>
 				<p class="mb-4 text-muted-foreground">
 					Your Minecraft client has been authorized. You can close this window and return to

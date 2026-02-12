@@ -206,7 +206,7 @@ const ogDescription = $derived.by(() => {
 										{formatVersion(version.version)}
 										{#if i === 0 && version.capture_count > 0}
 											<span
-												class="rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-blue-600 dark:bg-blue-400/15 dark:text-blue-400"
+												class="rounded bg-info/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-info"
 											>
 												Latest
 											</span>

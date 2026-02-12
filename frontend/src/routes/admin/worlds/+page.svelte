@@ -45,7 +45,7 @@ function lastUploadAt(world: WorldListItem): string | null {
 	{#if error}
 		<Alert variant="destructive">Error: {error}</Alert>
 	{:else if worlds.length === 0}
-		<p class="text-foreground">No worlds uploaded yet.</p>
+		<p class="text-muted-foreground">No worlds uploaded yet.</p>
 	{:else}
 		<div class="flex flex-col overflow-hidden rounded-lg border border-border">
 			{#each worlds as world (world.id)}

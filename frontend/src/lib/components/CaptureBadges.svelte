@@ -29,7 +29,7 @@ const py = $derived(size === 'sm' ? 'py-1 text-sm' : 'py-0.5 text-xs');
 		</span>
 	{/if}
 	{#if profileName}
-		<span class="rounded bg-primary px-2 {py} font-medium text-white">
+		<span class="rounded bg-primary px-2 {py} font-medium text-primary-foreground">
 			{profileName}
 		</span>
 	{/if}

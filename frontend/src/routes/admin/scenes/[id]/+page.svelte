@@ -228,7 +228,7 @@ async function handleReactivate() {
 			{/if}
 		</div>
 	{#if captures.length === 0}
-		<p class="text-sm text-foreground">No captures yet.</p>
+		<p class="text-sm text-muted-foreground">No captures yet.</p>
 	{:else}
 		<CaptureGridAdmin {captures}>
 		{#snippet footer(capture: CaptureWithContext)}

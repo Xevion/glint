@@ -250,9 +250,9 @@ function handleSliderChange(event: Event) {
 
 	.slider-container {
 		--divider-width: 3px;
-		--divider-color: hsl(var(--primary));
+		--divider-color: var(--primary);
 		--default-handle-width: 44px;
-		--default-handle-color: hsl(var(--primary));
+		--default-handle-color: var(--primary);
 		--default-handle-opacity: 1;
 		--default-handle-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 		width: 100%;
@@ -289,7 +289,7 @@ function handleSliderChange(event: Event) {
 	}
 
 	.toggle-container:focus-visible {
-		outline: 2px solid hsl(var(--ring));
+		outline: 2px solid var(--ring);
 		outline-offset: 2px;
 	}
 

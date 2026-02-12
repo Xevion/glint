@@ -40,7 +40,7 @@ const ogImage = $derived(scenes[0]?.image_url ?? null);
 	<!-- Header -->
 	<div in:fly={{ y: -10, duration: 400 }} class="mb-8">
 		<h1 class="mb-2 text-2xl font-semibold tracking-tight">Test Scenes</h1>
-	<p class="text-lg text-foreground">
+	<p class="text-lg text-muted-foreground">
 		{scenes.length} standardized environments for consistent shader comparison
 	</p>
 	</div>
@@ -77,7 +77,7 @@ const ogImage = $derived(scenes[0]?.image_url ?? null);
 	</div>
 
 	<!-- Results count -->
-	<div in:fade={{ duration: 300, delay: 200 }} class="mb-4 text-sm text-foreground">
+	<div in:fade={{ duration: 300, delay: 200 }} class="mb-4 text-sm text-muted-foreground">
 		{#if filteredScenes.length === scenes.length}
 			Showing all {scenes.length} scenes
 		{:else}
@@ -96,8 +96,8 @@ const ogImage = $derived(scenes[0]?.image_url ?? null);
 		</div>
 	{:else}
 		<div class="flex flex-col items-center justify-center py-16 text-center">
-		<Search class="mb-4 h-16 w-16 text-foreground opacity-50" strokeWidth={1.5} />
-		<h3 class="text-lg font-semibold text-foreground">No scenes found</h3>
+	<Search class="mb-4 h-16 w-16 text-muted-foreground opacity-50" strokeWidth={1.5} />
+	<h3 class="text-lg font-semibold text-foreground">No scenes found</h3>
 		<p class="mt-1 text-sm text-foreground/70">Try adjusting your filters</p>
 		</div>
 	{/if}

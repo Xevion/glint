@@ -256,7 +256,7 @@ function handlePointerUp() {
 									</span>
 								{/if}
 							{#if currentCapture.profile_name}
-								<span class="rounded bg-primary px-2 py-1 text-sm font-medium text-white">
+								<span class="rounded bg-primary px-2 py-1 text-sm font-medium text-primary-foreground">
 									{currentCapture.profile_name}
 								</span>
 							{/if}

@@ -26,11 +26,11 @@ const ogImage = $derived(featuredPairs[0]?.right_image_url ?? null);
 
 {#snippet statsBar()}
 	<div class="inline-flex items-center gap-6 rounded-full bg-muted/50 backdrop-blur-sm px-6 py-2 text-sm">
-		<span><strong class="text-foreground">{stats.shader_count}</strong> <span class="text-foreground">Shaders</span></span>
+		<span><strong class="text-foreground">{stats.shader_count}</strong> <span class="text-muted-foreground">Shaders</span></span>
 		<span class="text-foreground/30">|</span>
-		<span><strong class="text-foreground">{stats.scene_count}</strong> <span class="text-foreground">Scenes</span></span>
+		<span><strong class="text-foreground">{stats.scene_count}</strong> <span class="text-muted-foreground">Scenes</span></span>
 		<span class="text-foreground/30">|</span>
-		<span><strong class="text-foreground">{stats.capture_count}</strong> <span class="text-foreground">Captures</span></span>
+		<span><strong class="text-foreground">{stats.capture_count}</strong> <span class="text-muted-foreground">Captures</span></span>
 	</div>
 {/snippet}
 
@@ -76,7 +76,7 @@ const ogImage = $derived(featuredPairs[0]?.right_image_url ?? null);
 		<!-- Mobile hero text (below slider, not overlaid) -->
 		<div class="mt-4 text-center sm:hidden">
 			<h1 class="text-3xl font-bold tracking-tight">Glint</h1>
-			<p class="mt-1 text-base text-foreground">Shader Preview Catalog for Minecraft</p>
+			<p class="mt-1 text-base text-muted-foreground">Shader Preview Catalog for Minecraft</p>
 		<div class="mt-4 flex justify-center gap-3">
 			<Button href={resolve('/shaders', {})} size="default">Browse Shaders</Button>
 			<Button href={resolve('/compare', {})} variant="outline" size="default" class="border-foreground/20 bg-foreground/5 hover:bg-foreground/10">Compare</Button>
@@ -104,7 +104,7 @@ const ogImage = $derived(featuredPairs[0]?.right_image_url ?? null);
 		</h1>
 		<p
 			in:fly={{ y: -10, duration: 500, delay: 100 }}
-			class="mt-4 text-xl text-foreground sm:text-2xl"
+			class="mt-4 text-xl text-muted-foreground sm:text-2xl"
 		>
 			Shader Preview Catalog for Minecraft
 		</p>
@@ -156,7 +156,7 @@ const ogImage = $derived(featuredPairs[0]?.right_image_url ?? null);
 			class="group rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm p-6 transition-all hover:border-primary/50 hover:bg-card/50"
 		>
 			<h3 class="text-lg font-medium mb-2">Browse by Scene</h3>
-		<p class="text-sm text-foreground">
+		<p class="text-sm text-muted-foreground">
 			Compare how different shaders render the same environments
 		</p>
 		</a>
@@ -166,7 +166,7 @@ const ogImage = $derived(featuredPairs[0]?.right_image_url ?? null);
 			class="group rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm p-6 transition-all hover:border-primary/50 hover:bg-card/50"
 		>
 			<h3 class="text-lg font-medium mb-2">Side-by-Side Compare</h3>
-		<p class="text-sm text-foreground">
+		<p class="text-sm text-muted-foreground">
 			Put shaders head-to-head to find your perfect match
 		</p>
 		</a>

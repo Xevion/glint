@@ -124,7 +124,7 @@ const ogDescription = $derived.by(() => {
 											</h3>
 											<div class="flex items-center gap-2">
 								{#if selectedCapture.profile_name}
-												<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">
+												<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
 													{selectedCapture.profile_name}
 												</span>
 											{/if}
