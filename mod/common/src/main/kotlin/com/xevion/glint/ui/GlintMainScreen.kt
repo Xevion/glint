@@ -2,6 +2,7 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
+import com.xevion.glint.api.ApiError
 import com.xevion.glint.api.HttpClient
 import com.xevion.glint.api.PullResult
 import com.xevion.glint.api.PushResult
@@ -13,6 +14,7 @@ import com.xevion.glint.api.WorldInfo
 import com.xevion.glint.download.WorldDownloader
 import com.xevion.glint.orchestration.CaptureSpec
 import com.xevion.glint.orchestration.ShaderSpec
+import com.xevion.glint.scene.DiscoveryResult
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneApplicator
@@ -719,7 +721,7 @@ class GlintMainScreen(
         CompletableFuture
             .supplyAsync {
                 val start = System.currentTimeMillis()
-                val result = UrlValidation.testConnection(config.apiUrl)
+                val result = UrlValidation.testConnection(config.apiUrl, token = config.accessToken)
                 val latency = System.currentTimeMillis() - start
                 Pair(result, latency)
             }.thenAccept { (result, latency) ->
@@ -1420,25 +1422,46 @@ class GlintMainScreen(
     private fun loadMergedWorlds(config: ApiConfig) {
         CompletableFuture
             .supplyAsync {
-                val localCollections = SceneManager.discoverAllCollections()
+                val discovery = SceneManager.discoverAllCollections()
                 val apiResult = WorldClient.listWorlds(HttpClient(config.apiUrl, token = config.accessToken))
-                Pair(localCollections, apiResult)
-            }.thenAccept { (localCollections, apiResult) ->
+                Pair(discovery, apiResult)
+            }.thenAccept { (discovery, apiResult) ->
                 minecraft?.execute {
                     loading = false
+                    reportDiscoveryErrors(discovery)
                     apiResult
                         .onSuccess { apiWorlds ->
-                            worldData = mergeWorldSources(apiWorlds, localCollections)
+                            worldData = mergeWorldSources(apiWorlds, discovery.collections)
                             val apiCount = worldData.count { it.apiWorld != null }
                             val localCount = worldData.count { it.collection != null }
                             StatusLog.info("Loaded $apiCount API + $localCount local worlds")
                             refreshMasterContent()
                             rebuildStatusBar()
                         }.onFailure { error ->
-                            Loggers.Ui.get().warn("Failed to load from API, falling back to local: {}", error.message)
-                            StatusLog.warn("API unavailable, using local files")
+                            Loggers.Ui.get().warn("Failed to load from API, falling back to local") {
+                                "error" to error.message
+                            }
+                            val statusMessage =
+                                when (error) {
+                                    is ApiError.HttpError -> {
+                                        when (error.statusCode) {
+                                            401 -> "Session expired — re-authenticate in Config"
+                                            403 -> "Permission denied by API"
+                                            else -> "API error (HTTP ${error.statusCode}), using local files"
+                                        }
+                                    }
+
+                                    is ApiError.NetworkError -> {
+                                        "API unreachable, using local files"
+                                    }
+
+                                    else -> {
+                                        "API unavailable: ${error.message}"
+                                    }
+                                }
+                            StatusLog.error(statusMessage)
                             worldData =
-                                localCollections.map { (fileName, collection) ->
+                                discovery.collections.map { (fileName, collection) ->
                                     WorldEntry.fromLocal(fileName, collection)
                                 }
                             refreshMasterContent()
@@ -1451,18 +1474,26 @@ class GlintMainScreen(
     private fun loadLocalOnlyWorlds() {
         CompletableFuture
             .supplyAsync {
-                SceneManager.discoverAllCollections().map { (fileName, collection) ->
-                    WorldEntry.fromLocal(fileName, collection)
-                }
-            }.thenAccept { localWorlds ->
+                SceneManager.discoverAllCollections()
+            }.thenAccept { discovery ->
                 minecraft?.execute {
                     loading = false
-                    worldData = localWorlds
-                    StatusLog.info("Loaded ${localWorlds.size} worlds from local files")
+                    reportDiscoveryErrors(discovery)
+                    worldData =
+                        discovery.collections.map { (fileName, collection) ->
+                            WorldEntry.fromLocal(fileName, collection)
+                        }
+                    StatusLog.info("Loaded ${worldData.size} worlds from local files")
                     refreshMasterContent()
                     rebuildStatusBar()
                 }
             }
+    }
+
+    private fun reportDiscoveryErrors(discovery: DiscoveryResult) {
+        for (error in discovery.errors) {
+            StatusLog.error("Failed to load ${error.fileName}.json: ${error.message}")
+        }
     }
 
     private fun mergeWorldSources(

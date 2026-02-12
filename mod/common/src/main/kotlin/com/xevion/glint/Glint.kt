@@ -121,7 +121,7 @@ object Glint {
 
         CompletableFuture
             .supplyAsync {
-                UrlValidation.testConnection(config.apiUrl)
+                UrlValidation.testConnection(config.apiUrl, token = config.accessToken)
             }.thenAccept { result ->
                 result
                     .onSuccess {

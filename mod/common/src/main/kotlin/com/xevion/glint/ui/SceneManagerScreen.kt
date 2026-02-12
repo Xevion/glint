@@ -67,7 +67,11 @@ class SceneManagerScreen(
     }
 
     override fun buildContent(content: FlowLayout) {
-        collections = SceneManager.discoverAllCollections()
+        val discovery = SceneManager.discoverAllCollections()
+        collections = discovery.collections
+        for (error in discovery.errors) {
+            StatusLog.error("Failed to load ${error.fileName}.json: ${error.message}")
+        }
 
         if (collections.isEmpty()) {
             content.child(
@@ -369,11 +373,14 @@ class SceneManagerScreen(
             return
         }
 
-        val allCollections = SceneManager.discoverAllCollections()
+        val allDiscovery = SceneManager.discoverAllCollections()
+        for (error in allDiscovery.errors) {
+            StatusLog.error("Failed to load ${error.fileName}.json: ${error.message}")
+        }
         val client = HttpClient(config.apiUrl, token = config.accessToken)
         var totalScenes = 0
 
-        for ((_, collection) in allCollections) {
+        for ((_, collection) in allDiscovery.collections) {
             val worldId = collection.apiWorldId ?: continue
             totalScenes += collection.scenes.size
 
@@ -425,13 +432,13 @@ class SceneManagerScreen(
 
         log.info("Started push") {
             "scene_count" to totalScenes
-            "world_count" to allCollections.size
+            "world_count" to allDiscovery.collections.size
         }
         SystemToast.add(
             minecraft!!.toastManager,
             SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
             McComponent.literal("Pushing scenes..."),
-            McComponent.literal("$totalScenes scenes across ${allCollections.size} worlds"),
+            McComponent.literal("$totalScenes scenes across ${allDiscovery.collections.size} worlds"),
         )
     }
 }

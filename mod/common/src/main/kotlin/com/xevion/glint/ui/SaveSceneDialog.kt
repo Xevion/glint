@@ -382,6 +382,7 @@ class SaveSceneDialog(
             val fileName =
                 SceneManager
                     .discoverAllCollections()
+                    .collections
                     .find { (_, col) -> col.scenes.any { it.id == sceneId } }
                     ?.first
             if (fileName != null) {

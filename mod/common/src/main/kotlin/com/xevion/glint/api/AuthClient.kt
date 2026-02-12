@@ -102,6 +102,11 @@ object AuthClient {
                     }
                 }
 
+                429 -> {
+                    val retryAfter = connection.getHeaderField("Retry-After")?.toLongOrNull() ?: 5L
+                    Result.failure(ApiError.RateLimited(retryAfter))
+                }
+
                 else -> {
                     val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
                     Result.failure(ApiError.HttpError(connection.responseCode, errorBody))

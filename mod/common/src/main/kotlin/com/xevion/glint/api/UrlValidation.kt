@@ -75,10 +75,15 @@ object UrlValidation {
     }
 
     /**
-     * Tests connection to the API server using the device status endpoint (no auth required).
-     * Returns success if server responds with 200, error otherwise.
+     * Tests connection to the API server.
+     *
+     * First checks server reachability via the unauthenticated device status endpoint.
+     * If a [token] is provided, also validates the session against `/api/user/me`.
      */
-    fun testConnection(apiUrl: String): Result<String> {
+    fun testConnection(
+        apiUrl: String,
+        token: String? = null,
+    ): Result<String> {
         val validationResult = validateApiUrl(apiUrl)
         if (validationResult !is UrlValidationResult.Valid) {
             return Result.failure(
@@ -92,27 +97,52 @@ object UrlValidation {
             )
         }
 
-        val url = "${validationResult.normalizedUrl}/api/device/status"
+        val baseUrl = validationResult.normalizedUrl
 
-        return try {
-            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+        // Step 1: Check server reachability (unauthenticated)
+        try {
+            val connection = URI("$baseUrl/api/device/status").toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
 
-            when (connection.responseCode) {
-                200 -> {
-                    Result.success("Connection successful")
-                }
-
-                else -> {
-                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
-                    Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
-                }
+            if (connection.responseCode != 200) {
+                val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                return Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
             }
         } catch (e: Exception) {
-            Result.failure(ApiError.fromException(e))
+            return Result.failure(ApiError.fromException(e))
         }
+
+        // Step 2: Validate session if token is available
+        if (!token.isNullOrBlank()) {
+            try {
+                val connection = URI("$baseUrl/api/user/me").toURL().openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+                connection.setRequestProperty("Authorization", "Bearer $token")
+
+                when (connection.responseCode) {
+                    200 -> {
+                        return Result.success("Connection and session valid")
+                    }
+
+                    401 -> {
+                        return Result.failure(ApiError.HttpError(401, "Session expired or invalid"))
+                    }
+
+                    else -> {
+                        val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                        return Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
+                    }
+                }
+            } catch (e: Exception) {
+                return Result.failure(ApiError.fromException(e))
+            }
+        }
+
+        return Result.success("Connection successful (no session to validate)")
     }
 }
 

@@ -216,6 +216,18 @@ class DeviceAuthScreen(
                                     // Continue polling
                                 }
 
+                                is ApiError.RateLimited -> {
+                                    // Back off by the server-specified delay, then continue polling
+                                    Loggers.Ui.get().warn("Rate limited during device polling, backing off") {
+                                        "retry_after_s" to error.retryAfterSeconds
+                                    }
+                                    try {
+                                        Thread.sleep(error.retryAfterSeconds * 1000)
+                                    } catch (_: InterruptedException) {
+                                        // Polling was cancelled during backoff
+                                    }
+                                }
+
                                 is ApiError.TokenExpired -> {
                                     isPolling.set(false)
                                     minecraft?.execute {

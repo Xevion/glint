@@ -168,10 +168,38 @@ object SceneManager {
     }
 
     /**
-     * Discovers all available scene collections (public API for orchestrator).
-     * Returns list of collections with their filenames.
+     * Discovers all available scene collections with error reporting.
+     * Returns loaded collections and any files that failed to parse.
      */
-    fun discoverAllCollections(): List<Pair<String, SceneCollection>> = discoverCollections().toList()
+    fun discoverAllCollections(): DiscoveryResult {
+        val mc = Minecraft.getInstance()
+        val scenesDir = File(mc.gameDirectory, "glint/scenes")
+
+        if (!scenesDir.exists() || !scenesDir.isDirectory) {
+            return DiscoveryResult(emptyList(), emptyList())
+        }
+
+        val collections = mutableListOf<Pair<String, SceneCollection>>()
+        val errors = mutableListOf<DiscoveryError>()
+
+        scenesDir
+            .listFiles { file -> file.extension == "json" }
+            ?.forEach { file ->
+                val fileName = file.nameWithoutExtension
+                try {
+                    val collection = GlintJsonFile.decodeFromString(SceneCollection.serializer(), file.readText())
+                    loadedCollections[fileName] = collection
+                    collections.add(fileName to collection)
+                } catch (e: Exception) {
+                    log.error(e, "Failed to parse scene collection") {
+                        "path" to file.absolutePath
+                    }
+                    errors.add(DiscoveryError(fileName, file.absolutePath, e.message ?: "Unknown parse error"))
+                }
+            }
+
+        return DiscoveryResult(collections, errors)
+    }
 
     /**
      * Resolves a scene with its config inheritance.
@@ -452,6 +480,19 @@ object SceneManager {
         return false
     }
 }
+
+data class DiscoveryResult(
+    val collections: List<Pair<String, SceneCollection>>,
+    val errors: List<DiscoveryError>,
+) {
+    val hasErrors: Boolean get() = errors.isNotEmpty()
+}
+
+data class DiscoveryError(
+    val fileName: String,
+    val path: String,
+    val message: String,
+)
 
 /**
  * A scene with fully resolved configuration (all inheritance applied).

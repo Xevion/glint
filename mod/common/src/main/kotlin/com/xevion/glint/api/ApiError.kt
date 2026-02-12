@@ -92,6 +92,17 @@ sealed class ApiError : Exception() {
         override val userMessage: String = "Device code is invalid or already used."
     }
 
+    /**
+     * Server returned 429 Too Many Requests.
+     * The caller should back off and retry after [retryAfterSeconds].
+     */
+    data class RateLimited(
+        val retryAfterSeconds: Long,
+        override val message: String = "Rate limited (retry after ${retryAfterSeconds}s)",
+    ) : ApiError() {
+        override val userMessage: String = "Too many requests. Retrying in ${retryAfterSeconds}s..."
+    }
+
     companion object {
         fun fromException(e: Exception): ApiError =
             when (e) {
