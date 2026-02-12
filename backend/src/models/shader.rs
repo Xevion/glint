@@ -200,8 +200,8 @@ pub enum ShaderSearchSort {
 #[derive(Debug, Deserialize)]
 pub struct ShaderSearchRequest {
     pub query: Option<String>,
-    pub limit: Option<u32>,
-    pub offset: Option<u32>,
+    #[serde(flatten)]
+    pub page: crate::models::pagination::PageQuery,
     /// Sort order for browse mode (ignored when query is provided)
     pub sort: Option<ShaderSearchSort>,
 }

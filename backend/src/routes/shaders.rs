@@ -5,10 +5,9 @@ use crate::{
     error::{AppError, AppResult, OptionNotFoundExt},
     id::{self, ShaderVersionId, ShaderVersionProfileId},
     middleware::client_ip::ClientIp,
-    models::pagination::normalize_pagination,
     models::{
-        CaptureStatus, CreateShaderRequest, CreateShaderVersionRequest, Paginated, Shader,
-        ShaderListItem, ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
+        CaptureStatus, CreateShaderRequest, CreateShaderVersionRequest, PageQuery, Paginated,
+        Shader, ShaderListItem, ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
     },
     repo::{
         CaptureRepo, ExtractionRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo,
@@ -25,6 +24,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
 };
+use custom_debug_derive::Debug as CustomDebug;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tracing::{info, instrument, warn};
@@ -112,33 +112,22 @@ fn viewer_hash(ip: &str, user_agent: &str) -> String {
     hex::encode(&result[..8])
 }
 
-#[derive(Debug, Deserialize)]
-struct ShaderListQuery {
-    page: Option<i32>,
-    page_size: Option<i32>,
-}
-
 /// GET /api/shaders - Paginated list of shaders with enrichment (public)
 #[instrument(skip(state))]
 async fn list_shaders(
     State(state): State<AppState>,
-    Query(params): Query<ShaderListQuery>,
+    Query(params): Query<PageQuery>,
 ) -> AppResult<Json<Paginated<ShaderListItem>>> {
-    let p = normalize_pagination(params.page, params.page_size);
-    let (items, total) =
-        ShaderService::list_enriched(state.db(), p.page_size as i64, p.offset).await?;
-
-    Ok(Json(Paginated {
-        items,
-        total,
-        page: p.page,
-        page_size: p.page_size,
-    }))
+    let p = params.normalize();
+    let (items, total) = ShaderService::list_enriched(state.db(), &p).await?;
+    Ok(Json(Paginated::new(items, total, &p)))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(CustomDebug, Deserialize)]
 struct ShaderDetailQuery {
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     version_id: Option<String>,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     profile_id: Option<ShaderVersionProfileId>,
 }
 
@@ -158,7 +147,7 @@ fn etag_matches(headers: &HeaderMap, etag: &str) -> bool {
 ///
 /// Supports 301 redirects: if the path param is a nanoid, old slug, or non-canonical slug,
 /// the response redirects to the canonical `/api/shaders/{current_slug}` URL.
-#[instrument(skip(state, headers))]
+#[instrument(skip(state, headers, addr))]
 async fn get_shader(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -265,12 +254,13 @@ async fn get_shader(
     })
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(CustomDebug, Deserialize)]
 struct TrendingQuery {
     /// Number of days to consider (default: 7)
-    days: Option<i32>,
-    /// Maximum number of results (default: 10)
-    limit: Option<i64>,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
+    days: Option<u32>,
+    #[serde(flatten)]
+    page: PageQuery,
 }
 
 /// GET /api/shaders/trending - Get trending shaders by recent view count (public)
@@ -280,8 +270,8 @@ async fn trending_shaders(
     Query(query): Query<TrendingQuery>,
 ) -> AppResult<Response> {
     let days = query.days.unwrap_or(7).clamp(1, 90);
-    let limit = query.limit.unwrap_or(10).clamp(1, 50);
-    let result = ShaderService::list_trending(state.db(), days, limit).await?;
+    let p = query.page.normalize();
+    let result = ShaderService::list_trending(state.db(), days, &p).await?;
     let mut response = Json(result).into_response();
     response.headers_mut().insert(
         header::CACHE_CONTROL,

@@ -39,8 +39,9 @@ async fn search_platforms(
     Json(request): Json<ShaderSearchRequest>,
 ) -> AppResult<Json<ShaderSearchResponse>> {
     let query = request.query.as_deref().map(str::trim).unwrap_or_default();
-    let limit = request.limit.unwrap_or(20).min(100);
-    let offset = request.offset.unwrap_or(0);
+    let p = request.page.normalize();
+    let limit = p.page_size;
+    let offset = p.offset as u32;
     let sort = request.sort.unwrap_or_default();
 
     // Determine platform-specific sort parameters based on mode

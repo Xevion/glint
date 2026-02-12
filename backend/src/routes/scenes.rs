@@ -7,6 +7,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, put},
 };
+use custom_debug_derive::Debug as CustomDebug;
 use serde::Deserialize;
 use tracing::instrument;
 use validator::Validate;
@@ -107,8 +108,9 @@ async fn list_scenes_all(
     Ok(Json(scenes))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(CustomDebug, Deserialize)]
 struct SceneQuery {
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     world_id: Option<String>,
 }
 

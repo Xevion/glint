@@ -35,7 +35,7 @@ pub use capture::{
 };
 pub use extraction::{ExtractionStatus, ShaderVersionMetadata, ShaderVersionProfile};
 pub use featured::FeaturedPair;
-pub use pagination::{Paginated, PaginationParams};
+pub use pagination::{Page, PageQuery, Paginated};
 pub use scene::{
     Camera, CreateSceneRequest, Position, Scene, SceneListItem, SceneVersion, SceneWithCaptures,
     SceneWithVersion, SceneWithWorld, UpdateSceneMetadataRequest, UpdateSceneRequest,

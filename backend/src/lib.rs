@@ -6,6 +6,7 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod extraction;
+pub mod fmt;
 pub mod id;
 pub mod logging;
 pub mod middleware;

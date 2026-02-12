@@ -6,7 +6,7 @@ use tracing::{debug, instrument};
 use crate::db::DbPool;
 use crate::error::{AppResult, OptionNotFoundExt, SqlxResultExt};
 use crate::id::ShaderId;
-use crate::models::{CreateShaderRequest, Shader, ShaderAdopted, UpdateShaderRequest};
+use crate::models::{CreateShaderRequest, Page, Shader, ShaderAdopted, UpdateShaderRequest};
 use crate::platform::{Platform, PlatformMetadata};
 
 pub struct ShaderRepo;
@@ -27,11 +27,10 @@ impl ShaderRepo {
     ///
     /// Uses `COUNT(*) OVER()` to compute the total in a single query.
     /// Returns `(shaders, total)`.
-    #[instrument(skip(executor), level = "debug")]
+    #[instrument(skip(executor, page), level = "debug")]
     pub async fn list_with_captures(
         executor: impl sqlx::PgExecutor<'_>,
-        limit: i64,
-        offset: i64,
+        page: &Page,
     ) -> AppResult<(Vec<Shader>, i64)> {
         use chrono::{DateTime, Utc};
 
@@ -74,8 +73,8 @@ impl ShaderRepo {
             ORDER BY s.name
             LIMIT $1 OFFSET $2
             "#,
-            limit,
-            offset,
+            page.limit_i64(),
+            page.offset_i64(),
         )
         .fetch_all(executor)
         .await

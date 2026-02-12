@@ -3,6 +3,7 @@ use axum::{
     extract::{Query, State},
     routing::get,
 };
+use custom_debug_derive::Debug as CustomDebug;
 use serde::Deserialize;
 use tracing::instrument;
 
@@ -12,9 +13,11 @@ use crate::models::{StorageBucket, StorageStats};
 use crate::repo::CaptureRepo;
 use crate::state::AppState;
 
-#[derive(Debug, Deserialize)]
+#[derive(CustomDebug, Deserialize)]
 struct GrowthParams {
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     days: Option<i32>,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     interval_hours: Option<i32>,
 }
 

@@ -944,6 +944,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "custom_debug_derive"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a707ceda8652f6c7624f2be725652e9524c815bf3b9d55a0b2320be2303f9c11"
+dependencies = [
+ "darling 0.20.11",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "synstructure",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1466,6 +1479,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
+ "custom_debug_derive",
  "dashmap 6.1.0",
  "dotenvy",
  "figment",

@@ -69,7 +69,7 @@ impl UserRepo {
         .await
         .context(format!("failed to upsert user '{}'", discord_id))?;
 
-        debug!(user_id = user.id, discord_id, "User upserted");
+        debug!(user_id = user.id, "User upserted");
         Ok(user)
     }
 

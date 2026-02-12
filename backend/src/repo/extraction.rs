@@ -156,7 +156,7 @@ impl ExtractionRepo {
             .await
             .context("failed to commit extraction transaction")?;
 
-        debug!(version_id, "Persisted extraction data");
+        debug!("Persisted extraction data");
         Ok(())
     }
 
@@ -182,10 +182,7 @@ impl ExtractionRepo {
             "failed to list profiles for version '{version_id}'"
         ))?;
 
-        debug!(
-            count = profiles.len(),
-            version_id, "Listed profiles by version"
-        );
+        debug!(count = profiles.len(), "Listed profiles by version");
         Ok(profiles)
     }
 

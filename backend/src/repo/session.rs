@@ -67,7 +67,7 @@ impl SessionRepo {
         .await
         .context(format!("failed to create session for user '{}'", user_id))?;
 
-        debug!(user_id, source, "Session created");
+        debug!("Session created");
         Ok(session)
     }
 
@@ -170,7 +170,7 @@ impl SessionRepo {
 
         let count = result.rows_affected();
         if count > 0 {
-            debug!(user_id, count, "Deleted user sessions");
+            debug!(count, "Deleted user sessions");
         }
         Ok(count)
     }
@@ -227,7 +227,7 @@ impl SessionRepo {
         .context("failed to delete session by prefix")?;
 
         if result.is_some() {
-            debug!(user_id, prefix, "Deleted session by prefix");
+            debug!("Deleted session by prefix");
         }
         Ok(result)
     }
@@ -253,7 +253,7 @@ impl SessionRepo {
 
         let count = result.rows_affected();
         if count > 0 {
-            debug!(user_id, count, "Deleted other user sessions");
+            debug!(count, "Deleted other user sessions");
         }
         Ok(count)
     }

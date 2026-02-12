@@ -1,4 +1,5 @@
 use axum::{Json, Router, extract::State, routing::get};
+use custom_debug_derive::Debug as CustomDebug;
 use serde::Deserialize;
 use tracing::{debug, instrument};
 
@@ -8,15 +9,20 @@ use crate::models::WorkItem;
 use crate::repo::WorkRepo;
 use crate::state::AppState;
 
-#[derive(Debug, Deserialize)]
+#[derive(CustomDebug, Deserialize)]
 pub struct WorkQuery {
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub limit: Option<i64>,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub force: Option<bool>,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub shaders: Option<String>,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub scenes: Option<String>,
     /// If true, returns work items without side effects.
     /// Currently the endpoint is stateless, but this parameter documents intent
     /// and will prevent future reservation/locking logic from triggering.
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub dry_run: Option<bool>,
 }
 

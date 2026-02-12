@@ -5,6 +5,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
+use custom_debug_derive::Debug as CustomDebug;
 use serde::Deserialize;
 use tracing::{instrument, warn};
 
@@ -12,28 +13,27 @@ use crate::{
     auth::AdminUser,
     error::{AppError, AppResult, OptionNotFoundExt},
     id::{CaptureRunId, SceneId},
-    models::pagination::normalize_pagination,
-    models::{CaptureDetail, CaptureListItem, CaptureStatus, CaptureWithContext, Paginated},
+    models::{
+        CaptureDetail, CaptureListItem, CaptureStatus, CaptureWithContext, PageQuery, Paginated,
+    },
     repo::{
         CaptureRepo, SceneRepo,
-        capture::{CaptureDistinct, CaptureFilters, Pagination},
+        capture::{CaptureDistinct, CaptureFilters},
     },
     state::AppState,
 };
 
-#[derive(Debug, Deserialize)]
-pub struct PublicCaptureListParams {
-    pub page: Option<i32>,
-    pub page_size: Option<i32>,
-}
-
-#[derive(Debug, Deserialize)]
+#[derive(CustomDebug, Deserialize)]
 pub struct AdminCaptureListParams {
-    pub page: Option<i32>,
-    pub page_size: Option<i32>,
+    #[serde(flatten)]
+    pub page: PageQuery,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub shader: Option<String>,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub scene: Option<String>,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub status: Option<CaptureStatus>,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub run_id: Option<String>,
 }
 
@@ -49,17 +49,11 @@ pub fn router() -> Router<AppState> {
 #[instrument(skip(state))]
 async fn list_captures_public(
     State(state): State<AppState>,
-    Query(params): Query<PublicCaptureListParams>,
+    Query(params): Query<PageQuery>,
 ) -> AppResult<Json<Paginated<CaptureListItem>>> {
-    let p = normalize_pagination(params.page, params.page_size);
-    let (items, total) = CaptureRepo::list_items(state.db(), p.page_size as i64, p.offset).await?;
-
-    Ok(Json(Paginated {
-        items,
-        total,
-        page: p.page,
-        page_size: p.page_size,
-    }))
+    let p = params.normalize();
+    let (items, total) = CaptureRepo::list_items(state.db(), &p).await?;
+    Ok(Json(Paginated::new(items, total, &p)))
 }
 
 /// GET /api/captures/all - List all captures with context, paginated (admin)
@@ -69,7 +63,7 @@ async fn list_captures_all(
     State(state): State<AppState>,
     Query(params): Query<AdminCaptureListParams>,
 ) -> AppResult<Json<Paginated<CaptureWithContext>>> {
-    let p = normalize_pagination(params.page, params.page_size);
+    let p = params.page.normalize();
 
     let filters = CaptureFilters {
         shader_slug: params.shader,
@@ -78,25 +72,12 @@ async fn list_captures_all(
         run_id: params.run_id.map(CaptureRunId::from),
         ..Default::default()
     };
-    let pagination = Pagination {
-        limit: p.page_size as i64,
-        offset: p.offset,
-    };
 
-    let (items, total) = CaptureRepo::list_with_context(
-        state.db(),
-        &filters,
-        Some(&pagination),
-        CaptureDistinct::None,
-    )
-    .await?;
+    let (items, total) =
+        CaptureRepo::list_with_context(state.db(), &filters, Some(&p), CaptureDistinct::None)
+            .await?;
 
-    Ok(Json(Paginated {
-        items,
-        total: total.unwrap_or(0),
-        page: p.page,
-        page_size: p.page_size,
-    }))
+    Ok(Json(Paginated::new(items, total.unwrap_or(0), &p)))
 }
 
 /// Check `If-None-Match` against an ETag value.

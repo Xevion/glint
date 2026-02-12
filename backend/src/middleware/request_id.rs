@@ -46,7 +46,7 @@ where
         let req_id = ulid::Ulid::new().to_string();
         let method = req.method().clone();
         let path = req.uri().path().to_string();
-        let span = tracing::info_span!("request", req_id = %req_id, method = %method, path = %path);
+        let span = tracing::info_span!("request", req_id = %req_id);
         let start = Instant::now();
 
         let future = self.inner.call(req);

@@ -35,7 +35,7 @@ impl ShaderViewRepo {
         .context("failed to record shader view")?;
 
         let inserted = result.rows_affected() > 0;
-        debug!(shader_id, viewer_hash, inserted, "Recorded shader view");
+        debug!(inserted, "Recorded shader view");
         Ok(inserted)
     }
 

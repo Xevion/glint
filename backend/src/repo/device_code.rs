@@ -150,7 +150,7 @@ impl DeviceCodeRepo {
 
         match code {
             Some(c) => {
-                debug!(user_code = %c.user_code, user_id, "Device code authorized");
+                debug!("Device code authorized");
                 Ok(c)
             }
             None => Err(AppError::NotFound(

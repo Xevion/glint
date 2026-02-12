@@ -5,7 +5,7 @@ use tracing::{debug, instrument};
 use crate::{
     db::DbPool,
     error::AppResult,
-    models::{ShaderListItem, TrendingShader},
+    models::{Page, ShaderListItem, TrendingShader},
     repo::{
         CaptureRepo, CategoryRepo, FeatureRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo,
         ShaderViewRepo,
@@ -26,13 +26,8 @@ impl ShaderService {
     ///
     /// Returns `(items, total)` where total is the count before pagination.
     #[instrument(skip(db), level = "debug")]
-    pub async fn list_enriched(
-        db: &DbPool,
-        limit: i64,
-        offset: i64,
-    ) -> AppResult<(Vec<ShaderListItem>, i64)> {
-        // Fetch only the page of shaders that have thumbnails
-        let (shaders, total) = ShaderRepo::list_with_captures(db, limit, offset).await?;
+    pub async fn list_enriched(db: &DbPool, page: &Page) -> AppResult<(Vec<ShaderListItem>, i64)> {
+        let (shaders, total) = ShaderRepo::list_with_captures(db, page).await?;
 
         if shaders.is_empty() {
             return Ok((vec![], total));
@@ -100,10 +95,10 @@ impl ShaderService {
     #[instrument(skip(db), level = "debug")]
     pub async fn list_trending(
         db: &DbPool,
-        days: i32,
-        limit: i64,
+        days: u32,
+        page: &Page,
     ) -> AppResult<Vec<TrendingShader>> {
-        let trending = ShaderViewRepo::trending(db, days, limit).await?;
+        let trending = ShaderViewRepo::trending(db, days as i32, page.limit_i64()).await?;
 
         if trending.is_empty() {
             return Ok(vec![]);

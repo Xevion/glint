@@ -58,7 +58,7 @@ impl PendingUploadRepo {
         .await
         .context(format!("failed to create pending upload '{}'", upload_id))?;
 
-        debug!(upload_id, slug, "Pending upload created");
+        debug!("Pending upload created");
         Ok(())
     }
 
@@ -92,7 +92,7 @@ impl PendingUploadRepo {
             upload_id
         ))?;
 
-        debug!(upload_id, world_id, "Pending version upload created");
+        debug!("Pending version upload created");
         Ok(())
     }
 
@@ -150,7 +150,7 @@ impl PendingUploadRepo {
         ))?;
 
         if result.rows_affected() > 0 {
-            trace!(upload_id, "Deleted expired pending upload");
+            trace!("Deleted expired pending upload");
         }
         Ok(result.rows_affected() > 0)
     }

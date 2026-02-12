@@ -13,7 +13,7 @@ use crate::id::{
 };
 use crate::models::{
     Capture, CaptureDetail, CaptureFreshness, CaptureListItem, CaptureRunStatus, CaptureStatus,
-    CaptureWithContext, StorageBucket, StorageStats,
+    CaptureWithContext, Page, StorageBucket, StorageStats,
 };
 
 pub struct ThumbnailInfo {
@@ -32,12 +32,6 @@ pub struct CaptureFilters {
     pub status: Option<CaptureStatus>,
     pub run_id: Option<CaptureRunId>,
     pub scene_active: Option<bool>,
-}
-
-#[derive(Debug)]
-pub struct Pagination {
-    pub limit: i64,
-    pub offset: i64,
 }
 
 /// Controls DISTINCT ON behavior for capture list queries.
@@ -89,12 +83,8 @@ impl CaptureRepo {
     /// avoiding a separate count query and potential consistency issues.
     ///
     /// Returns `(items, total)` for the paginated envelope.
-    #[instrument(skip(db), level = "debug")]
-    pub async fn list_items(
-        db: &DbPool,
-        limit: i64,
-        offset: i64,
-    ) -> AppResult<(Vec<CaptureListItem>, i64)> {
+    #[instrument(skip(db, page), level = "debug")]
+    pub async fn list_items(db: &DbPool, page: &Page) -> AppResult<(Vec<CaptureListItem>, i64)> {
         struct Row {
             id: CaptureId,
             shader_version_id: ShaderVersionId,
@@ -130,8 +120,8 @@ impl CaptureRepo {
             ORDER BY c.created_at DESC
             LIMIT $1 OFFSET $2
             "#,
-            limit,
-            offset,
+            page.limit_i64(),
+            page.offset_i64(),
         )
         .fetch_all(db)
         .await
@@ -233,11 +223,11 @@ impl CaptureRepo {
     ///
     /// Returns `(captures, total_count)` where `total_count` is `Some` only when
     /// `pagination` is provided.
-    #[instrument(skip(db, filters), level = "debug")]
+    #[instrument(skip(db, filters, pagination, distinct), level = "debug")]
     pub async fn list_with_context(
         db: &DbPool,
         filters: &CaptureFilters,
-        pagination: Option<&Pagination>,
+        pagination: Option<&Page>,
         distinct: CaptureDistinct,
     ) -> AppResult<(Vec<CaptureWithContext>, Option<i64>)> {
         let status_str = filters.status.map(|s| s.as_str().to_owned());
@@ -281,8 +271,8 @@ impl CaptureRepo {
                         status_str,
                         run_id,
                         filters.scene_active,
-                        page.limit,
-                        page.offset,
+                        page.limit_i64(),
+                        page.offset_i64(),
                     )
                     .fetch_all(db)
                     .await
@@ -478,7 +468,7 @@ impl CaptureRepo {
             scene_id, shader_version_id
         ))?;
 
-        debug!(scene_id, shader_version_id, %status, "Capture inserted");
+        debug!(%status, "Capture inserted");
         Ok(())
     }
 
@@ -502,7 +492,7 @@ impl CaptureRepo {
         .await
         .context(format!("failed to confirm upload for capture '{}'", id))?;
 
-        debug!(id, "Capture upload confirmed");
+        debug!("Capture upload confirmed");
         Ok(result.rows_affected() > 0)
     }
 }
@@ -992,7 +982,7 @@ impl CaptureRepo {
         .await
         .context(format!("failed to update image after transcode for '{}'", id))?;
 
-        debug!(id, "Updated capture image after transcode");
+        debug!("Updated capture image after transcode");
         Ok(())
     }
 
@@ -1165,7 +1155,7 @@ impl CaptureRepo {
         .await
         .context(format!("failed to mark capture '{}' as failed", id))?;
 
-        debug!(id, error_message, "Capture marked as failed");
+        debug!("Capture marked as failed");
         Ok(result.rows_affected() > 0)
     }
 
