@@ -1,6 +1,11 @@
 import { createApiClient } from '$lib/api';
 import { ApiErrorType } from '$lib/api/errors';
-import type { CaptureWithContext, ShaderVersionDetail, ShaderWithCaptures } from '$lib/bindings';
+import type {
+	CaptureWithContext,
+	ShaderAuthor,
+	ShaderVersionDetail,
+	ShaderWithCaptures
+} from '$lib/bindings';
 import { pick } from '$lib/utils';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
@@ -10,6 +15,7 @@ export type ShaderDetailCapture = Pick<
 	CaptureWithContext,
 	'id' | 'image_url' | 'thumbhash' | 'scene_name' | 'profile_name' | 'shader_version' | 'shader_name'
 >;
+export type ShaderDetailAuthor = Pick<ShaderAuthor, 'name' | 'url'>;
 export type ShaderDetail = Pick<
 	ShaderWithCaptures,
 	| 'id'
@@ -23,9 +29,22 @@ export type ShaderDetail = Pick<
 	| 'upstream_downloads'
 	| 'view_count'
 > & {
+	authors: ShaderDetailAuthor[];
 	versions: ShaderDetailVersion[];
 	captures: ShaderDetailCapture[];
 };
+
+/** Deduplicate authors by name, preferring entries that have a URL. */
+function deduplicateAuthors(authors: ShaderAuthor[]): ShaderDetailAuthor[] {
+	const byName = new Map<string, ShaderDetailAuthor>();
+	for (const a of authors) {
+		const existing = byName.get(a.name);
+		if (!existing || (!existing.url && a.url)) {
+			byName.set(a.name, { name: a.name, url: a.url });
+		}
+	}
+	return [...byName.values()];
+}
 
 export function _trimShader(s: ShaderWithCaptures): ShaderDetail {
 	return {
@@ -41,6 +60,7 @@ export function _trimShader(s: ShaderWithCaptures): ShaderDetail {
 			'upstream_downloads',
 			'view_count'
 		]),
+		authors: deduplicateAuthors(s.authors),
 		versions: s.versions.map((v) => pick(v, ['id', 'version', 'capture_count'])),
 		captures: s.captures.map((c) =>
 			pick(c, [

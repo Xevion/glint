@@ -101,6 +101,7 @@ pub struct ShaderVersionDetail {
 pub struct ShaderWithCaptures {
     #[serde(flatten)]
     pub shader: Shader,
+    pub authors: Vec<ShaderAuthor>,
     pub versions: Vec<ShaderVersionDetail>,
     pub captures: Vec<CaptureWithContext>,
 }

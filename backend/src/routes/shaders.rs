@@ -11,7 +11,8 @@ use crate::{
         ShaderListItem, ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
     },
     repo::{
-        CaptureRepo, ShaderRepo, ShaderVersionRepo, ShaderViewRepo, SlugRedirectRepo,
+        CaptureRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo, ShaderViewRepo,
+        SlugRedirectRepo,
         capture::{CaptureDistinct, CaptureFilters},
     },
     services::shader::ShaderService,
@@ -217,6 +218,8 @@ async fn get_shader(
     let (captures, _) =
         CaptureRepo::list_with_context(db, &filters, None, CaptureDistinct::PerScene).await?;
 
+    let authors = ShaderAuthorRepo::list_by_shader(db, shader.id.as_ref()).await?;
+
     // Fire-and-forget view recording
     let hops = state.config().rate_limit.trusted_proxy_hops;
     let client_ip = ClientIp::resolve(&headers, Some(addr), hops);
@@ -243,6 +246,7 @@ async fn get_shader(
     Ok(ShaderDetailResponse::Data {
         body: Box::new(Json(ShaderWithCaptures {
             shader,
+            authors,
             versions,
             captures,
         })),

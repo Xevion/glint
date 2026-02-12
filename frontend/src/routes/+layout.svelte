@@ -5,6 +5,7 @@ import type { Snippet } from 'svelte';
 import { onMount } from 'svelte';
 import 'overlayscrollbars/overlayscrollbars.css';
 import BackgroundImage from '$lib/components/BackgroundImage.svelte';
+import Footer from '$lib/components/Footer.svelte';
 import BrandIconSprite from '$lib/components/icons/BrandIconSprite.svelte';
 import Navigation from '$lib/components/Navigation.svelte';
 import Sidebar from '$lib/components/Sidebar.svelte';
@@ -74,6 +75,8 @@ onMount(() => {
 					{@render children()}
 				</div>
 			</main>
+
+			<Footer />
 		</div>
 	</div>
 </BackgroundImage>
