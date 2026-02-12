@@ -1,14 +1,21 @@
-import type { Capture } from '$lib/bindings';
+import type { Capture, CaptureListItem, Paginated } from '$lib/bindings';
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
 
 export class CaptureEndpoints extends ApiClient {
 	/**
-	 * List completed captures (public)
+	 * Paginated list of completed captures (public)
 	 */
-	list(): Promise<Result<Capture[], ApiError>> {
-		return this.get<Capture[]>('/api/captures');
+	list(params?: {
+		page?: number;
+		pageSize?: number;
+	}): Promise<Result<Paginated<CaptureListItem>, ApiError>> {
+		const searchParams = new URLSearchParams();
+		if (params?.page != null) searchParams.set('page', String(params.page));
+		if (params?.pageSize != null) searchParams.set('page_size', String(params.pageSize));
+		const qs = searchParams.toString();
+		return this.get<Paginated<CaptureListItem>>(`/api/captures${qs ? `?${qs}` : ''}`);
 	}
 
 	/**

@@ -22,6 +22,92 @@ impl ShaderRepo {
         Ok(shaders)
     }
 
+    /// Paginated list of shaders that have at least one completed capture
+    /// from an active scene (i.e. shaders with thumbnails).
+    ///
+    /// Uses `COUNT(*) OVER()` to compute the total in a single query.
+    /// Returns `(shaders, total)`.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_with_captures(
+        executor: impl sqlx::PgExecutor<'_>,
+        limit: i64,
+        offset: i64,
+    ) -> AppResult<(Vec<Shader>, i64)> {
+        use chrono::{DateTime, Utc};
+
+        struct Row {
+            id: ShaderId,
+            name: String,
+            slug: String,
+            description: Option<String>,
+            modrinth_id: Option<String>,
+            curseforge_id: Option<String>,
+            website_url: Option<String>,
+            icon_url: Option<String>,
+            source_url: Option<String>,
+            license_id: Option<String>,
+            upstream_downloads: Option<i64>,
+            upstream_updated_at: Option<DateTime<Utc>>,
+            last_synced_at: Option<DateTime<Utc>>,
+            created_at: DateTime<Utc>,
+            updated_at: DateTime<Utc>,
+            view_count: i64,
+            total: i64,
+        }
+
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT
+                s.*,
+                COUNT(*) OVER() AS "total!"
+            FROM shaders s
+            WHERE EXISTS (
+                SELECT 1 FROM captures c
+                JOIN shader_versions sv ON c.shader_version_id = sv.id
+                JOIN scenes sc ON c.scene_id = sc.id
+                WHERE sv.shader_id = s.id
+                  AND c.status = 'completed'
+                  AND c.image_url IS NOT NULL
+                  AND sc.active = TRUE
+            )
+            ORDER BY s.name
+            LIMIT $1 OFFSET $2
+            "#,
+            limit,
+            offset,
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to list shaders with captures")?;
+
+        let total = rows.first().map_or(0, |r| r.total);
+        let shaders = rows
+            .into_iter()
+            .map(|r| Shader {
+                id: r.id,
+                name: r.name,
+                slug: r.slug,
+                description: r.description,
+                modrinth_id: r.modrinth_id,
+                curseforge_id: r.curseforge_id,
+                website_url: r.website_url,
+                icon_url: r.icon_url,
+                source_url: r.source_url,
+                license_id: r.license_id,
+                upstream_downloads: r.upstream_downloads,
+                upstream_updated_at: r.upstream_updated_at,
+                last_synced_at: r.last_synced_at,
+                created_at: r.created_at,
+                updated_at: r.updated_at,
+                view_count: r.view_count,
+            })
+            .collect();
+
+        debug!(total, "Listed shaders with captures (paginated)");
+        Ok((shaders, total))
+    }
+
     /// Resolve a shader by ID or slug. Inputs longer than `ID_LENGTH` can only
     /// be slugs; shorter ones could be either, so we check both in one query.
     #[instrument(skip(db), level = "debug")]

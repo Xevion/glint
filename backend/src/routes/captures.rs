@@ -12,7 +12,8 @@ use crate::{
     auth::AdminUser,
     error::{AppError, AppResult, OptionNotFoundExt},
     id::{CaptureRunId, SceneId},
-    models::{Capture, CaptureDetail, CaptureStatus, PaginatedCaptures},
+    models::pagination::normalize_pagination,
+    models::{CaptureDetail, CaptureListItem, CaptureStatus, CaptureWithContext, Paginated},
     repo::{
         CaptureRepo, SceneRepo,
         capture::{CaptureDistinct, CaptureFilters, Pagination},
@@ -21,7 +22,13 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
-pub struct CaptureListParams {
+pub struct PublicCaptureListParams {
+    pub page: Option<i32>,
+    pub page_size: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminCaptureListParams {
     pub page: Option<i32>,
     pub page_size: Option<i32>,
     pub shader: Option<String>,
@@ -38,11 +45,21 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/details", get(get_capture_details))
 }
 
-/// GET /api/captures - List completed captures (public)
+/// GET /api/captures - Paginated list of completed captures (public)
 #[instrument(skip(state))]
-async fn list_captures_public(State(state): State<AppState>) -> AppResult<Json<Vec<Capture>>> {
-    let captures = CaptureRepo::list_completed(state.db()).await?;
-    Ok(Json(captures))
+async fn list_captures_public(
+    State(state): State<AppState>,
+    Query(params): Query<PublicCaptureListParams>,
+) -> AppResult<Json<Paginated<CaptureListItem>>> {
+    let p = normalize_pagination(params.page, params.page_size);
+    let (items, total) = CaptureRepo::list_items(state.db(), p.page_size as i64, p.offset).await?;
+
+    Ok(Json(Paginated {
+        items,
+        total,
+        page: p.page,
+        page_size: p.page_size,
+    }))
 }
 
 /// GET /api/captures/all - List all captures with context, paginated (admin)
@@ -50,11 +67,9 @@ async fn list_captures_public(State(state): State<AppState>) -> AppResult<Json<V
 async fn list_captures_all(
     _admin: AdminUser,
     State(state): State<AppState>,
-    Query(params): Query<CaptureListParams>,
-) -> AppResult<Json<PaginatedCaptures>> {
-    let page = params.page.unwrap_or(1).max(1);
-    let page_size = params.page_size.unwrap_or(50).clamp(1, 250);
-    let offset = (page - 1) * page_size;
+    Query(params): Query<AdminCaptureListParams>,
+) -> AppResult<Json<Paginated<CaptureWithContext>>> {
+    let p = normalize_pagination(params.page, params.page_size);
 
     let filters = CaptureFilters {
         shader_slug: params.shader,
@@ -64,8 +79,8 @@ async fn list_captures_all(
         ..Default::default()
     };
     let pagination = Pagination {
-        limit: page_size as i64,
-        offset: offset as i64,
+        limit: p.page_size as i64,
+        offset: p.offset,
     };
 
     let (items, total) = CaptureRepo::list_with_context(
@@ -76,11 +91,11 @@ async fn list_captures_all(
     )
     .await?;
 
-    Ok(Json(PaginatedCaptures {
+    Ok(Json(Paginated {
         items,
         total: total.unwrap_or(0),
-        page,
-        page_size,
+        page: p.page,
+        page_size: p.page_size,
     }))
 }
 

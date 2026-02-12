@@ -11,8 +11,8 @@ use crate::id::{
     CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderId, ShaderVersionId, WorldVersionId,
 };
 use crate::models::{
-    Capture, CaptureDetail, CaptureFreshness, CaptureRunStatus, CaptureStatus, CaptureWithContext,
-    StorageBucket, StorageStats,
+    Capture, CaptureDetail, CaptureFreshness, CaptureListItem, CaptureRunStatus, CaptureStatus,
+    CaptureWithContext, StorageBucket, StorageStats,
 };
 
 pub struct ThumbnailInfo {
@@ -82,38 +82,79 @@ impl CaptureRepo {
         .map_err(Into::into)
     }
 
-    /// List all completed captures (only from active scenes)
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn list_completed(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<Capture>> {
-        let captures = sqlx::query_as!(
-            Capture,
+    /// Paginated list of completed captures (only from active scenes).
+    ///
+    /// Uses `COUNT(*) OVER()` to compute the total in a single query,
+    /// avoiding a separate count query and potential consistency issues.
+    ///
+    /// Returns `(items, total)` for the paginated envelope.
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_items(
+        db: &DbPool,
+        limit: i64,
+        offset: i64,
+    ) -> AppResult<(Vec<CaptureListItem>, i64)> {
+        struct Row {
+            id: CaptureId,
+            shader_version_id: ShaderVersionId,
+            scene_id: SceneId,
+            status: CaptureStatus,
+            profile: Option<String>,
+            image_url: Option<String>,
+            thumbhash: Option<String>,
+            captured_at: Option<DateTime<Utc>>,
+            resolution_width: Option<i32>,
+            resolution_height: Option<i32>,
+            total: i64,
+        }
+
+        let rows = sqlx::query_as!(
+            Row,
             r#"
             SELECT
                 c.id AS "id: CaptureId",
                 c.shader_version_id AS "shader_version_id: ShaderVersionId",
                 c.scene_id AS "scene_id: SceneId",
-                c.profile, c.image_url,
-                c.image_path, c.video_url, c.avg_fps, c.min_fps, c.max_fps,
-                c.frame_time_avg, c.frame_time_p99, c.minecraft_version,
-                c.iris_version, c.gpu_model, c.resolution_width, c.resolution_height,
-                c.captured_at,
                 c.status AS "status!: CaptureStatus",
-                c.error_message, c.thumbhash, c.file_size_bytes, c.content_type,
-                c.world_version_id AS "world_version_id: WorldVersionId",
-                c.scene_version_id AS "scene_version_id: SceneVersionId",
-                c.created_at, c.updated_at
+                c.profile,
+                c.image_url,
+                c.thumbhash,
+                c.captured_at,
+                c.resolution_width,
+                c.resolution_height,
+                COUNT(*) OVER() AS "total!"
             FROM captures c
             JOIN scenes sc ON c.scene_id = sc.id
             WHERE c.status = 'completed' AND sc.active = TRUE
             ORDER BY c.created_at DESC
-            "#
+            LIMIT $1 OFFSET $2
+            "#,
+            limit,
+            offset,
         )
-        .fetch_all(executor)
+        .fetch_all(db)
         .await
-        .context("failed to list completed captures")?;
+        .context("failed to list capture items")?;
 
-        debug!(count = captures.len(), "Listed completed captures");
-        Ok(captures)
+        let total = rows.first().map_or(0, |r| r.total);
+        let items = rows
+            .into_iter()
+            .map(|r| CaptureListItem {
+                id: r.id,
+                shader_version_id: r.shader_version_id,
+                scene_id: r.scene_id,
+                status: r.status,
+                profile: r.profile,
+                image_url: r.image_url,
+                thumbhash: r.thumbhash,
+                captured_at: r.captured_at,
+                resolution_width: r.resolution_width,
+                resolution_height: r.resolution_height,
+            })
+            .collect();
+
+        debug!(count = total, "Listed capture items");
+        Ok((items, total))
     }
 
     /// List captures by shader version

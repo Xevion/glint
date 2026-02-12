@@ -4,8 +4,10 @@ pub mod background;
 pub mod capture;
 pub mod device;
 pub mod featured;
+pub mod pagination;
 pub mod scene;
 pub mod shader;
+pub mod stats;
 pub mod storage;
 pub mod taxonomy;
 pub mod user;
@@ -26,11 +28,12 @@ pub use background::{
     UpdateBackgroundRequest,
 };
 pub use capture::{
-    Capture, CaptureDetail, CaptureFreshness, CaptureRun, CaptureRunItem, CaptureRunItemStatus,
-    CaptureRunItemWithContext, CaptureRunStatus, CaptureStatus, CaptureWithContext,
-    PaginatedCaptures,
+    Capture, CaptureDetail, CaptureFreshness, CaptureListItem, CaptureRun, CaptureRunItem,
+    CaptureRunItemStatus, CaptureRunItemWithContext, CaptureRunStatus, CaptureStatus,
+    CaptureWithContext,
 };
 pub use featured::FeaturedPair;
+pub use pagination::{Paginated, PaginationParams};
 pub use scene::{
     Camera, CreateSceneRequest, Position, Scene, SceneListItem, SceneVersion, SceneWithCaptures,
     SceneWithVersion, SceneWithWorld, UpdateSceneMetadataRequest, UpdateSceneRequest,

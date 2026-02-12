@@ -37,7 +37,7 @@ export const load: PageLoad = async ({ fetch }) => {
 	const errors: Record<string, string> = {};
 
 	const shaderCount = shadersRes.match({
-		Ok: (v) => v.length,
+		Ok: (v) => v.total,
 		Err: (e) => {
 			errors.shaders = e.message;
 			return 0;

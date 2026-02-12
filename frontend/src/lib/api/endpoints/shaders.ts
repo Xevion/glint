@@ -1,4 +1,4 @@
-import type { ShaderListItem, ShaderWithCaptures } from '$lib/bindings';
+import type { Paginated, ShaderListItem, ShaderWithCaptures } from '$lib/bindings';
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
@@ -10,10 +10,17 @@ export interface GetShaderParams {
 
 export class ShaderEndpoints extends ApiClient {
 	/**
-	 * List all shaders with enrichment data
+	 * Paginated list of all shaders with enrichment data
 	 */
-	list(): Promise<Result<ShaderListItem[], ApiError>> {
-		return this.get<ShaderListItem[]>('/api/shaders');
+	list(params?: {
+		page?: number;
+		pageSize?: number;
+	}): Promise<Result<Paginated<ShaderListItem>, ApiError>> {
+		const searchParams = new URLSearchParams();
+		if (params?.page != null) searchParams.set('page', String(params.page));
+		if (params?.pageSize != null) searchParams.set('page_size', String(params.pageSize));
+		const qs = searchParams.toString();
+		return this.get<Paginated<ShaderListItem>>(`/api/shaders${qs ? `?${qs}` : ''}`);
 	}
 
 	/**

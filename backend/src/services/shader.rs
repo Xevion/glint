@@ -15,20 +15,38 @@ use crate::{
 pub struct ShaderService;
 
 impl ShaderService {
-    /// Fetch all shaders enriched with authors, categories, features, latest
-    /// version, and a deterministic thumbnail.
+    /// Fetch shaders enriched with authors, categories, features, latest
+    /// version, and a deterministic thumbnail with pagination support.
     ///
     /// Only shaders that have at least one completed capture (thumbnail) are
     /// included — the rest are hidden from the public listing.
+    ///
+    /// Pagination and thumbnail filtering are pushed to SQL so we only fetch
+    /// the requested page of shaders, then enrich those in parallel.
+    ///
+    /// Returns `(items, total)` where total is the count before pagination.
     #[instrument(skip(db), level = "debug")]
-    pub async fn list_enriched(db: &DbPool) -> AppResult<Vec<ShaderListItem>> {
-        let (shaders, authors, categories, features, versions, thumbnails) = tokio::try_join!(
-            ShaderRepo::list(db),
+    pub async fn list_enriched(
+        db: &DbPool,
+        limit: i64,
+        offset: i64,
+    ) -> AppResult<(Vec<ShaderListItem>, i64)> {
+        // Fetch only the page of shaders that have thumbnails
+        let (shaders, total) = ShaderRepo::list_with_captures(db, limit, offset).await?;
+
+        if shaders.is_empty() {
+            return Ok((vec![], total));
+        }
+
+        let shader_ids: Vec<String> = shaders.iter().map(|s| s.id.0.clone()).collect();
+
+        // Fetch enrichment data in parallel (only for this page)
+        let (authors, categories, features, versions, thumbnails) = tokio::try_join!(
             ShaderAuthorRepo::list_all(db),
             CategoryRepo::list_all_for_shaders(db),
             FeatureRepo::list_all_for_shaders(db),
             ShaderVersionRepo::batch_latest_versions(db),
-            CaptureRepo::batch_thumbnails_by_shader(db),
+            CaptureRepo::batch_thumbnails_for_shaders(db, &shader_ids),
         )?;
 
         // Group by shader_id
@@ -52,7 +70,6 @@ impl ShaderService {
 
         let items = shaders
             .into_iter()
-            .filter(|shader| thumbnails.contains_key(shader.id.as_ref()))
             .map(|shader| {
                 let id = &shader.id;
                 let id_str: &str = id.as_ref();
@@ -69,10 +86,10 @@ impl ShaderService {
                     shader,
                 }
             })
-            .collect::<Vec<_>>();
+            .collect();
 
-        debug!(count = items.len(), "Built enriched shader list");
-        Ok(items)
+        debug!(count = total, "Built enriched shader list");
+        Ok((items, total))
     }
 
     /// Get trending shaders by recent view count, enriched with thumbnails.

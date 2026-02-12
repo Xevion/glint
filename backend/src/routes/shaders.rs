@@ -5,9 +5,10 @@ use crate::{
     error::{AppError, AppResult, OptionNotFoundExt},
     id::{self, ShaderVersionId},
     middleware::client_ip::ClientIp,
+    models::pagination::normalize_pagination,
     models::{
-        CaptureStatus, CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderListItem,
-        ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
+        CaptureStatus, CreateShaderRequest, CreateShaderVersionRequest, Paginated, Shader,
+        ShaderListItem, ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
     },
     repo::{
         CaptureRepo, ShaderRepo, ShaderVersionRepo, ShaderViewRepo, SlugRedirectRepo,
@@ -110,11 +111,28 @@ fn viewer_hash(ip: &str, user_agent: &str) -> String {
     hex::encode(&result[..8])
 }
 
-/// GET /api/shaders - List all shaders with enrichment (public)
+#[derive(Debug, Deserialize)]
+struct ShaderListQuery {
+    page: Option<i32>,
+    page_size: Option<i32>,
+}
+
+/// GET /api/shaders - Paginated list of shaders with enrichment (public)
 #[instrument(skip(state))]
-async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<ShaderListItem>>> {
-    let items = ShaderService::list_enriched(state.db()).await?;
-    Ok(Json(items))
+async fn list_shaders(
+    State(state): State<AppState>,
+    Query(params): Query<ShaderListQuery>,
+) -> AppResult<Json<Paginated<ShaderListItem>>> {
+    let p = normalize_pagination(params.page, params.page_size);
+    let (items, total) =
+        ShaderService::list_enriched(state.db(), p.page_size as i64, p.offset).await?;
+
+    Ok(Json(Paginated {
+        items,
+        total,
+        page: p.page,
+        page_size: p.page_size,
+    }))
 }
 
 #[derive(Debug, Deserialize)]

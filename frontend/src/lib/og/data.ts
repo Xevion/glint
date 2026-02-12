@@ -121,10 +121,10 @@ async function fetchHomeOgData(api: ApiClient): Promise<OgImageData> {
 }
 
 async function fetchShadersListOgData(api: ApiClient): Promise<OgImageData> {
-	const result = await api.shaders.list();
+	const result = await api.shaders.list({ pageSize: 1 });
 
 	const imageUrl =
-		result.isOk && result.value.length > 0 ? (result.value[0].image_url ?? null) : null;
+		result.isOk && result.value.items.length > 0 ? (result.value.items[0].image_url ?? null) : null;
 
 	return {
 		imageUrl,

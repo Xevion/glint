@@ -2,7 +2,7 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { api } from '$lib/api';
-import type { Shader, ShaderSearchResult, ShaderSearchSort } from '$lib/bindings';
+import type { Shader, ShaderListItem, ShaderSearchResult, ShaderSearchSort } from '$lib/bindings';
 import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
 import { AdminPageHeader } from '$lib/components/admin';
 import AdminTable from '$lib/components/AdminTable.svelte';
@@ -64,7 +64,7 @@ const columns = [
 	{ id: 'created_at', key: 'created_at', name: 'Created' }
 ];
 
-function getSyncStatus(shader: Shader): { label: string; class: string } {
+function getSyncStatus(shader: ShaderListItem): { label: string; class: string } {
 	const hasLink = !!shader.modrinth_id || !!shader.curseforge_id;
 	if (!hasLink) return { label: 'No link', class: 'text-muted-foreground' };
 	if (!shader.last_synced_at) return { label: 'Never', class: 'text-warning' };
@@ -274,33 +274,33 @@ function handleShaderAdopted(shader: Shader) {
 				<AdminTable
 					data={shaders}
 					{columns}
-					onRowClick={(shader: Shader) => goto(`/admin/shaders/${shader.id}`)}
-					getRowId={(s: Shader) => s.id}
+					onRowClick={(shader: ShaderListItem) => goto(`/admin/shaders/${shader.id}`)}
+					getRowId={(s: ShaderListItem) => s.id}
 				>
-					{#snippet cell({ columnId, value, row })}
-						{#if columnId === 'icon'}
-							{@const shader = row as Shader}
-							{#if shader.icon_url}
-								<img
-									src={shader.icon_url}
-									alt=""
-									class="h-8 w-8 shrink-0 rounded object-cover"
-								/>
-							{:else}
-								<div
-									class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted"
-								>
-									<Sparkles class="h-4 w-4 text-muted-foreground" />
-								</div>
-							{/if}
-						{:else if columnId === 'name'}
-							{@const shader = row as Shader}
-							<div>
-								<span class="font-medium">{value}</span>
-								<span class="ml-1.5 font-mono text-xs text-muted-foreground"
-									>{shader.slug}</span
-								>
+				{#snippet cell({ columnId, value, row })}
+					{#if columnId === 'icon'}
+						{@const shader = row as ShaderListItem}
+						{#if shader.icon_url}
+							<img
+								src={shader.icon_url}
+								alt=""
+								class="h-8 w-8 shrink-0 rounded object-cover"
+							/>
+						{:else}
+							<div
+								class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted"
+							>
+								<Sparkles class="h-4 w-4 text-muted-foreground" />
 							</div>
+						{/if}
+					{:else if columnId === 'name'}
+						{@const shader = row as ShaderListItem}
+						<div>
+							<span class="font-medium">{value}</span>
+							<span class="ml-1.5 font-mono text-xs text-muted-foreground"
+								>{shader.slug}</span
+							>
+						</div>
 						{:else if columnId === 'description'}
 							{#if value}
 								<span class="line-clamp-1 max-w-xs">{value}</span>
@@ -308,7 +308,7 @@ function handleShaderAdopted(shader: Shader) {
 								<span class="text-muted-foreground">-</span>
 							{/if}
 						{:else if columnId === 'sync_status'}
-							{@const status = getSyncStatus(row as Shader)}
+							{@const status = getSyncStatus(row as ShaderListItem)}
 							<span class="text-sm font-medium {status.class}"
 								>{status.label}</span
 							>

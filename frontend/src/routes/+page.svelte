@@ -9,31 +9,28 @@ import type { PageData } from './$types';
 
 let { data }: { data: PageData } = $props();
 
-// Featured shaders (first 6)
-const featuredShaders = $derived((data.shaders ?? []).slice(0, 6));
+// Featured shaders (already limited to 6 by page_size param)
+const featuredShaders = $derived(data.shaders ?? []);
 
-// Stats
-const captures = $derived(data.captures ?? []);
-const shaders = $derived(data.shaders ?? []);
+// Stats from dedicated endpoint
+const stats = $derived(data.stats);
 const featuredPairs = $derived(data.featuredPairs ?? []);
-const hasStats = $derived(shaders.length > 0 || captures.length > 0);
+const hasStats = $derived(stats.shader_count > 0 || stats.capture_count > 0);
 const hasFeaturedPairs = $derived(featuredPairs.length > 0);
-
-const sceneCount = $derived(new Set(captures.map((c) => c.scene_id)).size);
 
 let overlayVisible = $state(true);
 
 // OG image: use first featured pair's right image (the shader-enhanced one)
-const ogImage = $derived(featuredPairs[0]?.right_image_url ?? captures[0]?.image_url ?? null);
+const ogImage = $derived(featuredPairs[0]?.right_image_url ?? null);
 </script>
 
 {#snippet statsBar()}
 	<div class="inline-flex items-center gap-6 rounded-full bg-muted/50 backdrop-blur-sm px-6 py-2 text-sm">
-		<span><strong class="text-foreground">{shaders.length}</strong> <span class="text-foreground">Shaders</span></span>
+		<span><strong class="text-foreground">{stats.shader_count}</strong> <span class="text-foreground">Shaders</span></span>
 		<span class="text-foreground/30">|</span>
-		<span><strong class="text-foreground">{sceneCount}</strong> <span class="text-foreground">Scenes</span></span>
+		<span><strong class="text-foreground">{stats.scene_count}</strong> <span class="text-foreground">Scenes</span></span>
 		<span class="text-foreground/30">|</span>
-		<span><strong class="text-foreground">{captures.length}</strong> <span class="text-foreground">Captures</span></span>
+		<span><strong class="text-foreground">{stats.capture_count}</strong> <span class="text-foreground">Captures</span></span>
 	</div>
 {/snippet}
 

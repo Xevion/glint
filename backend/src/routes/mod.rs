@@ -10,6 +10,7 @@ mod runs;
 mod scenes;
 mod shaders;
 mod sitemap;
+mod stats;
 mod storage;
 mod user;
 mod users;
@@ -62,6 +63,8 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
     let cache_backgrounds =
         CacheControlLayer::new("public, max-age=300, s-maxage=300, stale-while-revalidate=600");
     let cache_featured = CacheControlLayer::new("public, max-age=60, s-maxage=30");
+    let cache_stats =
+        CacheControlLayer::new("public, max-age=300, s-maxage=300, stale-while-revalidate=600");
     let no_store = CacheControlLayer::new("no-store");
 
     Router::new()
@@ -95,6 +98,7 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         )
         .nest("/scenes", scenes::router().layer(cache_short.clone()))
         .nest("/captures", captures::router().layer(cache_short))
+        .nest("/stats", stats::router().layer(cache_stats))
         .nest("/users", users::router())
         .nest(
             "/work",

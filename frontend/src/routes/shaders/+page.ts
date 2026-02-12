@@ -6,11 +6,13 @@ export const load: PageLoad = async ({ fetch }) => {
 	const result = await api.shaders.list();
 
 	return result.match({
-		Ok: (shaders) => ({
-			shaders
+		Ok: (paginated) => ({
+			shaders: paginated.items,
+			total: paginated.total
 		}),
 		Err: (error) => ({
 			shaders: [],
+			total: 0,
 			error: error.message
 		})
 	});

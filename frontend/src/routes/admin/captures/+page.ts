@@ -1,5 +1,5 @@
 import { createApiClient } from '$lib/api';
-import type { CaptureWithContext, SceneWithWorld, Shader } from '$lib/bindings';
+import type { CaptureWithContext, SceneWithWorld, ShaderListItem } from '$lib/bindings';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch, url }) => {
@@ -19,8 +19,8 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	]);
 
 	const shaders = shadersRes.match({
-		Ok: (v) => v,
-		Err: () => [] as Shader[]
+		Ok: (v) => v.items,
+		Err: () => [] as ShaderListItem[]
 	});
 
 	const scenes = scenesRes.match({

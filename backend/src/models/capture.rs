@@ -376,12 +376,23 @@ pub struct CaptureDetail {
     pub same_run: Vec<CaptureWithContext>,
 }
 
-/// Paginated captures response envelope
-#[derive(Debug, Serialize, TS)]
-#[ts(export)]
-pub struct PaginatedCaptures {
-    pub items: Vec<CaptureWithContext>,
-    pub total: i64,
-    pub page: i32,
-    pub page_size: i32,
+/// Lightweight capture summary for public list endpoints.
+///
+/// Omits performance metrics, GPU info, error details, and other fields
+/// that are only needed on the detail view (`GET /api/captures/{id}`).
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, FromRow, TS)]
+#[ts(export, optional_fields)]
+pub struct CaptureListItem {
+    pub id: CaptureId,
+    pub shader_version_id: ShaderVersionId,
+    pub scene_id: SceneId,
+    pub status: CaptureStatus,
+    pub profile: Option<String>,
+    pub image_url: Option<String>,
+    pub thumbhash: Option<String>,
+    #[ts(as = "Option<String>")]
+    pub captured_at: Option<DateTime<Utc>>,
+    pub resolution_width: Option<i32>,
+    pub resolution_height: Option<i32>,
 }

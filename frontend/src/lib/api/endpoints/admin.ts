@@ -1,11 +1,13 @@
 import type {
 	CaptureDetail,
 	CaptureHealthResponse,
-	PaginatedCaptures,
+	CaptureWithContext,
+	Paginated,
 	Scene,
 	SceneWithVersion,
 	SceneWithWorld,
 	Shader,
+	ShaderListItem,
 	ShaderWithCaptures,
 	StorageBucket,
 	StorageStats,
@@ -25,8 +27,15 @@ import type { ApiError } from '../errors';
 export class AdminEndpoints extends ApiClient {
 	// ============== Shaders ==============
 
-	listShaders(): Promise<Result<Shader[], ApiError>> {
-		return this.get<Shader[]>('/api/shaders');
+	listShaders(params?: {
+		page?: number;
+		pageSize?: number;
+	}): Promise<Result<Paginated<ShaderListItem>, ApiError>> {
+		const searchParams = new URLSearchParams();
+		if (params?.page != null) searchParams.set('page', String(params.page));
+		if (params?.pageSize != null) searchParams.set('page_size', String(params.pageSize));
+		const qs = searchParams.toString();
+		return this.get<Paginated<ShaderListItem>>(`/api/shaders${qs ? `?${qs}` : ''}`);
 	}
 
 	getShader(id: string): Promise<Result<ShaderWithCaptures, ApiError>> {
@@ -98,7 +107,7 @@ export class AdminEndpoints extends ApiClient {
 		scene?: string;
 		status?: string;
 		runId?: string;
-	}): Promise<Result<PaginatedCaptures, ApiError>> {
+	}): Promise<Result<Paginated<CaptureWithContext>, ApiError>> {
 		const searchParams = new URLSearchParams();
 		if (params?.page != null) searchParams.set('page', String(params.page));
 		if (params?.pageSize != null) searchParams.set('page_size', String(params.pageSize));
@@ -107,7 +116,7 @@ export class AdminEndpoints extends ApiClient {
 		if (params?.status) searchParams.set('status', params.status);
 		if (params?.runId) searchParams.set('run_id', params.runId);
 		const qs = searchParams.toString();
-		return this.get<PaginatedCaptures>(`/api/captures/all${qs ? `?${qs}` : ''}`);
+		return this.get<Paginated<CaptureWithContext>>(`/api/captures/all${qs ? `?${qs}` : ''}`);
 	}
 
 	getCapture(id: string): Promise<Result<CaptureDetail, ApiError>> {
