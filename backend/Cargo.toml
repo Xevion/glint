@@ -46,3 +46,4 @@ sha2 = "0.10.9"
 mini-moka = "0.10.3"
 dashmap = "6.1.0"
 serde_with = "3.16.1"
+zip = { version = "7.4.0", default-features = false, features = ["deflate"] }
