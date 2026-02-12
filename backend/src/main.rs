@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use axum::http::{HeaderValue, Method, header};
 use clap::Parser;
@@ -6,6 +7,7 @@ use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
 use tower_http::cors::CorsLayer;
 use tracing::{debug, info, warn};
 
+use glint::services::lifecycle::{ServiceRunner, shutdown_signal};
 use glint::{
     cache::SessionCache, cli, config::Config, db, platform, repo::SessionRepo, routes, services,
     state::AppState,
@@ -161,49 +163,50 @@ async fn main() -> anyhow::Result<()> {
         session_cache,
     );
 
-    // Start upload cleanup background task
+    // Spawn background services with graceful shutdown support
+    let services = ServiceRunner::new();
+
     let cleanup_bucket = config
         .r2
         .bucket
         .clone()
         .unwrap_or_else(|| "glint".to_string());
-    tokio::spawn(services::upload_cleanup::cleanup_expired_uploads(
-        pool.clone(),
-        s3_client.clone(),
-        cleanup_bucket,
-    ));
-
-    // Start capture metadata background worker
-    let integrity_http = http_client.clone();
-    let extraction_http = http_client.clone();
-    tokio::spawn(services::metadata::run(
-        metadata_rx,
-        pool.clone(),
-        http_client,
-        s3_client.clone(),
-        config.r2.clone(),
-    ));
-
-    // Start capture run monitor (detects and times out stale runs)
-    tokio::spawn(services::run_monitor::monitor_capture_runs(pool.clone()));
-
-    // Start capture integrity sweep (verifies R2 images, cleans up orphans)
-    tokio::spawn(services::integrity::run(
-        pool.clone(),
-        integrity_http,
-        integrity_metadata_tx,
-    ));
-
-    // Start shader pack extraction worker (downloads zips, extracts metadata)
-    tokio::spawn(services::extraction::run(pool.clone(), extraction_http));
-
-    // Purge expired sessions every hour
-    {
+    services.spawn("upload-cleanup", {
         let pool = pool.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
-            loop {
-                interval.tick().await;
+        let s3 = s3_client.clone();
+        |ctx| services::upload_cleanup::cleanup_expired_uploads(ctx, pool, s3, cleanup_bucket)
+    });
+
+    services.spawn("metadata-worker", {
+        let pool = pool.clone();
+        let http = http_client.clone();
+        let s3 = s3_client.clone();
+        let r2 = config.r2.clone();
+        |ctx| services::metadata::run(ctx, metadata_rx, pool, http, s3, r2)
+    });
+
+    services.spawn("run-monitor", {
+        let pool = pool.clone();
+        |ctx| services::run_monitor::monitor_capture_runs(ctx, pool)
+    });
+
+    services.spawn("integrity-sweep", {
+        let pool = pool.clone();
+        let http = http_client.clone();
+        |ctx| services::integrity::run(ctx, pool, http, integrity_metadata_tx)
+    });
+
+    services.spawn("extraction-worker", {
+        let pool = pool.clone();
+        let http = http_client.clone();
+        |ctx| services::extraction::run(ctx, pool, http)
+    });
+
+    services.spawn("session-cleanup", {
+        let pool = pool.clone();
+        |ctx| async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(3600));
+            while ctx.tick(&mut interval).await {
                 match SessionRepo::delete_expired(&pool).await {
                     Ok(count) if count > 0 => {
                         info!(count, "Purged expired sessions");
@@ -214,8 +217,8 @@ async fn main() -> anyhow::Result<()> {
                     _ => {}
                 }
             }
-        });
-    }
+        }
+    });
 
     // Configure CORS. SvelteKit's universal fetch enforces CORS during SSR using
     // the page's origin, so the frontend origin (wherever SvelteKit is served)
@@ -283,7 +286,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(glint::middleware::security_headers::SecurityHeadersLayer)
         .layer(glint::middleware::request_id::RequestIdLayer);
 
-    // Start server
+    // Start server with graceful shutdown
     let addr: SocketAddr = format!("{}:{}", config.host, config.port)
         .parse()
         .expect("invalid host:port configuration");
@@ -294,7 +297,19 @@ async fn main() -> anyhow::Result<()> {
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(shutdown_signal())
     .await?;
+
+    // HTTP server has stopped accepting connections — drain background services
+    info!("HTTP server stopped, shutting down background services");
+    let clean = services.shutdown(Duration::from_secs(15)).await;
+    if !clean {
+        warn!("Some background services did not stop within timeout");
+    }
+
+    // Let in-flight database queries finish, then close the pool
+    pool.close().await;
+    info!("Shutdown complete");
 
     Ok(())
 }

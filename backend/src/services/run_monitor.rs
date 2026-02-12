@@ -2,9 +2,10 @@ use std::time::Duration;
 
 use sqlx::PgPool;
 use tokio::time::interval;
-use tracing::{error, info, trace, warn};
+use tracing::{error, trace, warn};
 
 use crate::repo::CaptureRunRepo;
+use crate::services::lifecycle::ServiceContext;
 
 /// How often the monitor checks for stale runs (60 seconds)
 const CHECK_INTERVAL_SECS: u64 = 60;
@@ -17,18 +18,10 @@ const RUN_TIMEOUT_SECS: i64 = 5 * 60;
 /// A run is "stale" when it's still in 'running' status but has had no item
 /// activity (claim, completion, or failure) for longer than `RUN_TIMEOUT_SECS`.
 /// Stale runs are transitioned to 'timed_out' with partial progress preserved.
-pub async fn monitor_capture_runs(pool: PgPool) {
-    info!(
-        check_interval_secs = CHECK_INTERVAL_SECS,
-        timeout_secs = RUN_TIMEOUT_SECS,
-        "Capture run monitor started"
-    );
-
+pub async fn monitor_capture_runs(ctx: ServiceContext, pool: PgPool) {
     let mut ticker = interval(Duration::from_secs(CHECK_INTERVAL_SECS));
 
-    loop {
-        ticker.tick().await;
-
+    while ctx.tick(&mut ticker).await {
         match CaptureRunRepo::find_stale_runs(&pool, RUN_TIMEOUT_SECS).await {
             Ok(stale_ids) => {
                 if stale_ids.is_empty() {

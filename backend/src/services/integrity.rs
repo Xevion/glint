@@ -5,6 +5,7 @@ use tokio::time::interval;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::repo::CaptureRepo;
+use crate::services::lifecycle::ServiceContext;
 
 /// How often the integrity sweep runs (30 minutes)
 const SWEEP_INTERVAL_SECS: u64 = 30 * 60;
@@ -31,21 +32,14 @@ const METADATA_GRACE_PERIOD_SECS: i64 = 60 * 60;
 ///    errors. The sweep does a HEAD request: if the image is a 404, the capture is
 ///    marked failed; otherwise the metadata worker is notified to retry.
 pub async fn run(
+    ctx: ServiceContext,
     pool: PgPool,
     http: reqwest::Client,
     metadata_tx: tokio::sync::mpsc::UnboundedSender<String>,
 ) {
-    info!(
-        sweep_interval_secs = SWEEP_INTERVAL_SECS,
-        orphan_threshold_secs = UPLOADING_ORPHAN_THRESHOLD_SECS,
-        metadata_grace_secs = METADATA_GRACE_PERIOD_SECS,
-        "Capture integrity sweep started"
-    );
-
     let mut ticker = interval(Duration::from_secs(SWEEP_INTERVAL_SECS));
 
-    loop {
-        ticker.tick().await;
+    while ctx.tick(&mut ticker).await {
         sweep_orphaned_uploads(&pool, &http).await;
         sweep_unverified_completions(&pool, &http, &metadata_tx).await;
     }

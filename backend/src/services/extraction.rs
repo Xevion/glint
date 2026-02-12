@@ -6,6 +6,7 @@ use tracing::{debug, error, info, warn};
 use crate::extraction::limits::MAX_ARCHIVE_SIZE;
 use crate::models::ShaderVersion;
 use crate::repo::{ExtractionRepo, ShaderVersionRepo};
+use crate::services::lifecycle::ServiceContext;
 
 /// Number of versions to fetch per query (large batch, worked through steadily).
 const BATCH_SIZE: i64 = 60;
@@ -27,31 +28,27 @@ const IDLE_BACKOFF_MAX: Duration = Duration::from_secs(5 * 60);
 /// Fetches a batch of pending versions, processes them steadily with a short
 /// inter-item delay, then re-queries. When the queue is empty, backs off
 /// exponentially (30s → 60s → … → 5min) and resets as soon as work appears.
-pub async fn run(pool: PgPool, http: reqwest::Client) {
-    info!(
-        batch_size = BATCH_SIZE,
-        item_delay_ms = ITEM_DELAY.as_millis() as u64,
-        idle_backoff_initial_secs = IDLE_BACKOFF_INITIAL.as_secs(),
-        idle_backoff_max_secs = IDLE_BACKOFF_MAX.as_secs(),
-        "Shader pack extraction worker started"
-    );
-
+pub async fn run(ctx: ServiceContext, pool: PgPool, http: reqwest::Client) {
     let mut backoff = IDLE_BACKOFF_INITIAL;
 
     loop {
-        let processed = process_batch(&pool, &http).await;
+        let processed = process_batch(&ctx, &pool, &http).await;
 
         if processed > 0 {
-            // Work was found — reset backoff and immediately re-query for more
             backoff = IDLE_BACKOFF_INITIAL;
         } else {
-            // Queue empty — sleep with exponential backoff
             debug!(
                 backoff_secs = backoff.as_secs(),
                 "No pending extractions, backing off"
             );
-            tokio::time::sleep(backoff).await;
+            if !ctx.sleep(backoff).await {
+                break;
+            }
             backoff = (backoff * 2).min(IDLE_BACKOFF_MAX);
+        }
+
+        if ctx.is_shutting_down() {
+            break;
         }
     }
 }
@@ -59,7 +56,8 @@ pub async fn run(pool: PgPool, http: reqwest::Client) {
 /// Fetch and process a batch of pending shader versions.
 ///
 /// Returns the number of items successfully fetched (not necessarily all completed).
-async fn process_batch(pool: &PgPool, http: &reqwest::Client) -> usize {
+/// Checks for shutdown between items so long batches don't block exit.
+async fn process_batch(ctx: &ServiceContext, pool: &PgPool, http: &reqwest::Client) -> usize {
     let versions = match ShaderVersionRepo::list_pending_extraction(pool, BATCH_SIZE).await {
         Ok(v) => v,
         Err(e) => {
@@ -76,8 +74,8 @@ async fn process_batch(pool: &PgPool, http: &reqwest::Client) -> usize {
 
     let count = versions.len();
     for (i, version) in versions.iter().enumerate() {
-        if i > 0 {
-            tokio::time::sleep(ITEM_DELAY).await;
+        if i > 0 && !ctx.sleep(ITEM_DELAY).await {
+            return count;
         }
         process_one(pool, http, version).await;
     }

@@ -3,9 +3,10 @@ use std::time::Duration;
 use aws_sdk_s3::Client as S3Client;
 use sqlx::PgPool;
 use tokio::time::interval;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::repo::PendingUploadRepo;
+use crate::services::lifecycle::ServiceContext;
 
 /// Interval between cleanup runs (10 minutes)
 const CLEANUP_INTERVAL_SECS: u64 = 600;
@@ -14,17 +15,15 @@ const CLEANUP_INTERVAL_SECS: u64 = 600;
 /// Runs every 10 minutes and removes:
 /// - Expired pending_uploads records from the database
 /// - Corresponding files from R2/S3 storage
-pub async fn cleanup_expired_uploads(pool: PgPool, s3: Option<S3Client>, bucket: String) {
-    info!(
-        interval_secs = CLEANUP_INTERVAL_SECS,
-        "Upload cleanup service started"
-    );
-
+pub async fn cleanup_expired_uploads(
+    ctx: ServiceContext,
+    pool: PgPool,
+    s3: Option<S3Client>,
+    bucket: String,
+) {
     let mut ticker = interval(Duration::from_secs(CLEANUP_INTERVAL_SECS));
 
-    loop {
-        ticker.tick().await;
-
+    while ctx.tick(&mut ticker).await {
         match run_cleanup(&pool, s3.as_ref(), &bucket).await {
             Ok(cleaned) => {
                 if cleaned > 0 {

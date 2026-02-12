@@ -8,13 +8,18 @@ use tracing::{debug, error, info, warn};
 
 use crate::config::R2Config;
 use crate::repo::CaptureRepo;
+use crate::services::lifecycle::ServiceContext;
 
 /// Run the capture metadata background worker.
 ///
 /// On startup, backfills any completed captures missing thumbhash or file metadata,
 /// then transcodes any remaining PNG captures to WebP. After backfill, loops on the
 /// channel processing new capture IDs as they arrive.
+///
+/// On shutdown, drains any remaining items from the channel so queued work
+/// is not silently lost.
 pub async fn run(
+    ctx: ServiceContext,
     mut rx: mpsc::UnboundedReceiver<String>,
     pool: PgPool,
     http: reqwest::Client,
@@ -64,12 +69,28 @@ pub async fn run(
         debug!("S3 not configured, skipping PNG→WebP transcoding");
     }
 
-    // Process new captures as they arrive
-    while let Some(capture_id) = rx.recv().await {
-        process_capture(&pool, &http, &capture_id).await;
+    // Process new captures as they arrive, exiting on shutdown signal
+    loop {
+        tokio::select! {
+            item = rx.recv() => {
+                match item {
+                    Some(capture_id) => process_capture(&pool, &http, &capture_id).await,
+                    None => break, // channel closed
+                }
+            }
+            () = ctx.cancelled() => break,
+        }
     }
 
-    warn!("Metadata worker channel closed, shutting down");
+    // Drain any items buffered in the channel so queued work isn't lost
+    let mut drained = 0u32;
+    while let Ok(capture_id) = rx.try_recv() {
+        process_capture(&pool, &http, &capture_id).await;
+        drained += 1;
+    }
+    if drained > 0 {
+        info!(count = drained, "Metadata worker drained remaining items");
+    }
 }
 
 /// Max retry attempts for transient fetch failures (CDN propagation delays, etc.)
