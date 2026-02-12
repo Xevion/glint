@@ -153,14 +153,9 @@ async fn discord_callback(
     let jar = jar.add(clear_csrf);
 
     // Exchange authorization code for access token
-    let http_client = reqwest::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| AppError::Internal(e.into()))?;
     let token_result = oauth_client
         .exchange_code(AuthorizationCode::new(query.code))
-        .request_async(&http_client)
+        .request_async(state.http())
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to exchange OAuth code");
@@ -170,7 +165,7 @@ async fn discord_callback(
     let access_token = token_result.access_token().secret();
 
     // Fetch user info from Discord
-    let discord_user = fetch_discord_user(access_token).await?;
+    let discord_user = fetch_discord_user(state.http(), access_token).await?;
     debug!(
         discord_id = %discord_user.id,
         username = %discord_user.username,
@@ -235,13 +230,11 @@ async fn logout(State(state): State<AppState>, jar: CookieJar) -> AppResult<(Coo
 }
 
 /// Fetch user info from Discord API
-#[instrument(skip(access_token), level = "debug")]
-async fn fetch_discord_user(access_token: &str) -> AppResult<DiscordUser> {
-    let client = reqwest::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| AppError::Internal(e.into()))?;
+#[instrument(skip(client, access_token), level = "debug")]
+async fn fetch_discord_user(
+    client: &reqwest::Client,
+    access_token: &str,
+) -> AppResult<DiscordUser> {
     let response = client
         .get("https://discord.com/api/v10/users/@me")
         .bearer_auth(access_token)

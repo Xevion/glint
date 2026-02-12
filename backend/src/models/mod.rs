@@ -6,8 +6,10 @@ pub mod device;
 pub mod featured;
 pub mod scene;
 pub mod shader;
+pub mod storage;
 pub mod taxonomy;
 pub mod user;
+pub mod work;
 pub mod world;
 
 // Re-export ID types for convenience
@@ -39,8 +41,10 @@ pub use shader::{
     ShaderSearchSort, ShaderVersion, ShaderVersionDetail, ShaderWithCaptures, ShaderWithVersions,
     TrendingShader, UpdateShaderRequest,
 };
+pub use storage::{StorageBucket, StorageStats};
 pub use taxonomy::{Category, Feature, Tag};
 pub use user::{Role, Session, SessionInfo, UpdateUserRoleRequest, User, UserWithSessions};
+pub use work::WorkItem;
 pub use world::{
     CompleteUploadRequest, CreateWorldRequest, CreateWorldUploadRequest,
     CreateWorldVersionUploadRequest, PendingUpload, UpdateWorldRequest, UploadResponse, World,

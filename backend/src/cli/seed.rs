@@ -1,8 +1,9 @@
 use sqlx::PgPool;
+use tracing::info;
 
 /// Seed the database with sample data
 pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
-    println!("Seeding database...");
+    info!("Seeding database...");
 
     // Clear existing data (cascades will handle related records)
     sqlx::query!("DELETE FROM capture_run_items")
@@ -39,7 +40,7 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
     .execute(pool)
     .await?;
 
-    println!("  Seeded 1 world");
+    info!("Seeded 1 world");
 
     // Seed sample scenes (identity + config tuples)
     let scenes = vec![
@@ -152,7 +153,7 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
         .await?;
     }
 
-    println!("  Seeded {} scenes", scenes.len());
+    info!(count = scenes.len(), "Seeded scenes");
 
     // Seed sample shader
     sqlx::query!(
@@ -169,7 +170,7 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
     .execute(pool)
     .await?;
 
-    println!("  Seeded 1 shader");
+    info!("Seeded 1 shader");
 
     // Seed shader version
     sqlx::query!(
@@ -185,7 +186,7 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
     .execute(pool)
     .await?;
 
-    println!("  Seeded 1 shader version");
+    info!("Seeded 1 shader version");
 
     // Seed sample captures (pending status)
     let captures = vec![
@@ -209,8 +210,8 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
         .await?;
     }
 
-    println!("  Seeded {} captures", captures.len());
-    println!("Database seeded successfully!");
+    info!(count = captures.len(), "Seeded captures");
+    info!("Database seeded successfully!");
 
     Ok(())
 }

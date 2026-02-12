@@ -135,6 +135,13 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Create shared HTTP client for ad-hoc requests (auth, integrity sweeps, etc.)
+    let http_client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .expect("failed to create HTTP client");
+
     // Create capture metadata channel
     let (metadata_tx, metadata_rx) = tokio::sync::mpsc::unbounded_channel();
     let integrity_metadata_tx = metadata_tx.clone();
@@ -144,6 +151,7 @@ async fn main() -> anyhow::Result<()> {
     let state = AppState::new(
         pool.clone(),
         config.clone(),
+        http_client.clone(),
         s3_client.clone(),
         oauth_client,
         modrinth_client,
@@ -166,9 +174,11 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Start capture metadata background worker
+    let integrity_http = http_client.clone();
     tokio::spawn(services::capture_metadata::run(
         metadata_rx,
         pool.clone(),
+        http_client,
         s3_client.clone(),
         config.r2.clone(),
     ));
@@ -181,6 +191,7 @@ async fn main() -> anyhow::Result<()> {
     // Start capture integrity sweep (verifies R2 images, cleans up orphans)
     tokio::spawn(services::capture_integrity::run(
         pool.clone(),
+        integrity_http,
         integrity_metadata_tx,
     ));
 

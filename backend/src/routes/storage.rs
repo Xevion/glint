@@ -8,7 +8,8 @@ use tracing::instrument;
 
 use crate::auth::AdminUser;
 use crate::error::AppResult;
-use crate::repo::{CaptureRepo, StorageBucket, StorageStats};
+use crate::models::{StorageBucket, StorageStats};
+use crate::repo::CaptureRepo;
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]

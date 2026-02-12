@@ -30,7 +30,11 @@ const METADATA_GRACE_PERIOD_SECS: i64 = 60 * 60;
 ///    where the metadata worker failed due to CDN propagation delays or transient
 ///    errors. The sweep does a HEAD request: if the image is a 404, the capture is
 ///    marked failed; otherwise the metadata worker is notified to retry.
-pub async fn run(pool: PgPool, metadata_tx: tokio::sync::mpsc::UnboundedSender<String>) {
+pub async fn run(
+    pool: PgPool,
+    http: reqwest::Client,
+    metadata_tx: tokio::sync::mpsc::UnboundedSender<String>,
+) {
     info!(
         sweep_interval_secs = SWEEP_INTERVAL_SECS,
         orphan_threshold_secs = UPLOADING_ORPHAN_THRESHOLD_SECS,
@@ -42,14 +46,14 @@ pub async fn run(pool: PgPool, metadata_tx: tokio::sync::mpsc::UnboundedSender<S
 
     loop {
         ticker.tick().await;
-        sweep_orphaned_uploads(&pool).await;
-        sweep_unverified_completions(&pool, &metadata_tx).await;
+        sweep_orphaned_uploads(&pool, &http).await;
+        sweep_unverified_completions(&pool, &http, &metadata_tx).await;
     }
 }
 
 /// Check captures stuck in 'uploading' beyond the threshold.
 /// HEAD request to R2 determines whether to complete or fail them.
-async fn sweep_orphaned_uploads(pool: &PgPool) {
+async fn sweep_orphaned_uploads(pool: &PgPool, http: &reqwest::Client) {
     let captures =
         match CaptureRepo::list_stale_uploading(pool, UPLOADING_ORPHAN_THRESHOLD_SECS).await {
             Ok(c) => c,
@@ -69,11 +73,6 @@ async fn sweep_orphaned_uploads(pool: &PgPool) {
         "Integrity sweep: checking orphaned uploads"
     );
 
-    let client = reqwest::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .expect("failed to create HTTP client");
     let mut completed = 0u32;
     let mut failed = 0u32;
 
@@ -95,7 +94,7 @@ async fn sweep_orphaned_uploads(pool: &PgPool) {
             }
         };
 
-        match head_check(&client, image_url).await {
+        match head_check(http, image_url).await {
             HeadResult::Exists => {
                 // Image is in R2 but confirmation was lost — complete it
                 match CaptureRepo::confirm_upload(pool, id, None).await {
@@ -153,6 +152,7 @@ async fn sweep_orphaned_uploads(pool: &PgPool) {
 /// HEAD request to R2 determines whether to re-queue for metadata or mark failed.
 async fn sweep_unverified_completions(
     pool: &PgPool,
+    http: &reqwest::Client,
     metadata_tx: &tokio::sync::mpsc::UnboundedSender<String>,
 ) {
     let captures =
@@ -174,11 +174,6 @@ async fn sweep_unverified_completions(
         "Integrity sweep: checking unverified completions"
     );
 
-    let client = reqwest::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .expect("failed to create HTTP client");
     let mut requeued = 0u32;
     let mut failed = 0u32;
 
@@ -198,7 +193,7 @@ async fn sweep_unverified_completions(
             }
         };
 
-        match head_check(&client, image_url).await {
+        match head_check(http, image_url).await {
             HeadResult::Exists => {
                 // Image exists but metadata processing failed — re-queue
                 let _ = metadata_tx.send(id.to_string());

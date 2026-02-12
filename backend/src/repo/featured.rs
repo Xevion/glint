@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
+use anyhow::Context;
 use rand::seq::SliceRandom;
-use sqlx::FromRow;
 
 use crate::db::DbPool;
 use crate::error::AppResult;
 use crate::models::FeaturedPair;
 
-#[derive(Debug, FromRow)]
 struct CandidateRow {
     image_url: String,
     thumbhash: Option<String>,
@@ -27,17 +26,18 @@ impl FeaturedRepo {
     pub async fn random_pairs(db: &DbPool, count: usize) -> AppResult<Vec<FeaturedPair>> {
         // Fetch completed captures from shaders ordered by popularity.
         // Only include scenes that are active and captures that have images.
-        let candidates: Vec<CandidateRow> = sqlx::query_as(
+        let candidates = sqlx::query_as!(
+            CandidateRow,
             r#"
             SELECT DISTINCT ON (sh.id, sc.id)
-                c.image_url,
+                c.image_url AS "image_url!",
                 c.thumbhash,
-                sh.name as shader_name,
-                sh.slug as shader_slug,
-                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = sh.id LIMIT 1) as shader_author,
-                sv.version as shader_version,
-                sc.name as scene_name,
-                sc.id as scene_id
+                sh.name AS "shader_name!",
+                sh.slug AS "shader_slug!",
+                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = sh.id LIMIT 1) AS shader_author,
+                sv.version AS "shader_version!",
+                sc.name AS "scene_name!",
+                sc.id AS "scene_id!"
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             JOIN shaders sh ON sv.shader_id = sh.id
@@ -49,7 +49,8 @@ impl FeaturedRepo {
             "#,
         )
         .fetch_all(db)
-        .await?;
+        .await
+        .context("failed to fetch featured candidates")?;
 
         // Group by scene_id for pairing
         let mut by_scene: HashMap<&str, Vec<&CandidateRow>> = HashMap::new();

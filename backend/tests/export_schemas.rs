@@ -1,5 +1,5 @@
+use glint::models::WorkItem;
 use glint::models::agent::*;
-use glint::repo::work::WorkItem;
 use schemars::schema_for;
 use std::fs;
 use std::path::PathBuf;

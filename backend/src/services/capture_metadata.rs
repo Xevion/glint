@@ -12,11 +12,12 @@ use crate::repo::CaptureRepo;
 /// Run the capture metadata background worker.
 ///
 /// On startup, backfills any completed captures missing thumbhash or file metadata,
-/// then transcodes any remaining PNG captures to AVIF. After backfill, loops on the
+/// then transcodes any remaining PNG captures to WebP. After backfill, loops on the
 /// channel processing new capture IDs as they arrive.
 pub async fn run(
     mut rx: mpsc::UnboundedReceiver<String>,
     pool: PgPool,
+    http: reqwest::Client,
     s3: Option<S3Client>,
     r2_config: R2Config,
 ) {
@@ -30,7 +31,7 @@ pub async fn run(
                     "Metadata worker started, backfilling unprocessed captures"
                 );
                 for id in ids {
-                    process_capture(&pool, &id).await;
+                    process_capture(&pool, &http, &id).await;
                 }
                 info!(count, "Metadata backfill complete");
             } else {
@@ -42,15 +43,15 @@ pub async fn run(
         }
     }
 
-    // Backfill PNG → AVIF transcoding
+    // Backfill PNG → WebP transcoding
     if let Some(ref s3_client) = s3 {
         match CaptureRepo::list_png_capture_ids(&pool).await {
             Ok(ids) if !ids.is_empty() => {
-                info!(count = ids.len(), "Transcoding PNG captures to AVIF");
+                info!(count = ids.len(), "Transcoding PNG captures to WebP");
                 for id in &ids {
-                    transcode_capture(&pool, s3_client, &r2_config, id).await;
+                    transcode_capture(&pool, &http, s3_client, &r2_config, id).await;
                 }
-                info!(count = ids.len(), "PNG→AVIF transcoding backfill complete");
+                info!(count = ids.len(), "PNG→WebP transcoding backfill complete");
             }
             Ok(_) => {
                 info!("No PNG captures to transcode");
@@ -60,12 +61,12 @@ pub async fn run(
             }
         }
     } else {
-        debug!("S3 not configured, skipping PNG→AVIF transcoding");
+        debug!("S3 not configured, skipping PNG→WebP transcoding");
     }
 
     // Process new captures as they arrive
     while let Some(capture_id) = rx.recv().await {
-        process_capture(&pool, &capture_id).await;
+        process_capture(&pool, &http, &capture_id).await;
     }
 
     warn!("Metadata worker channel closed, shutting down");
@@ -77,9 +78,9 @@ const MAX_RETRIES: u32 = 3;
 /// Initial retry delay (doubles each attempt: 10s, 20s, 40s)
 const INITIAL_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(10);
 
-async fn process_capture(pool: &PgPool, capture_id: &str) {
+async fn process_capture(pool: &PgPool, http: &reqwest::Client, capture_id: &str) {
     for attempt in 0..MAX_RETRIES {
-        match try_process_capture(pool, capture_id).await {
+        match try_process_capture(pool, http, capture_id).await {
             Ok(()) => return,
             Err(ProcessError::Permanent(msg)) => {
                 debug!(capture_id, reason = %msg, "Metadata: skipping (permanent)");
@@ -117,7 +118,11 @@ enum ProcessError {
     Transient(anyhow::Error),
 }
 
-async fn try_process_capture(pool: &PgPool, capture_id: &str) -> Result<(), ProcessError> {
+async fn try_process_capture(
+    pool: &PgPool,
+    http: &reqwest::Client,
+    capture_id: &str,
+) -> Result<(), ProcessError> {
     let capture = match CaptureRepo::find_by_id(pool, capture_id).await {
         Ok(Some(c)) => c,
         Ok(None) => return Err(ProcessError::Permanent("capture not found".into())),
@@ -138,7 +143,7 @@ async fn try_process_capture(pool: &PgPool, capture_id: &str) -> Result<(), Proc
 
     if needs_thumbhash {
         // Full GET: generate thumbhash + extract file metadata
-        let (hash_b64, file_size, content_type) = fetch_and_process(&image_url)
+        let (hash_b64, file_size, content_type) = fetch_and_process(http, &image_url)
             .await
             .map_err(ProcessError::Transient)?;
 
@@ -155,7 +160,7 @@ async fn try_process_capture(pool: &PgPool, capture_id: &str) -> Result<(), Proc
         );
     } else if needs_file_metadata {
         // HEAD only: just extract file metadata (thumbhash already exists)
-        let (file_size, content_type) = fetch_file_metadata(&image_url)
+        let (file_size, content_type) = fetch_file_metadata(http, &image_url)
             .await
             .map_err(ProcessError::Transient)?;
 
@@ -173,8 +178,14 @@ async fn try_process_capture(pool: &PgPool, capture_id: &str) -> Result<(), Proc
     Ok(())
 }
 
-/// Transcode a single PNG capture to AVIF and update R2 + DB.
-async fn transcode_capture(pool: &PgPool, s3: &S3Client, r2_config: &R2Config, capture_id: &str) {
+/// Transcode a single PNG capture to WebP and update R2 + DB.
+async fn transcode_capture(
+    pool: &PgPool,
+    http: &reqwest::Client,
+    s3: &S3Client,
+    r2_config: &R2Config,
+    capture_id: &str,
+) {
     let capture = match CaptureRepo::find_by_id(pool, capture_id).await {
         Ok(Some(c)) => c,
         Ok(None) => {
@@ -196,7 +207,7 @@ async fn transcode_capture(pool: &PgPool, s3: &S3Client, r2_config: &R2Config, c
     };
 
     // Download the PNG
-    let png_bytes = match reqwest::get(&image_url).await {
+    let png_bytes = match http.get(&image_url).send().await {
         Ok(resp) => match resp.bytes().await {
             Ok(b) => b,
             Err(e) => {
@@ -297,8 +308,11 @@ fn encode_to_webp(input: &[u8]) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Full GET: download image, generate thumbhash, extract file size and content type.
-async fn fetch_and_process(image_url: &str) -> anyhow::Result<(String, i64, String)> {
-    let response = reqwest::get(image_url).await?;
+async fn fetch_and_process(
+    http: &reqwest::Client,
+    image_url: &str,
+) -> anyhow::Result<(String, i64, String)> {
+    let response = http.get(image_url).send().await?;
     let content_type = response
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
@@ -326,12 +340,11 @@ async fn fetch_and_process(image_url: &str) -> anyhow::Result<(String, i64, Stri
 /// HEAD request: extract file size and content type without downloading the image.
 /// Returns `None` for file_size when Content-Length header is absent, avoiding
 /// permanently marking captures as 0 bytes.
-async fn fetch_file_metadata(image_url: &str) -> anyhow::Result<(Option<i64>, String)> {
-    let client = reqwest::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .timeout(std::time::Duration::from_secs(30))
-        .build()?;
-    let response = client.head(image_url).send().await?;
+async fn fetch_file_metadata(
+    http: &reqwest::Client,
+    image_url: &str,
+) -> anyhow::Result<(Option<i64>, String)> {
+    let response = http.head(image_url).send().await?;
 
     let content_type = response
         .headers()

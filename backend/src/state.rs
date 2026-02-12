@@ -1,4 +1,3 @@
-use std::ops::Deref;
 use std::sync::Arc;
 
 use aws_sdk_s3::Client as S3Client;
@@ -31,6 +30,7 @@ pub struct AppState {
 pub struct AppStateInner {
     pub db: DbPool,
     pub config: Config,
+    pub http: reqwest::Client,
     pub s3: Option<S3Client>,
     pub oauth: Option<OAuthClient>,
     pub modrinth: ModrinthClient,
@@ -45,6 +45,7 @@ impl AppState {
     pub fn new(
         db: DbPool,
         config: Config,
+        http: reqwest::Client,
         s3: Option<S3Client>,
         oauth: Option<OAuthClient>,
         modrinth: ModrinthClient,
@@ -57,6 +58,7 @@ impl AppState {
             inner: Arc::new(AppStateInner {
                 db,
                 config,
+                http,
                 s3,
                 oauth,
                 modrinth,
@@ -74,6 +76,10 @@ impl AppState {
 
     pub fn config(&self) -> &Config {
         &self.inner.config
+    }
+
+    pub fn http(&self) -> &reqwest::Client {
+        &self.inner.http
     }
 
     pub fn s3(&self) -> Option<&S3Client> {
@@ -130,13 +136,5 @@ impl AppState {
 
     pub async fn begin_tx(&self) -> AppResult<DbTransaction<'_>> {
         Ok(self.inner.db.begin().await?)
-    }
-}
-
-impl Deref for AppState {
-    type Target = AppStateInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
     }
 }

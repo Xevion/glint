@@ -6,6 +6,25 @@ use serde::{Deserialize, Deserializer};
 
 use crate::middleware::rate_limit::RateLimitConfig;
 
+/// Accept a string or an integer, coercing to `Option<String>`.
+///
+/// Figment infers types from env var values — pure-digit strings like Discord
+/// snowflake IDs (`1468509036625531012`) become u64 instead of String.
+fn deserialize_optional_string_or_int<'de, D: Deserializer<'de>>(
+    de: D,
+) -> Result<Option<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrInt {
+        Str(String),
+        Int(u64),
+    }
+    Ok(Option::<StringOrInt>::deserialize(de)?.map(|v| match v {
+        StringOrInt::Str(s) => s,
+        StringOrInt::Int(n) => n.to_string(),
+    }))
+}
+
 /// Accept either a sequence `["a", "b"]` or a comma-separated string `"a,b"`.
 fn deserialize_string_or_seq<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<String>, D::Error> {
     #[derive(Deserialize)]
@@ -141,7 +160,8 @@ fn default_cors_origins() -> Vec<String> {
 /// Discord OAuth configuration
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct DiscordConfig {
-    /// Discord application client ID
+    /// Discord application client ID (snowflake — always numeric)
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
     pub client_id: Option<String>,
 
     /// Discord application client secret
@@ -199,11 +219,25 @@ impl PostHogConfig {
     }
 }
 
+/// Known nested config prefixes. When a GLINT_ env var starts with one of
+/// these, the prefix is replaced with a dotted path so Figment maps it to
+/// the correct nested struct field (e.g. `r2_account_id` → `r2.account_id`).
+const NESTED_PREFIXES: &[&str] = &["r2_", "discord_", "platform_", "posthog_", "rate_limit_"];
+
 impl Config {
     pub fn load() -> anyhow::Result<Self> {
         let mut config: Config = Figment::new()
             .merge(Toml::file("config.toml"))
-            .merge(Env::prefixed("GLINT_"))
+            .merge(Env::prefixed("GLINT_").map(|key| {
+                let key_lower = key.as_str().to_ascii_lowercase();
+                for prefix in NESTED_PREFIXES {
+                    if let Some(rest) = key_lower.strip_prefix(prefix) {
+                        let section = prefix.trim_end_matches('_');
+                        return format!("{section}.{rest}").into();
+                    }
+                }
+                key_lower.into()
+            }))
             // DATABASE_URL is commonly set by tools like docker-compose, so read it directly
             .merge(
                 Env::raw()
@@ -219,36 +253,6 @@ impl Config {
         {
             config.cors_origins.push(origin);
         }
-
-        // Load R2 config from env vars directly (secrets - avoid logging)
-        config.r2 = R2Config {
-            account_id: std::env::var("GLINT_R2_ACCOUNT_ID").ok(),
-            bucket: std::env::var("GLINT_R2_BUCKET").ok(),
-            access_key_id: std::env::var("GLINT_R2_ACCESS_KEY_ID").ok(),
-            secret_access_key: std::env::var("GLINT_R2_SECRET_ACCESS_KEY").ok(),
-            public_url: std::env::var("GLINT_R2_PUBLIC_URL").ok(),
-        };
-
-        // Load Discord config from env vars directly (secrets - avoid logging)
-        config.discord = DiscordConfig {
-            client_id: std::env::var("GLINT_DISCORD_CLIENT_ID").ok(),
-            client_secret: std::env::var("GLINT_DISCORD_CLIENT_SECRET").ok(),
-            redirect_uri: std::env::var("GLINT_DISCORD_REDIRECT_URI").ok(),
-        };
-
-        // Load platform config from env vars directly (secrets - avoid logging)
-        if let Ok(key) = std::env::var("GLINT_CURSEFORGE_API_KEY") {
-            config.platform.curseforge_api_key = Some(key);
-        }
-        if let Ok(ua) = std::env::var("GLINT_MODRINTH_USER_AGENT") {
-            config.platform.modrinth_user_agent = ua;
-        }
-
-        // Load PostHog config from env vars directly (secrets - avoid logging)
-        config.posthog = PostHogConfig {
-            api_key: std::env::var("GLINT_POSTHOG_API_KEY").ok(),
-            host: std::env::var("GLINT_POSTHOG_HOST").unwrap_or_else(|_| default_posthog_host()),
-        };
 
         Ok(config)
     }

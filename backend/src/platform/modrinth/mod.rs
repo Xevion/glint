@@ -117,7 +117,13 @@ impl ModrinthClient {
     /// Fetch project metadata and authors as platform-agnostic types
     pub async fn fetch_shader_data(&self, id_or_slug: &str) -> PlatformResult<ProjectData> {
         let project = self.get_project(id_or_slug).await?;
-        let members = self.get_team_members(&project.id).await.unwrap_or_default();
+        let members = match self.get_team_members(&project.id).await {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::warn!(project_id = %project.id, error = %e, "Failed to fetch team members, proceeding without authors");
+                Vec::new()
+            }
+        };
 
         Ok(ProjectData {
             metadata: PlatformMetadata {

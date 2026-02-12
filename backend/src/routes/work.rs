@@ -4,8 +4,8 @@ use tracing::{debug, instrument};
 
 use crate::auth::AgentUser;
 use crate::error::AppResult;
+use crate::models::WorkItem;
 use crate::repo::WorkRepo;
-use crate::repo::work::WorkItem;
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]

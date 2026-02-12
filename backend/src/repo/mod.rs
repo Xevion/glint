@@ -19,7 +19,7 @@ pub mod world;
 pub mod world_version;
 
 pub use background::BackgroundRepo;
-pub use capture::{CaptureRepo, StorageBucket, StorageStats, ThumbnailInfo};
+pub use capture::{CaptureRepo, ThumbnailInfo};
 pub use capture_health::CaptureHealthRepo;
 pub use capture_run::CaptureRunRepo;
 pub use device_code::DeviceCodeRepo;
