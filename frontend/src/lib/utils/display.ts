@@ -55,14 +55,14 @@ export function formatDate(date: string | null | undefined): string {
 /**
  * Construct Modrinth shader URL from ID.
  */
-export function getModrinthUrl(modrinthId: string | null): string | null {
+export function getModrinthUrl(modrinthId: string | null | undefined): string | null {
 	return modrinthId ? `https://modrinth.com/shader/${modrinthId}` : null;
 }
 
 /**
  * Construct CurseForge shader URL from ID.
  */
-export function getCurseforgeUrl(curseforgeId: string | null): string | null {
+export function getCurseforgeUrl(curseforgeId: string | null | undefined): string | null {
 	return curseforgeId ? `https://www.curseforge.com/minecraft/shaders/${curseforgeId}` : null;
 }
 

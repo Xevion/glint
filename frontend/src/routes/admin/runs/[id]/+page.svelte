@@ -18,7 +18,7 @@ let items: CaptureRunItemWithContext[] = $derived(data.items);
 let refreshing = $state(false);
 let expandedItem = $state<string | null>(null);
 
-function formatMs(ms: number | null): string {
+function formatMs(ms: number | null | undefined): string {
 	if (ms == null) return '\u2014';
 	if (ms < 1000) return `${ms}ms`;
 	return `${(ms / 1000).toFixed(1)}s`;

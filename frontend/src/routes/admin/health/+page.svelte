@@ -162,7 +162,7 @@ let selectedTargets = $derived.by(() => {
 	return targetsByCell.get(`${selectedCell.shaderSlug}:${selectedCell.sceneSlug}`) ?? [];
 });
 
-function formatTime(iso: string | null): string {
+function formatTime(iso: string | null | undefined): string {
 	if (!iso) return 'Never';
 	const d = new Date(iso);
 	return d.toLocaleDateString('en-US', {

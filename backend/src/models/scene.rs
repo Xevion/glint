@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use sqlx::FromRow;
 use ts_rs::TS;
 use validator::{Validate, ValidationError};
@@ -9,8 +10,9 @@ use super::taxonomy::Tag;
 use super::world::World;
 use crate::id::{SceneId, SceneVersionId, WorldId};
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct Scene {
     pub id: SceneId,
     pub name: String,
@@ -25,8 +27,9 @@ pub struct Scene {
 }
 
 /// A specific revision of a Scene's config (position, camera, weather, etc.)
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct SceneVersion {
     pub id: SceneVersionId,
     pub scene_id: SceneId,
@@ -53,8 +56,9 @@ pub struct SceneWithVersion {
     pub version: SceneVersion,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct SceneListItem {
     #[serde(flatten)]
     pub scene: Scene,
@@ -65,8 +69,9 @@ pub struct SceneListItem {
     pub capture_count: i64,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct SceneWithCaptures {
     #[serde(flatten)]
     pub scene: Scene,
@@ -75,8 +80,9 @@ pub struct SceneWithCaptures {
     pub captures: Vec<CaptureWithContext>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct SceneWithWorld {
     #[serde(flatten)]
     pub scene: Scene,

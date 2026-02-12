@@ -44,7 +44,7 @@ export function formatDatetime(date: Date): string {
  */
 export function formatDuration(run: {
 	started_at: string;
-	completed_at: string | null;
+	completed_at?: string | null;
 }): string {
 	if (!run.completed_at) return 'In progress';
 	const start = new Date(run.started_at).getTime();

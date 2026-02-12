@@ -7,7 +7,7 @@ import { fade, fly } from 'svelte/transition';
 
 interface CaptureItem {
 	id: string;
-	image_url: string | null;
+	image_url?: string | null;
 	thumbhash?: string | null;
 	profile?: string | null;
 	shader_version?: string | null;

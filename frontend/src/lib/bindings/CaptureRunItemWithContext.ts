@@ -8,4 +8,4 @@ import type { ShaderVersionId } from "./ShaderVersionId";
 /**
  * Capture run item with denormalized shader/scene info for API responses
  */
-export type CaptureRunItemWithContext = { id: string, run_id: CaptureRunId, shader_version_id: ShaderVersionId, scene_id: SceneId, profile: string | null, status: CaptureRunItemStatus, capture_id: CaptureId | null, error_message: string | null, error_log: string | null, duration_ms: number | null, started_at: string | null, completed_at: string | null, shader_name: string, shader_slug: string, shader_version: string, scene_name: string, };
+export type CaptureRunItemWithContext = { id: string, run_id: CaptureRunId, shader_version_id: ShaderVersionId, scene_id: SceneId, profile?: string, status: CaptureRunItemStatus, capture_id?: CaptureId, error_message?: string, error_log?: string, duration_ms?: number, started_at?: string, completed_at?: string, shader_name: string, shader_slug: string, shader_version: string, scene_name: string, };

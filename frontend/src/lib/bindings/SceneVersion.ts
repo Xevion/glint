@@ -5,4 +5,4 @@ import type { SceneVersionId } from "./SceneVersionId";
 /**
  * A specific revision of a Scene's config (position, camera, weather, etc.)
  */
-export type SceneVersion = { id: SceneVersionId, scene_id: SceneId, x: number, y: number, z: number, pitch: number, yaw: number, time_of_day_ticks: number, weather: string, weather_intensity: number, moon_phase: number | null, biome: string | null, created_at: string, };
+export type SceneVersion = { id: SceneVersionId, scene_id: SceneId, x: number, y: number, z: number, pitch: number, yaw: number, time_of_day_ticks: number, weather: string, weather_intensity: number, moon_phase?: number, biome?: string, created_at: string, };

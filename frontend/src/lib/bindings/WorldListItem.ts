@@ -6,4 +6,4 @@ import type { WorldVersion } from "./WorldVersion";
 /**
  * World summary for list endpoints with aggregate counts
  */
-export type WorldListItem = { latest_version: WorldVersion | null, scene_count: number, version_count: number, capture_count: number, preview: WorldPreviewCapture | null, id: WorldId, slug: string, name: string, description: string | null, minecraft_version: string, created_at: string, updated_at: string, };
+export type WorldListItem = { latest_version?: WorldVersion, scene_count: number, version_count: number, capture_count: number, preview?: WorldPreviewCapture, id: WorldId, slug: string, name: string, description?: string, minecraft_version: string, created_at: string, updated_at: string, };

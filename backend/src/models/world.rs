@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use sqlx::FromRow;
 use ts_rs::TS;
 
@@ -7,8 +8,9 @@ use super::scene::Scene;
 use crate::id::{WorldId, WorldVersionId};
 
 /// Downloadable world files containing scenes
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct World {
     pub id: WorldId,
     pub slug: String,
@@ -22,8 +24,9 @@ pub struct World {
 }
 
 /// A specific revision of a World's save file
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct WorldVersion {
     pub id: WorldVersionId,
     pub world_id: WorldId,
@@ -53,16 +56,18 @@ pub struct PendingUpload {
 }
 
 /// Preview thumbnail for a world (from its first available capture)
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct WorldPreviewCapture {
     pub image_url: Option<String>,
     pub thumbhash: Option<String>,
 }
 
 /// World summary for list endpoints with aggregate counts
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct WorldListItem {
     #[serde(flatten)]
     pub world: World,
@@ -74,8 +79,9 @@ pub struct WorldListItem {
 }
 
 /// World with its associated scenes and latest version
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct WorldWithDetails {
     #[serde(flatten)]
     pub world: World,

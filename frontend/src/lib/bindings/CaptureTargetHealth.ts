@@ -8,4 +8,4 @@ import type { TargetHealth } from "./TargetHealth";
 /**
  * A single capture target with its health status
  */
-export type CaptureTargetHealth = { shader_id: ShaderId, shader_name: string, shader_slug: string, shader_version_id: ShaderVersionId, version: string, scene_id: SceneId, scene_name: string, scene_slug: string, profile: string | null, status: TargetHealth, stale_reason: StaleReason | null, last_capture_at: string | null, failure_count: number, };
+export type CaptureTargetHealth = { shader_id: ShaderId, shader_name: string, shader_slug: string, shader_version_id: ShaderVersionId, version: string, scene_id: SceneId, scene_name: string, scene_slug: string, profile?: string, status: TargetHealth, stale_reason?: StaleReason, last_capture_at?: string, failure_count: number, };

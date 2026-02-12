@@ -2,4 +2,4 @@
 import type { CaptureRunId } from "./CaptureRunId";
 import type { CaptureRunStatus } from "./CaptureRunStatus";
 
-export type CaptureRun = { id: CaptureRunId, agent_id: string | null, started_at: string, completed_at: string | null, status: CaptureRunStatus, total_items: number, completed_items: number, failed_items: number, skipped_items: number, metadata_json: Record<string, unknown> | null, };
+export type CaptureRun = { id: CaptureRunId, agent_id?: string, started_at: string, completed_at?: string, status: CaptureRunStatus, total_items: number, completed_items: number, failed_items: number, skipped_items: number, metadata_json?: Record<string, unknown>, };

@@ -3,8 +3,8 @@ import type { Shader } from '$lib/bindings';
 /** Display-only shader info for comparison overlays */
 export type ShaderDisplayInfo = Pick<Shader, 'name'> & {
 	version: string;
-	author: string | null;
-	profile: string | null;
+	author?: string | null;
+	profile?: string | null;
 };
 
 /** Comparison display modes */

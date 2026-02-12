@@ -4,4 +4,4 @@ import type { ShaderId } from "./ShaderId";
 /**
  * Shader author from upstream platform
  */
-export type ShaderAuthor = { id: string, shader_id: ShaderId, name: string, url: string | null, platform: string, };
+export type ShaderAuthor = { id: string, shader_id: ShaderId, name: string, url?: string, platform: string, };

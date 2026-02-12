@@ -3,4 +3,4 @@
 /**
  * Shader technical feature (volumetric, PBR, ray tracing, etc.)
  */
-export type Feature = { id: number, slug: string, name: string, description: string | null, };
+export type Feature = { id: number, slug: string, name: string, description?: string, };

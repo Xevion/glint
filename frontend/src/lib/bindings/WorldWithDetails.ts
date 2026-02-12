@@ -6,4 +6,4 @@ import type { WorldVersion } from "./WorldVersion";
 /**
  * World with its associated scenes and latest version
  */
-export type WorldWithDetails = { scenes: Array<Scene>, latest_version: WorldVersion | null, id: WorldId, slug: string, name: string, description: string | null, minecraft_version: string, created_at: string, updated_at: string, };
+export type WorldWithDetails = { scenes: Array<Scene>, latest_version?: WorldVersion, id: WorldId, slug: string, name: string, description?: string, minecraft_version: string, created_at: string, updated_at: string, };

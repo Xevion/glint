@@ -4,4 +4,4 @@ import type { Role } from "./Role";
 /**
  * Discord OAuth user
  */
-export type User = { id: number, discord_id: string, discord_username: string, discord_avatar: string | null, role: Role, created_at: string, updated_at: string, };
+export type User = { id: number, discord_id: string, discord_username: string, discord_avatar?: string, role: Role, created_at: string, updated_at: string, };

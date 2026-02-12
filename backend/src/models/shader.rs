@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use sqlx::FromRow;
 use sqlx::types::Json;
 use ts_rs::TS;
@@ -9,8 +10,9 @@ use super::taxonomy::{Category, Feature};
 use crate::id::{ShaderId, ShaderVersionId};
 
 /// Shader pack identity (not version-specific)
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct Shader {
     pub id: ShaderId,
     pub name: String,
@@ -23,9 +25,9 @@ pub struct Shader {
     pub source_url: Option<String>,
     pub license_id: Option<String>,
     pub upstream_downloads: Option<i64>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub upstream_updated_at: Option<DateTime<Utc>>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub last_synced_at: Option<DateTime<Utc>>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
@@ -35,8 +37,9 @@ pub struct Shader {
 }
 
 /// Specific release of a shader pack
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct ShaderVersion {
     pub id: ShaderVersionId,
     pub shader_id: ShaderId,
@@ -46,13 +49,13 @@ pub struct ShaderVersion {
     pub download_url: Option<String>,
     pub file_hash: Option<String>,
     pub file_size: Option<i64>,
-    #[ts(type = "Array<string> | null")]
+    #[ts(optional, type = "Array<string>")]
     pub game_versions: Option<Json<Vec<String>>>,
     pub release_channel: Option<String>,
     /// Array of profile names, discovered after first capture
-    #[ts(type = "Array<string> | null")]
+    #[ts(optional, type = "Array<string>")]
     pub supported_profiles: Option<Json<Vec<String>>>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub upstream_published_at: Option<DateTime<Utc>>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
@@ -60,8 +63,9 @@ pub struct ShaderVersion {
     pub last_capture_error: Option<String>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct ShaderListItem {
     #[serde(flatten)]
     pub shader: Shader,
@@ -69,7 +73,7 @@ pub struct ShaderListItem {
     pub categories: Vec<Category>,
     pub features: Vec<Feature>,
     pub latest_version: Option<String>,
-    #[ts(type = "Array<string> | null")]
+    #[ts(type = "Array<string>")]
     pub game_versions: Option<Json<Vec<String>>>,
     pub image_url: Option<String>,
     pub thumbhash: Option<String>,
@@ -104,8 +108,9 @@ pub struct ShaderWithCaptures {
 /// A shader that is currently trending (high view count in a recent time window).
 /// The `view_count` from the flattened `Shader` represents the all-time total;
 /// `trending_views` is the count within the requested time window.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct TrendingShader {
     #[serde(flatten)]
     pub shader: Shader,
@@ -115,8 +120,9 @@ pub struct TrendingShader {
 }
 
 /// Shader author from upstream platform
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct ShaderAuthor {
     pub id: String,
     pub shader_id: ShaderId,
@@ -133,8 +139,9 @@ pub struct ShaderAdopted {
     pub slug: String,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct ShaderSearchResult {
     pub platform: String,
     pub platform_id: String,
@@ -147,14 +154,15 @@ pub struct ShaderSearchResult {
     pub categories: Vec<String>,
     pub platform_url: String,
     /// When the shader was last updated on its platform
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub updated_at: Option<DateTime<Utc>>,
     /// Present when this shader has already been adopted into Glint
     pub adopted: Option<ShaderAdopted>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct ShaderSearchResponse {
     pub results: Vec<ShaderSearchResult>,
     pub total_modrinth: u32,

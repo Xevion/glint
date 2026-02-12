@@ -3,4 +3,4 @@ import type { SceneId } from "./SceneId";
 import type { SceneVersion } from "./SceneVersion";
 import type { WorldId } from "./WorldId";
 
-export type SceneWithWorld = { version: SceneVersion, world_name: string | null, world_slug: string | null, image_url: string | null, thumbhash: string | null, capture_count: number, id: SceneId, name: string, slug: string, description: string | null, world_id: WorldId, dimension: string, parent_scene_id: string | null, active: boolean, created_at: string, };
+export type SceneWithWorld = { version: SceneVersion, world_name?: string, world_slug?: string, image_url?: string, thumbhash?: string, capture_count: number, id: SceneId, name: string, slug: string, description?: string, world_id: WorldId, dimension: string, parent_scene_id?: string, active: boolean, created_at: string, };

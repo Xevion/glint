@@ -5,4 +5,4 @@ import type { WorldVersionId } from "./WorldVersionId";
 /**
  * A specific revision of a World's save file
  */
-export type WorldVersion = { id: WorldVersionId, world_id: WorldId, file_url: string | null, file_hash: string | null, size_bytes: number | null, created_at: string, };
+export type WorldVersion = { id: WorldVersionId, world_id: WorldId, file_url?: string, file_hash?: string, size_bytes?: number, created_at: string, };

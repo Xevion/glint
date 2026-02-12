@@ -5,4 +5,4 @@ import type { ThemeMode } from "./ThemeMode";
 /**
  * A page background image stored in R2.
  */
-export type Background = { id: BackgroundId, image_url: string, image_path: string, thumbhash: string | null, theme_mode: ThemeMode, enabled: boolean, sort_order: number, original_filename: string | null, width: number | null, height: number | null, file_size_bytes: number | null, content_type: string | null, created_at: string, updated_at: string, };
+export type Background = { id: BackgroundId, image_url: string, image_path: string, thumbhash?: string, theme_mode: ThemeMode, enabled: boolean, sort_order: number, original_filename?: string, width?: number, height?: number, file_size_bytes?: number, content_type?: string, created_at: string, updated_at: string, };

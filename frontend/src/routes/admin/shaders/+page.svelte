@@ -95,7 +95,7 @@ const PAGE_SIZE = 20;
 let discoverLoaded = $state(false);
 let discoverResults = $state<ShaderSearchResult[]>([]);
 let totalModrinth = $state(0);
-let totalCurseforge = $state<number | null>(null);
+let totalCurseforge = $state<number | undefined>(undefined);
 let discoverLoading = $state(false);
 let discoverLoadingMore = $state(false);
 let discoverError = $state<string | null>(null);
@@ -423,7 +423,7 @@ function handleShaderAdopted(shader: Shader) {
 				<!-- Result count -->
 				{#if discoverLoaded && !discoverLoading && discoverResults.length > 0}
 					<p class="text-xs text-foreground">
-						{totalModrinth} Modrinth{totalCurseforge !== null
+						{totalModrinth} Modrinth{totalCurseforge != null
 							? ` · ${totalCurseforge} CurseForge`
 							: ''}
 						{#if hideAdopted && filteredResults.length < discoverResults.length}

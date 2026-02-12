@@ -5,4 +5,4 @@ import type { SceneVersion } from "./SceneVersion";
 import type { World } from "./World";
 import type { WorldId } from "./WorldId";
 
-export type SceneWithCaptures = { version: SceneVersion, world: World | null, captures: Array<CaptureWithContext>, id: SceneId, name: string, slug: string, description: string | null, world_id: WorldId, dimension: string, parent_scene_id: string | null, active: boolean, created_at: string, };
+export type SceneWithCaptures = { version: SceneVersion, world?: World, captures: Array<CaptureWithContext>, id: SceneId, name: string, slug: string, description?: string, world_id: WorldId, dimension: string, parent_scene_id?: string, active: boolean, created_at: string, };

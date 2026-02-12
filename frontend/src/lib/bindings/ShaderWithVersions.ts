@@ -2,4 +2,4 @@
 import type { ShaderId } from "./ShaderId";
 import type { ShaderVersion } from "./ShaderVersion";
 
-export type ShaderWithVersions = { versions: Array<ShaderVersion>, id: ShaderId, name: string, slug: string, description: string | null, modrinth_id: string | null, curseforge_id: string | null, website_url: string | null, icon_url: string | null, source_url: string | null, license_id: string | null, upstream_downloads: number | null, upstream_updated_at: string | null, last_synced_at: string | null, created_at: string, updated_at: string, view_count: number, };
+export type ShaderWithVersions = { versions: Array<ShaderVersion>, id: ShaderId, name: string, slug: string, description?: string, modrinth_id?: string, curseforge_id?: string, website_url?: string, icon_url?: string, source_url?: string, license_id?: string, upstream_downloads?: number, upstream_updated_at?: string, last_synced_at?: string, created_at: string, updated_at: string, view_count: number, };

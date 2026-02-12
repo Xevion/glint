@@ -8,4 +8,4 @@ import type { SceneId } from "./SceneId";
 /**
  * Capture with denormalized shader/version info for API responses
  */
-export type CaptureWithContext = { id: CaptureId, scene_id: SceneId, shader_slug: string, shader_name: string, shader_version: string, profile: string | null, image_path: string | null, image_url: string | null, thumbhash: string | null, captured_at: string | null, resolution_width: number | null, resolution_height: number | null, file_size_bytes: number | null, run_id: CaptureRunId | null, run_status: CaptureRunStatus | null, shader_author: string | null, scene_name: string | null, scene_slug: string | null, freshness: CaptureFreshness, };
+export type CaptureWithContext = { id: CaptureId, scene_id: SceneId, shader_slug: string, shader_name: string, shader_version: string, profile?: string, image_path?: string, image_url?: string, thumbhash?: string, captured_at?: string, resolution_width?: number, resolution_height?: number, file_size_bytes?: number, run_id?: CaptureRunId, run_status?: CaptureRunStatus, shader_author?: string, scene_name?: string, scene_slug?: string, freshness: CaptureFreshness, };

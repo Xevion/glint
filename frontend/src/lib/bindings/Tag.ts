@@ -3,4 +3,4 @@
 /**
  * Scene tag (indoor, sunset, water, etc.)
  */
-export type Tag = { id: number, slug: string, name: string, description: string | null, };
+export type Tag = { id: number, slug: string, name: string, description?: string, };

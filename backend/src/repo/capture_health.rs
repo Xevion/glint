@@ -2,6 +2,7 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_with::skip_serializing_none;
 use sqlx::Executor;
 use tracing::{debug, instrument};
 use ts_rs::TS;
@@ -58,8 +59,9 @@ impl sqlx::Type<sqlx::Postgres> for TargetHealth {
 }
 
 /// A single capture target with its health status
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, JsonSchema, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct CaptureTargetHealth {
     pub shader_id: ShaderId,
     pub shader_name: String,
@@ -72,7 +74,7 @@ pub struct CaptureTargetHealth {
     pub profile: Option<String>,
     pub status: TargetHealth,
     pub stale_reason: Option<StaleReason>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub last_capture_at: Option<DateTime<Utc>>,
     pub failure_count: i32,
 }

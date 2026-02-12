@@ -4,4 +4,4 @@ import type { WorldId } from "./WorldId";
 /**
  * Downloadable world files containing scenes
  */
-export type World = { id: WorldId, slug: string, name: string, description: string | null, minecraft_version: string, created_at: string, updated_at: string, };
+export type World = { id: WorldId, slug: string, name: string, description?: string, minecraft_version: string, created_at: string, updated_at: string, };

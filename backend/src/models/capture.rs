@@ -3,6 +3,7 @@ use std::fmt;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use sqlx::FromRow;
 use ts_rs::TS;
 
@@ -178,8 +179,9 @@ impl sqlx::Encode<'_, sqlx::Postgres> for CaptureRunItemStatus {
     }
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct Capture {
     pub id: CaptureId,
     pub shader_version_id: ShaderVersionId,
@@ -198,7 +200,7 @@ pub struct Capture {
     pub gpu_model: Option<String>,
     pub resolution_width: Option<i32>,
     pub resolution_height: Option<i32>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub captured_at: Option<DateTime<Utc>>,
     pub status: CaptureStatus,
     pub error_message: Option<String>,
@@ -213,26 +215,28 @@ pub struct Capture {
     pub updated_at: DateTime<Utc>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct CaptureRun {
     pub id: CaptureRunId,
     pub agent_id: Option<String>,
     #[ts(type = "string")]
     pub started_at: DateTime<Utc>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub completed_at: Option<DateTime<Utc>>,
     pub status: CaptureRunStatus,
     pub total_items: i32,
     pub completed_items: i32,
     pub failed_items: i32,
     pub skipped_items: i32,
-    #[ts(type = "Record<string, unknown> | null")]
+    #[ts(optional, type = "Record<string, unknown>")]
     pub metadata_json: Option<serde_json::Value>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct CaptureRunItem {
     pub id: String,
     pub run_id: CaptureRunId,
@@ -244,15 +248,16 @@ pub struct CaptureRunItem {
     pub error_message: Option<String>,
     pub error_log: Option<String>,
     pub duration_ms: Option<i32>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub started_at: Option<DateTime<Utc>>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub completed_at: Option<DateTime<Utc>>,
 }
 
 /// Capture run item with denormalized shader/scene info for API responses
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct CaptureRunItemWithContext {
     pub id: String,
     pub run_id: CaptureRunId,
@@ -264,9 +269,9 @@ pub struct CaptureRunItemWithContext {
     pub error_message: Option<String>,
     pub error_log: Option<String>,
     pub duration_ms: Option<i32>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub started_at: Option<DateTime<Utc>>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub completed_at: Option<DateTime<Utc>>,
     // Denormalized context
     pub shader_name: String,
@@ -307,8 +312,9 @@ impl sqlx::Type<sqlx::Postgres> for CaptureFreshness {
 }
 
 /// Capture with denormalized shader/version info for API responses
+#[skip_serializing_none]
 #[derive(Debug, Serialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct CaptureWithContext {
     pub id: CaptureId,
     pub scene_id: SceneId,
@@ -319,7 +325,7 @@ pub struct CaptureWithContext {
     pub image_path: Option<String>,
     pub image_url: Option<String>,
     pub thumbhash: Option<String>,
-    #[ts(type = "string | null")]
+    #[ts(as = "Option<String>")]
     pub captured_at: Option<DateTime<Utc>>,
     pub resolution_width: Option<i32>,
     pub resolution_height: Option<i32>,
@@ -338,8 +344,9 @@ pub struct CaptureWithContext {
 
 /// Full capture details for admin detail view, including technical metadata
 /// and related captures for cross-referencing.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct CaptureDetail {
     #[serde(flatten)]
     pub context: CaptureWithContext,

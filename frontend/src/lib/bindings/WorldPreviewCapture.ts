@@ -3,4 +3,4 @@
 /**
  * Preview thumbnail for a world (from its first available capture)
  */
-export type WorldPreviewCapture = { image_url: string | null, thumbhash: string | null, };
+export type WorldPreviewCapture = { image_url?: string, thumbhash?: string, };

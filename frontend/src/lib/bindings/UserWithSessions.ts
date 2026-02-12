@@ -2,4 +2,4 @@
 import type { Role } from "./Role";
 import type { SessionInfo } from "./SessionInfo";
 
-export type UserWithSessions = { sessions: Array<SessionInfo>, id: number, discord_id: string, discord_username: string, discord_avatar: string | null, role: Role, created_at: string, updated_at: string, };
+export type UserWithSessions = { sessions: Array<SessionInfo>, id: number, discord_id: string, discord_username: string, discord_avatar?: string, role: Role, created_at: string, updated_at: string, };

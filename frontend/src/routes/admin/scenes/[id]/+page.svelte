@@ -203,7 +203,7 @@ async function handleReactivate() {
 				{scene.version.biome}
 			</AdminDetailField>
 		{/if}
-		{#if scene.version.moon_phase !== null}
+		{#if scene.version.moon_phase != null}
 			<AdminDetailField label="Moon Phase">
 				{scene.version.moon_phase}
 			</AdminDetailField>

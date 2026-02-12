@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use sqlx::FromRow;
 use ts_rs::TS;
 
@@ -53,8 +54,9 @@ pub struct DeviceTokenResponse {
 }
 
 /// Error response from POST /api/device/token (RFC 8628 error codes)
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct DeviceTokenError {
     pub error: String,
     pub error_description: Option<String>,

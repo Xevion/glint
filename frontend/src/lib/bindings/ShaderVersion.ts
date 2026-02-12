@@ -5,8 +5,8 @@ import type { ShaderVersionId } from "./ShaderVersionId";
 /**
  * Specific release of a shader pack
  */
-export type ShaderVersion = { id: ShaderVersionId, shader_id: ShaderId, version: string, modrinth_version_id: string | null, curseforge_file_id: number | null, download_url: string | null, file_hash: string | null, file_size: number | null, game_versions: Array<string> | null, release_channel: string | null, 
+export type ShaderVersion = { id: ShaderVersionId, shader_id: ShaderId, version: string, modrinth_version_id?: string, curseforge_file_id?: number, download_url?: string, file_hash?: string, file_size?: number, game_versions?: Array<string>, release_channel?: string, 
 /**
  * Array of profile names, discovered after first capture
  */
-supported_profiles: Array<string> | null, upstream_published_at: string | null, created_at: string, capture_failure_count: number, last_capture_error: string | null, };
+supported_profiles?: Array<string>, upstream_published_at?: string, created_at: string, capture_failure_count: number, last_capture_error?: string, };

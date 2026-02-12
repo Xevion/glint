@@ -4,4 +4,4 @@ import type { AdoptPreviewAuthor } from "./AdoptPreviewAuthor";
 /**
  * Preview response before confirming adoption
  */
-export type AdoptPreviewResponse = { platform: string, name: string, slug: string, description: string, icon_url: string | null, downloads: number, version_count: number, authors: Array<AdoptPreviewAuthor>, };
+export type AdoptPreviewResponse = { platform: string, name: string, slug: string, description: string, icon_url?: string, downloads: number, version_count: number, authors: Array<AdoptPreviewAuthor>, };

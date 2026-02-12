@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use ts_rs::TS;
 
 /// Request to preview or adopt a shader from a platform URL
@@ -14,8 +15,9 @@ pub struct LinkShaderRequest {
 }
 
 /// Preview response before confirming adoption
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct AdoptPreviewResponse {
     pub platform: String,
     pub name: String,
@@ -27,8 +29,9 @@ pub struct AdoptPreviewResponse {
     pub authors: Vec<AdoptPreviewAuthor>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct AdoptPreviewAuthor {
     pub name: String,
     pub url: Option<String>,

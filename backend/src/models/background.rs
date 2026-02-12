@@ -3,6 +3,7 @@ use std::fmt;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use sqlx::FromRow;
 use ts_rs::TS;
 
@@ -62,8 +63,9 @@ impl sqlx::Encode<'_, sqlx::Postgres> for ThemeMode {
 }
 
 /// A page background image stored in R2.
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct Background {
     pub id: BackgroundId,
     pub image_url: String,

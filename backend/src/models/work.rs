@@ -1,11 +1,13 @@
 use schemars::JsonSchema;
+use serde_with::skip_serializing_none;
 use ts_rs::TS;
 
 use crate::id::{SceneId, SceneVersionId, ShaderId, ShaderVersionId, WorldId, WorldVersionId};
 
 /// A single work item: one (shader_version, scene, profile) triple to capture
+#[skip_serializing_none]
 #[derive(Debug, sqlx::FromRow, serde::Serialize, JsonSchema, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct WorkItem {
     pub shader_version_id: ShaderVersionId,
     pub shader_id: ShaderId,

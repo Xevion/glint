@@ -2,6 +2,7 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use sqlx::FromRow;
 use ts_rs::TS;
 
@@ -42,8 +43,9 @@ impl fmt::Display for Role {
 }
 
 /// Discord OAuth user
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct User {
     pub id: i32,
     pub discord_id: String,

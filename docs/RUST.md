@@ -91,7 +91,6 @@ Optional services return `Option<&T>` — handlers check availability before use
 - External API client types (CurseForge, Modrinth) keep whatever casing the upstream API uses — add `#[serde(rename_all = "camelCase")]` or per-field `#[serde(rename)]` as needed.
 - Enum variants use their own conventions: `snake_case` for statuses, lowercase for sorts, `SCREAMING_SNAKE_CASE` where appropriate.
 - Types exported to frontend derive `TS` with `#[ts(export)]`
-- `DateTime<Utc>` serializes as ISO 8601 strings (`#[ts(type = "string")]` for TypeScript)
 - Request types: derive `Deserialize`. Response types: derive `Serialize`. Shared types: both.
 
 ```rust
@@ -101,6 +100,43 @@ struct SceneQuery {
     world_id: Option<String>,
 }
 ```
+
+### Null Omission in API Responses
+
+Response structs with `Option<T>` fields use `#[skip_serializing_none]` (from `serde_with`) to omit null fields from JSON, and `#[ts(optional_fields)]` so ts-rs generates `field?: T` instead of `field: T | null`. This reduces payload size and produces idiomatic TypeScript.
+
+```rust
+use serde_with::skip_serializing_none;
+
+#[skip_serializing_none]
+#[derive(Serialize, TS)]
+#[ts(export, optional_fields)]
+pub struct Shader {
+    pub id: ShaderId,
+    pub name: String,
+    pub description: Option<String>,  // omitted from JSON when None, TS: description?: string
+    #[ts(type = "string")]
+    pub created_at: DateTime<Utc>,    // non-optional, TS: created_at: string
+    #[ts(as = "Option<String>")]
+    pub updated_at: Option<DateTime<Utc>>,  // optional DateTime, TS: updated_at?: string
+}
+```
+
+**`#[ts(type)]` vs `#[ts(as)]` with optional fields:**
+
+`#[ts(type = "string")]` replaces the **entire** TypeScript type for a field, bypassing `optional_fields`. On an `Option<DateTime<Utc>>` field, it generates `field: string` (non-optional) — **wrong**.
+
+Use `#[ts(as = "Option<String>")]` instead, which tells ts-rs to treat the field as `Option<String>`. With `optional_fields`, this correctly generates `field?: string`.
+
+| Rust field type | Annotation | Generated TypeScript | Correct? |
+|---|---|---|---|
+| `DateTime<Utc>` | `#[ts(type = "string")]` | `field: string` | ✓ |
+| `Option<DateTime<Utc>>` | `#[ts(type = "string")]` | `field: string` | ✗ (lost optionality) |
+| `Option<DateTime<Utc>>` | `#[ts(as = "Option<String>")]` | `field?: string` | ✓ |
+| `Option<Json<Vec<T>>>` | `#[ts(optional, type = "Array<string>")]` | `field?: Array<string>` | ✓ |
+| `Option<serde_json::Value>` | `#[ts(optional, type = "Record<string, unknown>")]` | `field?: Record<string, unknown>` | ✓ |
+
+For complex types without a `TS` impl (like `serde_json::Value`, `Json<Vec<T>>`), combine `#[ts(optional)]` with `#[ts(type = "...")]` to preserve optionality while overriding the type.
 
 ## Async
 

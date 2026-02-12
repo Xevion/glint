@@ -3,4 +3,4 @@
 /**
  * Error response from POST /api/device/token (RFC 8628 error codes)
  */
-export type DeviceTokenError = { error: string, error_description: string | null, };
+export type DeviceTokenError = { error: string, error_description?: string, };

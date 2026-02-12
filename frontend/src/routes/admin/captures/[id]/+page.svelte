@@ -117,12 +117,12 @@ async function confirmDelete() {
 	}
 }
 
-function formatFps(value: number | null): string {
+function formatFps(value?: number): string {
 	if (value == null) return '\u2014';
 	return value.toFixed(1);
 }
 
-function formatMs(value: number | null): string {
+function formatMs(value?: number): string {
 	if (value == null) return '\u2014';
 	return `${value.toFixed(2)}ms`;
 }

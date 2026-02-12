@@ -7,8 +7,10 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 /// World information for a capture run
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WorldInfo {
     pub id: String,
@@ -22,6 +24,7 @@ pub struct WorldInfo {
 // Agent Request Types
 
 /// A file entry in a prepare-upload request, with metadata for R2 key generation.
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PrepareUploadFile {
     pub local_path: String,
@@ -50,6 +53,7 @@ pub struct PrepareUploadResponse {
 }
 
 /// A single capture result
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CaptureRecord {
     pub capture_id: String,
@@ -70,11 +74,11 @@ pub struct OrchestrationManifest {
     pub sessions: Vec<CaptureSessionData>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct OrchestrationInfo {
     pub id: String,
     /// Run ID from the run definition (None for interactive captures)
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub run_id: Option<String>,
     pub started_at: String,
     pub completed_at: String,
@@ -103,6 +107,7 @@ pub struct CaptureSessionData {
     pub captures: Vec<CaptureEntry>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MinecraftInfo {
     pub version: String,
@@ -112,6 +117,7 @@ pub struct MinecraftInfo {
     pub camera: Option<Camera>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CaptureEntry {
     pub file: String,
@@ -120,6 +126,7 @@ pub struct CaptureEntry {
     pub resolution: Resolution,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ShaderMetadata {
     pub filename: String,

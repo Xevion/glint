@@ -8,20 +8,18 @@ export const SKEW_DEG = 8;
 /** Data for one side of a comparison slider. */
 export interface SliderSide {
 	image: string;
-	thumbhash: string | null;
+	thumbhash?: string | null;
 	label: string;
 	slug: string;
-	author: string | null;
+	author?: string | null;
 	version: string;
 }
 
 /** Empty SliderSide for initialization before data loads. */
 export const EMPTY_SIDE: SliderSide = {
 	image: '',
-	thumbhash: null,
 	label: '',
 	slug: '',
-	author: null,
 	version: ''
 };
 
