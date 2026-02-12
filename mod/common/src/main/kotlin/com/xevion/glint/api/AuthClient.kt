@@ -71,7 +71,7 @@ object AuthClient {
             connection.connectTimeout = 5000
             connection.readTimeout = 10000
 
-            val requestBody = """{"device_code":"$deviceCode"}"""
+            val requestBody = json.encodeToString(DeviceTokenRequest.serializer(), DeviceTokenRequest(deviceCode))
             connection.outputStream.use { it.write(requestBody.toByteArray(StandardCharsets.UTF_8)) }
 
             when (connection.responseCode) {
@@ -112,6 +112,11 @@ object AuthClient {
         }
     }
 }
+
+@Serializable
+private data class DeviceTokenRequest(
+    val deviceCode: String,
+)
 
 @Serializable
 data class DeviceAuthResponse(

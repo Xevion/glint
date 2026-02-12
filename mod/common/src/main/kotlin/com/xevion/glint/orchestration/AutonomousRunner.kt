@@ -2,6 +2,8 @@ package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.AgentClient
+import com.xevion.glint.api.CaptureRun
+import com.xevion.glint.api.CaptureRunItem
 import com.xevion.glint.api.CreateRunItemRequest
 import com.xevion.glint.api.CreateRunRequest
 import com.xevion.glint.api.HttpClient
@@ -33,7 +35,7 @@ class AutonomousRunner(
     private val isForceMode: Boolean = forceScenes != null || forceShaders != null
 
     private var state: State = State.FetchingWork
-    private var pendingFuture: CompletableFuture<*>? = null
+    private var pending: PendingOp? = null
 
     // Work batch (per-run)
     private var currentRunId: String? = null
@@ -50,6 +52,26 @@ class AutonomousRunner(
         Capturing,
         FinalizingRun,
         Done,
+    }
+
+    private sealed class PendingOp {
+        abstract val future: CompletableFuture<*>
+
+        class FetchWork(
+            override val future: CompletableFuture<Result<List<WorkItem>>>,
+        ) : PendingOp()
+
+        class CreateRun(
+            override val future: CompletableFuture<Triple<String, List<CaptureRunItem>, List<WorkItem>>>,
+        ) : PendingOp()
+
+        class PrepareCapture(
+            override val future: CompletableFuture<PrepResult>,
+        ) : PendingOp()
+
+        class FinalizeRun(
+            override val future: CompletableFuture<Result<CaptureRun>>,
+        ) : PendingOp()
     }
 
     /** Call once to kick off the first work fetch. */
@@ -91,26 +113,26 @@ class AutonomousRunner(
 
     private fun fetchWork() {
         state = State.FetchingWork
-        pendingFuture =
-            CompletableFuture.supplyAsync {
-                AgentClient.fetchWork(
-                    client,
-                    limit = workLimit,
-                    force = isForceMode,
-                    shaders = forceShaders,
-                    scenes = forceScenes,
-                )
-            }
+        pending =
+            PendingOp.FetchWork(
+                CompletableFuture.supplyAsync {
+                    AgentClient.fetchWork(
+                        client,
+                        limit = workLimit,
+                        force = isForceMode,
+                        shaders = forceShaders,
+                        scenes = forceScenes,
+                    )
+                },
+            )
     }
 
     private fun tickFetchingWork() {
-        val future = pendingFuture as? CompletableFuture<*> ?: return
-        if (!future.isDone) return
+        val op = pending as? PendingOp.FetchWork ?: return
+        if (!op.future.isDone) return
 
-        pendingFuture = null
-
-        @Suppress("UNCHECKED_CAST")
-        val result = (future as CompletableFuture<Result<List<WorkItem>>>).join()
+        pending = null
+        val result = op.future.join()
 
         result
             .onSuccess { items ->
@@ -131,40 +153,41 @@ class AutonomousRunner(
 
     private fun startCreatingRun(workItems: List<WorkItem>) {
         state = State.CreatingRun
-        pendingFuture =
-            CompletableFuture.supplyAsync {
-                val createRequest =
-                    CreateRunRequest(
-                        items =
-                            workItems.map { item ->
-                                CreateRunItemRequest(
-                                    shaderVersionId = item.shaderVersionId,
-                                    sceneId = item.sceneId,
-                                    profile = item.profile,
-                                )
-                            },
-                    )
+        pending =
+            PendingOp.CreateRun(
+                CompletableFuture.supplyAsync {
+                    val createRequest =
+                        CreateRunRequest(
+                            items =
+                                workItems.map { item ->
+                                    CreateRunItemRequest(
+                                        shaderVersionId = item.shaderVersionId,
+                                        sceneId = item.sceneId,
+                                        profile = item.profile,
+                                    )
+                                },
+                        )
 
-                val runResult = AgentClient.createRun(client, createRequest)
-                val run = runResult.getOrThrow()
+                    val runResult = AgentClient.createRun(client, createRequest)
+                    val run = runResult.getOrThrow()
 
-                val itemsResult = AgentClient.listRunItems(client, run.id)
-                val runItems = itemsResult.getOrThrow()
+                    val itemsResult = AgentClient.listRunItems(client, run.id)
+                    val runItems = itemsResult.getOrThrow()
 
-                Triple(run.id, runItems, workItems)
-            }
+                    Triple(run.id, runItems, workItems)
+                },
+            )
     }
 
     private fun tickCreatingRun() {
-        val future = pendingFuture as? CompletableFuture<*> ?: return
-        if (!future.isDone) return
+        val op = pending as? PendingOp.CreateRun ?: return
+        if (!op.future.isDone) return
 
-        pendingFuture = null
+        pending = null
 
-        @Suppress("UNCHECKED_CAST")
         val triple =
             try {
-                (future as CompletableFuture<Triple<String, List<com.xevion.glint.api.CaptureRunItem>, List<WorkItem>>>).join()
+                op.future.join()
             } catch (e: CompletionException) {
                 log.error("Failed to create capture run") { "error" to (e.cause?.message ?: e.message) }
                 shutdown()
@@ -234,25 +257,23 @@ class AutonomousRunner(
             }
 
         // First tick: launch async preparation
-        if (pendingFuture == null) {
+        if (pending == null) {
             log.info("Preparing shader group") {
                 "progress" to "${currentGroupIndex + 1}/${shaderGroups.size}"
                 "shader" to group.shaderName
                 "items" to group.items.size
             }
             val runId = currentRunId
-            pendingFuture = CompletableFuture.supplyAsync { assetPreparer.prepare(group, runId) }
+            pending = PendingOp.PrepareCapture(CompletableFuture.supplyAsync { assetPreparer.prepare(group, runId) })
             return
         }
 
         // Poll for completion
-        val future = pendingFuture as? CompletableFuture<*> ?: return
-        if (!future.isDone) return
+        val op = pending as? PendingOp.PrepareCapture ?: return
+        if (!op.future.isDone) return
 
-        pendingFuture = null
-
-        @Suppress("UNCHECKED_CAST")
-        val result = (future as CompletableFuture<PrepResult>).join()
+        pending = null
+        val result = op.future.join()
 
         when (result) {
             is PrepResult.Ready -> {
@@ -317,21 +338,21 @@ class AutonomousRunner(
             }
 
         val uploader = runUploader
-        pendingFuture =
-            CompletableFuture.supplyAsync {
-                uploader?.drainAndShutdown()
-                AgentClient.completeRun(client, runId)
-            }
+        pending =
+            PendingOp.FinalizeRun(
+                CompletableFuture.supplyAsync {
+                    uploader?.drainAndShutdown()
+                    AgentClient.completeRun(client, runId)
+                },
+            )
     }
 
     private fun tickFinalizingRun() {
-        val future = pendingFuture as? CompletableFuture<*> ?: return
-        if (!future.isDone) return
+        val op = pending as? PendingOp.FinalizeRun ?: return
+        if (!op.future.isDone) return
 
-        pendingFuture = null
-
-        @Suppress("UNCHECKED_CAST")
-        val result = (future as CompletableFuture<Result<com.xevion.glint.api.CaptureRun>>).join()
+        pending = null
+        val result = op.future.join()
 
         result
             .onSuccess { run ->
@@ -360,7 +381,7 @@ class AutonomousRunner(
         if (currentGroupIndex >= shaderGroups.size) {
             startFinalizingRun()
         } else {
-            pendingFuture = null
+            pending = null
             state = State.PreparingCapture
         }
     }

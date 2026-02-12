@@ -26,7 +26,7 @@ import java.util.zip.ZipOutputStream
  * or any world directory from disk.
  */
 object WorldUploader {
-    private val log = Loggers.Download.get()
+    private val log = Loggers.Upload.get()
 
     private const val MAX_UPLOAD_BYTES = 512L * 1024 * 1024
     private val EXCLUDED_FILES = setOf("session.lock")

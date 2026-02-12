@@ -25,6 +25,7 @@ data class ApiConfig(
             Json {
                 prettyPrint = true
                 ignoreUnknownKeys = true
+                encodeDefaults = true
             }
 
         private fun getConfigFile(): File {

@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -19,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MinecraftMixin {
 
     @Shadow private MouseHandler mouseHandler;
-    private boolean mouseReleasedForCapture = false;
+    @Unique private boolean glint$mouseReleasedForCapture = false;
 
     /**
      * Intercepts pauseGame() to prevent pause screen during capture.
@@ -40,7 +41,7 @@ public class MinecraftMixin {
         boolean isCapturing = CaptureStateManager.INSTANCE.isActive();
         Minecraft mc = (Minecraft) (Object) this;
 
-        if (isCapturing && !mouseReleasedForCapture) {
+        if (isCapturing && !glint$mouseReleasedForCapture) {
             // Close pause screen if it's currently open
             if (mc.screen != null && mc.screen.isPauseScreen()) {
                 mc.setScreen(null);
@@ -50,10 +51,10 @@ public class MinecraftMixin {
             if (mouseHandler.isMouseGrabbed()) {
                 mouseHandler.releaseMouse();
             }
-            mouseReleasedForCapture = true;
-        } else if (!isCapturing && mouseReleasedForCapture) {
+            glint$mouseReleasedForCapture = true;
+        } else if (!isCapturing && glint$mouseReleasedForCapture) {
             // Reset flag when capture ends
-            mouseReleasedForCapture = false;
+            glint$mouseReleasedForCapture = false;
         }
     }
 }

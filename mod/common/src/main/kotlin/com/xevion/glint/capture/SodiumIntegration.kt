@@ -44,7 +44,6 @@ object SodiumIntegration {
     private var getTotalThreadCountMethod: java.lang.reflect.Method? = null
     private var getTotalSectionsMethod: java.lang.reflect.Method? = null
 
-    @Suppress("unused")
     private var sawRebuildActivity: Boolean = false
 
     fun isAvailable(): Boolean {
@@ -136,6 +135,18 @@ object SodiumIntegration {
         sawRebuildActivity = false
     }
 
+    /** Resolves the RenderSectionManager from the active SodiumWorldRenderer, or null. */
+    private fun getSectionManager(): Any? {
+        val renderer = instanceNullableMethod!!.invoke(null) ?: return null
+        return renderSectionManagerField!!.get(renderer)
+    }
+
+    /** Resolves the ChunkBuilder from the active RenderSectionManager, or null. */
+    private fun getBuilder(): Any? {
+        val sectionManager = getSectionManager() ?: return null
+        return getBuilderMethod!!.invoke(sectionManager)
+    }
+
     /**
      * Check if Sodium's chunk rendering is complete.
      *
@@ -150,35 +161,21 @@ object SodiumIntegration {
         if (!isAvailable()) return null
 
         try {
-            // Get SodiumWorldRenderer instance
-            val renderer = instanceNullableMethod!!.invoke(null) ?: return null
-
-            // Get RenderSectionManager
-            val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
-
-            // Check if render graph needs updating
+            val sectionManager = getSectionManager() ?: return null
             val needsUpdate = needsUpdateMethod!!.invoke(sectionManager) as Boolean
 
-            // Get ChunkBuilder and check queue state
             val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
             val scheduledJobs = getScheduledJobCountMethod!!.invoke(builder) as Int
             val queueEmpty = isBuildQueueEmptyMethod!!.invoke(builder) as Boolean
 
-            // Track if we've seen any rebuild activity
             if (needsUpdate || scheduledJobs > 0 || !queueEmpty) {
                 sawRebuildActivity = true
             }
 
-            // Don't consider complete until we've seen rebuild activity
-            // This prevents false positives when checking on the same tick as allChanged()
-            if (!sawRebuildActivity) {
-                return false
-            }
-
-            // Now check actual completion: graph updated and queue empty
-            if (needsUpdate) {
-                return false
-            }
+            // Don't consider complete until we've seen rebuild activity.
+            // Prevents false positives when checking on the same tick as allChanged().
+            if (!sawRebuildActivity) return false
+            if (needsUpdate) return false
 
             return queueEmpty
         } catch (e: Exception) {
@@ -193,15 +190,11 @@ object SodiumIntegration {
      */
     fun getScheduledJobCount(): Int? {
         if (!isAvailable()) return null
-
-        try {
-            val renderer = instanceNullableMethod!!.invoke(null) ?: return null
-            val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
-            val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
-            return getScheduledJobCountMethod!!.invoke(builder) as Int
+        return try {
+            getScheduledJobCountMethod!!.invoke(getBuilder() ?: return null) as Int
         } catch (e: Exception) {
             log.debug("Failed to get Sodium scheduled job count") { "error" to e.message }
-            return null
+            null
         }
     }
 
@@ -211,14 +204,11 @@ object SodiumIntegration {
      */
     fun needsGraphUpdate(): Boolean? {
         if (!isAvailable()) return null
-
-        try {
-            val renderer = instanceNullableMethod!!.invoke(null) ?: return null
-            val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
-            return needsUpdateMethod!!.invoke(sectionManager) as Boolean
+        return try {
+            needsUpdateMethod!!.invoke(getSectionManager() ?: return null) as Boolean
         } catch (e: Exception) {
             log.debug("Failed to check Sodium graph update state") { "error" to e.message }
-            return null
+            null
         }
     }
 
@@ -228,15 +218,11 @@ object SodiumIntegration {
      */
     fun getBusyThreadCount(): Int? {
         if (!isAvailable()) return null
-
-        try {
-            val renderer = instanceNullableMethod!!.invoke(null) ?: return null
-            val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
-            val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
-            return getBusyThreadCountMethod!!.invoke(builder) as Int
+        return try {
+            getBusyThreadCountMethod!!.invoke(getBuilder() ?: return null) as Int
         } catch (e: Exception) {
             log.debug("Failed to get Sodium busy thread count") { "error" to e.message }
-            return null
+            null
         }
     }
 
@@ -246,33 +232,25 @@ object SodiumIntegration {
      */
     fun getTotalThreadCount(): Int? {
         if (!isAvailable()) return null
-
-        try {
-            val renderer = instanceNullableMethod!!.invoke(null) ?: return null
-            val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
-            val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
-            return getTotalThreadCountMethod!!.invoke(builder) as Int
+        return try {
+            getTotalThreadCountMethod!!.invoke(getBuilder() ?: return null) as Int
         } catch (e: Exception) {
             log.debug("Failed to get Sodium total thread count") { "error" to e.message }
-            return null
+            null
         }
     }
 
     /**
      * Get the total number of render sections from Sodium's RenderSectionManager.
-     * This represents the total sections Sodium is managing for rendering.
      * Returns null if Sodium is not available or reflection fails.
      */
     fun getTotalSections(): Int? {
         if (!isAvailable()) return null
-
-        try {
-            val renderer = instanceNullableMethod!!.invoke(null) ?: return null
-            val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
-            return getTotalSectionsMethod!!.invoke(sectionManager) as Int
+        return try {
+            getTotalSectionsMethod!!.invoke(getSectionManager() ?: return null) as Int
         } catch (e: Exception) {
             log.debug("Failed to get Sodium section count") { "error" to e.message }
-            return null
+            null
         }
     }
 
@@ -282,15 +260,11 @@ object SodiumIntegration {
      */
     fun isBuildQueueEmpty(): Boolean? {
         if (!isAvailable()) return null
-
-        try {
-            val renderer = instanceNullableMethod!!.invoke(null) ?: return null
-            val sectionManager = renderSectionManagerField!!.get(renderer) ?: return null
-            val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
-            return isBuildQueueEmptyMethod!!.invoke(builder) as Boolean
+        return try {
+            isBuildQueueEmptyMethod!!.invoke(getBuilder() ?: return null) as Boolean
         } catch (e: Exception) {
             log.debug("Failed to check Sodium build queue") { "error" to e.message }
-            return null
+            null
         }
     }
 }

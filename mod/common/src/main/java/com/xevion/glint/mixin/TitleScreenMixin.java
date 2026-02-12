@@ -8,6 +8,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,6 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(TitleScreen.class)
 public abstract class TitleScreenMixin extends Screen {
 
+    @Unique private static final Logger glint$log = LoggerFactory.getLogger("mixin");
     @Unique private static boolean glint$autonomousTriggered = false;
 
     protected TitleScreenMixin(Component title) {
@@ -34,14 +37,12 @@ public abstract class TitleScreenMixin extends Screen {
 
         if (Glint.INSTANCE.isAutonomous() && !glint$autonomousTriggered) {
             glint$autonomousTriggered = true;
-            Glint.INSTANCE.getLOGGER().info("Autonomous mode: starting capture runner");
+            glint$log.info("Autonomous mode: starting capture runner");
 
             String apiUrl = Glint.INSTANCE.getApiUrl();
             String apiToken = Glint.INSTANCE.getApiToken();
             if (apiToken.isEmpty()) {
-                Glint.INSTANCE
-                        .getLOGGER()
-                        .error("Cannot start autonomous mode: GLINT_API_TOKEN not set");
+                glint$log.error("Cannot start autonomous mode: GLINT_API_TOKEN not set");
                 mc.stop();
                 return;
             }

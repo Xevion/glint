@@ -1,11 +1,10 @@
 package com.xevion.glint.scene
 
 import com.xevion.glint.Loggers
+import com.xevion.glint.api.GlintJsonFile
 import com.xevion.glint.capture.Camera
 import com.xevion.glint.capture.Position
 import com.xevion.glint.io.AsyncFileIO
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNamingStrategy
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.util.concurrent.CompletableFuture
@@ -16,13 +15,6 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object SceneManager {
     private val log = Loggers.Scene.get()
-
-    private val JSON =
-        Json {
-            namingStrategy = JsonNamingStrategy.SnakeCase
-            prettyPrint = true
-            ignoreUnknownKeys = true
-        }
 
     private val loadedCollections = ConcurrentHashMap<String, SceneCollection>()
 
@@ -107,7 +99,7 @@ object SceneManager {
         }
 
         return try {
-            val collection = JSON.decodeFromString(SceneCollection.serializer(), sceneFile.readText())
+            val collection = GlintJsonFile.decodeFromString(SceneCollection.serializer(), sceneFile.readText())
             loadedCollections[worldName] = collection
             log.debug("Loaded scene collection") {
                 "world" to worldName
@@ -258,7 +250,7 @@ object SceneManager {
                 scenes = listOf(scene),
             )
 
-        return JSON.encodeToString(SceneCollection.serializer(), collection)
+        return GlintJsonFile.encodeToString(SceneCollection.serializer(), collection)
     }
 
     /**
@@ -388,7 +380,7 @@ object SceneManager {
         val sceneFile = File(mc.gameDirectory, "glint/scenes/$worldName.json")
 
         return try {
-            sceneFile.writeText(JSON.encodeToString(SceneCollection.serializer(), collection))
+            sceneFile.writeText(GlintJsonFile.encodeToString(SceneCollection.serializer(), collection))
             loadedCollections[worldName] = collection
             log.debug("Saved scene collection") {
                 "world" to worldName

@@ -1,11 +1,10 @@
 package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
+import com.xevion.glint.api.GlintJson
 import com.xevion.glint.api.WorkItem
 import com.xevion.glint.scene.SceneManager
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNamingStrategy
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -40,11 +39,7 @@ class AssetPreparer(
     private val gameDirectory: File,
 ) {
     private val log = Loggers.Orchestration.get()
-    private val json =
-        Json {
-            namingStrategy = JsonNamingStrategy.SnakeCase
-            ignoreUnknownKeys = true
-        }
+    private val json = GlintJson
 
     fun prepare(
         group: ShaderGroup,

@@ -1,6 +1,7 @@
 package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
+import com.xevion.glint.api.GlintJsonFile
 import com.xevion.glint.capture.CaptureEntry
 import com.xevion.glint.capture.CaptureSession
 import com.xevion.glint.capture.CaptureSessionData
@@ -11,15 +12,13 @@ import com.xevion.glint.io.SessionDirectoryManager
 import com.xevion.glint.scene.ResolvedScene
 import com.xevion.glint.scene.SceneManager
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNamingStrategy
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.io.IOException
 import java.time.Instant
 
 /** Event fired when a single capture is taken during orchestration. */
-data class CaptureTakenEvent(
+class CaptureTakenEvent(
     val entry: CaptureEntry,
     val fileBytes: ByteArray,
     val sceneId: String,
@@ -95,7 +94,10 @@ class Orchestrator {
             return false
         }
 
-        CaptureStateManager.startCapture()
+        if (!CaptureStateManager.startCapture()) {
+            log.warn("Cannot start orchestration - capture already active")
+            return false
+        }
         transitionTo(State.Planning)
         return true
     }
@@ -581,12 +583,7 @@ class Orchestrator {
             )
 
         try {
-            val json =
-                Json {
-                    namingStrategy = JsonNamingStrategy.SnakeCase
-                    prettyPrint = true
-                }
-            manifestFile.writeText(json.encodeToString(OrchestrationManifest.serializer(), manifest))
+            manifestFile.writeText(GlintJsonFile.encodeToString(OrchestrationManifest.serializer(), manifest))
             log.info("Manifest written") {
                 "partial" to partial
                 "path" to manifestFile.absolutePath

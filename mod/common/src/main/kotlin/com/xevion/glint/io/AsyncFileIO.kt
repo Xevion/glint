@@ -1,9 +1,8 @@
 package com.xevion.glint.io
 
 import com.xevion.glint.Loggers
+import com.xevion.glint.api.GlintJsonFile
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNamingStrategy
 import java.io.File
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
@@ -23,13 +22,6 @@ object AsyncFileIO {
             }
         }
 
-    private val json =
-        Json {
-            namingStrategy = JsonNamingStrategy.SnakeCase
-            prettyPrint = true
-            ignoreUnknownKeys = true
-        }
-
     /**
      * Reads and deserializes a JSON file asynchronously.
      */
@@ -39,7 +31,7 @@ object AsyncFileIO {
     ): CompletableFuture<T> =
         CompletableFuture.supplyAsync({
             try {
-                json.decodeFromString(serializer, file.readText())
+                GlintJsonFile.decodeFromString(serializer, file.readText())
             } catch (e: Exception) {
                 log.error(e, "Failed to read JSON file") { "path" to file.absolutePath }
                 throw e
@@ -58,7 +50,7 @@ object AsyncFileIO {
             .runAsync(
                 {
                     try {
-                        file.writeText(json.encodeToString(serializer, data))
+                        file.writeText(GlintJsonFile.encodeToString(serializer, data))
                     } catch (e: Exception) {
                         log.error(e, "Failed to write JSON file") { "path" to file.absolutePath }
                         throw e

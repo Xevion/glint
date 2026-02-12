@@ -16,6 +16,15 @@ val GlintJson: Json =
         encodeDefaults = true
     }
 
+/** Shared Json configuration for file I/O (scenes, manifests, async file ops). */
+val GlintJsonFile: Json =
+    Json {
+        namingStrategy = JsonNamingStrategy.SnakeCase
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        prettyPrint = true
+    }
+
 /**
  * Shared HTTP client for Glint backend API communication.
  * Provides a request-builder DSL that eliminates per-endpoint boilerplate.

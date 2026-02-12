@@ -20,10 +20,14 @@ object CaptureStateManager {
     private val isCapturing = AtomicBoolean(false)
     private val cancelRequested = AtomicBoolean(false)
 
-    fun startCapture() {
-        isCapturing.set(true)
+    fun startCapture(): Boolean {
+        if (!isCapturing.compareAndSet(false, true)) {
+            log.warn("Capture already active, ignoring startCapture()")
+            return false
+        }
         cancelRequested.set(false)
         log.info("Capture started")
+        return true
     }
 
     fun endCapture() {

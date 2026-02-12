@@ -3,14 +3,14 @@ package com.xevion.glint
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.UrlValidation
 import com.xevion.glint.input.KeybindHandler
+import com.xevion.glint.io.AsyncFileIO
 import com.xevion.glint.orchestration.AutonomousRunner
 import com.xevion.glint.session.SessionRegistry
-import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
 
 object Glint {
     const val MOD_ID = "glint"
-    val LOGGER = LoggerFactory.getLogger(MOD_ID)
+    private val log = Loggers.Core.get()
 
     /**
      * Whether the mod was launched by the agent in autonomous capture mode.
@@ -37,13 +37,13 @@ object Glint {
     var autonomousRunner: AutonomousRunner? = null
 
     fun init() {
-        // Trigger Loggers companion init — configures all category loggers + "glint" via LogConfig
+        // Trigger Loggers companion init — configures all category loggers via LogConfig
         Loggers.getAllCategories()
-        LOGGER.info("Initializing Glint mod")
+        log.info("Initializing Glint mod")
 
         isAutonomous = System.getenv("GLINT_AUTONOMOUS")?.equals("true", ignoreCase = true) == true
         if (isAutonomous) {
-            LOGGER.info("Autonomous mode enabled - will auto-start orchestration on title screen")
+            log.info("Autonomous mode enabled - will auto-start orchestration on title screen")
             apiUrl = System.getenv("GLINT_API_URL") ?: "http://localhost:8080"
             apiToken = System.getenv("GLINT_API_TOKEN") ?: ""
 
@@ -51,7 +51,10 @@ object Glint {
             forceScenes = System.getenv("GLINT_FORCE_SCENES")
             forceShaders = System.getenv("GLINT_FORCE_SHADERS")
             if (isForceMode) {
-                LOGGER.info("Force mode: scenes={}, shaders={}", forceScenes ?: "+", forceShaders ?: "+")
+                log.info("Force mode enabled") {
+                    "scenes" to (forceScenes ?: "+")
+                    "shaders" to (forceShaders ?: "+")
+                }
             }
 
             workLimit = System.getenv("GLINT_WORK_LIMIT")?.toIntOrNull() ?: 50
@@ -60,13 +63,13 @@ object Glint {
             if (apiToken.isBlank()) {
                 val config = ApiConfig.load()
                 if (config.hasValidToken()) {
-                    LOGGER.info("Using saved access token from config")
+                    log.info("Using saved access token from config")
                     apiToken = config.accessToken
                     if (config.apiUrl.isNotBlank()) {
                         apiUrl = config.apiUrl
                     }
                 } else {
-                    LOGGER.error("GLINT_API_TOKEN is required in autonomous mode (env or config)")
+                    log.error("GLINT_API_TOKEN is required in autonomous mode (env or config)")
                 }
             }
         }
@@ -95,7 +98,8 @@ object Glint {
     }
 
     private fun onShutdown() {
-        LOGGER.info("Shutting down Glint mod")
+        log.info("Shutting down Glint mod")
+        AsyncFileIO.shutdown()
         com.xevion.glint.download.WorldDownloader
             .cleanupAllDownloads()
         com.xevion.glint.api.SceneSyncManager
@@ -113,7 +117,7 @@ object Glint {
             return
         }
 
-        LOGGER.info("Validating API connection to {}", config.apiUrl)
+        log.info("Validating API connection") { "url" to config.apiUrl }
 
         CompletableFuture
             .supplyAsync {
@@ -121,11 +125,11 @@ object Glint {
             }.thenAccept { result ->
                 result
                     .onSuccess {
-                        LOGGER.info("API connection validated successfully")
+                        log.info("API connection validated successfully")
                         val updatedConfig = config.copy(validated = true)
                         ApiConfig.save(updatedConfig)
                     }.onFailure { error ->
-                        LOGGER.warn("API connection validation failed: {}", error.message)
+                        log.warn("API connection validation failed") { "error" to error.message }
                         val updatedConfig = config.copy(validated = false)
                         ApiConfig.save(updatedConfig)
                     }

@@ -23,6 +23,7 @@ enum class Loggers(
 ) {
     Api("api"),
     Capture("capture"),
+    Core("core"),
     Download("download"),
     Input("input"),
     Io("io"),
@@ -31,6 +32,7 @@ enum class Loggers(
     Scene("scene"),
     Session("session"),
     Ui("ui"),
+    Upload("upload"),
     ;
 
     fun get(): GlintLogger = GlintLogger(LoggerFactory.getLogger(category))
