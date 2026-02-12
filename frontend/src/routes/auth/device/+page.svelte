@@ -7,9 +7,10 @@ import { Button } from '$lib/components/ui/button';
 import { CheckCircle, Clock, Loader2, Monitor, XCircle } from '@lucide/svelte';
 import { onMount } from 'svelte';
 import { fade, fly } from 'svelte/transition';
+import type { PageData } from './$types';
 
 interface Props {
-	data: { userCode: string | null; currentUrl: string };
+	data: PageData;
 }
 
 let { data }: Props = $props();

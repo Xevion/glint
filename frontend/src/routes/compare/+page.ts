@@ -1,16 +1,30 @@
 import { createApiClient } from '$lib/api';
 import type { CaptureWithContext, SceneListItem } from '$lib/bindings';
+import { pick } from '$lib/utils';
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ fetch, url }) => {
+type CompareScene = Pick<SceneListItem, 'slug' | 'name' | 'capture_count'>;
+type CompareCapture = Pick<
+	CaptureWithContext,
+	'thumbhash' | 'shader_name' | 'shader_version' | 'shader_author' | 'profile'
+> & { image_url: string };
+
+interface ComparePageData {
+	scenes: CompareScene[];
+	captures: CompareCapture[];
+	selectedSceneSlug: string | null;
+	error: string | null;
+}
+
+export const load: PageLoad = async ({ fetch, url }): Promise<ComparePageData> => {
 	const api = createApiClient(fetch);
 	const sceneSlug = url.searchParams.get('scene') ?? undefined;
 
 	const scenesResult = await api.scenes.list();
 
-	const scenes = scenesResult.match({
-		Ok: (v) => v,
-		Err: () => [] as SceneListItem[]
+	const scenes: CompareScene[] = scenesResult.match({
+		Ok: (v) => v.map((s) => pick(s, ['slug', 'name', 'capture_count'])),
+		Err: () => []
 	});
 
 	// Pick the target scene: explicit slug, or first scene with captures
@@ -19,9 +33,9 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	if (!targetSlug) {
 		return {
 			scenes,
-			captures: [] as CaptureWithContext[],
-			selectedSceneSlug: null as string | null,
-			error: null as string | null
+			captures: [],
+			selectedSceneSlug: null,
+			error: null
 		};
 	}
 
@@ -29,18 +43,23 @@ export const load: PageLoad = async ({ fetch, url }) => {
 
 	return sceneResult.match({
 		Ok: (data) => {
-			const captures = (data[0]?.captures ?? []).filter((c) => c.image_url);
+			const captures: CompareCapture[] = (data[0]?.captures ?? [])
+				.filter((c): c is typeof c & { image_url: string } => !!c.image_url)
+				.map((c) => ({
+					...pick(c, ['thumbhash', 'shader_name', 'shader_version', 'shader_author', 'profile']),
+					image_url: c.image_url
+				}));
 			return {
 				scenes,
 				captures,
-				selectedSceneSlug: targetSlug as string | null,
-				error: null as string | null
+				selectedSceneSlug: targetSlug,
+				error: null
 			};
 		},
-		Err: (err) => ({
+		Err: (err): ComparePageData => ({
 			scenes,
-			captures: [] as CaptureWithContext[],
-			selectedSceneSlug: targetSlug as string | null,
+			captures: [],
+			selectedSceneSlug: targetSlug,
 			error: err.message
 		})
 	});

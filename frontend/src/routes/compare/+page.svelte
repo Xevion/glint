@@ -1,6 +1,5 @@
 <script lang="ts">
 import { goto } from '$app/navigation';
-import type { CaptureWithContext } from '$lib/bindings';
 import ErrorBoundaryFallback from '$lib/components/ErrorBoundaryFallback.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import {
@@ -24,10 +23,10 @@ let { data }: Props = $props();
 type CompareImageOption = ImageOption & { shader: ShaderDisplayInfo };
 
 const images: CompareImageOption[] = $derived(
-	data.captures.map((c: CaptureWithContext) => {
+	data.captures.map((c) => {
 		const suffix = [c.shader_version, c.profile].filter(Boolean).join(' · ');
 		return {
-			url: c.image_url!,
+			url: c.image_url,
 			label: suffix ? `${c.shader_name} (${suffix})` : c.shader_name,
 			thumbhash: c.thumbhash,
 			shader: {
@@ -80,7 +79,7 @@ const ogTitle = $derived.by(() => {
 	if (images.length >= 2) {
 		const left = images[0].shader.name;
 		const right = images[1].shader.name;
-		const scene = data.scenes.find((s: { slug: string }) => s.slug === data.selectedSceneSlug);
+		const scene = data.scenes.find((s) => s.slug === data.selectedSceneSlug);
 		const scenePart = scene ? ` on ${scene.name}` : '';
 		return `${left} vs ${right}${scenePart}`;
 	}

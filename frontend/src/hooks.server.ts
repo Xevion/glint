@@ -94,7 +94,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 export const handleError: HandleServerError = ({ error, event, status }) => {
 	if (status !== 404) {
-		errorLogger.error('{method} {path} {status} (unhandled)', {
+		errorLogger.error('{method} {path} {status} (unhandled): {error}', {
 			status,
 			method: event.request.method,
 			path: event.url.pathname,

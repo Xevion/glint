@@ -1,6 +1,10 @@
 import { createApiClient } from '$lib/api';
-import type { CaptureWithContext, SceneWithWorld, ShaderListItem } from '$lib/bindings';
+import type { CaptureWithContext, SceneListItem, ShaderListItem } from '$lib/bindings';
+import { pick } from '$lib/utils';
 import type { PageLoad } from './$types';
+
+type FilterOption = Pick<ShaderListItem, 'id' | 'slug' | 'name'>;
+type SceneFilterOption = Pick<SceneListItem, 'id' | 'name'>;
 
 export const load: PageLoad = async ({ fetch, url }) => {
 	const api = createApiClient(fetch);
@@ -18,29 +22,40 @@ export const load: PageLoad = async ({ fetch, url }) => {
 		api.admin.listScenes()
 	]);
 
-	const shaders = shadersRes.match({
-		Ok: (v) => v.items,
-		Err: () => [] as ShaderListItem[]
+	const shaders: FilterOption[] = shadersRes.match({
+		Ok: (v) => v.items.map((s) => pick(s, ['id', 'slug', 'name'])),
+		Err: () => []
 	});
 
-	const scenes = scenesRes.match({
-		Ok: (v) => v,
-		Err: () => [] as SceneWithWorld[]
+	const scenes: SceneFilterOption[] = scenesRes.match({
+		Ok: (v) => v.map((s) => pick(s, ['id', 'name'])),
+		Err: () => []
 	});
 
-	return result.match({
+	interface CapturesPageData {
+		captures: CaptureWithContext[];
+		totalCount: number;
+		page: number;
+		pageSize: number;
+		error: string | null;
+		filters: { shader?: string; scene?: string; status?: string; runId?: string };
+		shaders: FilterOption[];
+		scenes: SceneFilterOption[];
+	}
+
+	return result.match<CapturesPageData>({
 		Ok: (data) => ({
 			captures: data.items,
 			totalCount: data.total,
 			page: data.page,
 			pageSize: data.page_size,
-			error: null as string | null,
+			error: null,
 			filters: { shader, scene, status, runId },
 			shaders,
 			scenes
 		}),
 		Err: (err) => ({
-			captures: [] as CaptureWithContext[],
+			captures: [],
 			totalCount: 0,
 			page: 1,
 			pageSize: 50,

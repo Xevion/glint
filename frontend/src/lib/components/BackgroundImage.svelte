@@ -5,8 +5,13 @@ import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { onMount } from 'svelte';
 import type { Snippet } from 'svelte';
 
+type BackgroundItem = Pick<
+	Background,
+	'id' | 'image_url' | 'thumbhash' | 'theme_mode' | 'width' | 'height'
+>;
+
 interface Props {
-	backgrounds: Background[];
+	backgrounds: BackgroundItem[];
 	blur?: number;
 	overlay?: boolean;
 	overlayOpacity?: number;
@@ -64,12 +69,12 @@ const sectionsNeeded = $derived.by(() => {
 	return Math.max(3, Math.ceil(containerHeight / sectionHeight) + 1);
 });
 
-function getImageUrl(bg: Background): string {
+function getImageUrl(bg: BackgroundItem): string {
 	// Use Cloudflare Image Transforms to serve optimized version (480px wide, webp)
 	return cfImageUrl(bg.image_url, { width: 480, quality: 50, format: 'webp' }) ?? bg.image_url;
 }
 
-function getThumbhashBackground(bg: Background): string | null {
+function getThumbhashBackground(bg: BackgroundItem): string | null {
 	return decodeThumbhash(bg.thumbhash);
 }
 
@@ -84,13 +89,13 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 // Cache for shuffled arrays (initialized in onMount)
-let lightShuffled = $state<Background[]>([]);
-let darkShuffled = $state<Background[]>([]);
+let lightShuffled = $state<BackgroundItem[]>([]);
+let darkShuffled = $state<BackgroundItem[]>([]);
 
 // Get backgrounds for the required sections (with looping)
-function getBackgroundsForSections(bgs: Background[], count: number): Background[] {
+function getBackgroundsForSections(bgs: BackgroundItem[], count: number): BackgroundItem[] {
 	if (bgs.length === 0) return [];
-	const result: Background[] = [];
+	const result: BackgroundItem[] = [];
 	for (let i = 0; i < count; i++) {
 		result.push(bgs[i % bgs.length]);
 	}

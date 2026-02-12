@@ -1,7 +1,6 @@
 <script lang="ts">
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import type { SceneListItem } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import { StatusBadge } from '$lib/components/ui/status-badge';
@@ -11,10 +10,18 @@ import {
 	getDimensionDisplayName,
 	getWeatherDisplayName
 } from '$lib/utils/display';
+import type { SceneListItem, SceneVersion } from '$lib/bindings';
 import { ArrowRight, Sun } from '@lucide/svelte';
 
+type SceneCardItem = Pick<
+	SceneListItem,
+	'slug' | 'name' | 'description' | 'dimension' | 'image_url' | 'thumbhash' | 'capture_count'
+> & {
+	version: Pick<SceneVersion, 'time_of_day_ticks' | 'weather' | 'biome'>;
+};
+
 interface Props {
-	scene: SceneListItem;
+	scene: SceneCardItem;
 	class?: string;
 }
 

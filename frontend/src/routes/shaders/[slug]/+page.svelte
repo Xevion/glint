@@ -1,7 +1,6 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
 import { createApiClient } from '$lib/api';
-import type { ShaderWithCaptures } from '$lib/bindings';
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
@@ -11,15 +10,17 @@ import { formatNumber, formatVersion } from '$lib/utils/display';
 import { preloadImage } from '$lib/utils/image';
 import { ChevronRight, Download, ExternalLink, ImageOff } from '@lucide/svelte';
 import { fly } from 'svelte/transition';
+import type { PageData } from './$types';
+import { _trimShader, type ShaderDetail } from './+page.ts';
 
 interface Props {
-	data: { shader: ShaderWithCaptures };
+	data: PageData;
 }
 
 let { data }: Props = $props();
 
 // Local override: set when version changes, cleared on navigation
-let shaderOverride = $state<ShaderWithCaptures | null>(null);
+let shaderOverride = $state<ShaderDetail | null>(null);
 
 // Reset user overrides when navigating between shader pages
 $effect(() => {
@@ -71,7 +72,7 @@ async function onVersionChange(versionId: string) {
 	if (generation !== fetchGeneration) return;
 	result.match({
 		Ok: (updated) => {
-			shaderOverride = updated;
+			shaderOverride = _trimShader(updated);
 		},
 		Err: (err) => {
 			console.warn('Failed to fetch shader version:', err.message);

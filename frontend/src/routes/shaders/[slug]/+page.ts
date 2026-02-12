@@ -1,7 +1,65 @@
 import { createApiClient } from '$lib/api';
 import { ApiErrorType } from '$lib/api/errors';
+import type { CaptureWithContext, ShaderVersionDetail, ShaderWithCaptures } from '$lib/bindings';
+import { pick } from '$lib/utils';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
+
+export type ShaderDetailVersion = Pick<
+	ShaderVersionDetail,
+	'id' | 'version' | 'capture_count' | 'supported_profiles'
+>;
+export type ShaderDetailCapture = Pick<
+	CaptureWithContext,
+	'id' | 'image_url' | 'thumbhash' | 'scene_name' | 'profile' | 'shader_version' | 'shader_name'
+>;
+export type ShaderDetail = Pick<
+	ShaderWithCaptures,
+	| 'id'
+	| 'name'
+	| 'slug'
+	| 'description'
+	| 'icon_url'
+	| 'website_url'
+	| 'modrinth_id'
+	| 'source_url'
+	| 'upstream_downloads'
+	| 'view_count'
+> & {
+	versions: ShaderDetailVersion[];
+	captures: ShaderDetailCapture[];
+};
+
+export function _trimShader(s: ShaderWithCaptures): ShaderDetail {
+	return {
+		...pick(s, [
+			'id',
+			'name',
+			'slug',
+			'description',
+			'icon_url',
+			'website_url',
+			'modrinth_id',
+			'source_url',
+			'upstream_downloads',
+			'view_count'
+		]),
+		versions: s.versions.map((v) =>
+			pick(v, ['id', 'version', 'capture_count', 'supported_profiles'])
+		),
+		captures: s.captures.map((c) =>
+			pick(c, [
+				'id',
+				'image_url',
+				'thumbhash',
+				'scene_name',
+				'profile',
+				'shader_version',
+				'shader_name'
+			])
+		)
+	};
+}
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	const api = createApiClient(fetch);
@@ -32,5 +90,5 @@ export const load: PageLoad = async ({ params, fetch }) => {
 		}
 	}
 
-	return { shader };
+	return { shader: _trimShader(shader) };
 };

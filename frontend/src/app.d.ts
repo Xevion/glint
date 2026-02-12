@@ -51,8 +51,12 @@ declare global {
 		}
 		// interface Locals {}
 		interface PageData {
-			// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- import() is the only option in ambient declarations
-			user: import('$lib/bindings/User').User | null;
+			/* eslint-disable @typescript-eslint/consistent-type-imports -- import() required in ambient declarations */
+			user: Pick<
+				import('$lib/bindings/User').User,
+				'role' | 'discord_id' | 'discord_username' | 'discord_avatar'
+			> | null;
+			/* eslint-enable @typescript-eslint/consistent-type-imports */
 		}
 		// interface PageState {}
 		// interface Platform {}
