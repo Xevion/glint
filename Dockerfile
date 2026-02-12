@@ -43,6 +43,10 @@ RUN bun install --frozen-lockfile
 
 COPY frontend/ ./
 
+# PostHog source map upload (optional: set via --build-arg in Railway)
+ARG POSTHOG_PERSONAL_API_KEY
+ARG POSTHOG_PROJECT_ID
+
 RUN bun --smol run build
 
 # ========== Stage 5: Runtime ==========
