@@ -15,6 +15,3 @@ pub const MAX_LINE_COUNT: usize = 50_000;
 
 /// Maximum length of a property key in bytes.
 pub const MAX_KEY_LENGTH: usize = 512;
-
-/// Maximum length of a property value in bytes.
-pub const MAX_VALUE_LENGTH: usize = 1024;

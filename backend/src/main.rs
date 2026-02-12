@@ -175,6 +175,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Start capture metadata background worker
     let integrity_http = http_client.clone();
+    let extraction_http = http_client.clone();
     tokio::spawn(services::capture_metadata::run(
         metadata_rx,
         pool.clone(),
@@ -194,6 +195,9 @@ async fn main() -> anyhow::Result<()> {
         integrity_http,
         integrity_metadata_tx,
     ));
+
+    // Start shader pack extraction worker (downloads zips, extracts metadata)
+    tokio::spawn(services::extraction::run(pool.clone(), extraction_http));
 
     // Purge expired sessions every hour
     {

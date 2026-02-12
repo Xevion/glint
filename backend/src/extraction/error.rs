@@ -39,13 +39,6 @@ pub enum ExtractionError {
         max: usize,
     },
 
-    #[error("value too long at line {line}: {length} bytes (max {max})")]
-    ValueTooLong {
-        line: usize,
-        length: usize,
-        max: usize,
-    },
-
     #[error("I/O error reading zip entry")]
     Io(#[from] std::io::Error),
 }

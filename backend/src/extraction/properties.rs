@@ -69,13 +69,6 @@ pub fn parse_properties(input: &str) -> Result<Vec<(String, String)>, Extraction
                 max: limits::MAX_KEY_LENGTH,
             });
         }
-        if value.len() > limits::MAX_VALUE_LENGTH {
-            return Err(ExtractionError::ValueTooLong {
-                line: line_num,
-                length: value.len(),
-                max: limits::MAX_VALUE_LENGTH,
-            });
-        }
 
         result.push((key, value));
     }
@@ -231,10 +224,13 @@ mod tests {
     }
 
     #[test]
-    fn test_value_too_long_rejected() {
-        let long_value = "v".repeat(limits::MAX_VALUE_LENGTH + 1);
+    fn test_long_values_accepted() {
+        // Values can be arbitrarily long (screen definitions, profile lines).
+        // The per-file size limit (1 MB) caps total data; no per-value limit needed.
+        let long_value = "v".repeat(4096);
         let input = format!("key={long_value}\n");
-        let result = parse_properties(&input);
-        assert!(matches!(result, Err(ExtractionError::ValueTooLong { .. })));
+        let result = parse_properties(&input).unwrap();
+        assert_eq!(result[0].0, "key");
+        assert_eq!(result[0].1.len(), 4096);
     }
 }

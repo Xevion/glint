@@ -430,6 +430,62 @@ impl ShaderVersionRepo {
         Ok(())
     }
 
+    /// List shader versions with pending extraction status that have a download URL.
+    /// Ordered by creation time (oldest first) so new versions don't starve old ones.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_pending_extraction(
+        executor: impl sqlx::PgExecutor<'_>,
+        limit: i64,
+    ) -> AppResult<Vec<ShaderVersion>> {
+        let versions = sqlx::query_as!(
+            ShaderVersion,
+            r#"SELECT id, shader_id, version, modrinth_version_id, curseforge_file_id,
+                download_url, file_hash, file_size,
+                game_versions as "game_versions: Json<Vec<String>>",
+                release_channel,
+                upstream_published_at, created_at, capture_failure_count, last_capture_error,
+                extraction_status AS "extraction_status!: ExtractionStatus",
+                extraction_error, extracted_at
+            FROM shader_versions
+            WHERE extraction_status = 'pending'
+              AND download_url IS NOT NULL
+            ORDER BY created_at ASC
+            LIMIT $1"#,
+            limit
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to list pending extraction versions")?;
+        debug!(count = versions.len(), "Listed pending extraction versions");
+        Ok(versions)
+    }
+
+    /// Mark a shader version's extraction as failed with an error message.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn mark_extraction_failed(
+        executor: impl sqlx::PgExecutor<'_>,
+        version_id: &str,
+        error_message: &str,
+    ) -> AppResult<()> {
+        sqlx::query!(
+            r#"
+            UPDATE shader_versions
+            SET extraction_status = 'failed',
+                extraction_error = $2
+            WHERE id = $1
+            "#,
+            version_id,
+            error_message,
+        )
+        .execute(executor)
+        .await
+        .context(format!(
+            "failed to mark extraction failed for version '{}'",
+            version_id
+        ))?;
+        Ok(())
+    }
+
     #[instrument(skip(executor), level = "debug")]
     pub async fn get_latest_for_shader(
         executor: impl sqlx::PgExecutor<'_>,
