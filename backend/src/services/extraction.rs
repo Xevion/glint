@@ -1,67 +1,88 @@
 use std::time::Duration;
 
 use sqlx::PgPool;
-use tokio::time::interval;
 use tracing::{debug, error, info, warn};
 
 use crate::extraction::limits::MAX_ARCHIVE_SIZE;
 use crate::models::ShaderVersion;
 use crate::repo::{ExtractionRepo, ShaderVersionRepo};
 
-/// How often the extraction worker polls for pending versions (5 minutes).
-const POLL_INTERVAL_SECS: u64 = 5 * 60;
-
-/// Maximum number of versions to process per poll cycle.
-const BATCH_SIZE: i64 = 10;
+/// Number of versions to fetch per query (large batch, worked through steadily).
+const BATCH_SIZE: i64 = 60;
 
 /// Timeout for downloading a shader pack zip from CDN.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// Courtesy delay between consecutive downloads to avoid hammering the CDN.
-const DOWNLOAD_DELAY: Duration = Duration::from_millis(500);
+/// Delay between consecutive extractions while processing a batch (~3 items per 5s).
+const ITEM_DELAY: Duration = Duration::from_millis(1_700);
 
-/// Background worker that periodically extracts metadata from pending shader versions.
+/// Initial backoff when no pending work is found.
+const IDLE_BACKOFF_INITIAL: Duration = Duration::from_secs(30);
+
+/// Maximum backoff when the queue stays empty.
+const IDLE_BACKOFF_MAX: Duration = Duration::from_secs(5 * 60);
+
+/// Background worker that continuously extracts metadata from pending shader versions.
 ///
-/// Polls the database for shader versions with `extraction_status = 'pending'`,
-/// downloads the zip archive from Modrinth CDN, runs the extraction pipeline,
-/// and persists the results (profiles + metadata) to the database.
+/// Fetches a batch of pending versions, processes them steadily with a short
+/// inter-item delay, then re-queries. When the queue is empty, backs off
+/// exponentially (30s → 60s → … → 5min) and resets as soon as work appears.
 pub async fn run(pool: PgPool, http: reqwest::Client) {
     info!(
-        poll_interval_secs = POLL_INTERVAL_SECS,
         batch_size = BATCH_SIZE,
+        item_delay_ms = ITEM_DELAY.as_millis() as u64,
+        idle_backoff_initial_secs = IDLE_BACKOFF_INITIAL.as_secs(),
+        idle_backoff_max_secs = IDLE_BACKOFF_MAX.as_secs(),
         "Shader pack extraction worker started"
     );
 
-    let mut ticker = interval(Duration::from_secs(POLL_INTERVAL_SECS));
+    let mut backoff = IDLE_BACKOFF_INITIAL;
 
     loop {
-        ticker.tick().await;
-        process_pending(&pool, &http).await;
+        let processed = process_batch(&pool, &http).await;
+
+        if processed > 0 {
+            // Work was found — reset backoff and immediately re-query for more
+            backoff = IDLE_BACKOFF_INITIAL;
+        } else {
+            // Queue empty — sleep with exponential backoff
+            debug!(
+                backoff_secs = backoff.as_secs(),
+                "No pending extractions, backing off"
+            );
+            tokio::time::sleep(backoff).await;
+            backoff = (backoff * 2).min(IDLE_BACKOFF_MAX);
+        }
     }
 }
 
 /// Fetch and process a batch of pending shader versions.
-async fn process_pending(pool: &PgPool, http: &reqwest::Client) {
+///
+/// Returns the number of items successfully fetched (not necessarily all completed).
+async fn process_batch(pool: &PgPool, http: &reqwest::Client) -> usize {
     let versions = match ShaderVersionRepo::list_pending_extraction(pool, BATCH_SIZE).await {
         Ok(v) => v,
         Err(e) => {
             error!(error = %e, "Failed to list pending extraction versions");
-            return;
+            return 0;
         }
     };
 
     if versions.is_empty() {
-        return;
+        return 0;
     }
 
     info!(count = versions.len(), "Processing pending extractions");
 
+    let count = versions.len();
     for (i, version) in versions.iter().enumerate() {
         if i > 0 {
-            tokio::time::sleep(DOWNLOAD_DELAY).await;
+            tokio::time::sleep(ITEM_DELAY).await;
         }
         process_one(pool, http, version).await;
     }
+
+    count
 }
 
 /// Download, extract, and persist metadata for a single shader version.
