@@ -3,6 +3,24 @@ import { error } from '@sveltejs/kit';
 
 const logger = getLogger(['ssr', 'api', 'error']);
 
+/**
+ * Throw a SvelteKit error with enriched App.Error fields.
+ *
+ * For API errors, prefer `ApiError.throw()` which automatically
+ * propagates the status code, error code, and detail from the backend.
+ * Use `pageError` only for non-API errors (e.g. invalid route params).
+ */
+export function pageError(status: number, message: string): never {
+	const errorId = crypto.randomUUID();
+	const timestamp = new Date().toISOString();
+
+	if (status !== 404) {
+		logger.error('{errorId} [{status}] {message}', { errorId, status, message });
+	}
+
+	error(status, { message, errorId, source: 'server', timestamp });
+}
+
 export enum ApiErrorType {
 	Network = 'NETWORK_ERROR',
 	NotFound = 'NOT_FOUND',
@@ -21,7 +39,8 @@ export class ApiError extends Error {
 		message: string,
 		statusCode?: number,
 		public readonly details?: unknown,
-		public readonly code?: string
+		public readonly code?: string,
+		public readonly detail?: string
 	) {
 		super(message);
 		this.name = 'ApiError';
@@ -29,17 +48,30 @@ export class ApiError extends Error {
 	}
 
 	/**
-	 * Log the error and throw a SvelteKit HttpError.
+	 * Log the error and throw a SvelteKit HttpError with enriched App.Error fields.
 	 * Use in load functions instead of raw `error()` so SSR failures always produce a log line.
 	 */
 	throw(): never {
-		logger.error('{type} {statusCode}: {message}', {
+		const errorId = crypto.randomUUID();
+		const timestamp = new Date().toISOString();
+
+		logger.error('{errorId} {type} {statusCode}: {message}', {
+			errorId,
 			type: this.type,
 			statusCode: this.statusCode,
 			message: this.message,
-			...(this.code && { code: this.code })
+			...(this.code && { code: this.code }),
+			...(this.detail && { detail: this.detail })
 		});
-		error(this.statusCode, this.message);
+
+		error(this.statusCode, {
+			message: this.message,
+			errorId,
+			source: 'server',
+			timestamp,
+			code: this.code,
+			detail: this.detail
+		});
 	}
 
 	private static statusCodeForType(type: ApiErrorType): number {
@@ -64,10 +96,12 @@ export class ApiError extends Error {
 	static fromResponse(response: Response, body?: unknown): ApiError {
 		let message: string | undefined;
 		let code: string | undefined;
+		let detail: string | undefined;
 
 		if (typeof body === 'object' && body) {
 			if ('error' in body && typeof body.error === 'string') message = body.error;
 			if ('code' in body && typeof body.code === 'string') code = body.code;
+			if ('detail' in body && typeof body.detail === 'string') detail = body.detail;
 		}
 
 		if (!message) {
@@ -91,20 +125,20 @@ export class ApiError extends Error {
 
 		switch (response.status) {
 			case 400:
-				return new ApiError(ApiErrorType.BadRequest, message, 400, body, code);
+				return new ApiError(ApiErrorType.BadRequest, message, 400, body, code, detail);
 			case 401:
-				return new ApiError(ApiErrorType.Unauthorized, message, 401, body, code);
+				return new ApiError(ApiErrorType.Unauthorized, message, 401, body, code, detail);
 			case 403:
-				return new ApiError(ApiErrorType.Forbidden, message, 403, body, code);
+				return new ApiError(ApiErrorType.Forbidden, message, 403, body, code, detail);
 			case 404:
-				return new ApiError(ApiErrorType.NotFound, message, 404, body, code);
+				return new ApiError(ApiErrorType.NotFound, message, 404, body, code, detail);
 			case 500:
 			case 502:
 			case 503:
 			case 504:
-				return new ApiError(ApiErrorType.ServerError, message, response.status, body, code);
+				return new ApiError(ApiErrorType.ServerError, message, response.status, body, code, detail);
 			default:
-				return new ApiError(ApiErrorType.Unknown, message, response.status, body, code);
+				return new ApiError(ApiErrorType.Unknown, message, response.status, body, code, detail);
 		}
 	}
 

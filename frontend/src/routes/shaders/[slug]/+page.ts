@@ -1,5 +1,5 @@
 import { createApiClient } from '$lib/api';
-import { ApiErrorType } from '$lib/api/errors';
+import { ApiErrorType, pageError } from '$lib/api/errors';
 import type {
 	CaptureWithContext,
 	ShaderAuthor,
@@ -9,7 +9,6 @@ import type {
 	ShaderWithCaptures
 } from '$lib/bindings';
 import { pick } from '$lib/utils';
-import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
 export type ShaderDetailVersion = Pick<ShaderVersionDetail, 'id' | 'version' | 'capture_count'>;
@@ -90,7 +89,7 @@ export const load: PageLoad = async ({ params, fetch }) => {
 		Ok: (s) => s,
 		Err: (err) => {
 			if (err.type === ApiErrorType.NotFound) {
-				error(404, { message: `Shader "${params.slug}" not found` });
+				pageError(404, `Shader "${params.slug}" not found`);
 			}
 			return err.throw();
 		}

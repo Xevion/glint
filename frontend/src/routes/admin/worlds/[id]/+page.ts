@@ -1,5 +1,5 @@
 import { createApiClient, ApiErrorType } from '$lib/api';
-import { error } from '@sveltejs/kit';
+import { pageError } from '$lib/api/errors';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params, fetch }) => {
@@ -9,8 +9,8 @@ export const load: PageLoad = async ({ params, fetch }) => {
 	return result.match({
 		Ok: (data) => ({ world: data }),
 		Err: (err) => {
-			if (err.type === ApiErrorType.NotFound) error(404, { message: 'World not found' });
-			error(500, { message: 'Failed to load world' });
+			if (err.type === ApiErrorType.NotFound) pageError(404, 'World not found');
+			return err.throw();
 		}
 	});
 };

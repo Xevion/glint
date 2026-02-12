@@ -47,7 +47,15 @@ declare global {
 	namespace App {
 		interface Error {
 			message: string;
+			errorId?: string;
+			source?: 'client' | 'server';
+			timestamp?: string;
 			stack?: string;
+			requestId?: string;
+			/** Backend error code (e.g. "INTERNAL_ERROR", "NOT_FOUND") */
+			code?: string;
+			/** Backend error detail for internal/database errors */
+			detail?: string;
 		}
 		// interface Locals {}
 		interface PageData {

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { goto } from '$app/navigation';
-import ErrorBoundaryFallback from '$lib/components/ErrorBoundaryFallback.svelte';
+import ErrorCard from '$lib/components/ErrorCard.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import {
 	type CompareMode,
@@ -152,13 +152,18 @@ const ogDescription = $derived.by(() => {
 				<svelte:boundary onerror={(e) => console.error('[Compare]', e)}>
 					<ShaderCompare {leftImage} {rightImage} {mode} {leftShader} {rightShader} />
 
-					{#snippet failed(error, reset)}
-						<ErrorBoundaryFallback
-							error={error instanceof Error ? error : new Error(String(error))}
-							{reset}
-							title="Comparison failed"
-						/>
-					{/snippet}
+				{#snippet failed(error, reset)}
+					{@const err = error instanceof Error ? error : new Error(String(error))}
+					<ErrorCard
+						title="Comparison failed"
+						message={err.message}
+						stack={err.stack}
+					>
+						{#snippet actions()}
+							<Button variant="outline" size="sm" onclick={reset}>Reload</Button>
+						{/snippet}
+					</ErrorCard>
+				{/snippet}
 				</svelte:boundary>
 			</div>
 

@@ -1,6 +1,6 @@
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
-import { initLogger } from '$lib/logger';
+import { initLogger } from '$lib/logger.server';
 import { requestContext } from '$lib/server/context';
 import { getLogger } from '@logtape/logtape';
 import type { Handle, HandleServerError } from '@sveltejs/kit';
@@ -106,33 +106,38 @@ export const handle: Handle = async ({ event, resolve }) => {
 };
 
 export const handleError: HandleServerError = ({ error, event, status }) => {
+	const errorId = crypto.randomUUID();
+	const timestamp = new Date().toISOString();
+	const requestId = event.request.headers.get('x-request-id') ?? undefined;
+	const errorMessage = error instanceof Error ? error.message : String(error);
+	const stack = error instanceof Error ? error.stack : undefined;
+
 	if (status !== 404) {
-		errorLogger.error('{method} {path} {status} (unhandled): {error}', {
+		errorLogger.error('{errorId} {method} {path} {status} (unhandled): {error}', {
+			errorId,
 			status,
 			method: event.request.method,
 			path: event.url.pathname,
-			error: error instanceof Error ? error.message : String(error)
+			error: errorMessage,
+			requestId
 		});
 	}
 
 	if (posthog && status !== 404) {
-		const requestId = event.request.headers.get('x-request-id') ?? 'unknown';
-		posthog.captureException(error, requestId, {
+		posthog.captureException(error, requestId ?? errorId, {
 			method: event.request.method,
 			path: event.url.pathname,
-			status
+			status,
+			errorId
 		});
 	}
 
-	const message =
-		status === 404
-			? 'Not Found'
-			: dev && error instanceof Error
-				? error.message
-				: 'An error occurred';
-
 	return {
-		message,
-		...(dev && error instanceof Error && error.stack ? { stack: error.stack } : {})
+		message: status === 404 ? 'Not Found' : errorMessage,
+		errorId,
+		source: 'server' as const,
+		timestamp,
+		stack,
+		requestId
 	};
 };

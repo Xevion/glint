@@ -1,5 +1,5 @@
 import { createApiClient, ApiErrorType } from '$lib/api';
-import { error } from '@sveltejs/kit';
+import { pageError } from '$lib/api/errors';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params, fetch }) => {
@@ -13,16 +13,14 @@ export const load: PageLoad = async ({ params, fetch }) => {
 	const run = runRes.match({
 		Ok: (r) => r,
 		Err: (err) => {
-			if (err.type === ApiErrorType.NotFound) error(404, { message: 'Run not found' });
-			error(500, { message: 'Failed to load run' });
+			if (err.type === ApiErrorType.NotFound) pageError(404, 'Run not found');
+			return err.throw();
 		}
 	});
 
 	const items = itemsRes.match({
 		Ok: (i) => i,
-		Err: () => {
-			error(500, { message: 'Failed to load run items' });
-		}
+		Err: (err) => err.throw()
 	});
 
 	return { run, items };

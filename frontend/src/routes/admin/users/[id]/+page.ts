@@ -1,5 +1,5 @@
 import { createApiClient, ApiErrorType } from '$lib/api';
-import { error } from '@sveltejs/kit';
+import { pageError } from '$lib/api/errors';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params, fetch }) => {
@@ -7,7 +7,7 @@ export const load: PageLoad = async ({ params, fetch }) => {
 	const id = parseInt(params.id, 10);
 
 	if (Number.isNaN(id)) {
-		error(400, 'Invalid user ID');
+		pageError(400, 'Invalid user ID');
 	}
 
 	const result = await api.admin.getUser(id);
@@ -15,8 +15,8 @@ export const load: PageLoad = async ({ params, fetch }) => {
 	return result.match({
 		Ok: (user) => ({ user }),
 		Err: (err) => {
-			if (err.type === ApiErrorType.NotFound) error(404, { message: 'User not found' });
-			error(500, { message: 'Failed to load user' });
+			if (err.type === ApiErrorType.NotFound) pageError(404, 'User not found');
+			return err.throw();
 		}
 	});
 };

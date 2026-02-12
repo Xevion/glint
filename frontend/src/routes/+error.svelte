@@ -2,21 +2,26 @@
 import { dev } from '$app/environment';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
+import ErrorCard from '$lib/components/ErrorCard.svelte';
 import { Button } from '$lib/components/ui/button';
-import { fade, fly } from 'svelte/transition';
+import { fade } from 'svelte/transition';
 
-const statusMessages: Record<number, { title: string; description: string }> = {
-	404: {
-		title: 'Page Not Found',
-		description: "The page you're looking for doesn't exist or has been moved."
+const errorTitles: Record<number, { title: string; description: string }> = {
+	400: {
+		title: 'Bad Request',
+		description: 'The request was malformed or invalid.'
 	},
 	403: {
 		title: 'Forbidden',
 		description: "You don't have permission to access this resource."
 	},
-	500: {
-		title: 'Internal Server Error',
-		description: 'Something went wrong on our end. Please try again later.'
+	404: {
+		title: 'Page Not Found',
+		description: "The page you're looking for doesn't exist or has been moved."
+	},
+	502: {
+		title: 'Backend Unavailable',
+		description: 'The backend service is unreachable. Please try again later.'
 	},
 	503: {
 		title: 'Service Unavailable',
@@ -25,50 +30,45 @@ const statusMessages: Record<number, { title: string; description: string }> = {
 };
 
 let status = $derived(page.status);
-let message = $derived(
-	statusMessages[status] ?? {
-		title: 'Error',
-		description: page.error?.message ?? 'An unexpected error occurred.'
-	}
-);
+let error = $derived(page.error);
+let source = $derived(error?.source ?? 'server');
 
-let devMessage = $derived(dev ? page.error?.message : null);
-let devStack = $derived(dev ? page.error?.stack : null);
+let info = $derived.by(() => {
+	if (status === 404) return errorTitles[404];
+	if (source === 'client')
+		return { title: 'Client Error', description: 'An error occurred in the browser.' };
+	return (
+		errorTitles[status] ?? {
+			title: 'Server Error',
+			description: 'Something went wrong while processing your request.'
+		}
+	);
+});
+
+let statusLabel = $derived.by(() => {
+	if (source === 'client' && status === 500) return 'CLIENT';
+	return String(status);
+});
 </script>
 
-<div class="py-16">
-	<div class="mx-auto max-w-2xl text-center">
-		<div in:fly={{ y: -20, duration: 400 }} class="mb-8">
-			<div class="text-[10rem] leading-none font-bold text-primary">{status}</div>
-		</div>
-
-		<h1 in:fly={{ y: 10, duration: 400, delay: 100 }} class="mb-6 text-3xl font-bold">
-			{message.title}
-		</h1>
-
-		<p
-			in:fade={{ duration: 300, delay: 200 }}
-			class="mb-12 text-xl text-muted-foreground"
+<div class="py-16" in:fade={{ duration: 200 }}>
+	<div class="mx-auto max-w-2xl px-4">
+		<ErrorCard
+			title={info.title}
+			description={info.description}
+			{statusLabel}
+			message={error?.message}
+			errorId={error?.errorId}
+			requestId={error?.requestId}
+			timestamp={error?.timestamp}
+			stack={error?.stack}
+			code={error?.code}
+			detail={error?.detail}
+			defaultStackOpen={dev}
 		>
-			{message.description}
-		</p>
-
-		{#if devMessage}
-			<div in:fade={{ duration: 300, delay: 250 }} class="mx-auto mb-8 max-w-xl text-left">
-				<div class="rounded-lg border border-warning/30 bg-warning/5 p-4">
-					<div class="mb-2 text-xs font-semibold uppercase tracking-wider text-warning">
-						Dev Error
-					</div>
-					<p class="text-sm text-muted-foreground">{devMessage}</p>
-					{#if devStack}
-						<pre class="mt-3 max-h-64 overflow-auto rounded bg-black/50 p-3 text-left font-mono text-xs text-muted-foreground">{devStack}</pre>
-					{/if}
-				</div>
-			</div>
-		{/if}
-
-		<div in:fade={{ duration: 300, delay: 300 }}>
-			<Button href={resolve('/', {})} variant="default" size="lg">Go Home</Button>
-		</div>
+			{#snippet actions()}
+				<Button href={resolve('/', {})} variant="default" size="sm">Go Home</Button>
+			{/snippet}
+		</ErrorCard>
 	</div>
 </div>

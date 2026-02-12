@@ -107,19 +107,29 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, code) = self.status_and_code();
 
-        let message = match &self {
+        let (message, detail) = match &self {
             AppError::Database(e) => {
                 error!(error = ?e, "Database error");
-                "Database error occurred".to_string()
+                (
+                    "Database error occurred".to_string(),
+                    Some(format!("{e:#}")),
+                )
             }
             AppError::Internal(e) => {
                 error!(error = ?e, "Internal error: {:#}", e);
-                "Internal server error occurred".to_string()
+                (
+                    "Internal server error occurred".to_string(),
+                    Some(format!("{e:#}")),
+                )
             }
-            other => other.to_string(),
+            other => (other.to_string(), None),
         };
 
-        let body = Json(json!({ "error": message, "code": code }));
+        let body = Json(if let Some(detail) = detail {
+            json!({ "error": message, "code": code, "detail": detail })
+        } else {
+            json!({ "error": message, "code": code })
+        });
 
         if let AppError::RateLimited { retry_after_secs } = &self {
             (
