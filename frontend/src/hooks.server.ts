@@ -4,7 +4,7 @@ import { env as publicEnv } from '$env/dynamic/public';
 import { initLogger } from '$lib/logger';
 import { requestContext } from '$lib/server/context';
 import { getLogger } from '@logtape/logtape';
-import type { Handle, HandleFetch, HandleServerError } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { PostHog } from 'posthog-node';
 
 await initLogger();
@@ -90,21 +90,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		return response;
 	});
-};
-
-/**
- * Forward cookies to the backend during SSR.
- * SvelteKit's fetch only auto-forwards cookies for same-origin requests;
- * the backend runs on a different port so cookies are dropped without this.
- */
-export const handleFetch: HandleFetch = async ({ event, request, fetch }) => {
-	if (request.url.startsWith(backendUrl)) {
-		const cookie = event.request.headers.get('cookie');
-		if (cookie) {
-			request.headers.set('cookie', cookie);
-		}
-	}
-	return fetch(request);
 };
 
 export const handleError: HandleServerError = ({ error, event, status }) => {

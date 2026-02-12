@@ -1,17 +1,14 @@
-import { browser } from '$app/environment';
-import { env } from '$env/dynamic/public';
-
 /**
  * Get the API base URL for the current context.
  *
- * - Browser: relative URLs (same-origin, handled by Vite proxy in dev or reverse proxy in prod)
- * - SSR: PUBLIC_BACKEND_URL env var for server-to-server calls (may be different host/port)
+ * Always returns '' (relative URLs) so that both browser and SSR requests
+ * use paths like `/api/...`. In the browser, these are handled by the Vite
+ * dev proxy or the production reverse proxy. During SSR, SvelteKit's handle
+ * hook intercepts `/api/*` and proxies to the backend.
+ *
+ * Using relative URLs prevents internal backend addresses (e.g. localhost:3001)
+ * from leaking into the serialized HTML via data-sveltekit-fetched data-url attributes.
  */
 export function getApiUrl(): string {
-	if (browser) {
-		return '';
-	}
-
-	// SSR: use dynamic public env for runtime resolution (import.meta.env is empty in built output)
-	return env.PUBLIC_BACKEND_URL ?? 'http://localhost:8080';
+	return '';
 }
