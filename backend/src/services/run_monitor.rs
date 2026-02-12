@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use sqlx::PgPool;
 use tokio::time::interval;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, trace, warn};
 
 use crate::repo::CaptureRunRepo;
 
@@ -32,7 +32,7 @@ pub async fn monitor_capture_runs(pool: PgPool) {
         match CaptureRunRepo::find_stale_runs(&pool, RUN_TIMEOUT_SECS).await {
             Ok(stale_ids) => {
                 if stale_ids.is_empty() {
-                    debug!("No stale capture runs found");
+                    trace!("No stale capture runs found");
                     continue;
                 }
 

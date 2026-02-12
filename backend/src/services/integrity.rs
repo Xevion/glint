@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use sqlx::PgPool;
 use tokio::time::interval;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::repo::CaptureRepo;
 
@@ -64,7 +64,7 @@ async fn sweep_orphaned_uploads(pool: &PgPool, http: &reqwest::Client) {
         };
 
     if captures.is_empty() {
-        debug!("Integrity sweep: no orphaned uploads found");
+        trace!("Integrity sweep: no orphaned uploads found");
         return;
     }
 
@@ -165,7 +165,7 @@ async fn sweep_unverified_completions(
         };
 
     if captures.is_empty() {
-        debug!("Integrity sweep: no unverified completions found");
+        trace!("Integrity sweep: no unverified completions found");
         return;
     }
 

@@ -1,7 +1,7 @@
-pub mod capture_integrity;
-pub mod capture_metadata;
-pub mod capture_run_monitor;
 pub mod extraction;
+pub mod integrity;
+pub mod metadata;
 pub mod platform;
+pub mod run_monitor;
 pub mod shader;
 pub mod upload_cleanup;

@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use dashmap::DashMap;
 use mini_moka::sync::Cache;
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, trace};
 
 use crate::db::DbPool;
 use crate::error::AppResult;
@@ -66,11 +66,11 @@ impl SessionCache {
     #[instrument(skip(self, db, token), level = "debug")]
     pub async fn get_or_validate(&self, db: &DbPool, token: &str) -> AppResult<(User, Session)> {
         if let Some(cached) = self.inner.cache.get(&token.to_string()) {
-            debug!("Session cache hit");
+            trace!("Session cache hit");
             return Ok(cached);
         }
 
-        debug!("Session cache miss, validating against database");
+        trace!("Session cache miss, validating against database");
         let result = SessionRepo::validate(db, token).await?;
 
         // Populate cache and reverse index

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use posthog_rs::{Client, Event};
 use serde_json::Value;
-use tracing::{debug, warn};
+use tracing::{trace, warn};
 
 /// PostHog analytics client wrapper.
 /// Provides fire-and-forget event tracking that never blocks request handling.
@@ -39,7 +39,7 @@ impl Analytics {
             if let Err(e) = client.capture(event).await {
                 warn!(error = %e, event = %event_name, "Failed to capture PostHog event");
             } else {
-                debug!(event = %event_name, distinct_id = %distinct_id, "PostHog event captured");
+                trace!(event = %event_name, distinct_id = %distinct_id, "PostHog event captured");
             }
         });
     }

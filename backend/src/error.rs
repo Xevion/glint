@@ -109,7 +109,7 @@ impl IntoResponse for AppError {
 
         let message = match &self {
             AppError::Database(e) => {
-                error!(error = %e, "Database error");
+                error!(error = ?e, "Database error");
                 "Database error occurred".to_string()
             }
             AppError::Internal(e) => {

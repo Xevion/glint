@@ -176,7 +176,7 @@ async fn main() -> anyhow::Result<()> {
     // Start capture metadata background worker
     let integrity_http = http_client.clone();
     let extraction_http = http_client.clone();
-    tokio::spawn(services::capture_metadata::run(
+    tokio::spawn(services::metadata::run(
         metadata_rx,
         pool.clone(),
         http_client,
@@ -185,12 +185,10 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Start capture run monitor (detects and times out stale runs)
-    tokio::spawn(services::capture_run_monitor::monitor_capture_runs(
-        pool.clone(),
-    ));
+    tokio::spawn(services::run_monitor::monitor_capture_runs(pool.clone()));
 
     // Start capture integrity sweep (verifies R2 images, cleans up orphans)
-    tokio::spawn(services::capture_integrity::run(
+    tokio::spawn(services::integrity::run(
         pool.clone(),
         integrity_http,
         integrity_metadata_tx,
