@@ -7,7 +7,7 @@ use crate::{
     middleware::client_ip::ClientIp,
     models::{
         CaptureStatus, CreateShaderRequest, CreateShaderVersionRequest, Shader, ShaderListItem,
-        ShaderVersion, ShaderWithCaptures, TrendingShader, UpdateShaderRequest,
+        ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
     },
     repo::{
         CaptureRepo, ShaderRepo, ShaderVersionRepo, ShaderViewRepo, SlugRedirectRepo,
@@ -19,7 +19,7 @@ use crate::{
 use axum::{
     Json, Router,
     extract::{ConnectInfo, Path, Query, State},
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
 };
@@ -38,17 +38,46 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/versions", post(create_shader_version))
 }
 
-/// Response type for shader detail endpoint: either JSON data or a 301 redirect.
+/// Response type for shader detail endpoint: JSON data, 301 redirect, or 304 not modified.
 enum ShaderDetailResponse {
-    Data(Box<Json<ShaderWithCaptures>>),
+    Data {
+        body: Box<Json<ShaderWithCaptures>>,
+        etag: String,
+    },
     Redirect(Redirect),
+    NotModified(String),
 }
 
 impl IntoResponse for ShaderDetailResponse {
     fn into_response(self) -> Response {
         match self {
-            Self::Data(json) => json.into_response(),
+            Self::Data { body, etag } => {
+                let mut response = body.into_response();
+                if let Ok(val) = HeaderValue::from_str(&etag) {
+                    response.headers_mut().insert(header::ETAG, val);
+                }
+                response.headers_mut().insert(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static(
+                        "public, max-age=30, s-maxage=30, stale-while-revalidate=120",
+                    ),
+                );
+                response
+            }
             Self::Redirect(r) => r.into_response(),
+            Self::NotModified(etag) => {
+                let mut response = StatusCode::NOT_MODIFIED.into_response();
+                if let Ok(val) = HeaderValue::from_str(&etag) {
+                    response.headers_mut().insert(header::ETAG, val);
+                }
+                response.headers_mut().insert(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static(
+                        "public, max-age=30, s-maxage=30, stale-while-revalidate=120",
+                    ),
+                );
+                response
+            }
         }
     }
 }
@@ -92,6 +121,18 @@ async fn list_shaders(State(state): State<AppState>) -> AppResult<Json<Vec<Shade
 struct ShaderDetailQuery {
     version_id: Option<String>,
     profile: Option<String>,
+}
+
+/// Check `If-None-Match` against an ETag value; return `true` if the client's
+/// cached version matches (meaning we can return 304).
+fn etag_matches(headers: &HeaderMap, etag: &str) -> bool {
+    headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| {
+            v.split(',')
+                .any(|t| t.trim().trim_matches('"') == etag.trim_matches('"'))
+        })
 }
 
 /// GET /api/shaders/{id} - Get shader by ID or slug with versions and captures (public)
@@ -174,13 +215,21 @@ async fn get_shader(
         }
     });
 
-    Ok(ShaderDetailResponse::Data(Box::new(Json(
-        ShaderWithCaptures {
+    // ETag based on shader identity + update timestamp
+    let etag = format!("\"s:{}:{}\"", shader.id, shader.updated_at.timestamp());
+
+    if etag_matches(&headers, &etag) {
+        return Ok(ShaderDetailResponse::NotModified(etag));
+    }
+
+    Ok(ShaderDetailResponse::Data {
+        body: Box::new(Json(ShaderWithCaptures {
             shader,
             versions,
             captures,
-        },
-    ))))
+        })),
+        etag,
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -196,11 +245,16 @@ struct TrendingQuery {
 async fn trending_shaders(
     State(state): State<AppState>,
     Query(query): Query<TrendingQuery>,
-) -> AppResult<Json<Vec<TrendingShader>>> {
+) -> AppResult<Response> {
     let days = query.days.unwrap_or(7).clamp(1, 90);
     let limit = query.limit.unwrap_or(10).clamp(1, 50);
     let result = ShaderService::list_trending(state.db(), days, limit).await?;
-    Ok(Json(result))
+    let mut response = Json(result).into_response();
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=300, s-maxage=300, stale-while-revalidate=600"),
+    );
+    Ok(response)
 }
 
 /// POST /api/shaders - Create a new shader (admin)

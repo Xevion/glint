@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, put},
 };
@@ -112,29 +112,70 @@ struct SceneQuery {
     world_id: Option<String>,
 }
 
-/// Response type for scene-by-slug endpoint: either JSON data or a 301 redirect.
+/// Response type for scene-by-slug endpoint: JSON data, 301 redirect, or 304 not modified.
 enum SceneSlugResponse {
-    Data(Json<Vec<SceneWithCaptures>>),
+    Data {
+        body: Json<Vec<SceneWithCaptures>>,
+        etag: String,
+    },
     Redirect(Redirect),
+    NotModified(String),
 }
 
 impl IntoResponse for SceneSlugResponse {
     fn into_response(self) -> Response {
         match self {
-            Self::Data(json) => json.into_response(),
+            Self::Data { body, etag } => {
+                let mut response = body.into_response();
+                if let Ok(val) = HeaderValue::from_str(&etag) {
+                    response.headers_mut().insert(header::ETAG, val);
+                }
+                response.headers_mut().insert(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static(
+                        "public, max-age=30, s-maxage=30, stale-while-revalidate=120",
+                    ),
+                );
+                response
+            }
             Self::Redirect(r) => r.into_response(),
+            Self::NotModified(etag) => {
+                let mut response = StatusCode::NOT_MODIFIED.into_response();
+                if let Ok(val) = HeaderValue::from_str(&etag) {
+                    response.headers_mut().insert(header::ETAG, val);
+                }
+                response.headers_mut().insert(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static(
+                        "public, max-age=30, s-maxage=30, stale-while-revalidate=120",
+                    ),
+                );
+                response
+            }
         }
     }
+}
+
+/// Check `If-None-Match` against an ETag value.
+fn etag_matches(headers: &HeaderMap, etag: &str) -> bool {
+    headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| {
+            v.split(',')
+                .any(|t| t.trim().trim_matches('"') == etag.trim_matches('"'))
+        })
 }
 
 /// GET /api/scenes/by-slug/{slug} - Get scene by slug with captures (public)
 ///
 /// Supports 301 redirects when accessing via an old slug that has since been renamed.
-#[instrument(skip(state))]
+#[instrument(skip(state, headers))]
 async fn get_scene_by_slug(
     State(state): State<AppState>,
     Path(slug): Path<String>,
     Query(params): Query<SceneQuery>,
+    headers: HeaderMap,
 ) -> Result<SceneSlugResponse, AppError> {
     // Fetch all scenes with this slug (world-scoped), optionally filtered by world_id
     let scenes = if let Some(ref world_id) = params.world_id {
@@ -192,7 +233,22 @@ async fn get_scene_by_slug(
         });
     }
 
-    Ok(SceneSlugResponse::Data(Json(results)))
+    // ETag from the latest scene version timestamp across all results
+    let max_ts = results
+        .iter()
+        .map(|r| r.version.created_at.timestamp())
+        .max()
+        .unwrap_or(0);
+    let etag = format!("\"sc:{}:{}\"", slug, max_ts);
+
+    if etag_matches(&headers, &etag) {
+        return Ok(SceneSlugResponse::NotModified(etag));
+    }
+
+    Ok(SceneSlugResponse::Data {
+        body: Json(results),
+        etag,
+    })
 }
 
 /// GET /api/scenes/{id} - Get scene by ID with latest version (admin)

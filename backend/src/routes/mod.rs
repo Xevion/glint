@@ -21,7 +21,10 @@ use tracing::instrument;
 
 use crate::{
     analytics::Analytics,
-    middleware::rate_limit::{RateLimitConfig, RateLimitLayer},
+    middleware::{
+        cache_control::CacheControlLayer,
+        rate_limit::{RateLimitConfig, RateLimitLayer},
+    },
     state::AppState,
 };
 
@@ -51,6 +54,16 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         )
     };
 
+    // Cache directives applied per-subrouter. Endpoints that set their own
+    // Cache-Control header (ETag detail endpoints, trending) are not overridden
+    // by the layer — it only injects headers on responses that lack them.
+    let cache_short =
+        CacheControlLayer::new("public, max-age=60, s-maxage=60, stale-while-revalidate=300");
+    let cache_backgrounds =
+        CacheControlLayer::new("public, max-age=300, s-maxage=300, stale-while-revalidate=600");
+    let cache_featured = CacheControlLayer::new("public, max-age=60, s-maxage=30");
+    let no_store = CacheControlLayer::new("no-store");
+
     Router::new()
         .nest("/auth", auth::router().layer(make_layer(&rl.auth, "auth")))
         .nest(
@@ -63,21 +76,33 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         )
         .nest(
             "/runs",
-            runs::router().layer(make_layer(&rl.agent, "agent")),
+            runs::router()
+                .layer(no_store.clone())
+                .layer(make_layer(&rl.agent, "agent")),
         )
         .merge(runs::failure_router().layer(make_layer(&rl.agent, "agent")))
         .merge(runs::upload_router().layer(make_layer(&rl.agent, "agent")))
-        .nest("/backgrounds", backgrounds::router())
+        .nest(
+            "/backgrounds",
+            backgrounds::router().layer(cache_backgrounds),
+        )
         .nest("/user", user::router())
-        .nest("/shaders", shaders::router().merge(adopt::router()))
-        .nest("/scenes", scenes::router())
-        .nest("/captures", captures::router())
+        .nest(
+            "/shaders",
+            shaders::router()
+                .merge(adopt::router())
+                .layer(cache_short.clone()),
+        )
+        .nest("/scenes", scenes::router().layer(cache_short.clone()))
+        .nest("/captures", captures::router().layer(cache_short))
         .nest("/users", users::router())
         .nest(
             "/work",
-            work::router().layer(make_layer(&rl.agent, "agent")),
+            work::router()
+                .layer(no_store)
+                .layer(make_layer(&rl.agent, "agent")),
         )
-        .nest("/featured", featured::router())
+        .nest("/featured", featured::router().layer(cache_featured))
         .nest("/admin/capture-health", capture_health::router())
         .nest("/admin/storage", storage::router())
         // Intentional double rate limiting: routes like /auth, /device, and /worlds
@@ -88,7 +113,11 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         .layer(make_layer(&rl.global, "global"))
 }
 
+/// Health check — must never be cached.
 #[instrument]
-async fn health() -> &'static str {
-    "ok"
+async fn health() -> (
+    [(axum::http::header::HeaderName, &'static str); 1],
+    &'static str,
+) {
+    ([(axum::http::header::CACHE_CONTROL, "no-store")], "ok")
 }

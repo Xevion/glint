@@ -122,7 +122,13 @@ fn xml_escape(s: &str) -> String {
 fn xml_response(body: &str) -> Response {
     (
         StatusCode::OK,
-        [(header::CONTENT_TYPE, "application/xml; charset=utf-8")],
+        [
+            (header::CONTENT_TYPE, "application/xml; charset=utf-8"),
+            (
+                header::CACHE_CONTROL,
+                "public, max-age=900, stale-while-revalidate=1800",
+            ),
+        ],
         body.to_owned(),
     )
         .into_response()
