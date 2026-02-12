@@ -258,6 +258,7 @@ async fn main() -> anyhow::Result<()> {
             auth = config.rate_limit.auth.requests_per_minute,
             device = config.rate_limit.device.requests_per_minute,
             upload = config.rate_limit.upload.requests_per_minute,
+            agent = config.rate_limit.agent.requests_per_minute,
             trusted_proxy_hops = config.rate_limit.trusted_proxy_hops,
             "Rate limiting enabled"
         );

@@ -41,6 +41,9 @@ pub struct RateLimitConfig {
 
     #[serde(default = "TierConfig::default_upload")]
     pub upload: TierConfig,
+
+    #[serde(default = "TierConfig::default_agent")]
+    pub agent: TierConfig,
 }
 
 impl Default for RateLimitConfig {
@@ -52,6 +55,7 @@ impl Default for RateLimitConfig {
             auth: TierConfig::default_auth(),
             device: TierConfig::default_device(),
             upload: TierConfig::default_upload(),
+            agent: TierConfig::default_agent(),
         }
     }
 }
@@ -93,6 +97,13 @@ impl TierConfig {
         Self {
             requests_per_minute: NonZeroU32::new(30).unwrap(),
             burst: NonZeroU32::new(10).unwrap(),
+        }
+    }
+
+    pub fn default_agent() -> Self {
+        Self {
+            requests_per_minute: NonZeroU32::new(600).unwrap(),
+            burst: NonZeroU32::new(100).unwrap(),
         }
     }
 

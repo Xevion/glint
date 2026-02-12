@@ -9,6 +9,7 @@ import com.xevion.glint.api.FailItemRequest
 import com.xevion.glint.api.HttpClient
 import com.xevion.glint.api.ReportFailureRequest
 import com.xevion.glint.api.WorkItem
+import com.xevion.glint.api.retryOnRateLimit
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -99,18 +100,19 @@ class RunUploader(
                     "completed" to completedCount.get()
                     "failed" to failed
                 }
-                AgentClient
-                    .failItem(
+                retryOnRateLimit(operationName = "fail item ${info.itemId}") {
+                    AgentClient.failItem(
                         client,
                         runId,
                         info.itemId,
                         FailItemRequest(errorMessage = "Upload failed: ${e.message}"),
-                    ).onFailure { failError ->
-                        log.error("Failed to report item failure") {
-                            "item_id" to info.itemId
-                            "error" to failError.message
-                        }
+                    )
+                }.onFailure { failError ->
+                    log.error("Failed to report item failure") {
+                        "item_id" to info.itemId
+                        "error" to failError.message
                     }
+                }
             } finally {
                 pendingCount.decrementAndGet()
             }
@@ -137,23 +139,24 @@ class RunUploader(
         for ((item, itemId) in unsubmittedEntries) {
             val future =
                 CompletableFuture.runAsync({
-                    AgentClient
-                        .failItem(
+                    retryOnRateLimit(operationName = "fail unsubmitted $itemId") {
+                        AgentClient.failItem(
                             client,
                             runId,
                             itemId,
                             FailItemRequest(errorMessage = "Capture not taken"),
-                        ).onSuccess {
-                            log.debug("Failed unsubmitted item") {
-                                "item_id" to itemId
-                                "scene_id" to item.sceneId
-                            }
-                        }.onFailure { e ->
-                            log.error("Failed to report unsubmitted item failure") {
-                                "item_id" to itemId
-                                "error" to e.message
-                            }
+                        )
+                    }.onSuccess {
+                        log.debug("Failed unsubmitted item") {
+                            "item_id" to itemId
+                            "scene_id" to item.sceneId
                         }
+                    }.onFailure { e ->
+                        log.error("Failed to report unsubmitted item failure") {
+                            "item_id" to itemId
+                            "error" to e.message
+                        }
+                    }
                 }, executor)
             pendingFutures.add(future)
         }
@@ -170,24 +173,25 @@ class RunUploader(
     ) {
         val future =
             CompletableFuture.runAsync({
-                AgentClient
-                    .reportFailure(
+                retryOnRateLimit(operationName = "report shader failure") {
+                    AgentClient.reportFailure(
                         client,
                         ReportFailureRequest(
                             shaderVersionId = shaderVersionId,
                             errorMessage = message,
                         ),
-                    ).onSuccess {
-                        log.debug("Reported shader failure") {
-                            "shader_version_id" to shaderVersionId
-                            "message" to message
-                        }
-                    }.onFailure { e ->
-                        log.error("Failed to report shader failure") {
-                            "shader_version_id" to shaderVersionId
-                            "error" to e.message
-                        }
+                    )
+                }.onSuccess {
+                    log.debug("Reported shader failure") {
+                        "shader_version_id" to shaderVersionId
+                        "message" to message
                     }
+                }.onFailure { e ->
+                    log.error("Failed to report shader failure") {
+                        "shader_version_id" to shaderVersionId
+                        "error" to e.message
+                    }
+                }
             }, executor)
         pendingFutures.add(future)
     }
@@ -243,8 +247,8 @@ class RunUploader(
     ) {
         log.debug("Claiming item") { "item_id" to itemId }
         val claimResponse =
-            AgentClient
-                .claimItem(
+            retryOnRateLimit(operationName = "claim item $itemId") {
+                AgentClient.claimItem(
                     client,
                     runId,
                     itemId,
@@ -255,7 +259,8 @@ class RunUploader(
                         worldVersionId = worldVersionId,
                         sceneVersionId = sceneVersionId,
                     ),
-                ).getOrThrow()
+                )
+            }.getOrThrow()
 
         log.debug("Uploading to R2") {
             "item_id" to itemId
@@ -264,6 +269,8 @@ class RunUploader(
         AgentClient.uploadFile(claimResponse.presignedUrl, event.fileBytes).getOrThrow()
 
         log.debug("Confirming upload") { "item_id" to itemId }
-        AgentClient.confirmUpload(client, runId, itemId, ConfirmUploadRequest()).getOrThrow()
+        retryOnRateLimit(operationName = "confirm upload $itemId") {
+            AgentClient.confirmUpload(client, runId, itemId, ConfirmUploadRequest())
+        }.getOrThrow()
     }
 }

@@ -8,6 +8,7 @@ import com.xevion.glint.api.CreateRunItemRequest
 import com.xevion.glint.api.CreateRunRequest
 import com.xevion.glint.api.HttpClient
 import com.xevion.glint.api.WorkItem
+import com.xevion.glint.api.retryOnRateLimit
 import com.xevion.glint.session.SessionRegistry
 import net.minecraft.client.Minecraft
 import java.util.concurrent.CancellationException
@@ -116,13 +117,15 @@ class AutonomousRunner(
         pending =
             PendingOp.FetchWork(
                 CompletableFuture.supplyAsync {
-                    AgentClient.fetchWork(
-                        client,
-                        limit = workLimit,
-                        force = isForceMode,
-                        shaders = forceShaders,
-                        scenes = forceScenes,
-                    )
+                    retryOnRateLimit(operationName = "fetch work") {
+                        AgentClient.fetchWork(
+                            client,
+                            limit = workLimit,
+                            force = isForceMode,
+                            shaders = forceShaders,
+                            scenes = forceScenes,
+                        )
+                    }
                 },
             )
     }
@@ -168,11 +171,15 @@ class AutonomousRunner(
                                 },
                         )
 
-                    val runResult = AgentClient.createRun(client, createRequest)
-                    val run = runResult.getOrThrow()
+                    val run =
+                        retryOnRateLimit(operationName = "create run") {
+                            AgentClient.createRun(client, createRequest)
+                        }.getOrThrow()
 
-                    val itemsResult = AgentClient.listRunItems(client, run.id)
-                    val runItems = itemsResult.getOrThrow()
+                    val runItems =
+                        retryOnRateLimit(operationName = "list run items") {
+                            AgentClient.listRunItems(client, run.id)
+                        }.getOrThrow()
 
                     Triple(run.id, runItems, workItems)
                 },
@@ -342,7 +349,9 @@ class AutonomousRunner(
             PendingOp.FinalizeRun(
                 CompletableFuture.supplyAsync {
                     uploader?.drainAndShutdown()
-                    AgentClient.completeRun(client, runId)
+                    retryOnRateLimit(operationName = "complete run $runId") {
+                        AgentClient.completeRun(client, runId)
+                    }
                 },
             )
     }

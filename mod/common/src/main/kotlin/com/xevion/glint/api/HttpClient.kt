@@ -79,6 +79,9 @@ class HttpClient(
                 } catch (e: Exception) {
                     Result.failure(ApiError.ParseError("Failed to parse response", e))
                 }
+            } else if (responseCode == 429) {
+                val retryAfter = connection.getHeaderField("Retry-After")?.toLongOrNull() ?: 1L
+                Result.failure(ApiError.RateLimited(retryAfter))
             } else {
                 val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
                 Result.failure(ApiError.HttpError(responseCode, errorBody))
@@ -103,6 +106,9 @@ class HttpClient(
 
             if (responseCode in builder.expectedStatus) {
                 Result.success(Unit)
+            } else if (responseCode == 429) {
+                val retryAfter = connection.getHeaderField("Retry-After")?.toLongOrNull() ?: 1L
+                Result.failure(ApiError.RateLimited(retryAfter))
             } else {
                 val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
                 Result.failure(ApiError.HttpError(responseCode, errorBody))

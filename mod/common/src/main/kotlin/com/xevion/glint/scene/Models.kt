@@ -21,7 +21,7 @@ data class SceneCollection(
     val version: String = "1.21.4",
     val description: String? = null,
     val defaultConfig: SceneConfig? = null,
-    val scenes: List<Scene>,
+    val scenes: List<Scene> = emptyList(),
     val entities: List<SceneEntity> = emptyList(),
 )
 
@@ -36,7 +36,7 @@ data class Scene(
     val dimension: String = "minecraft:overworld",
     val position: Position,
     val camera: Camera,
-    val timeOfDay: Int,
+    val timeOfDay: Int = 6000,
     val weather: Weather = Weather.CLEAR,
     val weatherIntensity: Float = 0.0f,
     val moonPhase: Int? = null,

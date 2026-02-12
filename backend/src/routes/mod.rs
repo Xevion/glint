@@ -60,17 +60,20 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         )
         .nest(
             "/runs",
-            runs::router().layer(make_layer(&rl.upload, "upload")),
+            runs::router().layer(make_layer(&rl.agent, "agent")),
         )
-        .merge(runs::failure_router().layer(make_layer(&rl.upload, "upload")))
-        .merge(runs::upload_router().layer(make_layer(&rl.upload, "upload")))
+        .merge(runs::failure_router().layer(make_layer(&rl.agent, "agent")))
+        .merge(runs::upload_router().layer(make_layer(&rl.agent, "agent")))
         .nest("/backgrounds", backgrounds::router())
         .nest("/user", user::router())
         .nest("/shaders", shaders::router().merge(adopt::router()))
         .nest("/scenes", scenes::router())
         .nest("/captures", captures::router())
         .nest("/users", users::router())
-        .nest("/work", work::router())
+        .nest(
+            "/work",
+            work::router().layer(make_layer(&rl.agent, "agent")),
+        )
         .nest("/featured", featured::router())
         .nest("/admin/capture-health", capture_health::router())
         .nest("/admin/storage", storage::router())
