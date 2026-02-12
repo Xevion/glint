@@ -59,6 +59,7 @@ onMount(() => {
 	backgrounds={data.backgrounds}
 	blur={4}
 	overlayOpacity={0.7}
+	lightOverlayOpacity={0.82}
 	lightBrightness={1.7}
 >
 	<div class="flex min-h-screen flex-col overflow-x-hidden px-3 md:px-5">

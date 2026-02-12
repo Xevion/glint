@@ -15,6 +15,8 @@ interface Props {
 	blur?: number;
 	overlay?: boolean;
 	overlayOpacity?: number;
+	/** Override overlay opacity for light mode (defaults to overlayOpacity if not set) */
+	lightOverlayOpacity?: number;
 	children?: Snippet;
 	/** Scale factor for wallpapers (1.75 = 175% zoom) */
 	scale?: number;
@@ -29,6 +31,7 @@ const {
 	blur = 0,
 	overlay = true,
 	overlayOpacity = 0.5,
+	lightOverlayOpacity,
 	children,
 	scale = 1.75,
 	blendHeight = 150,
@@ -288,7 +291,11 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 	{/if}
 
 	{#if overlay}
-		<div class="background-overlay" style:--overlay-opacity={overlayOpacity}></div>
+		<div
+			class="background-overlay"
+			style:--overlay-opacity={overlayOpacity}
+			style:--light-overlay-opacity={lightOverlayOpacity ?? overlayOpacity}
+		></div>
 	{/if}
 
 	<div class="noise-layer"></div>
@@ -381,8 +388,12 @@ const darkFilterStyle = $derived(blur > 0 ? `blur(${blur}px)` : undefined);
 		position: absolute;
 		inset: 0;
 		background: var(--background);
-		opacity: var(--overlay-opacity);
+		opacity: var(--light-overlay-opacity);
 		z-index: 1;
+	}
+
+	:global(.dark) .background-overlay {
+		opacity: var(--overlay-opacity);
 	}
 
 	.background-content {
