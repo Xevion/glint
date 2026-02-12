@@ -5,6 +5,7 @@ import type { Snippet } from 'svelte';
 import { onMount } from 'svelte';
 import 'overlayscrollbars/overlayscrollbars.css';
 import BackgroundImage from '$lib/components/BackgroundImage.svelte';
+import BrandIconSprite from '$lib/components/icons/BrandIconSprite.svelte';
 import Navigation from '$lib/components/Navigation.svelte';
 import Sidebar from '$lib/components/Sidebar.svelte';
 import { initNavigation } from '$lib/stores/navigation.svelte';
@@ -50,6 +51,8 @@ onMount(() => {
 	};
 });
 </script>
+
+<BrandIconSprite />
 
 <BackgroundImage
 	backgrounds={data.backgrounds}

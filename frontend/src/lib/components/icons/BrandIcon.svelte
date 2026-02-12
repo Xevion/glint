@@ -13,27 +13,24 @@ let { name, class: className = 'h-4 w-4', colorOnHover = false }: Props = $props
 const icon = $derived(icons[name]);
 </script>
 
-<svg class={className} viewBox={icon.viewBox} fill="currentColor">
-	{#each icon.paths as path (path.d)}
-		<path
-			class={colorOnHover ? 'transition-colors' : undefined}
-			style={colorOnHover ? `--hover-color: ${icon.hoverColor}` : undefined}
-			fill-rule={path.fillRule ?? undefined}
-			clip-rule={path.clipRule ?? undefined}
-			d={path.d}
-		/>
-	{/each}
+<svg
+	class="{className}{colorOnHover ? ' brand-icon-hover' : ''}"
+	style={colorOnHover ? `--brand-color: ${icon.hoverColor}` : undefined}
+	fill="currentColor"
+	aria-hidden="true"
+>
+	<use href="#brand-{name}" />
 </svg>
 
 <style>
-	path.transition-colors {
-		transition-property: fill;
+	.brand-icon-hover {
+		transition-property: color;
 		transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 		transition-duration: 150ms;
 	}
 
-	:global(.group\/modrinth:hover) path.transition-colors,
-	:global(.group\/curseforge:hover) path.transition-colors {
-		fill: var(--hover-color);
+	:global(.group\/modrinth:hover) .brand-icon-hover,
+	:global(.group\/curseforge:hover) .brand-icon-hover {
+		color: var(--brand-color);
 	}
 </style>
