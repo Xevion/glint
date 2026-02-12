@@ -1,0 +1,66 @@
+# Detekt configuration — builds on top of the default config.
+# Only overrides and tweaks are listed here.
+# https://detekt.dev/docs/rules/overview
+
+complexity:
+  LongMethod:
+    threshold: 130
+  LongParameterList:
+    functionThreshold: 10
+    constructorThreshold: 12
+  TooManyFunctions:
+    thresholdInObjects: 50
+    thresholdInFiles: 30
+    thresholdInClasses: 50
+  CyclomaticComplexMethod:
+    threshold: 25
+  NestedBlockDepth:
+    threshold: 8
+  LargeClass:
+    threshold: 1500
+
+style:
+  MagicNumber:
+    active: false
+  ReturnCount:
+    max: 12
+  MaxLineLength:
+    # ktlint handles line length
+    active: false
+  WildcardImport:
+    # ktlint handles import style
+    active: false
+  ForbiddenComment:
+    active: false
+  UnnecessaryAbstractClass:
+    active: true
+  ThrowsCount:
+    max: 8
+  LoopWithTooManyJumpStatements:
+    maxJumpCount: 3
+
+naming:
+  FunctionNaming:
+    # Mixin callbacks often use non-standard names (e.g., onScreenshotSaved)
+    excludes:
+      - "**/mixin/**"
+  MatchingDeclarationName:
+    active: false
+
+exceptions:
+  TooGenericExceptionCaught:
+    # Minecraft interop, reflection, and HTTP code legitimately need broad catches.
+    # Keep the rule active for new code awareness, but allow the common patterns.
+    active: true
+    exceptionNames:
+      - "Throwable"
+    allowedExceptionNameRegex: "_|(ignore|expected).*"
+  SwallowedException:
+    active: true
+    allowedExceptionNameRegex: "_|(ignore|expected).*"
+
+potential-bugs:
+  active: true
+
+performance:
+  active: true

@@ -97,7 +97,7 @@ object AuthClient {
                             "invalid_grant" -> Result.failure(ApiError.InvalidGrant())
                             else -> Result.failure(ApiError.HttpError(400, errorBody))
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         Result.failure(ApiError.HttpError(400, errorBody))
                     }
                 }

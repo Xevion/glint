@@ -19,7 +19,6 @@ import io.wispforest.owo.ui.core.HorizontalAlignment
 import io.wispforest.owo.ui.core.Sizing
 import io.wispforest.owo.ui.core.Surface
 import net.minecraft.Util
-import net.minecraft.client.gui.screens.Screen
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicBoolean
 import net.minecraft.network.chat.Component as McComponent
@@ -29,7 +28,6 @@ import net.minecraft.network.chat.Component as McComponent
  * Displays the user code and URL, polls for authorization completion.
  */
 class DeviceAuthScreen(
-    private val parent: Screen,
     private val serverUrl: String,
     private val onAuthorized: (DeviceTokenResponse) -> Unit,
     private val onBack: () -> Unit,
@@ -131,7 +129,7 @@ class DeviceAuthScreen(
             val remainingSeconds = ((expiresAtTime - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
             val minutes = remainingSeconds / 60
             val seconds = remainingSeconds % 60
-            val timeDisplay = String.format("%d:%02d", minutes, seconds)
+            val timeDisplay = String.format(java.util.Locale.ROOT, "%d:%02d", minutes, seconds)
 
             val timerLabel = instructionsContainer.childById(LabelComponent::class.java, "timer-label")
             timerLabel?.text(McComponent.literal("Waiting for authorization... (expires in $timeDisplay)"))

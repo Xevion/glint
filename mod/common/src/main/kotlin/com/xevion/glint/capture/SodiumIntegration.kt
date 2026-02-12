@@ -64,7 +64,7 @@ object SodiumIntegration {
 
             // Sodium is present, now try to set up reflection
             initReflection()
-        } catch (e: ClassNotFoundException) {
+        } catch (_: ClassNotFoundException) {
             log.debug("Sodium not detected, using vanilla chunk rendering detection")
             availability = AvailabilityState.UNAVAILABLE
         }
@@ -78,7 +78,7 @@ object SodiumIntegration {
         if (instanceNullableMethod != null) return
 
         try {
-            val swrClass = sodiumWorldRendererClass ?: throw IllegalStateException("Sodium class not loaded")
+            val swrClass = checkNotNull(sodiumWorldRendererClass) { "Sodium class not loaded" }
 
             // Get SodiumWorldRenderer.instanceNullable()
             instanceNullableMethod = swrClass.getMethod("instanceNullable")

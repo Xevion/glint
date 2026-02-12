@@ -152,7 +152,7 @@ object IrisIntegration {
     private fun queueProfile(profileName: String) {
         val pack =
             Iris.getCurrentPack().orElse(null)
-                ?: throw IllegalStateException("No shader pack loaded, cannot apply profile")
+                ?: error("No shader pack loaded, cannot apply profile")
 
         val menuContainer = (pack as ShaderPackAccessor).getMenuContainer()
         val profileSet = menuContainer.profiles

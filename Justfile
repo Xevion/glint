@@ -49,6 +49,7 @@ format:
 lint:
     bun run --cwd frontend lint
     cargo clippy --manifest-path backend/Cargo.toml -- --deny warnings
+    cd mod && ./gradlew detekt --quiet
 
 # Build everything for production
 build:

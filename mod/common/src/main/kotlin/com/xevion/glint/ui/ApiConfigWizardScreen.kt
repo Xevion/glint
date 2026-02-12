@@ -69,7 +69,6 @@ class ApiConfigWizardScreen(
     private fun showDeviceAuth(serverUrl: String) {
         minecraft?.setScreen(
             DeviceAuthScreen(
-                parent = parent,
                 serverUrl = serverUrl,
                 onAuthorized = { tokenResponse ->
                     val tokenExpiresAt =

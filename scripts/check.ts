@@ -258,7 +258,7 @@ const checks: Check[] = [
 	{
 		name: 'mod-lint',
 		subsystem: 'mod',
-		cmd: ['./gradlew', 'spotlessCheck', 'ktlintCheck', '--quiet'],
+		cmd: ['./gradlew', 'detekt', '--quiet'],
 		cwd: 'mod'
 	},
 	{

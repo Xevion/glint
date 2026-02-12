@@ -40,7 +40,7 @@ object SessionDirectoryManager {
         }
 
         if (!sessionDir.mkdirs()) {
-            throw IllegalStateException("Failed to create session directory: ${sessionDir.absolutePath}")
+            error("Failed to create session directory: ${sessionDir.absolutePath}")
         }
 
         return Pair(sessionDir, sessionId)

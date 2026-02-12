@@ -84,12 +84,18 @@ object SceneApplicator {
 
     private fun validateWorld(worldName: String): Boolean {
         val mc = Minecraft.getInstance()
-        if (mc.level == null) {
+        if (mc.level == null || mc.singleplayerServer == null) {
             return false
         }
 
-        // For now, we just check if a world is loaded
-        // TODO: Actually validate world name matches when we implement world loading
+        val loadedName = mc.singleplayerServer?.worldData?.levelName
+        if (loadedName != worldName) {
+            log.error("Wrong world loaded") {
+                "expected" to worldName
+                "actual" to (loadedName ?: "null")
+            }
+            return false
+        }
         return true
     }
 

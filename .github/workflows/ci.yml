@@ -105,6 +105,10 @@ jobs:
             ./gradlew spotlessCheck ktlintCheck --quiet || echo "::warning::Mod formatting issues found (not failing on push)"
           fi
 
+      - name: Lint (Detekt)
+        working-directory: mod
+        run: ./gradlew detekt --quiet
+
       - name: Compilation check
         working-directory: mod
         run: ./gradlew :common:compileKotlin :common:compileJava --quiet
