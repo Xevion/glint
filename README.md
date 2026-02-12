@@ -4,7 +4,7 @@
 
 Automated screenshot catalog for Minecraft shaders. Browse and compare shaders across standardized scenes.
 
-> **Alpha** — under active development with zero external users. Expect breaking changes.
+> Under active development. APIs and schemas may change without notice.
 
 <!-- TODO: Add screenshot/preview image here -->
 <!-- ![Glint Preview](docs/preview.png) -->

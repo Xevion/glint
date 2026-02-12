@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE shader_versions\n            SET extraction_status = 'completed',\n                extraction_error = NULL,\n                extracted_at = now()\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cfd54f806ac6f29476fa0f073c40b5ff3fce934484af61ee70acff1cef5e9d40"
+}

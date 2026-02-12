@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT shader_version_id, pipeline_features, iris_features_required,\n                   iris_features_optional, settings_screen, file_paths,\n                   dimension_support, has_custom_textures, extracted_at\n            FROM shader_version_metadata\n            WHERE shader_version_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "pipeline_features",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 2,
+        "name": "iris_features_required",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "iris_features_optional",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 4,
+        "name": "settings_screen",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "file_paths",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "dimension_support",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 7,
+        "name": "has_custom_textures",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "extracted_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "89513cf68a7bd9c6555b3eb8ea30e638073d509bc1269177d5266082e60cfb39"
+}

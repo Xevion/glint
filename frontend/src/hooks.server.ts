@@ -40,6 +40,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 				// @ts-expect-error Bun supports duplex streaming
 				duplex: 'half'
 			});
+
+			// Follow backend redirects (e.g. slug canonicalization) internally
+			// so SSR load functions receive the final response, not the 308.
+			if (response.status >= 300 && response.status < 400) {
+				const location = response.headers.get('location');
+				if (location) {
+					const redirectUrl = location.startsWith('/') ? `${backendUrl}${location}` : location;
+					response = await fetch(redirectUrl, {
+						method: 'GET',
+						headers,
+						redirect: 'manual'
+					});
+				}
+			}
 		} catch (err) {
 			proxyLogger.error('{method} {path} → backend unreachable', {
 				method,

@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO shader_version_metadata (\n                shader_version_id, pipeline_features, iris_features_required,\n                iris_features_optional, settings_screen, file_paths,\n                dimension_support, has_custom_textures, extracted_at\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())\n            ON CONFLICT (shader_version_id) DO UPDATE SET\n                pipeline_features = EXCLUDED.pipeline_features,\n                iris_features_required = EXCLUDED.iris_features_required,\n                iris_features_optional = EXCLUDED.iris_features_optional,\n                settings_screen = EXCLUDED.settings_screen,\n                file_paths = EXCLUDED.file_paths,\n                dimension_support = EXCLUDED.dimension_support,\n                has_custom_textures = EXCLUDED.has_custom_textures,\n                extracted_at = EXCLUDED.extracted_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cc7a01d9299f6bda4c39d1aeff53d6dffde1d3f61cfc2d59769627aa3d066e62"
+}

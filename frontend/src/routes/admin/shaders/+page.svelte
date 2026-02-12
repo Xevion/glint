@@ -70,14 +70,6 @@ const columns = [
 	{ id: 'created_at', key: 'created_at', name: 'Created' }
 ];
 
-function getExtractionRowBorder(shader: ShaderListItem): string {
-	const s = shader.extraction_summary;
-	if (!s) return '';
-	if (s.failed > 0) return 'border-l-2 border-l-destructive';
-	if (s.pending > 0) return 'border-l-2 border-l-warning';
-	return '';
-}
-
 function getSyncStatus(shader: ShaderListItem): { label: string; class: string } {
 	const hasLink = !!shader.modrinth_id || !!shader.curseforge_id;
 	if (!hasLink) return { label: 'No link', class: 'text-muted-foreground' };

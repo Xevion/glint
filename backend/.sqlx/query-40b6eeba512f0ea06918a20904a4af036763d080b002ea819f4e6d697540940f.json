@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM shader_version_profiles WHERE shader_version_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "40b6eeba512f0ea06918a20904a4af036763d080b002ea819f4e6d697540940f"
+}
