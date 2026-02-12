@@ -88,7 +88,7 @@ const bunProc = spawn({
 		PORT,
 		HOST: '0.0.0.0',
 		ORIGIN: process.env.ORIGIN ?? `http://localhost:${PORT}`,
-		PUBLIC_BACKEND_URL: `http://localhost:${BACKEND_PORT}`
+		BACKEND_URL: `http://localhost:${BACKEND_PORT}`
 	},
 	stdout: 'inherit',
 	stderr: 'inherit'

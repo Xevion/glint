@@ -74,7 +74,7 @@ COPY frontend/console-logger.js ./web/console-logger.js
 ENV PORT=8080 \
     GLINT_HOST=127.0.0.1 \
     GLINT_PORT=3001 \
-    PUBLIC_BACKEND_URL=http://localhost:3001 \
+    BACKEND_URL=http://localhost:3001 \
     LOG_JSON=true \
     TZ=Etc/UTC
 

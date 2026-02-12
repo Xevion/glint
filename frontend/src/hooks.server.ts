@@ -1,6 +1,5 @@
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
-import { env as publicEnv } from '$env/dynamic/public';
 import { initLogger } from '$lib/logger';
 import { requestContext } from '$lib/server/context';
 import { getLogger } from '@logtape/logtape';
@@ -9,7 +8,7 @@ import { PostHog } from 'posthog-node';
 
 await initLogger();
 
-const backendUrl = publicEnv.PUBLIC_BACKEND_URL ?? 'http://localhost:8080';
+const backendUrl = env.BACKEND_URL ?? 'http://localhost:8080';
 
 const posthog =
 	env.POSTHOG_KEY && env.POSTHOG_HOST
