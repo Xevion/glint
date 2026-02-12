@@ -265,12 +265,19 @@ async fn main() -> anyhow::Result<()> {
         warn!("Rate limiting disabled");
     }
 
-    // Build router
+    // Build router. CSP report endpoint is merged outside the analytics layer
+    // so browser-fired violation reports don't generate PostHog events.
     let analytics_layer =
         glint::middleware::analytics::AnalyticsLayer::new(state.analytics().cloned());
-    let app = routes::router(state.clone(), &config.rate_limit, state.analytics())
-        .layer(analytics_layer)
+    let tracked =
+        routes::router(state.clone(), &config.rate_limit, state.analytics()).layer(analytics_layer);
+    let app = tracked
+        .nest(
+            "/api/csp-report",
+            routes::csp_report::router().with_state(state.clone()),
+        )
         .layer(cors)
+        .layer(glint::middleware::security_headers::SecurityHeadersLayer)
         .layer(glint::middleware::request_id::RequestIdLayer);
 
     // Start server

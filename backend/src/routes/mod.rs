@@ -3,6 +3,7 @@ mod auth;
 mod backgrounds;
 mod capture_health;
 mod captures;
+pub mod csp_report;
 mod device;
 mod featured;
 mod runs;

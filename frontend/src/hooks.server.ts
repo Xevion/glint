@@ -69,6 +69,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 			filterSerializedResponseHeaders: (name) => name === 'content-length' || name === 'content-type'
 		});
 
+		// Security headers applied to all SvelteKit-served responses (HTML, static assets).
+		// CSP is handled separately via kit.csp in svelte.config.js.
+		response.headers.set('X-Frame-Options', 'DENY');
+		response.headers.set('X-Content-Type-Options', 'nosniff');
+		response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+		response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+		if (!dev) {
+			response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+		}
+
 		if (response.status >= 400) {
 			const reqLogger = getLogger(['ssr', 'request']);
 			reqLogger.warn('{method} {path} {status}', {
