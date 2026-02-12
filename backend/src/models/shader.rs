@@ -73,8 +73,6 @@ pub struct ShaderListItem {
     pub categories: Vec<Category>,
     pub features: Vec<Feature>,
     pub latest_version: Option<String>,
-    #[ts(type = "Array<string>")]
-    pub game_versions: Option<Json<Vec<String>>>,
     pub image_url: Option<String>,
     pub thumbhash: Option<String>,
 }

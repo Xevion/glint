@@ -80,7 +80,6 @@ impl ShaderService {
                     categories: categories_map.remove(id_str).unwrap_or_default(),
                     features: features_map.remove(id_str).unwrap_or_default(),
                     latest_version: version.map(|v| v.version.clone()),
-                    game_versions: version.and_then(|v| v.game_versions.clone()),
                     image_url: thumb.map(|t| t.image_url.clone()),
                     thumbhash: thumb.and_then(|t| t.thumbhash.clone()),
                     shader,

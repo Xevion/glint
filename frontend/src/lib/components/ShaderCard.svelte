@@ -6,13 +6,8 @@ import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import { comparisonStore } from '$lib/stores/comparison.svelte';
 import { cn } from '$lib/utils';
-import {
-	formatGameVersions,
-	formatVersion,
-	getCurseforgeUrl,
-	getModrinthUrl
-} from '$lib/utils/display';
-import { Check, ExternalLink, Layers } from '@lucide/svelte';
+import { formatVersion, getCurseforgeUrl, getModrinthUrl } from '$lib/utils/display';
+import { Check, ExternalLink } from '@lucide/svelte';
 import BrandIcon from './icons/BrandIcon.svelte';
 
 interface Props {
@@ -176,15 +171,6 @@ function handleCheckboxClick(e: MouseEvent) {
 				<!-- Version -->
 				<span class="inline-flex shrink-0 items-center gap-1 text-xs">
 					<span class="font-medium text-card-foreground">{shader.latest_version ? formatVersion(shader.latest_version) : '\u2014'}</span>
-				</span>
-
-				<!-- Separator -->
-				<span class="h-4 w-px shrink-0 bg-border"></span>
-
-				<!-- MC Version -->
-				<span class="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-					<Layers class="h-3.5 w-3.5 shrink-0" />
-					<span class="truncate">{formatGameVersions(shader.game_versions)}</span>
 				</span>
 			</div>
 
