@@ -64,6 +64,7 @@ object HighResCapture {
         }
 
         applyCaptureDimensions(mc)
+        FlawlessFrames.setEnabled(true)
         sessionActive = true
 
         log.info("Capture session begun") {
@@ -82,6 +83,7 @@ object HighResCapture {
         }
 
         activeTask = null
+        FlawlessFrames.setEnabled(false)
         restoreDimensions()
         restoreGraphicsMode()
         sessionActive = false

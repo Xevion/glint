@@ -12,6 +12,9 @@
   "entrypoints": {
     "client": [
       "com.xevion.glint.fabric.GlintFabric"
+    ],
+    "frex_flawless_frames": [
+      "com.xevion.glint.fabric.FlawlessFramesEntrypoint"
     ]
   },
   "mixins": [
