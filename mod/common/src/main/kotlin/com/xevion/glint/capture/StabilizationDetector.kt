@@ -6,75 +6,176 @@ import net.minecraft.world.level.chunk.EmptyLevelChunk
 import net.minecraft.world.level.chunk.status.ChunkStatus
 
 /**
- * Detects when the world has stabilized after shader or scene changes.
+ * Phased stabilization detector that gates on known preconditions in order.
  *
- * Simple approach: is the renderer busy? Wait. Is everything idle? Settle, then approve.
- * No modes, no flags — just polls the actual state of the engine each tick.
+ * Phases advance forward only — once a precondition is met, it's never rechecked.
+ * This eliminates the convergence problem where new chunks arriving would reset
+ * an idle counter, causing indefinite re-polling.
+ *
+ * Phases:
+ * 1. [Phase.ServerGeneration] — server has generated all chunks in render distance
+ * 2. [Phase.ChunkReceipt] — client has received all chunks from server
+ * 3. [Phase.RenderIdle] — Sodium build queue, lighting engine, and render graph are idle
+ * 4. [Phase.Settling] — all checks pass simultaneously for a short settle period
  */
 class StabilizationDetector {
     private val log = Loggers.Capture.get()
 
-    private var ticksSinceIdle: Int = 0
-    private var forceLoadingInitiated: Boolean = false
+    private var phase: Phase = Phase.ServerGeneration
+    private var totalTicks: Int = 0
+    private var ticksInPhase: Int = 0
+    private var settlingTicks: Int = 0
 
     fun reset() {
-        ticksSinceIdle = 0
-        forceLoadingInitiated = false
+        phase = Phase.ServerGeneration
+        totalTicks = 0
+        ticksInPhase = 0
+        settlingTicks = 0
     }
 
     /**
      * Check if the world has stabilized. Call once per tick.
      *
-     * @param ticksInState Total ticks spent in current stabilization phase (for logging)
-     * @return true if stable, false if still waiting
+     * @return true if stable (all phases complete), false if still waiting
      */
-    fun isStable(ticksInState: Int): Boolean {
+    fun isStable(): Boolean {
         val mc = Minecraft.getInstance()
-        val level = mc.level ?: return false
-        val player = mc.player ?: return false
+        if (mc.level == null || mc.player == null) return false
 
-        val logInterval = ticksInState % LOG_INTERVAL_TICKS == 0
+        totalTicks++
+        ticksInPhase++
 
-        // Enforce a minimum wait so the engine has time to react to teleports/changes.
-        if (ticksInState < MIN_WAIT_TICKS) {
-            if (logInterval) {
-                log.debug("Stabilize: minimum wait") {
-                    "ticks" to ticksInState
-                    "required" to MIN_WAIT_TICKS
+        return when (phase) {
+            Phase.ServerGeneration -> tickServerGeneration()
+            Phase.ChunkReceipt -> tickChunkReceipt(mc)
+            Phase.RenderIdle -> tickRenderIdle(mc)
+            Phase.Settling -> tickSettling(mc)
+        }
+    }
+
+    // -- Phase handlers --
+
+    private fun tickServerGeneration(): Boolean {
+        if (ChunkForceLoader.isGenerationComplete()) {
+            advancePhase(Phase.ChunkReceipt)
+            return false
+        }
+
+        if (ticksInPhase >= SERVER_GEN_TIMEOUT_TICKS) {
+            log.warn("ServerGeneration timed out, advancing") {
+                "ticks" to ticksInPhase
+                "timeout" to SERVER_GEN_TIMEOUT_TICKS
+            }
+            advancePhase(Phase.ChunkReceipt)
+            return false
+        }
+
+        if (ticksInPhase % LOG_INTERVAL_TICKS == 0) {
+            log.debug("Stabilize [ServerGeneration]: waiting for server chunk generation") {
+                "ticks" to ticksInPhase
+                "generation_complete" to ChunkForceLoader.isGenerationComplete()
+            }
+        }
+
+        return false
+    }
+
+    private fun tickChunkReceipt(mc: Minecraft): Boolean {
+        val (loaded, total) = countClientChunks(mc)
+        val ready = loaded >= total
+
+        if (ready) {
+            advancePhase(Phase.RenderIdle)
+            return false
+        }
+
+        if (ticksInPhase >= CHUNK_RECEIPT_TIMEOUT_TICKS) {
+            log.warn("ChunkReceipt timed out, advancing") {
+                "ticks" to ticksInPhase
+                "timeout" to CHUNK_RECEIPT_TIMEOUT_TICKS
+                "loaded" to loaded
+                "total" to total
+            }
+            advancePhase(Phase.RenderIdle)
+            return false
+        }
+
+        if (ticksInPhase % LOG_INTERVAL_TICKS == 0) {
+            log.debug("Stabilize [ChunkReceipt]: waiting for client chunks") {
+                "ticks" to ticksInPhase
+                "loaded" to loaded
+                "total" to total
+            }
+        }
+
+        return false
+    }
+
+    private fun tickRenderIdle(mc: Minecraft): Boolean {
+        val lightingDone =
+            !mc.level!!
+                .chunkSource.lightEngine
+                .hasLightWork()
+        val renderingIdle = isRenderingIdle(mc)
+
+        if (lightingDone && renderingIdle) {
+            advancePhase(Phase.Settling)
+            return false
+        }
+
+        if (ticksInPhase >= RENDER_IDLE_TIMEOUT_TICKS) {
+            log.warn("RenderIdle timed out, advancing") {
+                "ticks" to ticksInPhase
+                "timeout" to RENDER_IDLE_TIMEOUT_TICKS
+                "lighting_done" to lightingDone
+                "rendering_idle" to renderingIdle
+            }
+            advancePhase(Phase.Settling)
+            return false
+        }
+
+        if (ticksInPhase % LOG_INTERVAL_TICKS == 0) {
+            log.debug("Stabilize [RenderIdle]: waiting for render pipeline") {
+                "ticks" to ticksInPhase
+                "lighting_done" to lightingDone
+                "rendering_idle" to renderingIdle
+                "sodium_queued" to (SodiumIntegration.getScheduledJobCount() ?: -1)
+                "sodium_busy" to (SodiumIntegration.getBusyThreadCount() ?: -1)
+            }
+        }
+
+        return false
+    }
+
+    private fun tickSettling(mc: Minecraft): Boolean {
+        // Re-verify all conditions still hold during settle period.
+        // If anything regresses (e.g. late chunk triggers render work), reset settling.
+        val lightingDone =
+            !mc.level!!
+                .chunkSource.lightEngine
+                .hasLightWork()
+        val renderingIdle = isRenderingIdle(mc)
+
+        if (!lightingDone || !renderingIdle) {
+            settlingTicks = 0
+
+            if (ticksInPhase % LOG_INTERVAL_TICKS == 0) {
+                log.debug("Stabilize [Settling]: regression, resetting settle counter") {
+                    "lighting_done" to lightingDone
+                    "rendering_idle" to renderingIdle
                 }
             }
-            return false
-        }
-
-        // Force-load chunks once per cycle (singleplayer only)
-        if (!forceLoadingInitiated && mc.singleplayerServer != null) {
-            ChunkForceLoader.forceLoadRenderDistance()
-            forceLoadingInitiated = true
-        }
-
-        // Check if anything is still working
-        val chunksReady = areChunksReady(mc, logInterval)
-        val lightingDone = !level.chunkSource.lightEngine.hasLightWork()
-        val renderingDone = isRenderingIdle(mc, logInterval)
-
-        if (!chunksReady || !lightingDone || !renderingDone) {
-            ticksSinceIdle = 0
-
-            if (logInterval) {
-                if (!lightingDone) log.debug("Stabilize: lighting in progress")
-            }
 
             return false
         }
 
-        // Everything is idle — accumulate settling ticks
-        ticksSinceIdle++
+        settlingTicks++
 
-        if (ticksSinceIdle >= SETTLING_TICKS) {
+        if (settlingTicks >= SETTLING_TICKS) {
+            val (loaded, total) = countClientChunks(mc)
             log.info("Stabilization complete") {
-                "total_ticks" to ticksInState
-                "idle_ticks" to ticksSinceIdle
-                "chunks_loaded" to countLoadedChunks(mc)
+                "total_ticks" to totalTicks
+                "chunks" to "$loaded/$total"
             }
             return true
         }
@@ -82,13 +183,21 @@ class StabilizationDetector {
         return false
     }
 
-    /** Are all chunks around the player's position loaded? */
-    private fun areChunksReady(
-        mc: Minecraft,
-        logInterval: Boolean,
-    ): Boolean {
-        val player = mc.player ?: return false
-        val level = mc.level ?: return false
+    // -- Helpers --
+
+    private fun advancePhase(next: Phase) {
+        log.info("Stabilization phase: $phase → $next") {
+            "phase_ticks" to ticksInPhase
+            "total_ticks" to totalTicks
+        }
+        phase = next
+        ticksInPhase = 0
+    }
+
+    /** Returns (loaded, total) chunk counts within render distance. */
+    private fun countClientChunks(mc: Minecraft): Pair<Int, Int> {
+        val player = mc.player ?: return Pair(0, 0)
+        val level = mc.level ?: return Pair(0, 0)
         val chunkSource = level.chunkSource
 
         val chunkX = player.blockPosition().x shr 4
@@ -96,29 +205,21 @@ class StabilizationDetector {
         val renderDistance = mc.options.effectiveRenderDistance
         val radiusSquared = renderDistance * renderDistance
 
-        var totalChunks = 0
-        var loadedChunks = 0
+        var total = 0
+        var loaded = 0
 
         for (dx in -renderDistance..renderDistance) {
             for (dz in -renderDistance..renderDistance) {
                 if (dx * dx + dz * dz > radiusSquared) continue
-                totalChunks++
+                total++
                 val chunk = chunkSource.getChunk(chunkX + dx, chunkZ + dz, ChunkStatus.FULL, false)
                 if (chunk != null && chunk !is EmptyLevelChunk) {
-                    loadedChunks++
+                    loaded++
                 }
             }
         }
 
-        if (loadedChunks < totalChunks && logInterval) {
-            log.debug("Stabilize: chunks loading") {
-                "loaded" to loadedChunks
-                "total" to totalChunks
-                "server_generated" to ChunkForceLoader.isGenerationComplete()
-            }
-        }
-
-        return loadedChunks >= totalChunks
+        return Pair(loaded, total)
     }
 
     /**
@@ -128,10 +229,7 @@ class StabilizationDetector {
      * Falls back to vanilla's [net.minecraft.client.renderer.LevelRenderer.hasRenderedAllSections]
      * if Sodium is not available.
      */
-    private fun isRenderingIdle(
-        mc: Minecraft,
-        logInterval: Boolean,
-    ): Boolean {
+    private fun isRenderingIdle(mc: Minecraft): Boolean {
         if (!SodiumIntegration.isAvailable()) {
             return mc.levelRenderer.hasRenderedAllSections()
         }
@@ -141,44 +239,22 @@ class StabilizationDetector {
         val busyThreads = SodiumIntegration.getBusyThreadCount() ?: 0
         val queueEmpty = SodiumIntegration.isBuildQueueEmpty() ?: true
 
-        val busy = needsUpdate || scheduledJobs > 0 || busyThreads > 0 || !queueEmpty
-
-        if (busy && logInterval) {
-            log.debug("Stabilize: renderer busy") {
-                "needs_update" to needsUpdate
-                "queued" to scheduledJobs
-                "busy_threads" to busyThreads
-                "queue_empty" to queueEmpty
-            }
-        }
-
-        return !busy
+        return !needsUpdate && scheduledJobs == 0 && busyThreads == 0 && queueEmpty
     }
 
-    private fun countLoadedChunks(mc: Minecraft): Int {
-        val player = mc.player ?: return 0
-        val level = mc.level ?: return 0
-        val chunkSource = level.chunkSource
-
-        val chunkX = player.blockPosition().x shr 4
-        val chunkZ = player.blockPosition().z shr 4
-        val renderDistance = mc.options.effectiveRenderDistance
-        val radiusSquared = renderDistance * renderDistance
-
-        var count = 0
-        for (dx in -renderDistance..renderDistance) {
-            for (dz in -renderDistance..renderDistance) {
-                if (dx * dx + dz * dz > radiusSquared) continue
-                val chunk = chunkSource.getChunk(chunkX + dx, chunkZ + dz, ChunkStatus.FULL, false)
-                if (chunk != null && chunk !is EmptyLevelChunk) count++
-            }
-        }
-        return count
+    private enum class Phase {
+        ServerGeneration,
+        ChunkReceipt,
+        RenderIdle,
+        Settling,
     }
 
     companion object {
         private const val LOG_INTERVAL_TICKS = 10
-        private const val MIN_WAIT_TICKS = 5 // Short floor; upstream states handle rebuild waits
-        private const val SETTLING_TICKS = 10 // 0.5 seconds of idle before approving
+
+        private const val SERVER_GEN_TIMEOUT_TICKS = 600 // 30s
+        private const val CHUNK_RECEIPT_TIMEOUT_TICKS = 200 // 10s
+        private const val RENDER_IDLE_TIMEOUT_TICKS = 400 // 20s
+        private const val SETTLING_TICKS = 5 // 250ms of continuous idle
     }
 }

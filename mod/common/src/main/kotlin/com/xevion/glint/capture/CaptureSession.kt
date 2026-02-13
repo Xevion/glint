@@ -214,6 +214,13 @@ class CaptureSession(
             }
             lastApplyResult = result
             sceneApplied = true
+
+            // Kick off server-side chunk generation immediately after scene apply.
+            // Runs on the server thread in parallel with any rebuild-ack wait.
+            val mc = Minecraft.getInstance()
+            if (mc.singleplayerServer != null) {
+                ChunkForceLoader.forceLoadRenderDistance()
+            }
         }
 
         // Adaptive wait: rebuild-triggering changes go through a rebuild-ack gate,
@@ -254,7 +261,7 @@ class CaptureSession(
     }
 
     private fun handleWaitingForStabilization() {
-        if (stabilizationDetector.isStable(ticksInState)) {
+        if (stabilizationDetector.isStable()) {
             transitionTo(State.Capturing)
         }
     }
