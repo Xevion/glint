@@ -79,7 +79,8 @@ impl WorkRepo {
                 lwv.size_bytes AS world_size_bytes,
                 lwv.id AS "world_version_id: WorldVersionId",
                 lsv.id AS "scene_version_id: SceneVersionId",
-                tm.profile_id AS "profile_id: ShaderVersionProfileId"
+                tm.profile_id AS "profile_id: ShaderVersionProfileId",
+                svp.name AS "profile_name?"
             FROM capture_target_matrix tm
             JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id
             JOIN shaders sh ON sh.id = sv.shader_id
@@ -87,6 +88,7 @@ impl WorkRepo {
             JOIN worlds w ON w.id = tm.world_id
             LEFT JOIN latest_world_versions lwv ON lwv.world_id = w.id
             JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id
+            LEFT JOIN shader_version_profiles svp ON svp.id = tm.profile_id
             LEFT JOIN has_captures hc ON hc.shader_version_id = tm.shader_version_id
             LEFT JOIN best_captures bc
                 ON bc.shader_version_id = tm.shader_version_id

@@ -58,6 +58,7 @@ data class ShaderMetadata(
     val id: String,
     val version: String,
     val profile: String? = null,
+    val profileId: String? = null,
 )
 
 @Serializable

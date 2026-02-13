@@ -166,7 +166,7 @@ class AutonomousRunner(
                                     CreateRunItemRequest(
                                         shaderVersionId = item.shaderVersionId,
                                         sceneId = item.sceneId,
-                                        profile = item.profile,
+                                        profileId = item.profileId,
                                     )
                                 },
                         )
@@ -213,13 +213,13 @@ class AutonomousRunner(
             "items" to runItems.size
         }
 
-        // Build lookup: (shaderVersionId, sceneId, profile) → RunItemInfo
+        // Build lookup: (shaderVersionId, sceneId, profileId) → RunItemInfo
         // Merge run items (which have item IDs) with work items (which have world version IDs)
         val workItemsByKey =
-            workItems.associateBy { Triple(it.shaderVersionId, it.sceneId, it.profile) }
+            workItems.associateBy { Triple(it.shaderVersionId, it.sceneId, it.profileId) }
         val itemLookup =
             runItems.associate { item ->
-                val key = Triple(item.shaderVersionId, item.sceneId, item.profile)
+                val key = Triple(item.shaderVersionId, item.sceneId, item.profileId)
                 val workItem = workItemsByKey[key]
                 val worldVersionId =
                     workItem?.worldVersionId

@@ -249,6 +249,7 @@ class CaptureSession(
                     id = shaderInfo.id,
                     version = shaderInfo.version,
                     profile = shader.profile,
+                    profileId = shader.profileId,
                 )
             } else {
                 null

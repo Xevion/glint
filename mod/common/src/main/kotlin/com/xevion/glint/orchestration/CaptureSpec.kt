@@ -28,8 +28,10 @@ data class CaptureSpec(
 data class ShaderSpec(
     /** Shader pack filename in shaderpacks/. Null = vanilla. */
     val filename: String? = null,
-    /** Iris profile name. Null = default. */
+    /** Iris profile name (for applying to shader config). Null = default. */
     val profile: String? = null,
+    /** Backend profile ID (for API round-trips and lookup keys). Null = no profile. */
+    val profileId: String? = null,
 ) {
     val displayName: String
         get() =

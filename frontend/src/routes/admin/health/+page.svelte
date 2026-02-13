@@ -343,7 +343,6 @@ async function refresh() {
 						<Table.Head class="p-3">Version</Table.Head>
 						<Table.Head class="p-3">Scene</Table.Head>
 						<Table.Head class="p-3">Profile</Table.Head>
-						<Table.Head class="p-3">World</Table.Head>
 					</Table.Row>
 				</Table.Header>
 				<Table.Body>
@@ -356,11 +355,10 @@ async function refresh() {
 							<Table.Cell class="p-3 text-muted-foreground">{item.version}</Table.Cell>
 							<Table.Cell class="p-3">
 								<a href="/admin/scenes/{item.scene_id}" class="hover:underline">{item.scene_name}</a>
+								<span class="text-muted-foreground"> / </span>
+								<a href="/admin/worlds/{item.world_id}" class="text-muted-foreground hover:underline">{item.world_name}</a>
 							</Table.Cell>
-							<Table.Cell class="p-3 text-muted-foreground">{item.profile_id ?? '—'}</Table.Cell>
-							<Table.Cell class="p-3 text-muted-foreground">
-								<a href="/admin/worlds/{item.world_id}" class="hover:underline">{item.world_name}</a>
-							</Table.Cell>
+							<Table.Cell class="p-3 text-muted-foreground">{item.profile_name ?? '—'}</Table.Cell>
 						</Table.Row>
 					{/each}
 				</Table.Body>

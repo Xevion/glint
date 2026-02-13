@@ -112,6 +112,7 @@ async fn test_work_items_version_with_profiles_expands_per_profile(pool: sqlx::P
     assert!(custom_items.len() == 3);
     for item in &custom_items {
         check!(item.profile_id.is_some());
+        check!(item.profile_name.is_some());
     }
 
     let vanilla_items: Vec<_> = items
@@ -120,6 +121,7 @@ async fn test_work_items_version_with_profiles_expands_per_profile(pool: sqlx::P
         .collect();
     assert!(vanilla_items.len() == 1);
     check!(vanilla_items[0].profile_id.is_none());
+    check!(vanilla_items[0].profile_name.is_none());
 }
 
 #[sqlx::test]
@@ -137,6 +139,7 @@ async fn test_work_items_version_without_profiles_has_null_profile_id(pool: sqlx
 
     let custom = items.iter().find(|i| i.shader_slug == "shader-a").unwrap();
     check!(custom.profile_id.is_none());
+    check!(custom.profile_name.is_none());
 }
 
 #[sqlx::test]
@@ -169,7 +172,14 @@ async fn test_work_items_mixed_profile_and_no_profile_shaders(pool: sqlx::PgPool
     assert!(a_items.len() == 2);
     for item in &a_items {
         check!(item.profile_id.is_some());
+        check!(item.profile_name.is_some());
     }
+    let a_names: Vec<_> = a_items
+        .iter()
+        .filter_map(|i| i.profile_name.as_deref())
+        .collect();
+    check!(a_names.contains(&"Low"));
+    check!(a_names.contains(&"High"));
 
     let b_items: Vec<_> = items
         .iter()
@@ -177,6 +187,7 @@ async fn test_work_items_mixed_profile_and_no_profile_shaders(pool: sqlx::PgPool
         .collect();
     assert!(b_items.len() == 1);
     check!(b_items[0].profile_id.is_none());
+    check!(b_items[0].profile_name.is_none());
 
     let vanilla_items: Vec<_> = items
         .iter()
@@ -184,6 +195,7 @@ async fn test_work_items_mixed_profile_and_no_profile_shaders(pool: sqlx::PgPool
         .collect();
     assert!(vanilla_items.len() == 1);
     check!(vanilla_items[0].profile_id.is_none());
+    check!(vanilla_items[0].profile_name.is_none());
 }
 
 #[sqlx::test]
@@ -675,6 +687,7 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
         .expect("get_work_items");
     assert!(items.len() == 1);
     check!(items[0].profile_id.is_none());
+    check!(items[0].profile_name.is_none());
 
     // Add 2 profiles
     seed_profile(&pool, "p1", "shv1", "Low", 0).await;
@@ -686,6 +699,7 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
     assert!(items.len() == 2);
     for item in &items {
         check!(item.profile_id.is_some());
+        check!(item.profile_name.is_some());
     }
 }
 
@@ -722,4 +736,5 @@ async fn test_fresh_capture_for_one_profile_does_not_exclude_other(pool: sqlx::P
     assert!(items.len() == 1);
     let_assert!(Some(profile_id) = &items[0].profile_id);
     check!(profile_id.as_ref() == "p-b");
+    check!(items[0].profile_name.as_deref() == Some("Profile B"));
 }

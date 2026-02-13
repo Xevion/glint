@@ -35,7 +35,8 @@ data class WorkItem(
     val worldSizeBytes: Long? = null,
     val worldVersionId: String? = null,
     val sceneVersionId: String? = null,
-    val profile: String? = null,
+    val profileId: String? = null,
+    val profileName: String? = null,
 )
 
 /** Request to create a capture run. */
@@ -51,7 +52,7 @@ data class CreateRunRequest(
 data class CreateRunItemRequest(
     val shaderVersionId: String,
     val sceneId: String,
-    val profile: String? = null,
+    val profileId: String? = null,
 )
 
 /** Response from creating or completing a capture run. */
@@ -76,7 +77,8 @@ data class CaptureRunItem(
     val runId: String,
     val shaderVersionId: String,
     val sceneId: String,
-    val profile: String? = null,
+    val profileId: String? = null,
+    val profileName: String? = null,
     val status: String,
     val captureId: String? = null,
     val errorMessage: String? = null,

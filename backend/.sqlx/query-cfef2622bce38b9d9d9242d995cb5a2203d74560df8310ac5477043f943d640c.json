@@ -1,0 +1,205 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH has_captures AS (\n                SELECT DISTINCT shader_version_id\n                FROM captures\n                WHERE status = 'completed'\n            ),\n            best_captures AS (\n                SELECT DISTINCT ON (shader_version_id, scene_id, profile_id)\n                    shader_version_id, scene_id, profile_id, freshness\n                FROM captures_with_freshness\n                WHERE status IN ('completed', 'uploading')\n                ORDER BY shader_version_id, scene_id, profile_id, captured_at DESC\n            )\n            SELECT\n                tm.shader_version_id AS \"shader_version_id!: ShaderVersionId\",\n                sh.id AS \"shader_id!: ShaderId\",\n                sh.slug AS \"shader_slug!\",\n                sh.name AS \"shader_name!\",\n                sv.version AS \"version!\",\n                sv.download_url,\n                sv.file_hash,\n                tm.scene_id AS \"scene_id!: SceneId\",\n                sc.slug AS \"scene_slug!\",\n                sc.name AS \"scene_name!\",\n                sc.dimension AS \"scene_dimension!\",\n                lsv.x AS \"scene_x!\",\n                lsv.y AS \"scene_y!\",\n                lsv.z AS \"scene_z!\",\n                lsv.yaw AS \"scene_yaw!\",\n                lsv.pitch AS \"scene_pitch!\",\n                lsv.time_of_day_ticks AS \"scene_time_of_day_ticks!\",\n                lsv.weather AS \"scene_weather!\",\n                lsv.weather_intensity AS \"scene_weather_intensity!\",\n                lsv.moon_phase AS scene_moon_phase,\n                lsv.biome AS scene_biome,\n                w.id AS \"world_id!: WorldId\",\n                w.slug AS \"world_slug!\",\n                w.name AS \"world_name!\",\n                lwv.file_url AS world_file_url,\n                lwv.file_hash AS world_file_hash,\n                lwv.size_bytes AS world_size_bytes,\n                lwv.id AS \"world_version_id: WorldVersionId\",\n                lsv.id AS \"scene_version_id: SceneVersionId\",\n                tm.profile_id AS \"profile_id: ShaderVersionProfileId\",\n                svp.name AS \"profile_name?\"\n            FROM capture_target_matrix tm\n            JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id\n            JOIN shaders sh ON sh.id = sv.shader_id\n            JOIN scenes sc ON sc.id = tm.scene_id\n            JOIN worlds w ON w.id = tm.world_id\n            LEFT JOIN latest_world_versions lwv ON lwv.world_id = w.id\n            JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id\n            LEFT JOIN shader_version_profiles svp ON svp.id = tm.profile_id\n            LEFT JOIN has_captures hc ON hc.shader_version_id = tm.shader_version_id\n            LEFT JOIN best_captures bc\n                ON bc.shader_version_id = tm.shader_version_id\n                AND bc.scene_id = tm.scene_id\n                AND (bc.profile_id IS NOT DISTINCT FROM tm.profile_id)\n            WHERE ($2 OR sv.capture_failure_count < 3)\n              AND ($2 OR bc.shader_version_id IS NULL OR bc.freshness != 'fresh')\n              AND ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))\n              AND ($4::text IS NULL OR sc.slug = ANY(string_to_array($4, ',')))\n            ORDER BY\n                hc.shader_version_id IS NOT NULL ASC,\n                COALESCE(sh.upstream_downloads, 0) DESC,\n                sv.upstream_published_at DESC NULLS LAST,\n                sh.name ASC,\n                sc.name ASC,\n                tm.profile_id NULLS LAST\n            LIMIT $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_version_id!: ShaderVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_id!: ShaderId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "shader_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "shader_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "version!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "download_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "scene_id!: SceneId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "scene_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "scene_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "scene_dimension!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "scene_x!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 12,
+        "name": "scene_y!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 13,
+        "name": "scene_z!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 14,
+        "name": "scene_yaw!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 15,
+        "name": "scene_pitch!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 16,
+        "name": "scene_time_of_day_ticks!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 17,
+        "name": "scene_weather!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "scene_weather_intensity!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 19,
+        "name": "scene_moon_phase",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 20,
+        "name": "scene_biome",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "world_id!: WorldId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 22,
+        "name": "world_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 23,
+        "name": "world_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 24,
+        "name": "world_file_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 25,
+        "name": "world_file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 26,
+        "name": "world_size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 27,
+        "name": "world_version_id: WorldVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 28,
+        "name": "scene_version_id: SceneVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 29,
+        "name": "profile_id: ShaderVersionProfileId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 30,
+        "name": "profile_name?",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Bool",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "cfef2622bce38b9d9d9242d995cb5a2203d74560df8310ac5477043f943d640c"
+}

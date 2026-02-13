@@ -42,4 +42,5 @@ pub struct WorkItem {
     pub world_version_id: Option<WorldVersionId>,
     pub scene_version_id: Option<SceneVersionId>,
     pub profile_id: Option<ShaderVersionProfileId>,
+    pub profile_name: Option<String>,
 }

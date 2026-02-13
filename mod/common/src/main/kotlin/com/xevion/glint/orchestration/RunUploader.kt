@@ -64,12 +64,12 @@ class RunUploader(
         shaderVersionId: String,
         event: CaptureTakenEvent,
     ) {
-        val key = Triple(shaderVersionId, event.sceneId, event.entry.shader?.profile)
+        val key = Triple(shaderVersionId, event.sceneId, event.entry.shader?.profileId)
         val info = itemLookup[key]
         if (info == null) {
             log.warn("No run item found for capture") {
                 "scene_id" to event.sceneId
-                "profile" to (event.entry.shader?.profile ?: "null")
+                "profile_id" to (event.entry.shader?.profileId ?: "null")
             }
             return
         }
@@ -130,7 +130,7 @@ class RunUploader(
     ) {
         val unsubmittedEntries =
             items.mapNotNull { item ->
-                val key = Triple(shaderVersionId, item.sceneId, item.profile)
+                val key = Triple(shaderVersionId, item.sceneId, item.profileId)
                 val info = itemLookup[key] ?: return@mapNotNull null
                 if (info.itemId in submittedItemIds) return@mapNotNull null
                 item to info.itemId

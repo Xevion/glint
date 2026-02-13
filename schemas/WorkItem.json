@@ -22,6 +22,12 @@
         "null"
       ]
     },
+    "profile_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "scene_biome": {
       "type": [
         "string",

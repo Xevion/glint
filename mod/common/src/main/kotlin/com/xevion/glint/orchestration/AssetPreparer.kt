@@ -297,16 +297,21 @@ class AssetPreparer(
         val allSceneIds = group.items.map { it.sceneId }.distinct()
         if (allSceneIds.isEmpty()) return null
 
-        val profiles = group.items.mapNotNull { it.profile }.distinct()
+        // Collect distinct (profileId, profileName) pairs for Iris application and API lookups
+        val profilePairs =
+            group.items
+                .filter { it.profileId != null && it.profileName != null }
+                .map { it.profileId!! to it.profileName!! }
+                .distinct()
         val shaders =
             buildList {
                 if (shaderFilename == null) {
                     add(ShaderSpec(filename = null))
-                } else if (profiles.isEmpty()) {
+                } else if (profilePairs.isEmpty()) {
                     add(ShaderSpec(filename = shaderFilename))
                 } else {
-                    for (profile in profiles) {
-                        add(ShaderSpec(filename = shaderFilename, profile = profile))
+                    for ((profileId, profileName) in profilePairs) {
+                        add(ShaderSpec(filename = shaderFilename, profile = profileName, profileId = profileId))
                     }
                 }
             }
