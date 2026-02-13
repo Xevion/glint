@@ -115,10 +115,6 @@ class CaptureSession(
                 handleCapturing()
             }
 
-            State.PostCaptureCooldown -> {
-                handlePostCaptureCooldown()
-            }
-
             State.Finishing -> {
                 handleFinishing()
             }
@@ -267,7 +263,7 @@ class CaptureSession(
         if (pending != null) {
             if (!pending.isDone) return
             pendingCapture = null
-            transitionTo(State.PostCaptureCooldown)
+            advanceToNextScene()
             return
         }
 
@@ -337,12 +333,6 @@ class CaptureSession(
         }
 
         pendingCapture = future
-    }
-
-    private fun handlePostCaptureCooldown() {
-        if (ticksInState >= POST_CAPTURE_COOLDOWN_TICKS) {
-            advanceToNextScene()
-        }
     }
 
     private fun advanceToNextScene() {
@@ -431,12 +421,10 @@ class CaptureSession(
         WaitingForRebuild,
         WaitingForStabilization,
         Capturing,
-        PostCaptureCooldown,
         Finishing,
     }
 
     companion object {
-        private const val POST_CAPTURE_COOLDOWN_TICKS = 10
         private const val OPTION_PROPAGATION_TICKS = 2
         private const val REBUILD_TIMEOUT_TICKS = 200
     }
