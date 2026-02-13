@@ -59,13 +59,19 @@ export class ApiClient {
 				} catch {
 					// Response body isn't JSON, ignore
 				}
-				logger?.error('API request failed: {method} {path} → {status}', {
+				const logFields = {
 					method,
 					url,
 					path,
 					status: response.status,
 					statusText: response.statusText
-				});
+				};
+				// 401 is expected for unauthenticated users (e.g. /api/user/me on every page load)
+				if (response.status === 401) {
+					logger?.debug('API request unauthorized: {method} {path} - {status}', logFields);
+				} else {
+					logger?.error('API request failed: {method} {path} - {status}', logFields);
+				}
 				return Result.err(ApiError.fromResponse(response, body));
 			}
 
