@@ -53,3 +53,4 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 [dev-dependencies]
 assert2 = "0.3.16"
 rstest = "0.26.1"
+serde_urlencoded = "0.7.1"

@@ -1,6 +1,7 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
+use serde_with::{DisplayFromStr, serde_as};
 use ts_rs::TS;
 
 /// Shared pagination defaults.
@@ -13,9 +14,16 @@ pub const MAX_PAGE_SIZE: u32 = 250;
 /// via `#[serde(flatten)]`. Use directly as `Query<PageQuery>` for endpoints
 /// that only need pagination, or flatten into a larger struct for endpoints
 /// that combine pagination with filters.
+///
+/// `DisplayFromStr` is required because `serde(flatten)` buffers all values as
+/// strings in non-self-describing formats (query strings). Without it,
+/// `serde_urlencoded` fails with "invalid type: string, expected u32".
+#[serde_as]
 #[derive(Clone, Deserialize)]
 pub struct PageQuery {
+    #[serde_as(as = "Option<DisplayFromStr>")]
     pub page: Option<u32>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
     pub page_size: Option<u32>,
 }
 

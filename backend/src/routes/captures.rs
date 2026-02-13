@@ -175,3 +175,50 @@ async fn delete_capture(
 
     Ok(StatusCode::NO_CONTENT)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// With DisplayFromStr on PageQuery, serde_urlencoded handles flatten correctly.
+    #[test]
+    fn serde_urlencoded_flatten_with_display_from_str() {
+        let qs = "page=1&page_size=50";
+        let params: AdminCaptureListParams = serde_urlencoded::from_str(qs)
+            .expect("DisplayFromStr should fix flatten with serde_urlencoded");
+        assert_eq!(params.page.page, Some(1));
+        assert_eq!(params.page.page_size, Some(50));
+        assert!(params.shader.is_none());
+        assert!(params.status.is_none());
+    }
+
+    #[test]
+    fn serde_urlencoded_flatten_with_filters() {
+        let qs = "page=2&page_size=25&shader=bsl&status=completed";
+        let params: AdminCaptureListParams =
+            serde_urlencoded::from_str(qs).expect("DisplayFromStr should fix flatten with filters");
+        assert_eq!(params.page.page, Some(2));
+        assert_eq!(params.page.page_size, Some(25));
+        assert_eq!(params.shader.as_deref(), Some("bsl"));
+        assert_eq!(params.status, Some(CaptureStatus::Completed));
+    }
+
+    /// PageQuery also works when used directly (non-flattened).
+    #[test]
+    fn page_query_direct_deserialization() {
+        let qs = "page=3&page_size=100";
+        let params: PageQuery = serde_urlencoded::from_str(qs)
+            .expect("PageQuery should deserialize directly with DisplayFromStr");
+        assert_eq!(params.page, Some(3));
+        assert_eq!(params.page_size, Some(100));
+    }
+
+    /// Empty query string yields None for both fields.
+    #[test]
+    fn page_query_empty() {
+        let params: PageQuery =
+            serde_urlencoded::from_str("").expect("empty query string should give defaults");
+        assert_eq!(params.page, None);
+        assert_eq!(params.page_size, None);
+    }
+}
