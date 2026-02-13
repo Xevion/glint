@@ -12,19 +12,19 @@ All game logic lives in `common/`. Platform modules (`fabric/`, `neoforge/`) con
 mod/
 ├── common/src/main/
 │   ├── kotlin/com/xevion/glint/   # All business logic
-│   │   ├── api/          # HTTP clients (GlintApi, AgentApi)
-│   │   ├── capture/      # Capture lifecycle, state management
-│   │   ├── download/     # Shader pack downloading
-│   │   ├── input/        # Keybind handling
-│   │   ├── io/           # File I/O utilities
-│   │   ├── orchestration/ # Autonomous capture state machine
-│   │   ├── scene/        # Scene management
-│   │   ├── screenshot/   # Screenshot capture
-│   │   ├── session/      # Session lifecycle
-│   │   └── ui/           # Minecraft GUI screens
-│   └── java/.../mixin/   # Mixins (must be Java)
-├── fabric/                # ClientModInitializer + tick registration
-└── neoforge/              # @Mod annotation + event bus registration
+│   │   ├── api/           # HTTP clients (GlintApi, AgentApi)
+│   │   ├── capture/       # Capture lifecycle, high-res capture, framebuffer/WebP writing
+│   │   ├── download/      # Shader pack downloading
+│   │   ├── input/         # Keybind handling
+│   │   ├── io/            # File I/O utilities
+│   │   ├── orchestration/ # Autonomous capture state machine (AutonomousRunner, Orchestrator)
+│   │   ├── scene/         # Scene management, models, configuration
+│   │   ├── session/       # Session lifecycle
+│   │   ├── ui/            # Minecraft GUI screens
+│   │   └── upload/        # World file packaging and upload to backend
+│   └── java/.../mixin/    # Mixins (must be Java)
+├── fabric/                 # ClientModInitializer + tick registration
+└── neoforge/               # @Mod annotation + event bus registration
 ```
 
 ### State Management

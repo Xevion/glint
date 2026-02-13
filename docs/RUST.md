@@ -24,18 +24,27 @@ routes (HTTP handlers)
 
 ```
 src/
-├── auth/        # Extractors: AuthUser, AdminUser, MaybeAuthUser
-├── cli/         # CLI subcommands
-├── config/      # Figment-based configuration
-├── db/          # Pool initialization, migrations
-├── error.rs     # AppError, AppResult
-├── models/      # Domain types, DTOs, request/response shapes
-├── platform/    # External API clients (Modrinth, CurseForge)
-├── repo/        # One module per domain entity
-├── routes/      # One module per resource, each exports router()
-├── services/    # Background tasks, complex business logic
-├── state.rs     # AppState (Arc<Inner>)
-└── main.rs      # Server startup, router assembly
+├── analytics.rs   # PostHog client wrapper (fire-and-forget event tracking)
+├── auth/          # Extractors: AuthUser, AdminUser, MaybeAuthUser
+├── cache.rs       # In-memory session cache with TTL eviction
+├── cli/           # CLI subcommands (seed, etc.)
+├── config/        # Figment-based configuration
+├── db/            # Pool initialization, migrations
+├── error.rs       # AppError, AppResult
+├── extraction/    # Shader pack metadata extraction (properties, lang files, zip)
+├── fmt.rs         # Debug formatting helpers
+├── id.rs          # Newtype ID wrappers with macro-generated traits
+├── lib.rs         # Library root
+├── logging.rs     # Dual-format logging setup (pretty + JSON)
+├── main.rs        # Server startup, router assembly
+├── middleware/     # Axum middleware (rate limiting, cache control, request IDs, security headers)
+├── models/        # Domain types, DTOs, request/response shapes
+├── platform/      # External API clients (Modrinth, CurseForge)
+├── repo/          # One module per domain entity
+├── routes/        # One module per resource, each exports router()
+├── services/      # Background tasks, complex business logic
+├── slug.rs        # URL-safe slug generation
+└── state.rs       # AppState (Arc<Inner>)
 ```
 
 Each route module exports a `router()` function. Repos are unit structs with inherent methods that take `&DbPool`.
