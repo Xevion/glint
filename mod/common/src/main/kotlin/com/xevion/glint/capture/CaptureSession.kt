@@ -35,6 +35,7 @@ class CaptureSession(
 
     private val stabilizationDetector = StabilizationDetector()
     private var sceneApplied: Boolean = false
+    private var lastApplyResult: SceneApplyResult = SceneApplyResult.APPLIED
     private var pendingCapture: CompletableFuture<Path>? = null
 
     // Per-scene capture tracking, aggregated per scene across the session
@@ -100,6 +101,10 @@ class CaptureSession(
 
             State.ApplyingScene -> {
                 handleApplyingScene()
+            }
+
+            State.WaitingForRebuild -> {
+                handleWaitingForRebuild()
             }
 
             State.WaitingForStabilization -> {
@@ -172,6 +177,10 @@ class CaptureSession(
         state = newState
         ticksInState = 0
 
+        if (newState == State.WaitingForRebuild) {
+            SodiumIntegration.resetStabilizationState()
+        }
+
         if (newState == State.WaitingForStabilization) {
             stabilizationDetector.reset()
         }
@@ -203,10 +212,43 @@ class CaptureSession(
                 advanceToNextScene()
                 return
             }
+            lastApplyResult = result
             sceneApplied = true
         }
 
-        if (ticksInState >= SCENE_APPLICATION_WAIT_TICKS) {
+        // Adaptive wait: rebuild-triggering changes go through a rebuild-ack gate,
+        // non-rebuild changes just need a couple ticks for options to propagate.
+        if (lastApplyResult == SceneApplyResult.APPLIED_WITH_REBUILD) {
+            transitionTo(State.WaitingForRebuild)
+        } else if (ticksInState >= OPTION_PROPAGATION_TICKS) {
+            transitionTo(State.WaitingForStabilization)
+        }
+    }
+
+    private fun handleWaitingForRebuild() {
+        val renderingComplete = SodiumIntegration.isRenderingComplete()
+
+        if (renderingComplete == true) {
+            log.debug("Rebuild acknowledged by Sodium") { "ticks" to ticksInState }
+            transitionTo(State.WaitingForStabilization)
+            return
+        }
+
+        // Fallback for vanilla (no Sodium): use LevelRenderer
+        if (renderingComplete == null) {
+            val mc = Minecraft.getInstance()
+            if (mc.levelRenderer.hasRenderedAllSections()) {
+                log.debug("Rebuild complete (vanilla renderer)") { "ticks" to ticksInState }
+                transitionTo(State.WaitingForStabilization)
+                return
+            }
+        }
+
+        if (ticksInState >= REBUILD_TIMEOUT_TICKS) {
+            log.warn("Rebuild wait timed out, proceeding to stabilization") {
+                "ticks" to ticksInState
+                "timeout" to REBUILD_TIMEOUT_TICKS
+            }
             transitionTo(State.WaitingForStabilization)
         }
     }
@@ -383,6 +425,7 @@ class CaptureSession(
     private enum class State {
         Idle,
         ApplyingScene,
+        WaitingForRebuild,
         WaitingForStabilization,
         Capturing,
         PostCaptureCooldown,
@@ -391,6 +434,7 @@ class CaptureSession(
 
     companion object {
         private const val POST_CAPTURE_COOLDOWN_TICKS = 10
-        private const val SCENE_APPLICATION_WAIT_TICKS = 40
+        private const val OPTION_PROPAGATION_TICKS = 2
+        private const val REBUILD_TIMEOUT_TICKS = 200
     }
 }

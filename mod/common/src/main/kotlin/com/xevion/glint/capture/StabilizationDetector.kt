@@ -178,7 +178,7 @@ class StabilizationDetector {
 
     companion object {
         private const val LOG_INTERVAL_TICKS = 10
-        private const val MIN_WAIT_TICKS = 20 // 1 second floor
+        private const val MIN_WAIT_TICKS = 5 // Short floor; upstream states handle rebuild waits
         private const val SETTLING_TICKS = 10 // 0.5 seconds of idle before approving
     }
 }
