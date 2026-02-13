@@ -49,3 +49,7 @@ serde_with = "3.16.1"
 zip = { version = "7.4.0", default-features = false, features = ["deflate"] }
 custom_debug_derive = "0.6.2"
 tokio-util = { version = "0.7.18", features = ["rt"] }
+
+[dev-dependencies]
+assert2 = "0.3.16"
+rstest = "0.26.1"

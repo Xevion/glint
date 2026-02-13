@@ -157,8 +157,6 @@ class Orchestrator {
         }
     }
 
-    // ── State handlers ──────────────────────────────────────────────────
-
     private fun handlePlanning() {
         val plan = buildCapturePlan()
         if (plan.isEmpty()) {
@@ -349,8 +347,6 @@ class Orchestrator {
         }
     }
 
-    // ── Navigation ──────────────────────────────────────────────────────
-
     private fun advanceToNextShader() {
         captureSession = null
         val world = getCurrentWorld()
@@ -373,8 +369,6 @@ class Orchestrator {
             transitionTo(State.LoadingWorld)
         }
     }
-
-    // ── Session finalization ────────────────────────────────────────────
 
     private fun finalizeShaderRun() {
         val session = captureSession ?: return
@@ -418,8 +412,6 @@ class Orchestrator {
             }
         }
     }
-
-    // ── Cleanup ─────────────────────────────────────────────────────────
 
     private fun finishWithError(reason: String) {
         log.error("Orchestration failed") { "reason" to reason }
@@ -466,8 +458,6 @@ class Orchestrator {
         originalShaderPack = null
         spec = null
     }
-
-    // ── Plan building ───────────────────────────────────────────────────
 
     /**
      * Builds the capture plan: world → shader → scenes.
@@ -533,8 +523,6 @@ class Orchestrator {
 
         return plan
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────
 
     private fun getCurrentWorld(): WorldCaptures? = capturePlan.getOrNull(currentWorldIndex)
 

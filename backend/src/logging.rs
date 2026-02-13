@@ -44,8 +44,6 @@ const TIME_FORMAT: &[FormatItem<'static>] =
 const JSON_TIME_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
 
-// ── Pretty Formatter ──────────────────────────────────────────────
-
 /// Custom formatter that outputs compact timestamps with colored levels and spans.
 ///
 /// Format: `HH:MM:SS.sss LEVEL span{fields}:span2 target: message`
@@ -105,8 +103,6 @@ where
         writeln!(writer)
     }
 }
-
-// ── Compact Field Formatter ──────────────────────────────────────
 
 /// Closure that transforms a field's display string.
 type FieldTransform = Box<dyn Fn(&str) -> Cow<'_, str> + Send + Sync>;
@@ -234,8 +230,6 @@ fn compact_fields() -> CompactFields {
         }
     })
 }
-
-// ── JSON Formatter ────────────────────────────────────────────────
 
 /// Machine-readable JSON formatter for production/log aggregation.
 ///
@@ -367,8 +361,6 @@ where
     }
 }
 
-// ── ANSI Helpers ──────────────────────────────────────────────────
-
 fn write_dimmed(writer: &mut format::Writer<'_>, text: &str) -> fmt::Result {
     if writer.has_ansi_escapes() {
         write!(writer, "\x1b[2m{text}\x1b[0m")
@@ -406,8 +398,6 @@ fn write_colored_level(writer: &mut format::Writer<'_>, level: Level) -> fmt::Re
         write!(writer, "{name}")
     }
 }
-
-// ── Initialization ───────────────────────────────────────────────
 
 /// Default log level based on build profile.
 fn default_level() -> &'static str {

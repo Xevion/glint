@@ -38,8 +38,6 @@ object HighResCapture {
 
     private var sessionActive: Boolean = false
 
-    // ── Session lifecycle ──────────────────────────────────────────────
-
     /**
      * Begins a capture session by resizing to 4K and forcing Fancy graphics mode.
      *
@@ -94,8 +92,6 @@ object HighResCapture {
     /** Whether a capture session is active (dimensions are at 4K). */
     fun isSessionActive(): Boolean = sessionActive
 
-    // ── Per-capture lifecycle ──────────────────────────────────────────
-
     /**
      * Starts a single high-resolution capture within an active session.
      *
@@ -144,8 +140,6 @@ object HighResCapture {
 
     /** Whether a single capture is currently in-flight. */
     fun isCapturing(): Boolean = activeTask != null
-
-    // ── Internal ───────────────────────────────────────────────────────
 
     /**
      * Fake a window resize to the capture resolution. Mirrors what Minecraft.resizeDisplay()

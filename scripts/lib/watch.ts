@@ -16,365 +16,391 @@
 import { watch, type FSWatcher } from "fs";
 import { c, elapsed } from "./fmt";
 
-type State = "building" | "idle" | "running" | "building_with_server" | "swapping";
+type State =
+  | "building"
+  | "idle"
+  | "running"
+  | "building_with_server"
+  | "swapping";
 
 export interface BackendWatcherOptions {
-	/** Path to backend Cargo.toml */
-	manifestPath: string;
-	/** Path to compiled binary */
-	binPath: string;
-	/** Use release profile */
-	release: boolean;
-	/** Arguments to pass to the server binary */
-	args: string[];
-	/** Kill the compiler on new changes (true) or wait for it to finish (false) */
-	interrupt: boolean;
-	/** Stream compilation output inline instead of buffering */
-	verboseBuild: boolean;
+  /** Path to backend Cargo.toml */
+  manifestPath: string;
+  /** Path to compiled binary */
+  binPath: string;
+  /** Use release profile */
+  release: boolean;
+  /** Arguments to pass to the server binary */
+  args: string[];
+  /** Kill the compiler on new changes (true) or wait for it to finish (false) */
+  interrupt: boolean;
+  /** Stream compilation output inline instead of buffering */
+  verboseBuild: boolean;
 }
 
 export class BackendWatcher {
-	private state: State = "building";
-	private serverProc: ReturnType<typeof Bun.spawn> | null = null;
-	private buildProc: ReturnType<typeof Bun.spawn> | null = null;
-	private buildInterrupted = false;
-	private dirty = false;
-	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-	private watchers: FSWatcher[] = [];
-	private shutdownRequested = false;
+  private state: State = "building";
+  private serverProc: ReturnType<typeof Bun.spawn> | null = null;
+  private buildProc: ReturnType<typeof Bun.spawn> | null = null;
+  private buildInterrupted = false;
+  private dirty = false;
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private watchers: FSWatcher[] = [];
+  private shutdownRequested = false;
 
-	constructor(private opts: BackendWatcherOptions) {}
+  constructor(private opts: BackendWatcherOptions) {}
 
-	/** Begin watching and trigger the initial build. Fire-and-forget. */
-	start(): void {
-		this.setupWatchers();
-		this.triggerBuild();
-	}
+  /** Begin watching and trigger the initial build. Fire-and-forget. */
+  start(): void {
+    this.setupWatchers();
+    this.triggerBuild();
+  }
 
-	/**
-	 * Synchronous cleanup — kills all child processes immediately.
-	 * Suitable for signal handlers where async work isn't possible.
-	 */
-	killSync(): void {
-		this.shutdownRequested = true;
-		if (this.debounceTimer) clearTimeout(this.debounceTimer);
-		for (const w of this.watchers) w.close();
-		this.watchers = [];
-		if (this.buildProc) {
-			try {
-				this.buildProc.kill("SIGTERM");
-			} catch {
-				/* already dead */
-			}
-		}
-		if (this.serverProc) {
-			try {
-				this.serverProc.kill("SIGTERM");
-			} catch {
-				/* already dead */
-			}
-		}
-	}
+  /**
+   * Synchronous cleanup — kills all child processes immediately.
+   * Suitable for signal handlers where async work isn't possible.
+   */
+  killSync(): void {
+    this.shutdownRequested = true;
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    for (const w of this.watchers) w.close();
+    this.watchers = [];
+    if (this.buildProc) {
+      try {
+        this.buildProc.kill("SIGTERM");
+      } catch {
+        /* already dead */
+      }
+    }
+    if (this.serverProc) {
+      try {
+        this.serverProc.kill("SIGTERM");
+      } catch {
+        /* already dead */
+      }
+    }
+  }
 
-	/**
-	 * Graceful async shutdown — SIGTERM with timeout, then SIGKILL.
-	 * Closes watchers, kills build, and drains the running server.
-	 */
-	async shutdown(): Promise<void> {
-		this.shutdownRequested = true;
-		if (this.debounceTimer) {
-			clearTimeout(this.debounceTimer);
-			this.debounceTimer = null;
-		}
-		for (const w of this.watchers) w.close();
-		this.watchers = [];
+  /**
+   * Graceful async shutdown — SIGTERM with timeout, then SIGKILL.
+   * Closes watchers, kills build, and drains the running server.
+   */
+  async shutdown(): Promise<void> {
+    this.shutdownRequested = true;
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    for (const w of this.watchers) w.close();
+    this.watchers = [];
 
-		// Kill active build
-		if (this.buildProc) {
-			try {
-				this.buildProc.kill("SIGTERM");
-			} catch {
-				/* already dead */
-			}
-			await this.buildProc.exited;
-			this.buildProc = null;
-		}
+    // Kill active build
+    if (this.buildProc) {
+      try {
+        this.buildProc.kill("SIGTERM");
+      } catch {
+        /* already dead */
+      }
+      await this.buildProc.exited;
+      this.buildProc = null;
+    }
 
-		// Graceful server shutdown
-		if (this.serverProc) {
-			try {
-				this.serverProc.kill("SIGTERM");
-			} catch {
-				/* already dead */
-			}
-			const exited = await Promise.race([
-				this.serverProc.exited.then(() => true as const),
-				new Promise<false>((r) => setTimeout(() => r(false), 3000)),
-			]);
-			if (!exited) {
-				try {
-					this.serverProc.kill("SIGKILL");
-				} catch {
-					/* already dead */
-				}
-				await this.serverProc.exited;
-			}
-			this.serverProc = null;
-		}
-	}
+    // Graceful server shutdown
+    if (this.serverProc) {
+      try {
+        this.serverProc.kill("SIGTERM");
+      } catch {
+        /* already dead */
+      }
+      const exited = await Promise.race([
+        this.serverProc.exited.then(() => true as const),
+        new Promise<false>((r) => setTimeout(() => r(false), 3000)),
+      ]);
+      if (!exited) {
+        try {
+          this.serverProc.kill("SIGKILL");
+        } catch {
+          /* already dead */
+        }
+        await this.serverProc.exited;
+      }
+      this.serverProc = null;
+    }
+  }
 
-	// ── File watching ──────────────────────────────────────────────
+  private setupWatchers(): void {
+    // Watch backend/src recursively for .rs files
+    const srcWatcher = watch(
+      "backend/src",
+      { recursive: true },
+      (_event, filename) => {
+        if (filename && filename.toString().endsWith(".rs")) {
+          this.onFileChange();
+        }
+      },
+    );
+    this.watchers.push(srcWatcher);
 
-	private setupWatchers(): void {
-		// Watch backend/src recursively for .rs files
-		const srcWatcher = watch("backend/src", { recursive: true }, (_event, filename) => {
-			if (filename && filename.toString().endsWith(".rs")) {
-				this.onFileChange();
-			}
-		});
-		this.watchers.push(srcWatcher);
+    // Watch backend/ (non-recursive) for Cargo.toml / Cargo.lock
+    const manifestWatcher = watch(
+      "backend",
+      { recursive: false },
+      (_event, filename) => {
+        const name = filename?.toString();
+        if (name === "Cargo.toml" || name === "Cargo.lock") {
+          this.onFileChange();
+        }
+      },
+    );
+    this.watchers.push(manifestWatcher);
 
-		// Watch backend/ (non-recursive) for Cargo.toml / Cargo.lock
-		const manifestWatcher = watch("backend", { recursive: false }, (_event, filename) => {
-			const name = filename?.toString();
-			if (name === "Cargo.toml" || name === "Cargo.lock") {
-				this.onFileChange();
-			}
-		});
-		this.watchers.push(manifestWatcher);
+    // Watch .sqlx/ cache — offline query validation at compile time
+    this.tryWatch("backend/.sqlx", { recursive: true }, (_event, filename) => {
+      if (filename && filename.toString().endsWith(".json")) {
+        this.onFileChange();
+      }
+    });
 
-		// Watch .sqlx/ cache — offline query validation at compile time
-		this.tryWatch("backend/.sqlx", { recursive: true }, (_event, filename) => {
-			if (filename && filename.toString().endsWith(".json")) {
-				this.onFileChange();
-			}
-		});
+    // Watch migrations — schema changes invalidate the .sqlx cache
+    this.tryWatch(
+      "backend/migrations",
+      { recursive: true },
+      (_event, filename) => {
+        if (filename && filename.toString().endsWith(".sql")) {
+          this.onFileChange();
+        }
+      },
+    );
 
-		// Watch migrations — schema changes invalidate the .sqlx cache
-		this.tryWatch("backend/migrations", { recursive: true }, (_event, filename) => {
-			if (filename && filename.toString().endsWith(".sql")) {
-				this.onFileChange();
-			}
-		});
+    // Watch .cargo/config.toml — env vars and build configuration
+    this.tryWatch(
+      "backend/.cargo",
+      { recursive: false },
+      (_event, filename) => {
+        if (filename?.toString() === "config.toml") {
+          this.onFileChange();
+        }
+      },
+    );
+  }
 
-		// Watch .cargo/config.toml — env vars and build configuration
-		this.tryWatch("backend/.cargo", { recursive: false }, (_event, filename) => {
-			if (filename?.toString() === "config.toml") {
-				this.onFileChange();
-			}
-		});
-	}
+  /** Watch a path if it exists — some directories (e.g., .sqlx) may not exist yet. */
+  private tryWatch(
+    path: string,
+    options: { recursive: boolean },
+    cb: (event: string, filename: string | Buffer | null) => void,
+  ): void {
+    try {
+      this.watchers.push(watch(path, options, cb));
+    } catch {
+      // Directory doesn't exist — skip silently
+    }
+  }
 
-	/** Watch a path if it exists — some directories (e.g., .sqlx) may not exist yet. */
-	private tryWatch(
-		path: string,
-		options: { recursive: boolean },
-		cb: (event: string, filename: string | Buffer | null) => void,
-	): void {
-		try {
-			this.watchers.push(watch(path, options, cb));
-		} catch {
-			// Directory doesn't exist — skip silently
-		}
-	}
+  private onFileChange(): void {
+    if (this.shutdownRequested) return;
 
-	private onFileChange(): void {
-		if (this.shutdownRequested) return;
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = null;
+      this.handleChange();
+    }, 200);
+  }
 
-		if (this.debounceTimer) clearTimeout(this.debounceTimer);
-		this.debounceTimer = setTimeout(() => {
-			this.debounceTimer = null;
-			this.handleChange();
-		}, 200);
-	}
+  private handleChange(): void {
+    if (this.shutdownRequested) return;
 
-	// ── State transitions ──────────────────────────────────────────
+    switch (this.state) {
+      case "idle":
+        this.triggerBuild();
+        break;
 
-	private handleChange(): void {
-		if (this.shutdownRequested) return;
+      case "running":
+        this.state = "building_with_server";
+        this.triggerBuild();
+        break;
 
-		switch (this.state) {
-			case "idle":
-				this.triggerBuild();
-				break;
+      case "building":
+      case "building_with_server":
+        if (this.opts.interrupt && this.buildProc) {
+          console.log(
+            c("1;33", "→ Change detected, restarting compilation..."),
+          );
+          this.buildInterrupted = true;
+          try {
+            this.buildProc.kill("SIGTERM");
+          } catch {
+            /* already dead */
+          }
+          // triggerBuild will detect buildInterrupted and restart
+        } else {
+          console.log(
+            c(
+              "1;33",
+              "→ Change detected, will rebuild after current compilation",
+            ),
+          );
+          this.dirty = true;
+        }
+        break;
 
-			case "running":
-				this.state = "building_with_server";
-				this.triggerBuild();
-				break;
+      case "swapping":
+        // Mid-swap — rebuild after swap completes
+        this.dirty = true;
+        break;
+    }
+  }
 
-			case "building":
-			case "building_with_server":
-				if (this.opts.interrupt && this.buildProc) {
-					console.log(c("1;33", "→ Change detected, restarting compilation..."));
-					this.buildInterrupted = true;
-					try {
-						this.buildProc.kill("SIGTERM");
-					} catch {
-						/* already dead */
-					}
-					// triggerBuild will detect buildInterrupted and restart
-				} else {
-					console.log(
-						c("1;33", "→ Change detected, will rebuild after current compilation"),
-					);
-					this.dirty = true;
-				}
-				break;
+  private async triggerBuild(): Promise<void> {
+    if (this.shutdownRequested) return;
 
-			case "swapping":
-				// Mid-swap — rebuild after swap completes
-				this.dirty = true;
-				break;
-		}
-	}
+    const hadServer =
+      this.state === "building_with_server" || this.state === "running";
+    this.state = hadServer ? "building_with_server" : "building";
+    this.dirty = false;
 
-	// ── Build lifecycle ────────────────────────────────────────────
+    console.log(c("1;36", "→ Compiling backend..."));
+    const startTime = Date.now();
 
-	private async triggerBuild(): Promise<void> {
-		if (this.shutdownRequested) return;
+    const cargoArgs = [
+      "cargo",
+      "build",
+      "--manifest-path",
+      this.opts.manifestPath,
+    ];
+    if (this.opts.release) cargoArgs.push("--release");
 
-		const hadServer = this.state === "building_with_server" || this.state === "running";
-		this.state = hadServer ? "building_with_server" : "building";
-		this.dirty = false;
+    const piped = !this.opts.verboseBuild;
+    const buildProc = Bun.spawn(cargoArgs, {
+      stdout: piped ? "pipe" : "inherit",
+      stderr: piped ? "pipe" : "inherit",
+      env: { ...process.env, CI: "1" },
+    });
+    this.buildProc = buildProc;
 
-		console.log(c("1;36", "→ Compiling backend..."));
-		const startTime = Date.now();
+    // Consume pipes to prevent blocking (even if we don't display stdout)
+    let stderr = "";
+    if (piped) {
+      const [, stderrText] = await Promise.all([
+        buildProc.stdout ? new Response(buildProc.stdout).text() : "",
+        buildProc.stderr ? new Response(buildProc.stderr).text() : "",
+      ]);
+      stderr = stderrText;
+    }
 
-		const cargoArgs = ["cargo", "build", "--manifest-path", this.opts.manifestPath];
-		if (this.opts.release) cargoArgs.push("--release");
+    const exitCode = await buildProc.exited;
+    this.buildProc = null;
 
-		const piped = !this.opts.verboseBuild;
-		const buildProc = Bun.spawn(cargoArgs, {
-			stdout: piped ? "pipe" : "inherit",
-			stderr: piped ? "pipe" : "inherit",
-			env: { ...process.env, CI: "1" },
-		});
-		this.buildProc = buildProc;
+    if (this.shutdownRequested) return;
 
-		// Consume pipes to prevent blocking (even if we don't display stdout)
-		let stderr = "";
-		if (piped) {
-			const [, stderrText] = await Promise.all([
-				buildProc.stdout ? new Response(buildProc.stdout).text() : "",
-				buildProc.stderr ? new Response(buildProc.stderr).text() : "",
-			]);
-			stderr = stderrText;
-		}
+    // Interrupted by a newer change — restart immediately
+    if (this.buildInterrupted) {
+      this.buildInterrupted = false;
+      this.triggerBuild();
+      return;
+    }
 
-		const exitCode = await buildProc.exited;
-		this.buildProc = null;
+    if (exitCode === 0) {
+      console.log(c("1;32", `→ Backend compiled (${elapsed(startTime)})`));
 
-		if (this.shutdownRequested) return;
+      if (this.dirty) {
+        this.triggerBuild();
+        return;
+      }
 
-		// Interrupted by a newer change — restart immediately
-		if (this.buildInterrupted) {
-			this.buildInterrupted = false;
-			this.triggerBuild();
-			return;
-		}
+      if (this.state === "building_with_server") {
+        await this.swapServer();
+      } else {
+        await this.startServer();
+      }
+    } else {
+      console.log(c("1;31", `→ Build failed (${elapsed(startTime)}):`));
+      if (piped && stderr) {
+        process.stderr.write(stderr);
+      }
 
-		if (exitCode === 0) {
-			console.log(c("1;32", `→ Backend compiled (${elapsed(startTime)})`));
+      if (this.state === "building_with_server") {
+        console.log(c("1;33", "→ Keeping previous server running"));
+        this.state = "running";
+      } else {
+        console.log(c("1;33", "→ Waiting for changes..."));
+        this.state = "idle";
+      }
 
-			if (this.dirty) {
-				this.triggerBuild();
-				return;
-			}
+      if (this.dirty) {
+        this.triggerBuild();
+      }
+    }
+  }
 
-			if (this.state === "building_with_server") {
-				await this.swapServer();
-			} else {
-				await this.startServer();
-			}
-		} else {
-			console.log(c("1;31", `→ Build failed (${elapsed(startTime)}):`));
-			if (piped && stderr) {
-				process.stderr.write(stderr);
-			}
+  private async startServer(): Promise<void> {
+    if (this.shutdownRequested) return;
 
-			if (this.state === "building_with_server") {
-				console.log(c("1;33", "→ Keeping previous server running"));
-				this.state = "running";
-			} else {
-				console.log(c("1;33", "→ Waiting for changes..."));
-				this.state = "idle";
-			}
+    const proc = Bun.spawn([this.opts.binPath, ...this.opts.args], {
+      stdio: ["ignore", "inherit", "inherit"],
+      env: { ...process.env },
+    });
+    this.serverProc = proc;
+    this.state = "running";
+    console.log(c("1;32", `→ Backend running (pid ${proc.pid})`));
 
-			if (this.dirty) {
-				this.triggerBuild();
-			}
-		}
-	}
+    // Monitor for unexpected exit (crash)
+    proc.exited.then((code) => {
+      if (this.serverProc !== proc) return; // stale reference
+      this.serverProc = null;
+      if (this.shutdownRequested) return;
 
-	// ── Server lifecycle ───────────────────────────────────────────
+      console.log(c("1;31", `→ Backend exited (code ${code})`));
+      if (this.state === "building_with_server") {
+        // Crashed while a rebuild was in progress — downgrade to plain building
+        this.state = "building";
+        console.log(
+          c("1;33", "→ Build in progress, will start server on completion"),
+        );
+      } else {
+        this.state = "idle";
+        console.log(c("1;33", "→ Waiting for changes..."));
+      }
+    });
+  }
 
-	private async startServer(): Promise<void> {
-		if (this.shutdownRequested) return;
+  private async swapServer(): Promise<void> {
+    if (this.shutdownRequested) return;
 
-		const proc = Bun.spawn([this.opts.binPath, ...this.opts.args], {
-			stdio: ["ignore", "inherit", "inherit"],
-			env: { ...process.env },
-		});
-		this.serverProc = proc;
-		this.state = "running";
-		console.log(c("1;32", `→ Backend running (pid ${proc.pid})`));
+    this.state = "swapping";
 
-		// Monitor for unexpected exit (crash)
-		proc.exited.then((code) => {
-			if (this.serverProc !== proc) return; // stale reference
-			this.serverProc = null;
-			if (this.shutdownRequested) return;
+    if (this.serverProc) {
+      console.log(c("1;36", "→ Restarting backend..."));
+      const oldProc = this.serverProc;
+      this.serverProc = null;
 
-			console.log(c("1;31", `→ Backend exited (code ${code})`));
-			if (this.state === "building_with_server") {
-				// Crashed while a rebuild was in progress — downgrade to plain building
-				this.state = "building";
-				console.log(c("1;33", "→ Build in progress, will start server on completion"));
-			} else {
-				this.state = "idle";
-				console.log(c("1;33", "→ Waiting for changes..."));
-			}
-		});
-	}
+      try {
+        oldProc.kill("SIGTERM");
+      } catch {
+        /* already dead */
+      }
 
-	private async swapServer(): Promise<void> {
-		if (this.shutdownRequested) return;
+      const exited = await Promise.race([
+        oldProc.exited.then(() => true as const),
+        new Promise<false>((r) => setTimeout(() => r(false), 3000)),
+      ]);
 
-		this.state = "swapping";
+      if (!exited) {
+        try {
+          oldProc.kill("SIGKILL");
+        } catch {
+          /* already dead */
+        }
+        await oldProc.exited;
+      }
+    }
 
-		if (this.serverProc) {
-			console.log(c("1;36", "→ Restarting backend..."));
-			const oldProc = this.serverProc;
-			this.serverProc = null;
+    if (this.shutdownRequested) return;
 
-			try {
-				oldProc.kill("SIGTERM");
-			} catch {
-				/* already dead */
-			}
+    await this.startServer();
 
-			const exited = await Promise.race([
-				oldProc.exited.then(() => true as const),
-				new Promise<false>((r) => setTimeout(() => r(false), 3000)),
-			]);
-
-			if (!exited) {
-				try {
-					oldProc.kill("SIGKILL");
-				} catch {
-					/* already dead */
-				}
-				await oldProc.exited;
-			}
-		}
-
-		if (this.shutdownRequested) return;
-
-		await this.startServer();
-
-		if (this.dirty) {
-			this.handleChange();
-		}
-	}
+    if (this.dirty) {
+      this.handleChange();
+    }
+  }
 }

@@ -25,8 +25,6 @@ import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
 
 export class AdminEndpoints extends ApiClient {
-	// ============== Shaders ==============
-
 	listShaders(params?: {
 		page?: number;
 		pageSize?: number;
@@ -55,10 +53,10 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	linkShaderPlatform(id: string, url: string): Promise<Result<Shader, ApiError>> {
-		return this.post<Shader>(`/api/shaders/${encodeURIComponent(id)}/link`, { url });
+		return this.post<Shader>(`/api/shaders/${encodeURIComponent(id)}/link`, {
+			url
+		});
 	}
-
-	// ============== Worlds ==============
 
 	getWorld(id: string): Promise<Result<WorldWithDetails, ApiError>> {
 		return this.get<WorldWithDetails>(`/api/worlds/${encodeURIComponent(id)}`);
@@ -75,8 +73,6 @@ export class AdminEndpoints extends ApiClient {
 	listWorldVersions(worldId: string): Promise<Result<WorldVersion[], ApiError>> {
 		return this.get<WorldVersion[]>(`/api/worlds/${encodeURIComponent(worldId)}/versions`);
 	}
-
-	// ============== Scenes ==============
 
 	listScenes(): Promise<Result<SceneWithWorld[], ApiError>> {
 		return this.get<SceneWithWorld[]>('/api/scenes/all');
@@ -97,8 +93,6 @@ export class AdminEndpoints extends ApiClient {
 	reactivateScene(id: string): Promise<Result<Scene, ApiError>> {
 		return this.put<Scene>(`/api/scenes/${encodeURIComponent(id)}/reactivate`, {});
 	}
-
-	// ============== Captures ==============
 
 	listCaptures(params?: {
 		page?: number;
@@ -127,8 +121,6 @@ export class AdminEndpoints extends ApiClient {
 		return this.delete(`/api/captures/${encodeURIComponent(id)}`);
 	}
 
-	// ============== Users ==============
-
 	listUsers(): Promise<Result<User[], ApiError>> {
 		return this.get<User[]>('/api/users');
 	}
@@ -138,22 +130,20 @@ export class AdminEndpoints extends ApiClient {
 	}
 
 	updateUserRole(id: number, role: string): Promise<Result<User, ApiError>> {
-		return this.put<User>(`/api/users/${encodeURIComponent(id)}/role`, { role });
+		return this.put<User>(`/api/users/${encodeURIComponent(id)}/role`, {
+			role
+		});
 	}
 
 	deleteUserSessions(id: number): Promise<Result<null, ApiError>> {
 		return this.delete(`/api/users/${encodeURIComponent(id)}/sessions`);
 	}
 
-	// ============== Sessions ==============
-
 	deleteSession(userId: number, tokenPrefix: string): Promise<Result<null, ApiError>> {
 		return this.delete(
 			`/api/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(tokenPrefix)}`
 		);
 	}
-
-	// ============== Capture Health ==============
 
 	captureHealth(): Promise<Result<CaptureHealthResponse, ApiError>> {
 		return this.get<CaptureHealthResponse>('/api/admin/capture-health');
@@ -166,13 +156,9 @@ export class AdminEndpoints extends ApiClient {
 		return this.get<WorkItem[]>(`/api/work?${searchParams.toString()}`);
 	}
 
-	// ============== Health ==============
-
 	health(): Promise<Result<string, ApiError>> {
 		return this.getText('/api/health');
 	}
-
-	// ============== Storage ==============
 
 	storageStats(): Promise<Result<StorageStats, ApiError>> {
 		return this.get<StorageStats>('/api/admin/storage/stats');

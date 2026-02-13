@@ -328,8 +328,6 @@ class CaptureSession(
         pendingCapture = null
     }
 
-    // ── Filename helpers ────────────────────────────────────────────────
-
     private fun buildCaptureFilename(config: ShaderSpec): String {
         val sceneInput = scenes.getOrNull(currentSceneIndex) ?: return "unknown.webp"
         val scenePrefix = sanitizeForFilename(sceneInput.sceneId)
