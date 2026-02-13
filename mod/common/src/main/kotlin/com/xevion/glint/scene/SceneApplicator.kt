@@ -58,16 +58,20 @@ object SceneApplicator {
         // 2. Set position and camera
         applyPositionAndCamera(scene, config)
 
-        // 3. Set time and weather
+        // 3. Set time and weather (boolean flags + countdown timers)
         applyTimeAndWeather(scene)
 
         // 4. Apply render settings (only changes what differs from current state)
         val rebuildTriggered = applyRenderSettings(config)
 
-        // 5. Freeze world state
+        // 5. Freeze world state (disables daylight cycle and weather cycle)
         freezeWorldState(config)
 
-        // 6. Only force a full chunk reload if a rebuild-triggering setting changed.
+        // 6. Snap weather levels AFTER freeze so the server's advanceWeatherCycle
+        //    doesn't detect a stale state change and send packets that undo the snap
+        snapWeatherLevels(scene)
+
+        // 7. Only force a full chunk reload if a rebuild-triggering setting changed.
         //    Individual option setters for graphicsMode, ambientOcclusion, and biomeBlend
         //    already call allChanged() via Minecraft's internal listeners, but an explicit
         //    call ensures consistency. When settings are unchanged, skip entirely to avoid
@@ -173,36 +177,68 @@ object SceneApplicator {
         // Set weather on server using the public API
         when (scene.weather) {
             Weather.CLEAR -> {
-                // setWeatherParameters(clearWeatherTime, rainTime, isRaining, isThundering)
                 overworld.setWeatherParameters(6000, 0, false, false)
                 log.debug("Set weather") { "weather" to "CLEAR" }
             }
 
             Weather.RAIN -> {
-                // setWeatherParameters(clearWeatherTime, rainTime, isRaining, isThundering)
                 overworld.setWeatherParameters(0, 6000, true, false)
                 log.debug("Set weather") { "weather" to "RAIN" }
-
-                // Apply intensity via public Level.setRainLevel/setThunderLevel (0.0–1.0)
-                val intensity = scene.weatherIntensity
-                if (intensity > 0f) {
-                    overworld.setRainLevel(intensity)
-                    log.debug("Set rain intensity") { "intensity" to intensity }
-                }
             }
 
             Weather.THUNDER -> {
-                // setWeatherParameters(clearWeatherTime, rainTime, isRaining, isThundering)
                 overworld.setWeatherParameters(0, 6000, true, true)
                 log.debug("Set weather") { "weather" to "THUNDER" }
-
-                val intensity = scene.weatherIntensity
-                if (intensity > 0f) {
-                    overworld.setRainLevel(intensity)
-                    overworld.setThunderLevel(intensity)
-                    log.debug("Set storm intensity") { "intensity" to intensity }
-                }
             }
+        }
+    }
+
+    /** Compute the target rain/thunder levels for a scene. */
+    private fun weatherLevelsFor(scene: Scene): Pair<Float, Float> {
+        val intensity = scene.weatherIntensity
+        return when (scene.weather) {
+            Weather.CLEAR -> {
+                0f to 0f
+            }
+
+            Weather.RAIN -> {
+                (if (intensity > 0f) intensity else 1f) to 0f
+            }
+
+            Weather.THUNDER -> {
+                val level = if (intensity > 0f) intensity else 1f
+                level to level
+            }
+        }
+    }
+
+    /**
+     * Snaps weather levels on both server and client to the scene's target values.
+     *
+     * Must be called after [applyTimeAndWeather] and [freezeWorldState].
+     * Also safe to call again later to counteract stale weather packets —
+     * the server's `advanceWeatherCycle` sends `START_RAINING`/`STOP_RAINING`
+     * packets when it detects a state change, and the client handler
+     * counterintuitively resets `rainLevel` (e.g. `STOP_RAINING` sets it to 1.0
+     * for gradual fadeout), overwriting our previous snap.
+     */
+    fun snapWeatherLevels(scene: Scene) {
+        val mc = Minecraft.getInstance()
+        val server = mc.singleplayerServer ?: return
+
+        val (targetRainLevel, targetThunderLevel) = weatherLevelsFor(scene)
+
+        val overworld = server.overworld()
+        overworld.setRainLevel(targetRainLevel)
+        overworld.setThunderLevel(targetThunderLevel)
+        mc.level?.let { clientLevel ->
+            clientLevel.setRainLevel(targetRainLevel)
+            clientLevel.setThunderLevel(targetThunderLevel)
+        }
+
+        log.debug("Weather levels snapped") {
+            "rain" to targetRainLevel
+            "thunder" to targetThunderLevel
         }
     }
 

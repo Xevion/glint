@@ -9,10 +9,12 @@
   ],
   "client": [
     "BlitScaleMixin",
+    "FrameCounterMixin",
     "GameRendererMixin",
     "KeyboardHandlerMixin",
     "MinecraftMixin",
     "MouseHandlerMixin",
+    "SystemTimeUniformsMixin",
     "TitleScreenMixin"
   ],
   "injectors": {

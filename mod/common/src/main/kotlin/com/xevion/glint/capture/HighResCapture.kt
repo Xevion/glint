@@ -130,9 +130,13 @@ object HighResCapture {
 
     /**
      * Called from GameRendererMixin after each frame render.
-     * Advances the active capture task through its frame sequence.
+     * Advances the active capture task and the synthetic time clock.
      */
     fun onPostRender() {
+        // Advance synthetic shader time after each rendered frame so the next
+        // frame's Iris Timer.beginFrame() call sees an incremented timestamp.
+        CaptureTimeOverride.advanceFrame()
+
         val task = activeTask ?: return
 
         if (task.onRenderTick()) {

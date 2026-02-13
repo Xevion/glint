@@ -111,6 +111,10 @@ class CaptureSession(
                 handleWaitingForStabilization()
             }
 
+            State.PreCaptureSettle -> {
+                handlePreCaptureSettle()
+            }
+
             State.Capturing -> {
                 handleCapturing()
             }
@@ -170,11 +174,37 @@ class CaptureSession(
             "from" to state
             "to" to newState
         }
+
+        // Deactivate time override when leaving PreCaptureSettle for any reason
+        // other than Capturing (e.g., cancellation → Finishing).
+        // For the normal PreCaptureSettle → Capturing path, keep it active through
+        // the capture frame; it gets deactivated when leaving Capturing.
+        if (state == State.PreCaptureSettle && newState != State.Capturing) {
+            CaptureTimeOverride.deactivate()
+        }
+
+        // Deactivate time override when capture is done
+        if (state == State.Capturing) {
+            CaptureTimeOverride.deactivate()
+        }
+
         state = newState
         ticksInState = 0
 
         if (newState == State.WaitingForStabilization) {
             stabilizationDetector.reset()
+
+            // Re-snap weather levels to counteract stale START_RAINING/STOP_RAINING
+            // packets the server may have sent during the previous tick(s). By this
+            // point the server tick has run and any transition packet has been
+            // processed by the client, so our snap is the final word.
+            scenes.getOrNull(currentSceneIndex)?.let {
+                SceneApplicator.snapWeatherLevels(it.scene.scene)
+            }
+        }
+
+        if (newState == State.PreCaptureSettle) {
+            CaptureTimeOverride.activate()
         }
 
         if (newState == State.ApplyingScene) {
@@ -254,6 +284,20 @@ class CaptureSession(
 
     private fun handleWaitingForStabilization() {
         if (stabilizationDetector.isStable()) {
+            transitionTo(State.PreCaptureSettle)
+        }
+    }
+
+    private fun handlePreCaptureSettle() {
+        // CaptureTimeOverride.advanceFrame() is called from the render loop
+        // (GameRendererMixin → HighResCapture.onPostRender path), not here,
+        // because tick() runs once per game tick while rendering may produce
+        // multiple frames per tick. We just count ticks as a proxy — at normal
+        // tick rate each tick renders one frame.
+        if (ticksInState >= PRE_CAPTURE_SETTLE_FRAMES) {
+            log.debug("Pre-capture settle complete") {
+                "settle_frames" to PRE_CAPTURE_SETTLE_FRAMES
+            }
             transitionTo(State.Capturing)
         }
     }
@@ -350,6 +394,8 @@ class CaptureSession(
             "scenes_captured" to sceneCaptures.size
         }
 
+        // Safety net: ensure time override is off regardless of how we got here
+        CaptureTimeOverride.deactivate()
         ChunkForceLoader.releaseAll()
 
         originalState?.let {
@@ -420,6 +466,7 @@ class CaptureSession(
         ApplyingScene,
         WaitingForRebuild,
         WaitingForStabilization,
+        PreCaptureSettle,
         Capturing,
         Finishing,
     }
@@ -427,5 +474,12 @@ class CaptureSession(
     companion object {
         private const val OPTION_PROPAGATION_TICKS = 2
         private const val REBUILD_TIMEOUT_TICKS = 200
+
+        /**
+         * Number of frames to render with synthetic time before capturing.
+         * Lets TAA/temporal effects reconverge after the time override resets.
+         * At 60fps synthetic rate, 10 frames = ~167ms of shader time.
+         */
+        private const val PRE_CAPTURE_SETTLE_FRAMES = 10
     }
 }
