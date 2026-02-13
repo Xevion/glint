@@ -12,13 +12,9 @@ import com.xevion.glint.Loggers
  *
  * IMPORTANT: When `LevelRenderer.allChanged()` is called, Sodium destroys and recreates its
  * RenderSectionManager. The `needsUpdate` flag is set to true initially but gets cleared
- * during the same tick's render pass when `update()` is called. This creates a race condition
- * where we might check the state after Sodium has already processed the graph update but before
- * chunk builds are scheduled.
- *
- * To handle this, we track whether we've seen any rebuild activity (needsUpdate=true OR
- * scheduled jobs > 0) since the last reset. This ensures we don't prematurely consider
- * rendering complete on the same tick that allChanged() was called.
+ * during the same tick's render pass when `update()` is called. Callers must provide their own
+ * timing buffer (e.g. the [CaptureSession] `WaitingForRebuild` state) to avoid checking on
+ * the same tick as `allChanged()`.
  */
 object SodiumIntegration {
     private val log = Loggers.Capture.get()
@@ -43,8 +39,6 @@ object SodiumIntegration {
     private var getBusyThreadCountMethod: java.lang.reflect.Method? = null
     private var getTotalThreadCountMethod: java.lang.reflect.Method? = null
     private var getTotalSectionsMethod: java.lang.reflect.Method? = null
-
-    private var sawRebuildActivity: Boolean = false
 
     fun isAvailable(): Boolean {
         if (availability == AvailabilityState.UNKNOWN) {
@@ -131,10 +125,6 @@ object SodiumIntegration {
         }
     }
 
-    fun resetStabilizationState() {
-        sawRebuildActivity = false
-    }
-
     /** Resolves the RenderSectionManager from the active SodiumWorldRenderer, or null. */
     private fun getSectionManager(): Any? {
         val renderer = instanceNullableMethod!!.invoke(null) ?: return null
@@ -150,12 +140,11 @@ object SodiumIntegration {
     /**
      * Check if Sodium's chunk rendering is complete.
      *
-     * Returns true only when:
-     * 1. We've seen rebuild activity (needsUpdate=true or jobs scheduled) since last reset
-     * 2. The render graph doesn't need updating (needsUpdate() == false)
-     * 3. The build queue is empty (isBuildQueueEmpty() == true)
-     *
+     * Returns true when the render graph is up-to-date and the build queue is empty.
      * Returns null if Sodium is not available or reflection fails.
+     *
+     * Callers must provide their own timing buffer (e.g. the [CaptureSession.State.WaitingForRebuild]
+     * state) to avoid checking on the same tick as `allChanged()`.
      */
     fun isRenderingComplete(): Boolean? {
         if (!isAvailable()) return null
@@ -163,21 +152,10 @@ object SodiumIntegration {
         try {
             val sectionManager = getSectionManager() ?: return null
             val needsUpdate = needsUpdateMethod!!.invoke(sectionManager) as Boolean
-
-            val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
-            val scheduledJobs = getScheduledJobCountMethod!!.invoke(builder) as Int
-            val queueEmpty = isBuildQueueEmptyMethod!!.invoke(builder) as Boolean
-
-            if (needsUpdate || scheduledJobs > 0 || !queueEmpty) {
-                sawRebuildActivity = true
-            }
-
-            // Don't consider complete until we've seen rebuild activity.
-            // Prevents false positives when checking on the same tick as allChanged().
-            if (!sawRebuildActivity) return false
             if (needsUpdate) return false
 
-            return queueEmpty
+            val builder = getBuilderMethod!!.invoke(sectionManager) ?: return null
+            return isBuildQueueEmptyMethod!!.invoke(builder) as Boolean
         } catch (e: Exception) {
             log.debug("Sodium rendering check failed") { "error" to e.message }
             return null

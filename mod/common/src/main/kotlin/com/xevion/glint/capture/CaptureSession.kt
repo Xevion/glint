@@ -177,10 +177,6 @@ class CaptureSession(
         state = newState
         ticksInState = 0
 
-        if (newState == State.WaitingForRebuild) {
-            SodiumIntegration.resetStabilizationState()
-        }
-
         if (newState == State.WaitingForStabilization) {
             stabilizationDetector.reset()
         }

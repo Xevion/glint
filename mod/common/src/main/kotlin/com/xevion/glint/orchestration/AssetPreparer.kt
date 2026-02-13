@@ -11,6 +11,7 @@ import kotlinx.serialization.json.putJsonObject
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.concurrent.CompletionException
 
 data class ShaderGroup(
@@ -170,14 +171,33 @@ class AssetPreparer(
         val shaderpacksDir = File(gameDirectory, "shaderpacks")
         shaderpacksDir.mkdirs()
 
-        val files = shaderpacksDir.listFiles() ?: emptyArray()
-        val existingFile =
-            files.firstOrNull { it.name.contains(group.shaderSlug, ignoreCase = true) }
-                ?: files.firstOrNull { it.nameWithoutExtension.contains(group.shaderName, ignoreCase = true) }
+        val hash8 = group.fileHash?.take(8)
+        val filename =
+            if (hash8 != null) {
+                "${group.shaderSlug}-${group.version}-$hash8.zip"
+            } else {
+                "${group.shaderSlug}-${group.version}.zip"
+            }
+        val targetFile = File(shaderpacksDir, filename)
 
-        if (existingFile != null) {
-            log.debug("Shader already present") { "file" to existingFile.name }
-            return existingFile.name
+        // Check if file already exists
+        if (targetFile.exists()) {
+            if (group.fileHash != null) {
+                val existingHash = sha1Hex(targetFile)
+                if (existingHash == group.fileHash) {
+                    log.debug("Shader already present and verified") { "file" to filename }
+                    return filename
+                }
+                log.warn("Shader file exists but hash mismatch, re-downloading") {
+                    "file" to filename
+                    "expected" to group.fileHash
+                    "actual" to existingHash
+                }
+                targetFile.delete()
+            } else {
+                log.debug("Shader already present") { "file" to filename }
+                return filename
+            }
         }
 
         val downloadUrl = group.downloadUrl
@@ -185,9 +205,6 @@ class AssetPreparer(
             log.error("No download URL for shader") { "name" to group.shaderName }
             return null
         }
-
-        val filename = "${group.shaderSlug}-${group.version}.zip"
-        val targetFile = File(shaderpacksDir, filename)
 
         log.info("Downloading shader") {
             "name" to group.shaderName
@@ -214,6 +231,20 @@ class AssetPreparer(
                 }
             }
 
+            // Verify downloaded file hash
+            if (group.fileHash != null) {
+                val downloadedHash = sha1Hex(targetFile)
+                if (downloadedHash != group.fileHash) {
+                    log.error("Downloaded shader hash mismatch") {
+                        "file" to filename
+                        "expected" to group.fileHash
+                        "actual" to downloadedHash
+                    }
+                    targetFile.delete()
+                    return null
+                }
+            }
+
             log.info("Shader downloaded") {
                 "file" to filename
                 "bytes" to targetFile.length()
@@ -228,6 +259,18 @@ class AssetPreparer(
             targetFile.delete()
             return null
         }
+    }
+
+    private fun sha1Hex(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-1")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            while (input.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun writeSceneDefinitions(group: ShaderGroup) {
