@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { type Logger, getLogger } from '@logtape/logtape';
 import { Result } from 'true-myth';
+import { connectivity } from '$lib/stores/connectivity.svelte';
 import { getApiUrl } from './config';
 import { ApiError, ApiErrorType } from './errors';
 
@@ -47,6 +48,8 @@ export class ApiClient {
 				...options,
 				headers
 			});
+
+			if (browser) connectivity.reportBackendSuccess();
 
 			// Handle non-OK responses
 			if (!response.ok) {
@@ -100,6 +103,7 @@ export class ApiClient {
 			}
 		} catch (error) {
 			// Network error or other fetch failure
+			if (browser) connectivity.reportBackendError();
 			const message = error instanceof Error ? error.message : 'Network request failed';
 			logger?.error('API request exception: {method} {path}', {
 				method,

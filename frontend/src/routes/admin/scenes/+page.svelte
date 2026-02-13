@@ -82,7 +82,7 @@ function formatDimension(dim: string): string {
 							<div
 								class="flex h-20 w-32 items-center justify-center rounded-md bg-muted"
 							>
-								<MapPin class="h-8 w-8 text-muted-foreground/40" />
+								<MapPin class="h-8 w-8 text-muted-foreground opacity-40" />
 							</div>
 						{/if}
 					</div>

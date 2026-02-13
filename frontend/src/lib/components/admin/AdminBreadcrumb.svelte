@@ -23,7 +23,7 @@ let { backHref, backLabel = 'Go back', segments, trailing }: Props = $props();
 	</a>
 	{#each segments as segment, i (i)}
 		{#if i > 0}
-			<ChevronRight class="h-3.5 w-3.5 text-foreground/60" />
+			<ChevronRight class="h-3.5 w-3.5 text-foreground opacity-60" />
 		{/if}
 		{#if segment.href}
 			<a href={segment.href} class="text-foreground/70 hover:text-foreground">

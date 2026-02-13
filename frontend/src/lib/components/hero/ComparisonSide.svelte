@@ -4,6 +4,7 @@ import { resolve } from '$app/paths';
 import { formatVersion } from '$lib/utils/display';
 import { cfImageSrcset, cfImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
+import { ImageOff } from '@lucide/svelte';
 import { cubicInOut } from 'svelte/easing';
 import { crossfade } from 'svelte/transition';
 import type { Orientation, SliderSide } from './types';
@@ -19,15 +20,17 @@ interface Props {
 let { side, position, clipPath, orientation, willChange }: Props = $props();
 
 let loaded = $state(false);
+let errored = $state(false);
 
 const placeholder = $derived(browser ? decodeThumbhash(side.thumbhash) : null);
 const src = $derived(cfImageUrl(side.image, 'hero'));
 const srcset = $derived(cfImageSrcset(side.image, 'hero'));
 
-// Reset loaded state when the image URL changes
+// Reset loaded/errored state when the image URL changes
 $effect(() => {
 	void side.image;
 	loaded = false;
+	errored = false;
 });
 
 const href = $derived(side.slug ? resolve('/shaders/[slug]', { slug: side.slug }) : undefined);
@@ -71,13 +74,20 @@ const [send, receive] = crossfade({
 		sizes="(min-width: 1024px) 66vw, 100vw"
 		alt={side.label || `${position} comparison`}
 		class="pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
-		class:opacity-0={!loaded}
+		class:opacity-0={!loaded || errored}
 		loading="eager"
 		decoding="async"
 		fetchpriority="high"
 		draggable="false"
 		onload={() => (loaded = true)}
+		onerror={() => (errored = true)}
 	/>
+	{#if errored}
+		<div class="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white/70">
+			<ImageOff class="h-6 w-6" strokeWidth={1.5} />
+			<span class="mt-1 text-xs">Image unavailable</span>
+		</div>
+	{/if}
 	{#if side.label}
 		{#key isTop}
 			<a

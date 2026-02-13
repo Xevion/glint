@@ -14,6 +14,7 @@ import { Input } from '$lib/components/ui/input';
 import * as Tabs from '$lib/components/ui/tabs';
 import { cn } from '$lib/utils';
 import { formatNumber } from '$lib/utils/display';
+import { withRetry } from '$lib/utils/retry';
 import {
 	Check,
 	CircleAlert,
@@ -146,7 +147,7 @@ async function loadBrowse(sort: ShaderSearchSort) {
 	if (isInitial) discoverLoading = true;
 	discoverError = null;
 
-	const result = await api.adopt.search(undefined, PAGE_SIZE, 0, sort);
+	const result = await withRetry(() => api.adopt.search(undefined, PAGE_SIZE, 0, sort));
 	if (result.isOk) {
 		discoverResults = result.value.results;
 		totalModrinth = result.value.total_modrinth;
@@ -174,7 +175,7 @@ async function handleSearch() {
 	searchActive = true;
 	searchQuery = q;
 
-	const result = await api.adopt.search(q, PAGE_SIZE, 0);
+	const result = await withRetry(() => api.adopt.search(q, PAGE_SIZE, 0));
 	if (result.isOk) {
 		discoverResults = result.value.results;
 		totalModrinth = result.value.total_modrinth;
@@ -194,7 +195,7 @@ async function loadMore() {
 	const sort: ShaderSearchSort | undefined = searchActive ? undefined : browseSort;
 	const q = searchActive ? searchQuery : undefined;
 
-	const result = await api.adopt.search(q, PAGE_SIZE, offset, sort);
+	const result = await withRetry(() => api.adopt.search(q, PAGE_SIZE, offset, sort));
 	if (result.isOk) {
 		discoverResults = [...discoverResults, ...result.value.results];
 		totalModrinth = result.value.total_modrinth;

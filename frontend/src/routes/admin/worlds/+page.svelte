@@ -69,7 +69,7 @@ function lastUploadAt(world: WorldListItem): string | null {
 							<div
 								class="flex h-20 w-32 items-center justify-center rounded-md bg-muted"
 							>
-								<Globe class="h-8 w-8 text-muted-foreground/40" />
+								<Globe class="h-8 w-8 text-muted-foreground opacity-40" />
 							</div>
 						{/if}
 					</div>

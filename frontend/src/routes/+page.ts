@@ -4,6 +4,7 @@ import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => {
 	const api = createApiClient(fetch);
+	const errors: string[] = [];
 
 	const [statsResult, shadersResult, featuredResult] = await Promise.all([
 		api.stats.getStats(),
@@ -13,22 +14,32 @@ export const load: PageLoad = async ({ fetch }) => {
 
 	const stats = statsResult.match({
 		Ok: (s): Stats => s,
-		Err: (): Stats => ({ shader_count: 0, scene_count: 0, capture_count: 0 })
+		Err: (e) => {
+			errors.push(`Stats: ${e.message}`);
+			return { shader_count: 0, scene_count: 0, capture_count: 0 } as Stats;
+		}
 	});
 
 	const shaders = shadersResult.match({
 		Ok: (result): ShaderListItem[] => result.items,
-		Err: () => [] as ShaderListItem[]
+		Err: (e) => {
+			errors.push(`Shaders: ${e.message}`);
+			return [] as ShaderListItem[];
+		}
 	});
 
 	const featuredPairs = featuredResult.match({
 		Ok: (pairs): FeaturedPair[] => pairs,
-		Err: () => [] as FeaturedPair[]
+		Err: (e) => {
+			errors.push(`Featured: ${e.message}`);
+			return [] as FeaturedPair[];
+		}
 	});
 
 	return {
 		stats,
 		shaders,
-		featuredPairs
+		featuredPairs,
+		errors
 	};
 };

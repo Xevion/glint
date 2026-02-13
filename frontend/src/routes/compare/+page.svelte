@@ -1,7 +1,8 @@
 <script lang="ts">
 import { goto } from '$app/navigation';
-import ErrorCard from '$lib/components/ErrorCard.svelte';
+import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import Meta from '$lib/components/Meta.svelte';
+import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import {
 	type CompareMode,
 	type ImageOption,
@@ -9,7 +10,6 @@ import {
 	ShaderCompare,
 	type ShaderDisplayInfo
 } from '$lib/components/compare';
-import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ArrowLeftRight, Columns3, SplitSquareHorizontal, ToggleLeft } from '@lucide/svelte';
 import { fade, fly } from 'svelte/transition';
@@ -141,30 +141,15 @@ const ogDescription = $derived.by(() => {
 		</div>
 
 		{#if data.error}
-			<Alert variant="destructive" class="mb-6">
-				Failed to load captures: {data.error}
-			</Alert>
+			<ErrorBanner message="Failed to load captures: {data.error}" class="mb-6" />
 		{/if}
 
 		{#if images.length >= 2 && leftImage && rightImage}
 			<!-- Shader comparison -->
 			<div in:fade={{ duration: 300, delay: 100 }} class="mb-6 overflow-hidden rounded-xl border border-border bg-card">
-				<svelte:boundary onerror={(e) => console.error('[Compare]', e)}>
+				<SectionBoundary title="Comparison failed">
 					<ShaderCompare {leftImage} {rightImage} {mode} {leftShader} {rightShader} />
-
-				{#snippet failed(error, reset)}
-					{@const err = error instanceof Error ? error : new Error(String(error))}
-					<ErrorCard
-						title="Comparison failed"
-						message={err.message}
-						stack={err.stack}
-					>
-						{#snippet actions()}
-							<Button variant="outline" size="sm" onclick={reset}>Reload</Button>
-						{/snippet}
-					</ErrorCard>
-				{/snippet}
-				</svelte:boundary>
+				</SectionBoundary>
 			</div>
 
 			<!-- Image pickers -->

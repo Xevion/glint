@@ -2,7 +2,9 @@
 import { invalidateAll } from '$app/navigation';
 import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
 import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
+import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
+import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Button } from '$lib/components/ui/button';
 import { formatBytes, formatDatetime } from '$lib/utils/format';
@@ -65,6 +67,7 @@ let chartData = $derived(
 	)
 );
 let errors: Record<string, string> = $derived(data.errors);
+const failedSections = $derived(Object.keys(errors).filter((k) => k !== 'health'));
 
 let refreshing = $state(false);
 let autoRefresh = $state(true);
@@ -166,6 +169,11 @@ onDestroy(() => {
 		</div>
 	</header>
 
+	<!-- Error Summary -->
+	{#if failedSections.length > 0}
+		<ErrorBanner message="Failed to load: {failedSections.join(', ')}" />
+	{/if}
+
 	<!-- Stats Grid -->
 		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
 			{#each statCards as card (card.label)}
@@ -232,6 +240,7 @@ onDestroy(() => {
 				</div>
 			</div>
 		{#if chartData.length > 1}
+			<SectionBoundary title="Storage chart">
 			<div class="mt-2 text-xs text-muted-foreground">Storage Growth</div>
 			<div class="mt-1 h-75">
 				<Chart
@@ -324,6 +333,7 @@ onDestroy(() => {
 					</Tooltip.Root>
 				</Chart>
 			</div>
+		</SectionBoundary>
 		{/if}
 		</div>
 	{/if}

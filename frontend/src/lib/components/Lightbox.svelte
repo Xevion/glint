@@ -2,7 +2,7 @@
 import { Button } from '$lib/components/ui/button';
 import { cfImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
-import { ChevronLeft, ChevronRight, X } from '@lucide/svelte';
+import { ChevronLeft, ChevronRight, ImageOff, X } from '@lucide/svelte';
 import { fade, fly } from 'svelte/transition';
 
 interface CaptureItem {
@@ -52,6 +52,7 @@ let isDragging = $state(false);
 let dragStart = $state({ x: 0, y: 0 });
 let panStart = $state({ x: 0, y: 0 });
 let imageLoaded = $state(false);
+let imageErrored = $state(false);
 let imgEl = $state<HTMLImageElement | null>(null);
 
 // Reset zoom and loaded state when navigating to a different image
@@ -60,6 +61,7 @@ $effect(() => {
 	zoomLevel = 1;
 	panOffset = { x: 0, y: 0 };
 	imageLoaded = false;
+	imageErrored = false;
 });
 
 // Handle images already cached by the browser
@@ -238,12 +240,19 @@ function handlePointerUp() {
 							src={fullImageUrl}
 							alt="Capture fullscreen view"
 							class="col-start-1 row-start-1 max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-300"
-							class:opacity-0={!imageLoaded}
+							class:opacity-0={!imageLoaded || imageErrored}
 							loading="eager"
 							decoding="async"
 							draggable="false"
 							onload={() => (imageLoaded = true)}
+							onerror={() => (imageErrored = true)}
 						/>
+						{#if imageErrored}
+							<div class="col-start-1 row-start-1 flex flex-col items-center justify-center text-white/70">
+								<ImageOff class="h-10 w-10" strokeWidth={1.5} />
+								<span class="mt-2 text-sm">Image unavailable</span>
+							</div>
+						{/if}
 					</div>
 
 					<!-- Capture info overlay -->

@@ -1,6 +1,8 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
+import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import Meta from '$lib/components/Meta.svelte';
+import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import HeroSlider from '$lib/components/hero/HeroSlider.svelte';
 import { Button } from '$lib/components/ui/button';
@@ -8,6 +10,7 @@ import { fade, fly } from 'svelte/transition';
 import type { PageData } from './$types';
 
 let { data }: { data: PageData } = $props();
+const errors = $derived(data.errors ?? []);
 
 // Featured shaders (already limited to 6 by page_size param)
 const featuredShaders = $derived(data.shaders ?? []);
@@ -42,57 +45,65 @@ const ogImage = $derived(featuredPairs[0]?.right_image_url ?? null);
 	ogImagePath="/og/home/og.png"
 />
 
+{#if errors.length > 0}
+	<div class="mb-4">
+		<ErrorBanner message="Some content failed to load. You may see incomplete data." />
+	</div>
+{/if}
+
 <!-- Hero Section -->
 {#if hasFeaturedPairs}
-	<div in:fade={{ duration: 400 }} class="py-8 sm:py-12">
-		<!-- Hero slider with overlay text -->
-		<div class="relative">
-			<HeroSlider pairs={featuredPairs} bind:overlayVisible />
+	<SectionBoundary title="Hero slider">
+		<div in:fade={{ duration: 400 }} class="py-8 sm:py-12">
+			<!-- Hero slider with overlay text -->
+			<div class="relative">
+				<HeroSlider pairs={featuredPairs} bind:overlayVisible />
 
-		<!-- Desktop overlay: scrim + centered text (hidden on mobile, fades on slider interaction) -->
-		<div
-			class="pointer-events-none absolute inset-0 z-30 hidden select-none sm:flex flex-col items-center justify-center transition-opacity duration-300 {overlayVisible ? '' : 'opacity-0'}"
-			style="background: radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 40%, transparent 70%);"
-		>
-				<h1
-					class="text-5xl font-bold tracking-tight text-white drop-shadow-lg lg:text-6xl"
-					style="text-shadow: 0 2px 12px rgba(0,0,0,0.5);"
-				>
-					Glint
-				</h1>
-				<p
-					class="mt-2 text-xl text-white/90 drop-shadow-md"
-					style="text-shadow: 0 1px 8px rgba(0,0,0,0.5);"
-				>
-					Shader Preview Catalog for Minecraft
-				</p>
-			<div class="dark mt-6 flex gap-4 {overlayVisible ? 'pointer-events-auto' : 'pointer-events-none'}">
-				<Button href={resolve('/shaders', {})} size="lg" class="shadow-lg">Browse Shaders</Button>
-				<Button href={resolve('/compare', {})} variant="outline" size="lg" class="border-white/50 bg-black/30 text-white shadow-lg backdrop-blur-sm hover:bg-black/50">Compare</Button>
-			</div>
-			</div>
-		</div>
-
-		<!-- Mobile hero text (below slider, not overlaid) -->
-		<div class="mt-4 text-center sm:hidden">
-			<h1 class="text-3xl font-bold tracking-tight">Glint</h1>
-			<p class="mt-1 text-base text-muted-foreground">Shader Preview Catalog for Minecraft</p>
-		<div class="mt-4 flex justify-center gap-3">
-			<Button href={resolve('/shaders', {})} size="default">Browse Shaders</Button>
-			<Button href={resolve('/compare', {})} variant="outline" size="default" class="border-foreground/20 bg-foreground/5 hover:bg-foreground/10">Compare</Button>
-		</div>
-		</div>
-
-		<!-- Stats (below hero) -->
-		{#if hasStats}
+			<!-- Desktop overlay: scrim + centered text (hidden on mobile, fades on slider interaction) -->
 			<div
-				in:fly={{ y: 10, duration: 400, delay: 200 }}
-				class="mt-6 flex justify-center"
+				class="pointer-events-none absolute inset-0 z-30 hidden select-none sm:flex flex-col items-center justify-center transition-opacity duration-300 {overlayVisible ? '' : 'opacity-0'}"
+				style="background: radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 40%, transparent 70%);"
 			>
-				{@render statsBar()}
+					<h1
+						class="text-5xl font-bold tracking-tight text-white drop-shadow-lg lg:text-6xl"
+						style="text-shadow: 0 2px 12px rgba(0,0,0,0.5);"
+					>
+						Glint
+					</h1>
+					<p
+						class="mt-2 text-xl text-white/90 drop-shadow-md"
+						style="text-shadow: 0 1px 8px rgba(0,0,0,0.5);"
+					>
+						Shader Preview Catalog for Minecraft
+					</p>
+				<div class="dark mt-6 flex gap-4 {overlayVisible ? 'pointer-events-auto' : 'pointer-events-none'}">
+					<Button href={resolve('/shaders', {})} size="lg" class="shadow-lg">Browse Shaders</Button>
+					<Button href={resolve('/compare', {})} variant="outline" size="lg" class="border-white/50 bg-black/30 text-white shadow-lg backdrop-blur-sm hover:bg-black/50">Compare</Button>
+				</div>
+				</div>
 			</div>
-		{/if}
-	</div>
+
+			<!-- Mobile hero text (below slider, not overlaid) -->
+			<div class="mt-4 text-center sm:hidden">
+				<h1 class="text-3xl font-bold tracking-tight">Glint</h1>
+				<p class="mt-1 text-base text-muted-foreground">Shader Preview Catalog for Minecraft</p>
+			<div class="mt-4 flex justify-center gap-3">
+				<Button href={resolve('/shaders', {})} size="default">Browse Shaders</Button>
+				<Button href={resolve('/compare', {})} variant="outline" size="default" class="border-foreground/20 bg-foreground/5 hover:bg-foreground/10">Compare</Button>
+			</div>
+			</div>
+
+			<!-- Stats (below hero) -->
+			{#if hasStats}
+				<div
+					in:fly={{ y: 10, duration: 400, delay: 200 }}
+					class="mt-6 flex justify-center"
+				>
+					{@render statsBar()}
+				</div>
+			{/if}
+		</div>
+	</SectionBoundary>
 {:else}
 	<!-- Fallback: text-only hero when no featured pairs available -->
 	<div class="py-16 sm:py-24 text-center">
@@ -127,25 +138,27 @@ const ogImage = $derived(featuredPairs[0]?.right_image_url ?? null);
 
 <!-- Featured Shaders -->
 {#if featuredShaders.length > 0}
-	<section in:fly={{ y: 20, duration: 400, delay: 400 }} class="py-8">
-		<div class="mb-6 flex items-center justify-between">
-			<h2 class="text-xl font-semibold">Featured Shaders</h2>
-			<a
-				href={resolve('/shaders', {})}
-				class="text-sm text-foreground/70 hover:text-foreground transition-colors"
-			>
-				View all →
-			</a>
-		</div>
+	<SectionBoundary title="Featured shaders">
+		<section in:fly={{ y: 20, duration: 400, delay: 400 }} class="py-8">
+			<div class="mb-6 flex items-center justify-between">
+				<h2 class="text-xl font-semibold">Featured Shaders</h2>
+				<a
+					href={resolve('/shaders', {})}
+					class="text-sm text-foreground/70 hover:text-foreground transition-colors"
+				>
+					View all →
+				</a>
+			</div>
 
-		<div class="grid gap-5" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
-			{#each featuredShaders as shader, i (shader.id)}
-				<div in:fly={{ y: 20, duration: 300, delay: 450 + i * 50 }}>
-					<ShaderCard {shader} />
-				</div>
-			{/each}
-		</div>
-	</section>
+			<div class="grid gap-5" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+				{#each featuredShaders as shader, i (shader.id)}
+					<div in:fly={{ y: 20, duration: 300, delay: 450 + i * 50 }}>
+						<ShaderCard {shader} />
+					</div>
+				{/each}
+			</div>
+		</section>
+	</SectionBoundary>
 {/if}
 
 <!-- Quick Links -->

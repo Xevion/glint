@@ -5,6 +5,7 @@ import type { Snippet } from 'svelte';
 import { onMount } from 'svelte';
 import 'overlayscrollbars/overlayscrollbars.css';
 import BackgroundImage from '$lib/components/BackgroundImage.svelte';
+import ConnectivityBanner from '$lib/components/ConnectivityBanner.svelte';
 import Footer from '$lib/components/Footer.svelte';
 import BrandIconSprite from '$lib/components/icons/BrandIconSprite.svelte';
 import Navigation from '$lib/components/Navigation.svelte';
@@ -54,6 +55,7 @@ onMount(() => {
 </script>
 
 <BrandIconSprite />
+<ConnectivityBanner />
 
 <BackgroundImage
 	backgrounds={data.backgrounds}
@@ -66,12 +68,22 @@ onMount(() => {
 		<div class="w-full max-w-6xl mx-auto flex flex-col flex-1">
 			<!-- Navbar - excluded from view transitions to avoid ghost highlights -->
 			<div class="pt-5 pb-5">
-				<Navigation />
+				<svelte:boundary onerror={(e) => console.error('[Navigation]', e)}>
+					<Navigation />
+					{#snippet failed()}
+						<nav class="flex h-10 items-center">
+							<a href="/" class="text-lg font-semibold">Glint</a>
+						</nav>
+					{/snippet}
+				</svelte:boundary>
 			</div>
 
 			<!-- Content with contextual sidebar -->
 			<main class="flex-1 flex gap-8 pb-5">
-				<Sidebar />
+				<svelte:boundary onerror={(e) => console.error('[Sidebar]', e)}>
+					<Sidebar />
+					{#snippet failed()}{/snippet}
+				</svelte:boundary>
 				<div class="flex-1 min-w-0" style="view-transition-name: app-content">
 					{@render children()}
 				</div>

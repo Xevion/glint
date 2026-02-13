@@ -1,9 +1,10 @@
 <script lang="ts">
+import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import SceneCard from '$lib/components/SceneCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
-import { Search } from '@lucide/svelte';
+import { AlertTriangle, Search } from '@lucide/svelte';
 import { fade, fly, scale } from 'svelte/transition';
 import type { PageData } from './$types';
 
@@ -12,6 +13,7 @@ interface Props {
 }
 let { data }: Props = $props();
 const scenes = $derived(data.scenes);
+const loadError = $derived(data.error);
 
 // Filter state
 let searchQuery = $state('');
@@ -76,17 +78,32 @@ const ogImage = $derived(scenes[0]?.image_url ?? null);
 		</div>
 	</div>
 
+	<!-- Error Banner -->
+	{#if loadError}
+		<div class="mb-4">
+			<ErrorBanner message="Failed to load scenes: {loadError}" />
+		</div>
+	{/if}
+
 	<!-- Results count -->
-	<div in:fade={{ duration: 300, delay: 200 }} class="mb-4 text-sm text-muted-foreground">
-		{#if filteredScenes.length === scenes.length}
-			Showing all {scenes.length} scenes
-		{:else}
-			Showing {filteredScenes.length} of {scenes.length} scenes
-		{/if}
-	</div>
+	{#if !loadError}
+		<div in:fade={{ duration: 300, delay: 200 }} class="mb-4 text-sm text-muted-foreground">
+			{#if filteredScenes.length === scenes.length}
+				Showing all {scenes.length} scenes
+			{:else}
+				Showing {filteredScenes.length} of {scenes.length} scenes
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Scene Grid -->
-	{#if filteredScenes.length > 0}
+	{#if loadError && scenes.length === 0}
+		<div class="flex flex-col items-center justify-center py-16 text-center">
+			<AlertTriangle class="mb-4 h-16 w-16 text-destructive opacity-50" strokeWidth={1.5} />
+			<h3 class="text-lg font-semibold text-foreground">Failed to load scenes</h3>
+			<p class="mt-1 text-sm text-foreground/70">Check your connection and try again</p>
+		</div>
+	{:else if filteredScenes.length > 0}
 		<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 			{#each filteredScenes as scene, i (scene.id)}
 				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>
@@ -94,11 +111,17 @@ const ogImage = $derived(scenes[0]?.image_url ?? null);
 				</div>
 			{/each}
 		</div>
+	{:else if hasFilters}
+		<div class="flex flex-col items-center justify-center py-16 text-center">
+			<Search class="mb-4 h-16 w-16 text-muted-foreground opacity-50" strokeWidth={1.5} />
+			<h3 class="text-lg font-semibold text-foreground">No scenes found</h3>
+			<p class="mt-1 text-sm text-foreground/70">Try adjusting your filters</p>
+		</div>
 	{:else}
 		<div class="flex flex-col items-center justify-center py-16 text-center">
-	<Search class="mb-4 h-16 w-16 text-muted-foreground opacity-50" strokeWidth={1.5} />
-	<h3 class="text-lg font-semibold text-foreground">No scenes found</h3>
-		<p class="mt-1 text-sm text-foreground/70">Try adjusting your filters</p>
+			<Search class="mb-4 h-16 w-16 text-muted-foreground opacity-50" strokeWidth={1.5} />
+			<h3 class="text-lg font-semibold text-foreground">No scenes yet</h3>
+			<p class="mt-1 text-sm text-foreground/70">Scenes will appear here once they've been created</p>
 		</div>
 	{/if}
 </div>

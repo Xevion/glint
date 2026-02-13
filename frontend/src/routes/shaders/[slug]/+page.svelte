@@ -5,10 +5,12 @@ import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import Meta from '$lib/components/Meta.svelte';
+import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import * as Select from '$lib/components/ui/select';
 import { formatNumber, formatVersion } from '$lib/utils/display';
 import { preloadImage } from '$lib/utils/image';
+import { withRetry } from '$lib/utils/retry';
 import { ChevronDown, ChevronRight, Download, ExternalLink, ImageOff } from '@lucide/svelte';
 import { fly } from 'svelte/transition';
 import type { PageData } from './$types';
@@ -30,6 +32,7 @@ $effect(() => {
 	versionOverride = null;
 	selectedCaptureId = null;
 	selectedProfileId = null;
+	iconErrored = false;
 });
 
 // Core data: prefer override (from version change), fall back to page data
@@ -63,6 +66,7 @@ const heroCapture = $derived(
 // Lightbox state
 let lightboxOpen = $state(false);
 let lightboxIndex = $state(0);
+let iconErrored = $state(false);
 
 // Guards stale responses from racing version fetches
 let fetchGeneration = 0;
@@ -74,7 +78,7 @@ async function onVersionChange(versionId: string) {
 	selectedProfileId = null;
 	const generation = ++fetchGeneration;
 	const api = createApiClient(fetch);
-	const result = await api.shaders.getShader(shader.slug, { versionId });
+	const result = await withRetry(() => api.shaders.getShader(shader.slug, { versionId }));
 	if (generation !== fetchGeneration) return;
 	result.match({
 		Ok: (updated) => {
@@ -95,7 +99,7 @@ async function onProfileChange(profileId: string | null) {
 	const params: { versionId?: string; profile_id?: string } = {};
 	if (selectedVersionId) params.versionId = selectedVersionId;
 	if (profileId) params.profile_id = profileId;
-	const result = await api.shaders.getShader(shader.slug, params);
+	const result = await withRetry(() => api.shaders.getShader(shader.slug, params));
 	if (generation !== fetchGeneration) return;
 	result.match({
 		Ok: (updated) => {
@@ -151,11 +155,12 @@ const ogDescription = $derived.by(() => {
 				<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 					<!-- Left: Icon + Name + Description -->
 					<div class="flex items-start gap-4">
-						{#if shader.icon_url}
+						{#if shader.icon_url && !iconErrored}
 							<img
 								src={shader.icon_url}
 								alt="{shader.name} icon"
 								class="h-14 w-14 rounded-lg object-cover"
+								onerror={() => (iconErrored = true)}
 							/>
 						{/if}
 						<div>
@@ -362,6 +367,7 @@ const ogDescription = $derived.by(() => {
 			{/if}
 
 			<!-- Hero Image -->
+			<SectionBoundary title="Hero image">
 			{#if heroCapture}
 				<div class="mb-8">
 					<button
@@ -410,8 +416,10 @@ const ogDescription = $derived.by(() => {
 					</div>
 				</div>
 			{/if}
+			</SectionBoundary>
 
 			<!-- Scene Grid -->
+		<SectionBoundary title="Scene captures">
 		{#if captures.length > 1}
 			<div>
 				<h2 class="mb-4 text-lg font-semibold text-foreground">Scenes</h2>
@@ -454,6 +462,7 @@ const ogDescription = $derived.by(() => {
 					</div>
 				</div>
 			{/if}
+		</SectionBoundary>
 		</div>
 {/key}
 
