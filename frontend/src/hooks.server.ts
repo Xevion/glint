@@ -2,6 +2,7 @@ import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { initLogger } from '$lib/logger.server';
 import { requestContext } from '$lib/server/context';
+import { createThumbhashExpression } from '$lib/thumbhash-inline';
 import { getLogger } from '@logtape/logtape';
 import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { PostHog } from 'posthog-node';
@@ -17,6 +18,9 @@ const posthog =
 
 const proxyLogger = getLogger(['ssr', 'proxy']);
 const errorLogger = getLogger(['ssr', 'error']);
+
+// Pre-compute once at startup — the expression is static
+const thumbhashSnippet = createThumbhashExpression();
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const { method } = event.request;
@@ -78,7 +82,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	return requestContext.run({ requestId }, async () => {
 		const response = await resolve(event, {
-			transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', 'en'),
+			transformPageChunk: ({ html }) =>
+				html.replace('%paraglide.lang%', 'en').replace('%thumbhash.snippet%', thumbhashSnippet),
 			filterSerializedResponseHeaders: (name) => name === 'content-length' || name === 'content-type'
 		});
 

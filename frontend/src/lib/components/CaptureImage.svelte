@@ -62,6 +62,7 @@ $effect(() => {
 
 <div
 	class={cn('relative overflow-hidden', containerClass)}
+	data-thumbhash={thumbhash ?? undefined}
 	style:background-image={placeholderUrl ? `url(${placeholderUrl})` : undefined}
 	style:background-size="cover"
 	style:background-position="center"

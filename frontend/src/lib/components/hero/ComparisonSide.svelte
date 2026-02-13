@@ -57,11 +57,12 @@ const [send, receive] = crossfade({
 	class:will-change-[clip-path]={willChange}
 	style:clip-path={clipPath}
 >
-	{#if placeholder}
+	{#if placeholder ?? side.thumbhash}
 		<div
 			class="absolute inset-0 bg-cover bg-center transition-opacity duration-300"
 			class:opacity-0={loaded}
-			style:background-image="url({placeholder})"
+			data-thumbhash={!placeholder ? (side.thumbhash ?? undefined) : undefined}
+			style:background-image={placeholder ? `url(${placeholder})` : undefined}
 		></div>
 	{/if}
 	<img
