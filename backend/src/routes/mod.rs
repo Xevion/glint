@@ -5,6 +5,7 @@ mod capture_health;
 mod captures;
 pub mod csp_report;
 mod device;
+mod extraction;
 mod featured;
 mod runs;
 mod scenes;
@@ -108,6 +109,7 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         )
         .nest("/featured", featured::router().layer(cache_featured))
         .nest("/admin/capture-health", capture_health::router())
+        .nest("/admin/shaders", extraction::router())
         .nest("/admin/storage", storage::router())
         // Intentional double rate limiting: routes like /auth, /device, and /worlds
         // have tier-specific limiters that enforce tight per-category budgets. The

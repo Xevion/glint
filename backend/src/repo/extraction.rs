@@ -186,6 +186,29 @@ impl ExtractionRepo {
         Ok(profiles)
     }
 
+    /// Reset extraction status to 'pending' for a shader version,
+    /// allowing re-extraction. Returns `true` if a row was updated.
+    #[instrument(skip(pool), level = "debug")]
+    pub async fn reset_extraction_status(pool: &PgPool, version_id: &str) -> AppResult<bool> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE shader_versions
+            SET extraction_status = 'pending',
+                extraction_error = NULL,
+                extracted_at = NULL
+            WHERE id = $1
+            "#,
+            version_id,
+        )
+        .execute(pool)
+        .await
+        .context(format!(
+            "failed to reset extraction status for version '{version_id}'"
+        ))?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Get extracted metadata for a shader version, if available.
     #[instrument(skip(executor), level = "debug")]
     pub async fn get_metadata_by_version(

@@ -7,7 +7,8 @@ use crate::{
     middleware::client_ip::ClientIp,
     models::{
         CaptureStatus, CreateShaderRequest, CreateShaderVersionRequest, PageQuery, Paginated,
-        Shader, ShaderListItem, ShaderVersion, ShaderWithCaptures, UpdateShaderRequest,
+        Shader, ShaderListItem, ShaderVersion, ShaderVersionProfile, ShaderWithCaptures,
+        UpdateShaderRequest,
     },
     repo::{
         CaptureRepo, ExtractionRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo,
@@ -38,6 +39,10 @@ pub fn router() -> Router<AppState> {
             get(get_shader).put(update_shader).delete(delete_shader),
         )
         .route("/{id}/versions", post(create_shader_version))
+        .route(
+            "/{id}/versions/{version_id}/profiles",
+            get(list_version_profiles),
+        )
 }
 
 /// Response type for shader detail endpoint: JSON data, 301 redirect, or 304 not modified.
@@ -315,6 +320,19 @@ async fn create_shader_version(
     let version = ShaderVersionRepo::create(state.db(), &id, &shader_id, &request).await?;
 
     Ok((StatusCode::CREATED, Json(version)))
+}
+
+/// GET /api/shaders/{id}/versions/{version_id}/profiles - List profiles for a shader version (public)
+///
+/// Lightweight endpoint for the mod capture orchestrator to fetch profiles without
+/// pulling the full shader detail response. Returns empty array when no profiles exist.
+#[instrument(skip(state))]
+async fn list_version_profiles(
+    State(state): State<AppState>,
+    Path((_shader_id, version_id)): Path<(String, String)>,
+) -> AppResult<Json<Vec<ShaderVersionProfile>>> {
+    let profiles = ExtractionRepo::list_profiles_by_version(state.db(), &version_id).await?;
+    Ok(Json(profiles))
 }
 
 /// PUT /api/shaders/{id} - Update shader metadata (admin)
