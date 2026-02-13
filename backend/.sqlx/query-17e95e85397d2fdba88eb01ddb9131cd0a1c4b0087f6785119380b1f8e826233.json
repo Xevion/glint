@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                cri.id,\n                cri.run_id AS \"run_id: CaptureRunId\",\n                cri.shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                cri.scene_id AS \"scene_id: SceneId\",\n                cri.profile_id AS \"profile_id: ShaderVersionProfileId\",\n                svp.name as profile_name,\n                cri.status AS \"status!: CaptureRunItemStatus\",\n                cri.capture_id AS \"capture_id: CaptureId\",\n                cri.error_message, cri.error_log, cri.duration_ms,\n                cri.started_at, cri.completed_at,\n                s.name as shader_name,\n                s.slug as shader_slug,\n                sv.version as shader_version,\n                sc.name as scene_name\n            FROM capture_run_items cri\n            JOIN shader_versions sv ON cri.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            JOIN scenes sc ON cri.scene_id = sc.id\n            LEFT JOIN shader_version_profiles svp ON cri.profile_id = svp.id\n            WHERE cri.run_id = $1\n            ORDER BY cri.started_at ASC NULLS LAST\n            ",
+  "query": "\n            SELECT\n                cri.id,\n                cri.run_id AS \"run_id: CaptureRunId\",\n                cri.shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                cri.scene_id AS \"scene_id: SceneId\",\n                cri.profile_id AS \"profile_id: ShaderVersionProfileId\",\n                svp.name as \"profile_name?\",\n                cri.status AS \"status!: CaptureRunItemStatus\",\n                cri.capture_id AS \"capture_id: CaptureId\",\n                cri.error_message, cri.error_log, cri.duration_ms,\n                cri.started_at, cri.completed_at,\n                s.name as shader_name,\n                s.slug as shader_slug,\n                sv.version as shader_version,\n                sc.name as scene_name\n            FROM capture_run_items cri\n            JOIN shader_versions sv ON cri.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            JOIN scenes sc ON cri.scene_id = sc.id\n            LEFT JOIN shader_version_profiles svp ON cri.profile_id = svp.id\n            WHERE cri.run_id = $1\n            ORDER BY cri.started_at ASC NULLS LAST\n            ",
   "describe": {
     "columns": [
       {
@@ -30,7 +30,7 @@
       },
       {
         "ordinal": 5,
-        "name": "profile_name",
+        "name": "profile_name?",
         "type_info": "Text"
       },
       {
@@ -114,5 +114,5 @@
       false
     ]
   },
-  "hash": "32c96c589ee905460ad4ab4c85525b85096b4133ad45870659e1258850e4f1ea"
+  "hash": "17e95e85397d2fdba88eb01ddb9131cd0a1c4b0087f6785119380b1f8e826233"
 }

@@ -325,7 +325,7 @@ impl CaptureRunRepo {
                 cri.shader_version_id AS "shader_version_id: ShaderVersionId",
                 cri.scene_id AS "scene_id: SceneId",
                 cri.profile_id AS "profile_id: ShaderVersionProfileId",
-                svp.name as profile_name,
+                svp.name as "profile_name?",
                 cri.status AS "status!: CaptureRunItemStatus",
                 cri.capture_id AS "capture_id: CaptureId",
                 cri.error_message, cri.error_log, cri.duration_ms,
