@@ -1,6 +1,7 @@
 package com.xevion.glint.session
 
 import com.xevion.glint.Loggers
+import com.xevion.glint.api.WorkItem
 import com.xevion.glint.orchestration.CaptureSpec
 import com.xevion.glint.orchestration.Orchestrator
 
@@ -11,7 +12,7 @@ object SessionRegistry {
     private val orchestratorManager = SessionManager<Orchestrator>()
 
     /**
-     * Starts orchestration with the given capture spec.
+     * Starts orchestration with the given capture spec (interactive UI path).
      * @return true if orchestration started successfully, false if already running
      */
     fun startOrchestration(
@@ -22,6 +23,23 @@ object SessionRegistry {
             name = "Orchestration",
             factory = { Orchestrator().also { configure?.invoke(it) } },
             starter = { it.start(spec) },
+            isRunning = { it.isRunning },
+        )
+
+    /**
+     * Starts linear orchestration with pre-ordered work items (autonomous capture path).
+     * @return true if orchestration started successfully, false if already running
+     */
+    fun startLinearOrchestration(
+        items: List<WorkItem>,
+        runId: String,
+        outputDir: String? = null,
+        configure: ((Orchestrator) -> Unit)? = null,
+    ): Boolean =
+        orchestratorManager.start(
+            name = "Linear Orchestration",
+            factory = { Orchestrator().also { configure?.invoke(it) } },
+            starter = { it.startLinear(items, runId, outputDir) },
             isRunning = { it.isRunning },
         )
 

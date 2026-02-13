@@ -31,7 +31,7 @@ object Glint {
         private set
     val isForceMode: Boolean get() = forceScenes != null || forceShaders != null
 
-    var workLimit: Int = 50
+    var shaderLimit: Int = 10
         private set
 
     var autonomousRunner: AutonomousRunner? = null
@@ -57,7 +57,7 @@ object Glint {
                 }
             }
 
-            workLimit = System.getenv("GLINT_WORK_LIMIT")?.toIntOrNull() ?: 50
+            shaderLimit = System.getenv("GLINT_SHADER_LIMIT")?.toIntOrNull() ?: 10
 
             // Fall back to saved config token if env var is empty
             if (apiToken.isBlank()) {

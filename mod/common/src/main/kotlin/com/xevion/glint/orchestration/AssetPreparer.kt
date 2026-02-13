@@ -14,73 +14,92 @@ import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.CompletionException
 
-data class ShaderGroup(
-    val shaderVersionId: String,
-    val shaderId: String,
-    val shaderSlug: String,
-    val shaderName: String,
-    val version: String,
-    val downloadUrl: String?,
-    val fileHash: String?,
-    val items: List<WorkItem>,
-)
-
+/** Result of preparing all assets for a set of work items. */
 sealed class PrepResult {
     data class Ready(
-        val spec: CaptureSpec,
+        val items: List<WorkItem>,
     ) : PrepResult()
 
     data class Failed(
         val reason: String,
-        val isShaderFailure: Boolean,
+        /** True if a shader download failed (report to backend). */
+        val isShaderFailure: Boolean = false,
+        /** Shader version ID if this is a shader-specific failure. */
+        val failedShaderVersionId: String? = null,
     ) : PrepResult()
 }
 
+/**
+ * Prepares assets (worlds, shaders, scene definitions) for autonomous capture.
+ *
+ * Downloads all unique worlds and shaders from the work item list, writes scene
+ * definitions to disk, and reports which items are ready for capture.
+ */
 class AssetPreparer(
     private val gameDirectory: File,
 ) {
     private val log = Loggers.Orchestration.get()
     private val json = GlintJson
 
-    fun prepare(
-        group: ShaderGroup,
-        runId: String?,
-    ): PrepResult {
-        // 1. Download worlds
-        val worldFolders = downloadWorlds(group)
+    /**
+     * Prepares all assets needed for the given work items.
+     *
+     * Downloads worlds and shaders, writes scene definitions, and returns
+     * the items that are ready for capture (items whose worlds/shaders
+     * downloaded successfully).
+     */
+    fun prepareAll(items: List<WorkItem>): PrepResult {
+        if (items.isEmpty()) return PrepResult.Failed("No work items")
+
+        // 1. Download all unique worlds
+        val worldFolders = downloadWorlds(items)
         if (worldFolders.isEmpty()) {
-            return PrepResult.Failed("Failed to download any worlds", isShaderFailure = false)
+            return PrepResult.Failed("Failed to download any worlds")
         }
 
-        // 2. Download shader (if not vanilla)
-        val shaderFilename =
-            if (group.shaderSlug != "vanilla") {
-                val filename = downloadShader(group)
-                if (filename == null) {
-                    return PrepResult.Failed("Failed to download shader: ${group.shaderName}", isShaderFailure = true)
-                }
-                filename
-            } else {
-                null
-            }
+        // 2. Download all unique shaders
+        val shaderResults = downloadShaders(items)
 
         // 3. Write scene definitions
-        writeSceneDefinitions(group)
+        writeSceneDefinitions(items)
 
-        // 4. Build capture spec
-        val spec =
-            buildCaptureSpec(group, shaderFilename, runId)
-                ?: return PrepResult.Failed("No valid scenes found", isShaderFailure = false)
+        // 4. Filter items to only those with successfully downloaded assets
+        val readyItems =
+            items.filter { item ->
+                val worldReady = item.worldId in worldFolders
+                val shaderReady =
+                    if (item.shaderSlug == "vanilla") {
+                        true
+                    } else {
+                        shaderResults[item.shaderVersionId] != null
+                    }
+                worldReady && shaderReady
+            }
 
-        return PrepResult.Ready(spec)
+        if (readyItems.isEmpty()) {
+            return PrepResult.Failed("No items ready after asset preparation")
+        }
+
+        log.info("Asset preparation complete") {
+            "total_items" to items.size
+            "ready_items" to readyItems.size
+            "worlds" to worldFolders.size
+            "shaders" to shaderResults.size
+        }
+
+        return PrepResult.Ready(readyItems)
     }
 
-    private fun downloadWorlds(group: ShaderGroup): Map<String, String> {
+    /**
+     * Downloads all unique worlds from the work items.
+     * Returns a map of world ID → world folder name for successfully downloaded worlds.
+     */
+    private fun downloadWorlds(items: List<WorkItem>): Map<String, String> {
         val savesDir = File(gameDirectory, "saves")
         val worldFolders = mutableMapOf<String, String>()
 
         val uniqueWorlds =
-            group.items
+            items
                 .distinctBy { it.worldId }
                 .map { item ->
                     WorldTarget(
@@ -167,30 +186,58 @@ class AssetPreparer(
         return worldFolders
     }
 
-    private fun downloadShader(group: ShaderGroup): String? {
+    /**
+     * Downloads all unique shaders from the work items.
+     * Returns a map of shader version ID → filename for successfully downloaded shaders.
+     */
+    private fun downloadShaders(items: List<WorkItem>): Map<String, String> {
+        val results = mutableMapOf<String, String>()
+
+        val uniqueShaders =
+            items
+                .filter { it.shaderSlug != "vanilla" }
+                .distinctBy { it.shaderVersionId }
+
+        for (item in uniqueShaders) {
+            val filename = downloadShader(item)
+            if (filename != null) {
+                results[item.shaderVersionId] = filename
+            } else {
+                log.error("Failed to download shader") {
+                    "shader" to item.shaderName
+                    "version" to item.version
+                }
+            }
+        }
+
+        return results
+    }
+
+    /** Downloads a single shader pack and returns its filename, or null on failure. */
+    private fun downloadShader(item: WorkItem): String? {
         val shaderpacksDir = File(gameDirectory, "shaderpacks")
         shaderpacksDir.mkdirs()
 
-        val hash8 = group.fileHash?.take(8)
+        val hash8 = item.fileHash?.take(8)
         val filename =
             if (hash8 != null) {
-                "${group.shaderSlug}-${group.version}-$hash8.zip"
+                "${item.shaderSlug}-${item.version}-$hash8.zip"
             } else {
-                "${group.shaderSlug}-${group.version}.zip"
+                "${item.shaderSlug}-${item.version}.zip"
             }
         val targetFile = File(shaderpacksDir, filename)
 
         // Check if file already exists
         if (targetFile.exists()) {
-            if (group.fileHash != null) {
+            if (item.fileHash != null) {
                 val existingHash = sha1Hex(targetFile)
-                if (existingHash == group.fileHash) {
+                if (existingHash == item.fileHash) {
                     log.debug("Shader already present and verified") { "file" to filename }
                     return filename
                 }
                 log.warn("Shader file exists but hash mismatch, re-downloading") {
                     "file" to filename
-                    "expected" to group.fileHash
+                    "expected" to item.fileHash
                     "actual" to existingHash
                 }
                 targetFile.delete()
@@ -200,14 +247,14 @@ class AssetPreparer(
             }
         }
 
-        val downloadUrl = group.downloadUrl
+        val downloadUrl = item.downloadUrl
         if (downloadUrl == null) {
-            log.error("No download URL for shader") { "name" to group.shaderName }
+            log.error("No download URL for shader") { "name" to item.shaderName }
             return null
         }
 
         log.info("Downloading shader") {
-            "name" to group.shaderName
+            "name" to item.shaderName
             "file" to filename
         }
         try {
@@ -232,12 +279,12 @@ class AssetPreparer(
             }
 
             // Verify downloaded file hash
-            if (group.fileHash != null) {
+            if (item.fileHash != null) {
                 val downloadedHash = sha1Hex(targetFile)
-                if (downloadedHash != group.fileHash) {
+                if (downloadedHash != item.fileHash) {
                     log.error("Downloaded shader hash mismatch") {
                         "file" to filename
-                        "expected" to group.fileHash
+                        "expected" to item.fileHash
                         "actual" to downloadedHash
                     }
                     targetFile.delete()
@@ -273,17 +320,18 @@ class AssetPreparer(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun writeSceneDefinitions(group: ShaderGroup) {
+    /** Writes scene definition JSON files for all scenes referenced by the work items. */
+    private fun writeSceneDefinitions(items: List<WorkItem>) {
         val scenesDir = File(gameDirectory, "glint/scenes")
         scenesDir.mkdirs()
 
-        val itemsByWorld = group.items.groupBy { it.worldSlug }
+        val itemsByWorld = items.groupBy { it.worldSlug }
 
-        for ((worldSlug, items) in itemsByWorld) {
+        for ((worldSlug, worldItems) in itemsByWorld) {
             val collectionFile = File(scenesDir, "$worldSlug.json")
 
             val sceneElements =
-                items
+                worldItems
                     .distinctBy { it.sceneId }
                     .map { item ->
                         buildJsonObject {
@@ -330,42 +378,6 @@ class AssetPreparer(
         }
 
         SceneManager.clearCache()
-    }
-
-    private fun buildCaptureSpec(
-        group: ShaderGroup,
-        shaderFilename: String?,
-        runId: String?,
-    ): CaptureSpec? {
-        val allSceneIds = group.items.map { it.sceneId }.distinct()
-        if (allSceneIds.isEmpty()) return null
-
-        // Collect distinct (profileId, profileName) pairs for Iris application and API lookups
-        val profilePairs =
-            group.items
-                .filter { it.profileId != null && it.profileName != null }
-                .map { it.profileId!! to it.profileName!! }
-                .distinct()
-        val shaders =
-            buildList {
-                if (shaderFilename == null) {
-                    add(ShaderSpec(filename = null))
-                } else if (profilePairs.isEmpty()) {
-                    add(ShaderSpec(filename = shaderFilename))
-                } else {
-                    for ((profileId, profileName) in profilePairs) {
-                        add(ShaderSpec(filename = shaderFilename, profile = profileName, profileId = profileId))
-                    }
-                }
-            }
-
-        return CaptureSpec(
-            sceneIds = allSceneIds,
-            shaders = shaders,
-            outputDir = "glint/runs/$runId",
-            shutdownOnComplete = false,
-            runId = runId,
-        )
     }
 
     private data class WorldTarget(

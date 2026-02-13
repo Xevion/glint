@@ -49,9 +49,9 @@ public abstract class TitleScreenMixin extends Screen {
 
             String forceScenes = Glint.INSTANCE.getForceScenes();
             String forceShaders = Glint.INSTANCE.getForceShaders();
-            int workLimit = Glint.INSTANCE.getWorkLimit();
+            int shaderLimit = Glint.INSTANCE.getShaderLimit();
             AutonomousRunner runner =
-                    new AutonomousRunner(apiUrl, apiToken, forceScenes, forceShaders, workLimit);
+                    new AutonomousRunner(apiUrl, apiToken, forceScenes, forceShaders, shaderLimit);
             Glint.INSTANCE.setAutonomousRunner(runner);
             runner.start();
             return;

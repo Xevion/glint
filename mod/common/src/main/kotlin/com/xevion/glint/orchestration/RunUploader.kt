@@ -120,17 +120,16 @@ class RunUploader(
     }
 
     /**
-     * Asynchronously fails items that never received a screenshot.
+     * Asynchronously fails all items that never received a screenshot.
      *
-     * Called from game thread (tick).
+     * Called from game thread (tick). Looks up each item by its full key
+     * (shaderVersionId, sceneId, profileId) and fails any that weren't
+     * already submitted via [handleCapture].
      */
-    fun failUnsubmittedItems(
-        shaderVersionId: String,
-        items: List<WorkItem>,
-    ) {
+    fun failAllItems(items: List<WorkItem>) {
         val unsubmittedEntries =
             items.mapNotNull { item ->
-                val key = Triple(shaderVersionId, item.sceneId, item.profileId)
+                val key = Triple(item.shaderVersionId, item.sceneId, item.profileId)
                 val info = itemLookup[key] ?: return@mapNotNull null
                 if (info.itemId in submittedItemIds) return@mapNotNull null
                 item to info.itemId

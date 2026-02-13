@@ -638,7 +638,7 @@ async fn test_work_items_alphabetical_tiebreaker(pool: sqlx::PgPool) {
 }
 
 #[sqlx::test]
-async fn test_work_items_limit_truncates(pool: sqlx::PgPool) {
+async fn test_work_items_shader_limit_truncates(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
     setup_world_with_two_scenes(&pool).await;
@@ -649,11 +649,26 @@ async fn test_work_items_limit_truncates(pool: sqlx::PgPool) {
     seed_shader_version(&pool, "shv2", "sh2", "1.0.0").await;
     // Total: (2 custom + vanilla) × 2 scenes = 6
 
-    let items = WorkRepo::get_work_items(&pool, 3, false, None, None)
+    // shader_limit=1 selects only the top shader per world → 1 shader × 2 scenes = 2
+    let items = WorkRepo::get_work_items(&pool, 1, false, None, None)
         .await
         .expect("get_work_items");
 
-    assert!(items.len() == 3);
+    assert!(items.len() == 2);
+
+    // shader_limit=2 selects top 2 shaders → 2 × 2 = 4
+    let items = WorkRepo::get_work_items(&pool, 2, false, None, None)
+        .await
+        .expect("get_work_items");
+
+    assert!(items.len() == 4);
+
+    // shader_limit=100 selects all 3 shaders → 3 × 2 = 6
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+        .await
+        .expect("get_work_items");
+
+    assert!(items.len() == 6);
 }
 
 #[sqlx::test]

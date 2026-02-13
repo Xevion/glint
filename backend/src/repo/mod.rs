@@ -18,6 +18,7 @@ pub mod stats;
 pub mod taxonomy;
 pub mod user;
 pub mod work;
+pub mod work_ordering;
 pub mod world;
 pub mod world_version;
 

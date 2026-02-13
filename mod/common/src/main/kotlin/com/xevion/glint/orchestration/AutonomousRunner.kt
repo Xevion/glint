@@ -17,9 +17,10 @@ import java.util.concurrent.CompletionException
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Drives the autonomous capture loop: fetch work → create run → capture → upload → repeat.
+ * Drives the autonomous capture loop: fetch work → create run → prepare → capture → upload → repeat.
  *
  * Asset preparation is delegated to [AssetPreparer] (runs off the tick thread).
+ * The [Orchestrator] handles world/shader/scene transitions via [SessionRegistry].
  * Capture uploads are managed by [RunUploader] (thread-safe, per-run lifecycle).
  */
 class AutonomousRunner(
@@ -27,7 +28,7 @@ class AutonomousRunner(
     private val apiToken: String,
     private val forceScenes: String? = null,
     private val forceShaders: String? = null,
-    private val workLimit: Int = 50,
+    private val shaderLimit: Int = 10,
 ) {
     private val log = Loggers.Orchestration.get()
     private val client = HttpClient(apiUrl, token = apiToken)
@@ -41,15 +42,12 @@ class AutonomousRunner(
     // Work batch (per-run)
     private var currentRunId: String? = null
     private var runUploader: RunUploader? = null
-
-    // Shader group processing
-    private var shaderGroups: List<ShaderGroup> = emptyList()
-    private var currentGroupIndex: Int = 0
+    private var currentWorkItems: List<WorkItem> = emptyList()
 
     private enum class State {
         FetchingWork,
         CreatingRun,
-        PreparingCapture,
+        PreparingAssets,
         Capturing,
         FinalizingRun,
         Done,
@@ -66,7 +64,7 @@ class AutonomousRunner(
             override val future: CompletableFuture<Triple<String, List<CaptureRunItem>, List<WorkItem>>>,
         ) : PendingOp()
 
-        class PrepareCapture(
+        class PrepareAssets(
             override val future: CompletableFuture<PrepResult>,
         ) : PendingOp()
 
@@ -92,8 +90,8 @@ class AutonomousRunner(
                 tickCreatingRun()
             }
 
-            State.PreparingCapture -> {
-                tickPreparingCapture()
+            State.PreparingAssets -> {
+                tickPreparingAssets()
             }
 
             State.Capturing -> {
@@ -120,7 +118,7 @@ class AutonomousRunner(
                     retryOnRateLimit(operationName = "fetch work") {
                         AgentClient.fetchWork(
                             client,
-                            limit = workLimit,
+                            shaderLimit = shaderLimit,
                             force = isForceMode,
                             shaders = forceShaders,
                             scenes = forceScenes,
@@ -208,13 +206,13 @@ class AutonomousRunner(
         val (runId, runItems, workItems) = triple
 
         currentRunId = runId
+        currentWorkItems = workItems
         log.info("Created capture run") {
             "run_id" to runId
             "items" to runItems.size
         }
 
         // Build lookup: (shaderVersionId, sceneId, profileId) → RunItemInfo
-        // Merge run items (which have item IDs) with work items (which have world version IDs)
         val workItemsByKey =
             workItems.associateBy { Triple(it.shaderVersionId, it.sceneId, it.profileId) }
         val itemLookup =
@@ -232,51 +230,15 @@ class AutonomousRunner(
 
         runUploader = RunUploader(apiUrl, apiToken, runId, itemLookup)
 
-        // Group work items by shader version
-        shaderGroups =
-            workItems
-                .groupBy { it.shaderVersionId }
-                .map { (_, items) ->
-                    val first = items.first()
-                    ShaderGroup(
-                        shaderVersionId = first.shaderVersionId,
-                        shaderId = first.shaderId,
-                        shaderSlug = first.shaderSlug,
-                        shaderName = first.shaderName,
-                        version = first.version,
-                        downloadUrl = first.downloadUrl,
-                        fileHash = first.fileHash,
-                        items = items,
-                    )
-                }
-
-        currentGroupIndex = 0
-        state = State.PreparingCapture
+        // Start asset preparation
+        state = State.PreparingAssets
+        pending = PendingOp.PrepareAssets(CompletableFuture.supplyAsync { assetPreparer.prepareAll(workItems) })
     }
 
-    // -- PreparingCapture (async) --
+    // -- PreparingAssets --
 
-    private fun tickPreparingCapture() {
-        val group =
-            shaderGroups.getOrNull(currentGroupIndex) ?: run {
-                startFinalizingRun()
-                return
-            }
-
-        // First tick: launch async preparation
-        if (pending == null) {
-            log.info("Preparing shader group") {
-                "progress" to "${currentGroupIndex + 1}/${shaderGroups.size}"
-                "shader" to group.shaderName
-                "items" to group.items.size
-            }
-            val runId = currentRunId
-            pending = PendingOp.PrepareCapture(CompletableFuture.supplyAsync { assetPreparer.prepare(group, runId) })
-            return
-        }
-
-        // Poll for completion
-        val op = pending as? PendingOp.PrepareCapture ?: return
+    private fun tickPreparingAssets() {
+        val op = pending as? PendingOp.PrepareAssets ?: return
         if (!op.future.isDone) return
 
         pending = null
@@ -284,37 +246,56 @@ class AutonomousRunner(
 
         when (result) {
             is PrepResult.Ready -> {
-                log.info("Starting capture") {
-                    "scene_count" to result.spec.sceneIds.size
-                    "shader_count" to result.spec.shaders.size
+                log.info("Assets prepared, starting orchestration") {
+                    "ready_items" to result.items.size
                 }
+
+                val runId = currentRunId ?: error("No run ID for orchestration")
                 val uploader = runUploader!!
-                val shaderVersionId = group.shaderVersionId
+
                 val started =
-                    SessionRegistry.startOrchestration(result.spec) { orchestrator ->
+                    SessionRegistry.startLinearOrchestration(
+                        items = result.items,
+                        runId = runId,
+                        outputDir = "glint/runs/$runId",
+                    ) { orchestrator ->
                         orchestrator.onCaptureTaken = { event ->
-                            uploader.handleCapture(shaderVersionId, event)
+                            // Find the shaderVersionId for this capture from the work items.
+                            // The event has sceneId + profileId (from ShaderSpec on CaptureEntry);
+                            // we need the shaderVersionId to key into the RunUploader's lookup.
+                            val profileId = event.entry.shader?.profileId
+                            val matchingItem =
+                                result.items.find { item ->
+                                    item.sceneId == event.sceneId && item.profileId == profileId
+                                }
+                            if (matchingItem != null) {
+                                uploader.handleCapture(matchingItem.shaderVersionId, event)
+                            } else {
+                                log.warn("No matching work item for capture event") {
+                                    "scene_id" to event.sceneId
+                                    "profile_id" to (profileId ?: "null")
+                                }
+                            }
                         }
                     }
+
                 if (started) {
                     state = State.Capturing
                 } else {
                     log.error("Failed to start orchestration")
-                    uploader.failUnsubmittedItems(group.shaderVersionId, group.items)
-                    advanceToNextGroup()
+                    uploader.failAllItems(currentWorkItems)
+                    startFinalizingRun()
                 }
             }
 
             is PrepResult.Failed -> {
-                log.error("Preparation failed") {
-                    "shader" to group.shaderName
-                    "reason" to result.reason
+                log.error("Asset preparation failed") { "reason" to result.reason }
+                val uploader = runUploader!!
+                if (result.isShaderFailure && result.failedShaderVersionId != null) {
+                    uploader.reportShaderFailure(result.failedShaderVersionId, result.reason)
                 }
-                runUploader!!.failUnsubmittedItems(group.shaderVersionId, group.items)
-                if (result.isShaderFailure) {
-                    runUploader!!.reportShaderFailure(group.shaderVersionId, result.reason)
-                }
-                advanceToNextGroup()
+                uploader.failAllItems(currentWorkItems)
+                startFinalizingRun()
             }
         }
     }
@@ -323,14 +304,10 @@ class AutonomousRunner(
 
     private fun tickCapturing() {
         if (!SessionRegistry.isOrchestrationActive()) {
-            val group = shaderGroups[currentGroupIndex]
-            log.info("Orchestration complete") {
-                "shader" to group.shaderName
-            }
-
+            log.info("Orchestration complete")
             // Fail any items that didn't produce a screenshot
-            runUploader!!.failUnsubmittedItems(group.shaderVersionId, group.items)
-            advanceToNextGroup()
+            runUploader!!.failAllItems(currentWorkItems)
+            startFinalizingRun()
         }
     }
 
@@ -376,24 +353,13 @@ class AutonomousRunner(
 
         // Clear state
         currentRunId = null
-        shaderGroups = emptyList()
-        currentGroupIndex = 0
+        currentWorkItems = emptyList()
         runUploader = null
 
         fetchWork()
     }
 
     // -- Helpers --
-
-    private fun advanceToNextGroup() {
-        currentGroupIndex++
-        if (currentGroupIndex >= shaderGroups.size) {
-            startFinalizingRun()
-        } else {
-            pending = null
-            state = State.PreparingCapture
-        }
-    }
 
     private fun shutdown() {
         runUploader?.drainAndShutdown(60.seconds)

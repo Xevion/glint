@@ -2,6 +2,7 @@ package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.GlintJsonFile
+import com.xevion.glint.api.WorkItem
 import com.xevion.glint.capture.CaptureEntry
 import com.xevion.glint.capture.CaptureSession
 import com.xevion.glint.capture.CaptureSessionData
@@ -32,6 +33,10 @@ class CaptureTakenEvent(
  * - Shader loads happen once per shader per world (not per scene)
  * - Scene transitions are cheap teleports within an already-loaded shader
  *
+ * Supports two entry points:
+ * - [start] with a [CaptureSpec] for interactive captures (UI-driven)
+ * - [startLinear] with pre-ordered [WorkItem]s for autonomous captures (backend-driven)
+ *
  * The 4K framebuffer is kept active for the entire orchestration to avoid
  * per-session Iris pipeline recreation from resolution changes.
  */
@@ -45,7 +50,13 @@ class Orchestrator {
     private var state: State = State.Idle
     private var ticksInState: Int = 0
 
+    // Interactive path
     private var spec: CaptureSpec? = null
+
+    // Linear (autonomous) path
+    private var workItems: List<WorkItem>? = null
+    private var linearRunId: String? = null
+    private var linearOutputDir: String? = null
 
     // Capture plan: world → shader → scenes
     private var capturePlan: List<WorldCaptures> = emptyList()
@@ -67,7 +78,7 @@ class Orchestrator {
         val shaderRuns: List<ShaderRun>,
     )
 
-    /** All scenes to capture with a specific shader. */
+    /** All scenes to capture with a specific shader (and optional profile). */
     private data class ShaderRun(
         val shader: ShaderSpec,
         val scenes: List<SceneEntry>,
@@ -78,6 +89,7 @@ class Orchestrator {
         val scene: ResolvedScene,
     )
 
+    /** Starts orchestration from a [CaptureSpec] (interactive UI path). */
     fun start(spec: CaptureSpec): Boolean {
         if (state != State.Idle) {
             log.warn("Orchestrator already running")
@@ -89,6 +101,46 @@ class Orchestrator {
             "shader_count" to spec.shaders.size
         }
         this.spec = spec
+
+        if (!createSessionDirectory()) {
+            return false
+        }
+
+        if (!CaptureStateManager.startCapture()) {
+            log.warn("Cannot start orchestration - capture already active")
+            return false
+        }
+        transitionTo(State.Planning)
+        return true
+    }
+
+    /**
+     * Starts orchestration from pre-ordered [WorkItem]s (autonomous capture path).
+     *
+     * The backend returns items already sorted in optimal execution order
+     * (world → shader → profile → clustered scenes). This method builds the
+     * same internal plan structure by walking the pre-ordered list and detecting
+     * transitions.
+     *
+     * Scene definitions must already be written to disk before calling this.
+     */
+    fun startLinear(
+        items: List<WorkItem>,
+        runId: String,
+        outputDir: String? = null,
+    ): Boolean {
+        if (state != State.Idle) {
+            log.warn("Orchestrator already running")
+            return false
+        }
+
+        log.info("Starting linear orchestration") {
+            "items" to items.size
+            "run_id" to runId
+        }
+        this.workItems = items
+        this.linearRunId = runId
+        this.linearOutputDir = outputDir
 
         if (!createSessionDirectory()) {
             return false
@@ -158,7 +210,12 @@ class Orchestrator {
     }
 
     private fun handlePlanning() {
-        val plan = buildCapturePlan()
+        val plan =
+            if (workItems != null) {
+                buildCapturePlanFromWorkItems()
+            } else {
+                buildCapturePlan()
+            }
         if (plan.isEmpty()) {
             finishWithError("No valid scenes found")
             return
@@ -457,10 +514,13 @@ class Orchestrator {
         worldLoader.reset()
         originalShaderPack = null
         spec = null
+        workItems = null
+        linearRunId = null
+        linearOutputDir = null
     }
 
     /**
-     * Builds the capture plan: world → shader → scenes.
+     * Builds the capture plan from a [CaptureSpec] (interactive path).
      *
      * Groups scenes by world, then for each world creates a [ShaderRun] per
      * shader in the spec. This ensures each shader is loaded only once per world.
@@ -524,21 +584,130 @@ class Orchestrator {
         return plan
     }
 
+    /**
+     * Builds the capture plan from pre-ordered [WorkItem]s (autonomous path).
+     *
+     * Walks the backend's pre-sorted list and groups consecutive items into the
+     * same plan structure (world → shader/profile → scenes). The backend orders
+     * items as world → shader → profile → clustered scenes, so consecutive items
+     * sharing the same world+shader+profile become one [ShaderRun].
+     */
+    private fun buildCapturePlanFromWorkItems(): List<WorldCaptures> {
+        val items = workItems ?: return emptyList()
+        if (items.isEmpty()) return emptyList()
+
+        val worlds = mutableListOf<WorldCaptures>()
+        var currentWorldSlug: String? = null
+        var currentShaderRuns = mutableListOf<ShaderRun>()
+
+        // Track current shader run grouping key: (shaderVersionId, profileId)
+        var currentGroupKey: Pair<String, String?>? = null
+        var currentShaderSpec: ShaderSpec? = null
+        var currentScenes = mutableListOf<SceneEntry>()
+
+        for (item in items) {
+            val worldFolder = item.worldSlug
+            val groupKey = item.shaderVersionId to item.profileId
+
+            // World transition — flush current world
+            if (worldFolder != currentWorldSlug) {
+                flushShaderRun(currentShaderSpec, currentScenes, currentShaderRuns)
+                flushWorld(currentWorldSlug, currentShaderRuns, worlds)
+                currentWorldSlug = worldFolder
+                currentShaderRuns = mutableListOf()
+                currentGroupKey = null
+                currentShaderSpec = null
+                currentScenes = mutableListOf()
+            }
+
+            // Shader/profile transition — flush current shader run
+            if (groupKey != currentGroupKey) {
+                flushShaderRun(currentShaderSpec, currentScenes, currentShaderRuns)
+                currentGroupKey = groupKey
+                currentShaderSpec = buildShaderSpecFromItem(item)
+                currentScenes = mutableListOf()
+            }
+
+            // Resolve scene and add to current run
+            val resolvedScene = SceneManager.loadScene(item.sceneId)
+            if (resolvedScene == null) {
+                log.warn("Failed to load scene from work item, skipping") { "scene_id" to item.sceneId }
+                continue
+            }
+            currentScenes.add(SceneEntry(item.sceneId, resolvedScene))
+        }
+
+        // Flush remaining
+        flushShaderRun(currentShaderSpec, currentScenes, currentShaderRuns)
+        flushWorld(currentWorldSlug, currentShaderRuns, worlds)
+
+        if (worlds.isNotEmpty()) {
+            val totalScenes = worlds.sumOf { w -> w.shaderRuns.sumOf { it.scenes.size } }
+            log.info("Resolved linear capture plan") {
+                "worlds" to worlds.size
+                "shader_runs" to worlds.sumOf { it.shaderRuns.size }
+                "total_captures" to totalScenes
+            }
+        }
+
+        return worlds
+    }
+
+    private fun flushShaderRun(
+        shader: ShaderSpec?,
+        scenes: MutableList<SceneEntry>,
+        target: MutableList<ShaderRun>,
+    ) {
+        if (shader != null && scenes.isNotEmpty()) {
+            target.add(ShaderRun(shader, scenes.toList()))
+        }
+    }
+
+    private fun flushWorld(
+        worldFolder: String?,
+        shaderRuns: MutableList<ShaderRun>,
+        target: MutableList<WorldCaptures>,
+    ) {
+        if (worldFolder != null && shaderRuns.isNotEmpty()) {
+            target.add(WorldCaptures(worldFolder, shaderRuns.toList()))
+        }
+    }
+
+    private fun buildShaderSpecFromItem(item: WorkItem): ShaderSpec =
+        if (item.shaderSlug == "vanilla") {
+            ShaderSpec(filename = null)
+        } else {
+            val hash8 = item.fileHash?.take(8)
+            val filename =
+                if (hash8 != null) {
+                    "${item.shaderSlug}-${item.version}-$hash8.zip"
+                } else {
+                    "${item.shaderSlug}-${item.version}.zip"
+                }
+            ShaderSpec(
+                filename = filename,
+                profile = item.profileName,
+                profileId = item.profileId,
+            )
+        }
+
     private fun getCurrentWorld(): WorldCaptures? = capturePlan.getOrNull(currentWorldIndex)
 
     private fun createSessionDirectory(): Boolean {
         val mc = Minecraft.getInstance()
-        val currentSpec = spec ?: return false
         startedAt = Instant.now()
 
         return try {
-            if (currentSpec.outputDir != null) {
-                val dir = File(mc.gameDirectory, currentSpec.outputDir)
+            val outputDir = spec?.outputDir ?: linearOutputDir
+            val runId = spec?.runId ?: linearRunId
+
+            if (outputDir != null) {
+                val dir = File(mc.gameDirectory, outputDir)
                 if (!dir.exists() && !dir.mkdirs()) {
                     log.error("Failed to create output directory") { "path" to dir.absolutePath }
                     return false
                 }
-                sessionId = currentSpec.runId?.let { "run_$it" } ?: dir.name
+                sessionId = runId?.let { "run_$it" } ?: dir.name
                 sessionDir = dir
             } else {
                 val capturesDir = File(mc.gameDirectory, "glint/captures")
@@ -562,12 +731,13 @@ class Orchestrator {
         val manifestName = if (partial) "manifest_partial.json" else "manifest.json"
         val manifestFile = File(currentSessionDir, manifestName)
 
+        val runId = spec?.runId ?: linearRunId
         val manifest =
             OrchestrationManifest.create(
                 sessionDataList,
                 sessionId,
                 startedAt ?: Instant.now(),
-                runId = spec?.runId,
+                runId = runId,
             )
 
         try {

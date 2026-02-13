@@ -12,14 +12,14 @@ import java.nio.charset.StandardCharsets
 object AgentClient {
     fun fetchWork(
         client: HttpClient,
-        limit: Int = 100,
+        shaderLimit: Int = 10,
         force: Boolean = false,
         shaders: String? = null,
         scenes: String? = null,
     ): Result<List<WorkItem>> {
         val params =
             buildString {
-                append("?limit=$limit")
+                append("?shader_limit=$shaderLimit")
                 if (force) append("&force=true")
                 if (shaders != null) append("&shaders=$shaders")
                 if (scenes != null) append("&scenes=$scenes")
