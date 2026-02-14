@@ -1,13 +1,14 @@
 <script lang="ts">
 import { api } from '$lib/api';
 import { useRetry } from '$lib/api/retry.svelte';
+import { ItemGrid } from '$lib/components/item-grid';
 import Meta from '$lib/components/Meta.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
 import { AlertTriangle, LoaderCircle, Search } from '@lucide/svelte';
 import { untrack } from 'svelte';
-import { fly, scale } from 'svelte/transition';
+import { fly } from 'svelte/transition';
 import type { PageData } from './$types';
 
 interface Props {
@@ -147,20 +148,18 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 				{/if}
 			</Button>
 		</div>
-	{:else if filteredShaders.length > 0}
-		<!-- Shader Grid -->
-		<div class="grid grid-cols-1 gap-6 sm:[grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
-			{#each filteredShaders as shader, i (shader.id)}
-				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>
-					<ShaderCard {shader} />
-				</div>
-			{/each}
-		</div>
 	{:else}
-		<div class="flex flex-col items-center justify-center py-16 text-center">
-	<Search class="mb-4 h-16 w-16 text-muted-foreground opacity-50" strokeWidth={1.5} />
-	<h3 class="text-lg font-semibold text-foreground">No shaders found</h3>
-		<p class="mt-1 text-sm text-foreground/70">Try adjusting your filters</p>
-		</div>
+		<!-- eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -->
+		<ItemGrid
+			items={filteredShaders}
+			key={(s) => s.id}
+			size="medium"
+			empty={{ icon: Search, title: 'No shaders found', message: 'Try adjusting your filters' }}
+		>
+			{#snippet card(shader)}
+				<ShaderCard {shader} />
+			{/snippet}
+		</ItemGrid>
+		<!-- eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -->
 	{/if}
 </div>

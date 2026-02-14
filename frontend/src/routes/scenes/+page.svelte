@@ -1,11 +1,12 @@
 <script lang="ts">
 import ErrorBanner from '$lib/components/ErrorBanner.svelte';
+import { ItemGrid } from '$lib/components/item-grid';
 import Meta from '$lib/components/Meta.svelte';
 import SceneCard from '$lib/components/SceneCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
 import { AlertTriangle, Search } from '@lucide/svelte';
-import { fade, fly, scale } from 'svelte/transition';
+import { fade, fly } from 'svelte/transition';
 import type { PageData } from './$types';
 
 interface Props {
@@ -103,25 +104,20 @@ const ogImage = $derived(scenes[0]?.image_url ?? null);
 			<h3 class="text-lg font-semibold text-foreground">Failed to load scenes</h3>
 			<p class="mt-1 text-sm text-foreground/70">Check your connection and try again</p>
 		</div>
-	{:else if filteredScenes.length > 0}
-		<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-			{#each filteredScenes as scene, i (scene.id)}
-				<div in:scale={{ duration: 350, delay: Math.min(i * 50, 400) + 150, start: 0.95 }}>
-					<SceneCard {scene} />
-				</div>
-			{/each}
-		</div>
-	{:else if hasFilters}
-		<div class="flex flex-col items-center justify-center py-16 text-center">
-			<Search class="mb-4 h-16 w-16 text-muted-foreground opacity-50" strokeWidth={1.5} />
-			<h3 class="text-lg font-semibold text-foreground">No scenes found</h3>
-			<p class="mt-1 text-sm text-foreground/70">Try adjusting your filters</p>
-		</div>
 	{:else}
-		<div class="flex flex-col items-center justify-center py-16 text-center">
-			<Search class="mb-4 h-16 w-16 text-muted-foreground opacity-50" strokeWidth={1.5} />
-			<h3 class="text-lg font-semibold text-foreground">No scenes yet</h3>
-			<p class="mt-1 text-sm text-foreground/70">Scenes will appear here once they've been created</p>
-		</div>
+		<!-- eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -->
+		<ItemGrid
+			items={filteredScenes}
+			key={(s) => s.id}
+			size="small"
+			empty={hasFilters
+				? { icon: Search, title: 'No scenes found', message: 'Try adjusting your filters' }
+				: { icon: Search, title: 'No scenes yet', message: 'Scenes will appear here once they\'ve been created' }}
+		>
+			{#snippet card(scene)}
+				<SceneCard {scene} />
+			{/snippet}
+		</ItemGrid>
+		<!-- eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -->
 	{/if}
 </div>
