@@ -22,7 +22,8 @@
 		"src/**/*.ts",
 		"src/**/*.svelte",
 		"tests/**/*.ts"
-	]
+	],
+	"exclude": ["src/**/*.stories.svelte", "src/**/*.stories.ts"]
 	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
 	// except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
 	//
