@@ -3,6 +3,7 @@ import { ApiErrorType, pageError } from '$lib/api/errors';
 import type {
 	CaptureWithContext,
 	ShaderAuthor,
+	ShaderListItem,
 	ShaderVersionDetail,
 	ShaderVersionMetadata,
 	ShaderVersionProfile,
@@ -26,6 +27,7 @@ export type ShaderDetail = Pick<
 	| 'icon_url'
 	| 'website_url'
 	| 'modrinth_id'
+	| 'curseforge_id'
 	| 'source_url'
 	| 'upstream_downloads'
 	| 'view_count'
@@ -59,6 +61,7 @@ export function _trimShader(s: ShaderWithCaptures): ShaderDetail {
 			'icon_url',
 			'website_url',
 			'modrinth_id',
+			'curseforge_id',
 			'source_url',
 			'upstream_downloads',
 			'view_count'
@@ -110,5 +113,12 @@ export const load: PageLoad = async ({ params, fetch }) => {
 		}
 	}
 
-	return { shader: _trimShader(shader) };
+	// Fetch other shaders for the "Similar Shaders" section (mock: random selection)
+	const listResult = await api.shaders.list({ pageSize: 20 });
+	const similarShaders: ShaderListItem[] = listResult.match({
+		Ok: (page) => page.items.filter((s) => s.slug !== params.slug).slice(0, 6),
+		Err: () => []
+	});
+
+	return { shader: _trimShader(shader), similarShaders };
 };
