@@ -11,7 +11,7 @@ import BrandIcon from '$lib/components/icons/BrandIcon.svelte';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import * as Select from '$lib/components/ui/select';
 import { formatNumber, formatVersion, getCurseforgeUrl, getModrinthUrl } from '$lib/utils/display';
-import { preloadImage } from '$lib/utils/image';
+import { cfImageUrl } from '$lib/utils/image';
 import { withRetry } from '$lib/utils/retry';
 import {
 	Camera,
@@ -181,10 +181,10 @@ const ogDescription = $derived.by(() => {
 		<!-- Unified header card -->
 		<div
 			in:fly|local={{ y: 10, duration: 400, delay: 100 }}
-			class="mb-8 rounded-xl border border-border bg-card p-5"
+			class="mb-8 rounded-xl border border-border bg-card p-3 sm:p-5"
 		>
 			<!-- Top row: icon + title/author + action buttons -->
-			<div class="flex items-start gap-4">
+			<div class="flex flex-wrap items-start gap-x-3 gap-y-2 sm:gap-x-4">
 				{#if shader.icon_url && !iconErrored}
 					<img
 						src={shader.icon_url}
@@ -193,9 +193,9 @@ const ogDescription = $derived.by(() => {
 						onerror={() => (iconErrored = true)}
 					/>
 				{/if}
-				<div class="min-w-0 flex-1">
+				<div class="min-w-0 flex-1 basis-44">
 					<div class="flex flex-wrap items-baseline gap-x-2">
-						<h1 class="text-3xl font-bold text-card-foreground">{shader.name}</h1>
+						<h1 class="text-2xl font-bold text-card-foreground sm:text-3xl">{shader.name}</h1>
 						{#if shader.authors.length > 0}
 							<!-- eslint-disable svelte/no-navigation-without-resolve -->
 							<span class="text-sm text-muted-foreground">
@@ -210,41 +210,41 @@ const ogDescription = $derived.by(() => {
 							</span>
 							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/if}
-					</div>
-					{#if shader.description}
-						<p class="mt-1 text-sm text-muted-foreground line-clamp-2">
-							{shader.description}
-						</p>
-					{/if}
 				</div>
+			</div>
 
-				<!-- Action buttons (top-right) -->
+			<!-- Action buttons (top-right) -->
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
-				<div class="flex shrink-0 items-center gap-2">
+				<div class="ml-auto flex items-center gap-2">
 					{#if downloadLink}
 						<a
 							href={downloadLink.url}
 							target="_blank"
 							rel="noopener noreferrer"
-							class="group/{downloadLink.platform} inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-							style="background-color: {downloadLink.color}"
-						>
-							<BrandIcon name={downloadLink.platform} class="h-4 w-4" />
-							Download
-						</a>
+						class="group/{downloadLink.platform} inline-flex items-center gap-2 rounded-lg p-2 text-sm font-medium text-white transition-opacity hover:opacity-90 sm:px-4 sm:py-2"
+						style="background-color: {downloadLink.color}"
+					>
+						<BrandIcon name={downloadLink.platform} class="h-4 w-4" />
+						<span class="hidden sm:inline">Download</span>
+					</a>
 					{/if}
 					<a
 						href={resolve('/compare', {})}
-						class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-					>
-						<GitCompareArrows class="h-4 w-4" />
-						Compare
-					</a>
+					class="inline-flex items-center gap-2 rounded-lg bg-primary p-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:px-4 sm:py-2"
+				>
+					<GitCompareArrows class="h-4 w-4" />
+					<span class="hidden sm:inline">Compare</span>
+				</a>
 				</div>
-				<!-- eslint-enable svelte/no-navigation-without-resolve -->
-			</div>
+			<!-- eslint-enable svelte/no-navigation-without-resolve -->
+		</div>
+		{#if shader.description}
+			<p class="mt-2 text-sm text-muted-foreground line-clamp-2">
+				{shader.description}
+			</p>
+		{/if}
 
-			<!-- Inline stats & details -->
+		<!-- Inline stats & details -->
 			<div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
 				{#if versions.length > 0 && selectedVersionId}
 					<Select.Root
@@ -298,9 +298,9 @@ const ogDescription = $derived.by(() => {
 						<span class="font-medium text-card-foreground">{formatNumber(shader.view_count)}</span> views
 					</span>
 				{/if}
-				{#if hasLinks}
-					<span class="text-border">|</span>
-				{/if}
+			{#if hasLinks}
+				<span class="hidden w-px self-stretch bg-border sm:block" aria-hidden="true"></span>
+			{/if}
 
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				{#if shader.website_url}
@@ -399,8 +399,13 @@ const ogDescription = $derived.by(() => {
 								selectedCaptureId = capture.id;
 								openLightbox(i);
 							}}
-							onmouseenter={() =>
-								preloadImage(capture.image_url, 'full')}
+						onmouseenter={() => {
+							const url = cfImageUrl(capture.image_url, 'full');
+							if (url) {
+								const img = new Image();
+								img.src = url;
+							}
+						}}
 						>
 							<CaptureImage
 								src={capture.image_url}
@@ -413,7 +418,7 @@ const ogDescription = $derived.by(() => {
 
 							<!-- Hover overlay with badges -->
 							<div
-								class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+								class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent sm:opacity-0 sm:transition-opacity sm:duration-200 sm:group-hover:opacity-100"
 							>
 								<div class="absolute right-0 bottom-0 left-0 p-3">
 									<CaptureBadges
@@ -507,10 +512,10 @@ const ogDescription = $derived.by(() => {
 						Similar Shaders
 					</h2>
 					<div
-						class="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2"
+						class="-mx-3 flex snap-x snap-mandatory gap-4 overflow-x-auto px-3 pb-2 sm:-mx-1 sm:px-1"
 					>
 						{#each data.similarShaders as similar (similar.id)}
-							<div class="w-72 shrink-0">
+							<div class="w-64 shrink-0 snap-start sm:w-72">
 								<ShaderCard shader={similar} />
 							</div>
 						{/each}

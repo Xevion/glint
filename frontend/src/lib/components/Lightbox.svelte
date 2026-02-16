@@ -3,7 +3,8 @@ import { Button } from '$lib/components/ui/button';
 import { cfImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { ChevronLeft, ChevronRight, ImageOff, X } from '@lucide/svelte';
-import { fade, fly } from 'svelte/transition';
+import { fade } from 'svelte/transition';
+import { Spring } from 'svelte/motion';
 
 interface CaptureItem {
 	id: string;
@@ -24,25 +25,34 @@ interface Props {
 
 let { captures, currentIndex, onClose, onNavigate }: Props = $props();
 
-// Track navigation direction for slide animation
-let direction = $state<'left' | 'right'>('left');
-let prevIndex: number = $state(0);
-$effect(() => {
-	// Runs on mount (syncing prevIndex) and on every navigation
-	if (currentIndex !== prevIndex) {
-		direction = currentIndex > prevIndex ? 'left' : 'right';
-		prevIndex = currentIndex;
-	}
-});
+// Adjacent captures for 3-panel rendering
+const prevCapture = $derived(currentIndex > 0 ? captures[currentIndex - 1] : null);
+const nextCapture = $derived(
+	currentIndex < captures.length - 1 ? captures[currentIndex + 1] : null
+);
+
+// Swipe spring: drives translateX for all three panels
+const swipeSpring = new Spring(0, { stiffness: 0.3, damping: 0.8 });
+let containerWidth = $state(0);
+let swipeOffset = $state(0);
+let isSwipeDragging = $state(false);
+
+// Display offset: raw pixel offset during drag, spring-driven during animation
+const displayOffset = $derived(isSwipeDragging ? swipeOffset : swipeSpring.current);
+
+// Navigation animation tracking
+let swipeGeneration = 0;
+let isAnimating = false;
+let pendingNavigationIndex: number | null = null;
+
+// Velocity tracking (ring buffer of recent pointer samples)
+let velocitySamples: { x: number; t: number }[] = [];
 
 const currentCapture = $derived(captures[currentIndex]);
 const hasPrev = $derived(currentIndex > 0);
 const hasNext = $derived(currentIndex < captures.length - 1);
 
-// Resolved image URL — single source, no srcset duplication
 const fullImageUrl = $derived(cfImageUrl(currentCapture?.image_url, 'full'));
-
-// Thumbhash placeholder for current image
 const placeholderUrl = $derived(decodeThumbhash(currentCapture?.thumbhash));
 
 // Zoom and pan state
@@ -54,6 +64,18 @@ let panStart = $state({ x: 0, y: 0 });
 let imageLoaded = $state(false);
 let imageErrored = $state(false);
 let imgEl = $state<HTMLImageElement | null>(null);
+
+// Swipe/gesture detection
+let swipeStartX = 0;
+let swipeStartY = 0;
+let hasMoved = false;
+let suppressClick = false;
+let axisLocked: 'x' | 'y' | null = null;
+
+// Pinch-to-zoom tracking
+let isPinching = $state(false);
+let lastPinchDistance = 0;
+let pinchStartZoom = 1;
 
 // Reset zoom and loaded state when navigating to a different image
 $effect(() => {
@@ -86,6 +108,47 @@ $effect(() => {
 	}
 });
 
+// --- Navigation ---
+
+function navigateTo(newIndex: number) {
+	if (newIndex < 0 || newIndex >= captures.length) return;
+
+	// Complete any in-progress animation instantly
+	if (isAnimating && pendingNavigationIndex !== null) {
+		swipeGeneration++;
+		void swipeSpring.set(0, { instant: true });
+		onNavigate(pendingNavigationIndex);
+		pendingNavigationIndex = null;
+		isAnimating = false;
+	}
+
+	// Fallback: no container measured yet, navigate instantly
+	if (containerWidth === 0) {
+		onNavigate(newIndex);
+		return;
+	}
+
+	const dir = newIndex > currentIndex ? -1 : 1;
+	pendingNavigationIndex = newIndex;
+	void animateNavigation(dir * containerWidth, newIndex);
+}
+
+async function animateNavigation(targetOffset: number, newIndex: number) {
+	isAnimating = true;
+	const gen = ++swipeGeneration;
+	await swipeSpring.set(targetOffset);
+	if (gen !== swipeGeneration) {
+		isAnimating = false;
+		return;
+	}
+	onNavigate(newIndex);
+	void swipeSpring.set(0, { instant: true });
+	pendingNavigationIndex = null;
+	isAnimating = false;
+}
+
+// --- Event Handlers ---
+
 function handleKeydown(e: KeyboardEvent) {
 	switch (e.key) {
 		case 'Escape':
@@ -97,10 +160,10 @@ function handleKeydown(e: KeyboardEvent) {
 			}
 			break;
 		case 'ArrowLeft':
-			if (hasPrev) onNavigate(currentIndex - 1);
+			if (hasPrev) navigateTo(currentIndex - 1);
 			break;
 		case 'ArrowRight':
-			if (hasNext) onNavigate(currentIndex + 1);
+			if (hasNext) navigateTo(currentIndex + 1);
 			break;
 	}
 }
@@ -125,7 +188,9 @@ function handleWheel(e: WheelEvent) {
 	}
 }
 
-function handleDblClick() {
+function handleDblClick(e: MouseEvent) {
+	const target = e.target as HTMLElement;
+	if (!target.closest('img')) return;
 	if (zoomLevel === 1) {
 		zoomLevel = 2;
 	} else {
@@ -135,23 +200,160 @@ function handleDblClick() {
 }
 
 function handlePointerDown(e: PointerEvent) {
-	if (zoomLevel <= 1) return;
-	isDragging = true;
-	dragStart = { x: e.clientX, y: e.clientY };
-	panStart = { x: panOffset.x, y: panOffset.y };
+	if (isPinching || isAnimating) return;
+
+	swipeStartX = e.clientX;
+	swipeStartY = e.clientY;
+	hasMoved = false;
+	axisLocked = null;
+	velocitySamples = [];
+	swipeOffset = 0;
+
+	if (zoomLevel > 1) {
+		isDragging = true;
+		dragStart = { x: e.clientX, y: e.clientY };
+		panStart = { x: panOffset.x, y: panOffset.y };
+	}
+
 	(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 }
 
 function handlePointerMove(e: PointerEvent) {
-	if (!isDragging) return;
-	panOffset = {
-		x: panStart.x + (e.clientX - dragStart.x) / zoomLevel,
-		y: panStart.y + (e.clientY - dragStart.y) / zoomLevel
-	};
+	if (isPinching) return;
+
+	const dx = e.clientX - swipeStartX;
+	const dy = e.clientY - swipeStartY;
+	const absDx = Math.abs(dx);
+	const absDy = Math.abs(dy);
+
+	if (absDx > 5 || absDy > 5) hasMoved = true;
+
+	// Zoom-pan mode
+	if (isDragging && zoomLevel > 1) {
+		panOffset = {
+			x: panStart.x + (e.clientX - dragStart.x) / zoomLevel,
+			y: panStart.y + (e.clientY - dragStart.y) / zoomLevel
+		};
+		return;
+	}
+
+	if (zoomLevel > 1) return;
+
+	// Lock axis after 10px of deliberate movement
+	if (!axisLocked && (absDx > 10 || absDy > 10)) {
+		axisLocked = absDx >= absDy ? 'x' : 'y';
+	}
+
+	if (axisLocked !== 'x') return;
+
+	isSwipeDragging = true;
+	let offset = dx;
+
+	// Edge friction: resist when no adjacent image exists
+	if ((offset > 0 && !hasPrev) || (offset < 0 && !hasNext)) {
+		offset *= 0.35;
+	}
+
+	swipeOffset = offset;
+
+	// Track velocity
+	const now = performance.now();
+	velocitySamples.push({ x: e.clientX, t: now });
+	if (velocitySamples.length > 4) velocitySamples.shift();
 }
 
-function handlePointerUp() {
-	isDragging = false;
+function handlePointerUp(_e: PointerEvent) {
+	if (isPinching) return;
+
+	// Zoom-pan release
+	if (zoomLevel > 1) {
+		if (hasMoved) suppressClick = true;
+		isDragging = false;
+		return;
+	}
+
+	// Swipe release
+	if (isSwipeDragging) {
+		suppressClick = true;
+		isSwipeDragging = false;
+
+		const offset = swipeOffset;
+
+		// Compute velocity from recent samples
+		let velocity = 0;
+		if (velocitySamples.length >= 2) {
+			const last = velocitySamples[velocitySamples.length - 1];
+			const prev = velocitySamples[velocitySamples.length - 2];
+			const dt = last.t - prev.t;
+			if (dt > 0 && dt < 50) {
+				velocity = (last.x - prev.x) / dt; // px/ms, positive = moving right
+			}
+		}
+
+		// Sync spring to current drag position (no visual jump)
+		void swipeSpring.set(offset, { instant: true });
+
+		const positionThreshold = containerWidth * 0.33;
+		const velocityThreshold = 0.4; // px/ms
+
+		if ((offset < -positionThreshold || velocity < -velocityThreshold) && hasNext) {
+			void animateNavigation(-containerWidth, currentIndex + 1);
+		} else if ((offset > positionThreshold || velocity > velocityThreshold) && hasPrev) {
+			void animateNavigation(containerWidth, currentIndex - 1);
+		} else {
+			// Spring back to center
+			void swipeSpring.set(0);
+		}
+		return;
+	}
+
+	// Non-swipe movement still suppresses click (prevents accidental close)
+	if (hasMoved) {
+		suppressClick = true;
+	}
+}
+
+function handleContainerClick(e: MouseEvent) {
+	if (suppressClick) {
+		suppressClick = false;
+		return;
+	}
+	const target = e.target as HTMLElement;
+	if (target.closest('img')) return;
+	if (zoomLevel > 1) {
+		zoomLevel = 1;
+		panOffset = { x: 0, y: 0 };
+		return;
+	}
+	onClose();
+}
+
+function handleTouchStart(e: TouchEvent) {
+	if (e.touches.length === 2) {
+		isPinching = true;
+		const dx = e.touches[0].clientX - e.touches[1].clientX;
+		const dy = e.touches[0].clientY - e.touches[1].clientY;
+		lastPinchDistance = Math.hypot(dx, dy);
+		pinchStartZoom = zoomLevel;
+	}
+}
+
+function handleTouchMove(e: TouchEvent) {
+	if (e.touches.length === 2 && isPinching) {
+		e.preventDefault();
+		const dx = e.touches[0].clientX - e.touches[1].clientX;
+		const dy = e.touches[0].clientY - e.touches[1].clientY;
+		const distance = Math.hypot(dx, dy);
+		zoomLevel = Math.min(5, Math.max(1, pinchStartZoom * (distance / lastPinchDistance)));
+		if (zoomLevel === 1) panOffset = { x: 0, y: 0 };
+	}
+}
+
+function handleTouchEnd(e: TouchEvent) {
+	if (e.touches.length < 2 && isPinching) {
+		isPinching = false;
+		suppressClick = true;
+	}
 }
 </script>
 
@@ -182,8 +384,8 @@ function handlePointerUp() {
 		<Button
 			variant="ghost"
 			size="icon"
-			class="absolute left-4 z-10 cursor-pointer text-white hover:bg-white/10"
-			onclick={() => onNavigate(currentIndex - 1)}
+			class="absolute left-4 z-10 cursor-pointer bg-white/10 text-white hover:bg-white/20 sm:bg-transparent sm:hover:bg-white/10"
+			onclick={() => navigateTo(currentIndex - 1)}
 		>
 			<ChevronLeft class="h-8 w-8" />
 		</Button>
@@ -193,15 +395,16 @@ function handlePointerUp() {
 		<Button
 			variant="ghost"
 			size="icon"
-			class="absolute right-4 z-10 cursor-pointer text-white hover:bg-white/10"
-			onclick={() => onNavigate(currentIndex + 1)}
+			class="absolute right-4 z-10 cursor-pointer bg-white/10 text-white hover:bg-white/20 sm:bg-transparent sm:hover:bg-white/10"
+			onclick={() => navigateTo(currentIndex + 1)}
 		>
 			<ChevronRight class="h-8 w-8" />
 		</Button>
 	{/if}
 
-	<!-- Main image -->
+	<!-- Main image viewport -->
 	{#if currentCapture?.image_url}
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<div
 			class="relative h-[90vh] w-[90vw] select-none overflow-hidden"
 			class:cursor-grab={zoomLevel > 1 && !isDragging}
@@ -209,81 +412,165 @@ function handlePointerUp() {
 			style:touch-action="none"
 			role="img"
 			tabindex="-1"
+			onclick={handleContainerClick}
+			onkeydown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					if (zoomLevel > 1) {
+						zoomLevel = 1;
+						panOffset = { x: 0, y: 0 };
+					} else {
+						onClose();
+					}
+				}
+			}}
 			onwheel={handleWheel}
 			ondblclick={handleDblClick}
 			onpointerdown={handlePointerDown}
 			onpointermove={handlePointerMove}
 			onpointerup={handlePointerUp}
 			onpointercancel={handlePointerUp}
+			ontouchstart={handleTouchStart}
+			ontouchmove={handleTouchMove}
+			ontouchend={handleTouchEnd}
+			bind:clientWidth={containerWidth}
 		>
-			{#key currentIndex}
+			<!-- Previous image panel -->
+			{#if prevCapture?.image_url && containerWidth > 0}
+				{@const prevUrl = cfImageUrl(prevCapture.image_url, 'full')}
+				{@const prevThumb = decodeThumbhash(prevCapture.thumbhash)}
 				<div
-					in:fly={{ x: direction === 'left' ? 40 : -40, duration: 200, opacity: 1 }}
-					out:fade={{ duration: 100 }}
 					class="absolute inset-0 flex items-center justify-center"
+					style:transform="translateX({displayOffset - containerWidth}px)"
 				>
 					<div
-						style="transform: scale({zoomLevel}) translate({panOffset.x}px, {panOffset.y}px); transition: transform {isDragging ? '0s' : '0.15s'} ease;"
 						class="grid max-h-[90vh] max-w-[90vw]"
 						style:grid-template="1fr / 1fr"
 					>
-						{#if placeholderUrl && !imageLoaded}
+						{#if prevThumb}
 							<img
-								src={placeholderUrl}
+								src={prevThumb}
 								alt=""
 								class="col-start-1 row-start-1 h-[90vh] w-[90vw] object-contain"
 								aria-hidden="true"
 							/>
 						{/if}
-						<img
-							bind:this={imgEl}
-							src={fullImageUrl}
-							alt="Capture fullscreen view"
-							class="col-start-1 row-start-1 max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-300"
-							class:opacity-0={!imageLoaded || imageErrored}
-							loading="eager"
-							decoding="async"
-							draggable="false"
-							onload={() => (imageLoaded = true)}
-							onerror={() => (imageErrored = true)}
-						/>
-						{#if imageErrored}
-							<div class="col-start-1 row-start-1 flex flex-col items-center justify-center text-white/70">
-								<ImageOff class="h-10 w-10" strokeWidth={1.5} />
-								<span class="mt-2 text-sm">Image unavailable</span>
-							</div>
+						{#if prevUrl}
+							<img
+								src={prevUrl}
+								alt="Previous capture"
+								class="col-start-1 row-start-1 h-[90vh] w-[90vw] object-contain"
+								loading="eager"
+								draggable="false"
+							/>
 						{/if}
 					</div>
+				</div>
+			{/if}
 
-					<!-- Capture info overlay -->
-					<div
-						class="pointer-events-none absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/80 to-transparent p-4"
-					>
-						<div class="flex items-center justify-between">
-							<div class="flex items-center gap-2">
-								{#if currentCapture.scene_name}
-									<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
-										{currentCapture.scene_name}
-									</span>
-								{/if}
-							{#if currentCapture.profile_name}
-								<span class="rounded bg-primary px-2 py-1 text-sm font-medium text-primary-foreground">
-									{currentCapture.profile_name}
-								</span>
-							{/if}
-								{#if currentCapture.shader_version}
-									<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
-										v{currentCapture.shader_version}
-									</span>
-								{/if}
-							</div>
-							<span class="text-sm text-white/70">
-								{currentIndex + 1} / {captures.length}
-							</span>
+			<!-- Current image panel -->
+			<div
+				class="absolute inset-0 flex items-center justify-center"
+				style:transform="translateX({displayOffset}px)"
+			>
+				<div
+					style="transform: scale({zoomLevel}) translate({panOffset.x}px, {panOffset.y}px); transition: transform {isDragging ? '0s' : '0.15s'} ease;"
+					class="grid max-h-[90vh] max-w-[90vw]"
+					style:grid-template="1fr / 1fr"
+				>
+					{#if placeholderUrl && !imageLoaded}
+						<img
+							src={placeholderUrl}
+							alt=""
+							class="col-start-1 row-start-1 h-[90vh] w-[90vw] object-contain"
+							aria-hidden="true"
+						/>
+					{/if}
+					<img
+						bind:this={imgEl}
+						src={fullImageUrl}
+						alt="Capture fullscreen view"
+						class="col-start-1 row-start-1 max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-300"
+						class:opacity-0={!imageLoaded || imageErrored}
+						loading="eager"
+						decoding="async"
+						draggable="false"
+						onload={() => (imageLoaded = true)}
+						onerror={() => (imageErrored = true)}
+					/>
+					{#if imageErrored}
+						<div
+							class="col-start-1 row-start-1 flex flex-col items-center justify-center text-white/70"
+						>
+							<ImageOff class="h-10 w-10" strokeWidth={1.5} />
+							<span class="mt-2 text-sm">Image unavailable</span>
 						</div>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Next image panel -->
+			{#if nextCapture?.image_url && containerWidth > 0}
+				{@const nextUrl = cfImageUrl(nextCapture.image_url, 'full')}
+				{@const nextThumb = decodeThumbhash(nextCapture.thumbhash)}
+				<div
+					class="absolute inset-0 flex items-center justify-center"
+					style:transform="translateX({displayOffset + containerWidth}px)"
+				>
+					<div
+						class="grid max-h-[90vh] max-w-[90vw]"
+						style:grid-template="1fr / 1fr"
+					>
+						{#if nextThumb}
+							<img
+								src={nextThumb}
+								alt=""
+								class="col-start-1 row-start-1 h-[90vh] w-[90vw] object-contain"
+								aria-hidden="true"
+							/>
+						{/if}
+						{#if nextUrl}
+							<img
+								src={nextUrl}
+								alt="Next capture"
+								class="col-start-1 row-start-1 h-[90vh] w-[90vw] object-contain"
+								loading="eager"
+								draggable="false"
+							/>
+						{/if}
 					</div>
 				</div>
-			{/key}
+			{/if}
+
+			<!-- Capture info overlay (static, doesn't translate with swipe) -->
+			<div
+				class="pointer-events-none absolute right-0 bottom-0 left-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4"
+			>
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2">
+						{#if currentCapture.scene_name}
+							<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
+								{currentCapture.scene_name}
+							</span>
+						{/if}
+						{#if currentCapture.profile_name}
+							<span
+								class="rounded bg-primary px-2 py-1 text-sm font-medium text-primary-foreground"
+							>
+								{currentCapture.profile_name}
+							</span>
+						{/if}
+						{#if currentCapture.shader_version}
+							<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
+								v{currentCapture.shader_version}
+							</span>
+						{/if}
+					</div>
+					<span class="text-sm text-white/70">
+						{currentIndex + 1} / {captures.length}
+					</span>
+				</div>
+			</div>
 		</div>
 	{/if}
 </div>
