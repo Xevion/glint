@@ -9,6 +9,7 @@ import ConnectivityBanner from '$lib/components/ConnectivityBanner.svelte';
 import Footer from '$lib/components/Footer.svelte';
 import BrandIconSprite from '$lib/components/icons/BrandIconSprite.svelte';
 import Navigation from '$lib/components/Navigation.svelte';
+import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import Sidebar from '$lib/components/Sidebar.svelte';
 import { initNavigation } from '$lib/stores/navigation.svelte';
 import { themeStore } from '$lib/stores/theme.svelte';
@@ -84,9 +85,11 @@ onMount(() => {
 					<Sidebar />
 					{#snippet failed()}{/snippet}
 				</svelte:boundary>
-				<div class="flex-1 min-w-0" style="view-transition-name: app-content">
+			<div class="flex-1 min-w-0" style="view-transition-name: app-content">
+				<SectionBoundary title="Page">
 					{@render children()}
-				</div>
+				</SectionBoundary>
+			</div>
 			</main>
 
 			<Footer />

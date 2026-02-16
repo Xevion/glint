@@ -12,7 +12,9 @@ interface Props {
 	image?: string;
 	/** Thumbhash for image placeholder */
 	thumbhash?: string;
-	/** Called when the row is clicked */
+	/** Link destination (renders as <a>) */
+	href?: string;
+	/** Called when the row is clicked (renders as <button>) */
 	onclick?: () => void;
 	/** Additional metadata rendered inline after the subtitle */
 	metadata?: Snippet;
@@ -27,6 +29,7 @@ let {
 	subtitle,
 	image,
 	thumbhash,
+	href,
 	onclick,
 	metadata,
 	trailing,
@@ -34,8 +37,7 @@ let {
 }: Props = $props();
 
 const baseClasses = 'flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors';
-const interactiveClasses =
-	'cursor-pointer hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none';
+const interactiveClasses = 'hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none';
 </script>
 
 {#snippet content()}
@@ -75,7 +77,11 @@ const interactiveClasses =
 	{/if}
 {/snippet}
 
-{#if onclick}
+{#if href}
+	<a {href} class={cn(baseClasses, interactiveClasses, className)}>
+		{@render content()}
+	</a>
+{:else if onclick}
 	<button type="button" {onclick} class={cn(baseClasses, interactiveClasses, className)}>
 		{@render content()}
 	</button>

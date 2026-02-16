@@ -114,9 +114,9 @@ export const load: PageLoad = async ({ params, fetch }) => {
 	}
 
 	// Fetch other shaders for the "Similar Shaders" section (mock: random selection)
-	const listResult = await api.shaders.list({ pageSize: 20 });
+	const listResult = await api.shaders.list({ pageSize: 30 });
 	const similarShaders: ShaderListItem[] = listResult.match({
-		Ok: (page) => page.items.filter((s) => s.slug !== params.slug).slice(0, 6),
+		Ok: (page) => page.items.filter((s) => s.slug !== params.slug),
 		Err: () => []
 	});
 

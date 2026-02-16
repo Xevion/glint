@@ -1,12 +1,15 @@
 <script lang="ts">
 import { api } from '$lib/api';
 import { useRetry } from '$lib/api/retry.svelte';
-import { ItemGrid } from '$lib/components/item-grid';
+import type { ShaderListItem } from '$lib/bindings';
+import BrowseToolbar from '$lib/components/BrowseToolbar.svelte';
+import { CompactRow, ItemGrid, ViewToggle } from '$lib/components/item-grid';
+import type { GridMode } from '$lib/components/item-grid';
 import Meta from '$lib/components/Meta.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
-import { AlertTriangle, LoaderCircle, Search } from '@lucide/svelte';
+import { AlertTriangle, ChevronRight, LoaderCircle, Search } from '@lucide/svelte';
 import { untrack } from 'svelte';
 import { fly } from 'svelte/transition';
 import type { PageData } from './$types';
@@ -31,6 +34,7 @@ const hasError = $derived(!!shaderRetry.error || (!!loadError && !shaderRetry.da
 // Filter state
 let searchQuery = $state('');
 let sortBy = $state<'popular' | 'name' | 'updated'>('popular');
+let viewMode = $state<GridMode>('card');
 
 const filteredShaders = $derived.by(() => {
 	let result = shaders.filter((shader: (typeof shaders)[0]) => {
@@ -73,21 +77,24 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 />
 
 <div class="py-6">
-	<!-- Minimal inline header -->
-	<div in:fly={{ y: -10, duration: 400 }} class="mb-6 flex flex-wrap items-center gap-4">
-		<!-- Title with count -->
+	<!-- Title -->
+	<div in:fly={{ y: -10, duration: 400 }} class="mb-6">
 		<h1 class="text-2xl font-semibold tracking-tight">
 			Shaders
 			{#if !hasError}
-				<span class="ml-1 text-lg font-normal text-muted-foreground">({filteredShaders.length})</span>
+				<span class="ml-1 text-lg font-normal text-muted-foreground"
+					>({filteredShaders.length})</span
+				>
 			{/if}
 		</h1>
+	</div>
 
-		<div class="flex w-full flex-wrap items-center gap-3 sm:ml-auto sm:w-auto">
-			<!-- Search -->
-			<div class="relative">
-		<Search
-			class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+	<!-- Toolbar -->
+	<BrowseToolbar class="mb-6">
+		<!-- Search -->
+		<div class="relative min-w-0 flex-1 sm:min-w-48 sm:flex-initial">
+			<Search
+				class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
 				strokeWidth={2}
 			/>
 			<Input
@@ -95,34 +102,38 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 				placeholder="Search..."
 				bind:value={searchQuery}
 				disabled={hasError}
-				class="w-full bg-background/50 pr-3 pl-9 backdrop-blur-sm transition-all focus:w-full sm:w-48 sm:focus:w-64"
+				class="w-full pr-3 pl-9 sm:w-48 sm:focus:w-64"
 			/>
-			</div>
+		</div>
 
-			<!-- Sort -->
+		<!-- Sort -->
 		<select
 			bind:value={sortBy}
 			disabled={hasError}
-			class="h-9 rounded-md border border-input bg-background/50 px-3 text-sm shadow-xs backdrop-blur-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+			class="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
 		>
-				<option value="popular">Popular</option>
-				<option value="updated">Recent</option>
-				<option value="name">A-Z</option>
-			</select>
+			<option value="popular">Popular</option>
+			<option value="updated">Recent</option>
+			<option value="name">A-Z</option>
+		</select>
 
-			{#if hasFilters}
-				<Button
-					variant="ghost"
-					size="sm"
-					onclick={() => {
-						searchQuery = '';
-					}}
-				>
-					Clear
-				</Button>
-			{/if}
-		</div>
-	</div>
+		{#if hasFilters}
+			<Button
+				variant="ghost"
+				size="sm"
+				onclick={() => {
+					searchQuery = '';
+				}}
+			>
+				Clear
+			</Button>
+		{/if}
+
+		<!-- Spacer pushes view toggle to the right -->
+		<div class="flex-1"></div>
+
+		<ViewToggle mode={viewMode} onchange={(m: GridMode) => { viewMode = m; }} />
+	</BrowseToolbar>
 
 	<!-- Error State -->
 	{#if hasError}
@@ -149,17 +160,44 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 			</Button>
 		</div>
 	{:else}
-		<!-- eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -->
 		<ItemGrid
 			items={filteredShaders}
-			key={(s) => s.id}
+			key={(s: ShaderListItem) => s.id}
+			mode={viewMode}
 			size="medium"
 			empty={{ icon: Search, title: 'No shaders found', message: 'Try adjusting your filters' }}
 		>
-			{#snippet card(shader)}
+			{#snippet card(shader: ShaderListItem)}
 				<ShaderCard {shader} />
 			{/snippet}
+			{#snippet row(shader: ShaderListItem)}
+				<CompactRow
+					name={shader.name}
+					subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
+					image={shader.image_url}
+					thumbhash={shader.thumbhash}
+					href={`/shaders/${shader.slug}`}
+				>
+					{#snippet metadata()}
+						{#if shader.categories.length > 0}
+							<div class="flex gap-1">
+								{#each shader.categories.slice(0, 3) as category (category)}
+									<span
+										class="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+									>
+										{category}
+									</span>
+								{/each}
+							</div>
+						{:else if shader.latest_version}
+							<span>{shader.latest_version}</span>
+						{/if}
+					{/snippet}
+					{#snippet trailing()}
+						<ChevronRight class="h-4 w-4 text-muted-foreground" />
+					{/snippet}
+				</CompactRow>
+			{/snippet}
 		</ItemGrid>
-		<!-- eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -->
 	{/if}
 </div>

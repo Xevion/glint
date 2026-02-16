@@ -1,5 +1,6 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
+import type { ShaderListItem } from '$lib/bindings';
 import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import { ItemGrid } from '$lib/components/item-grid';
 import Meta from '$lib/components/Meta.svelte';
@@ -151,9 +152,8 @@ const ogImage = $derived(featuredPairs[0]?.right_image_url ?? null);
 				</a>
 			</div>
 
-			<!-- eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -->
-			<ItemGrid items={featuredShaders} key={(s) => s.id} size="medium">
-				{#snippet card(shader)}
+			<ItemGrid items={featuredShaders} key={(s: ShaderListItem) => s.id} size="medium">
+				{#snippet card(shader: ShaderListItem)}
 					<ShaderCard {shader} />
 				{/snippet}
 			</ItemGrid>

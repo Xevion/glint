@@ -19,7 +19,7 @@ interface Props {
 }
 
 let {
-	name,
+	name: _name,
 	versionCount,
 	captureCount,
 	upstreamDownloads,

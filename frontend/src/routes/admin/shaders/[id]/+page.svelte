@@ -9,7 +9,8 @@ import type {
 	ShaderWithCaptures,
 	UpdateShaderRequest
 } from '$lib/bindings';
-import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
+import CaptureImage from '$lib/components/CaptureImage.svelte';
+import { ItemGrid } from '$lib/components/item-grid';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
@@ -1199,36 +1200,48 @@ async function confirmDelete() {
                             View all
                         </a>
                     </div>
-                    <CaptureGridAdmin
-                        {captures}
-                        alt={(c: CaptureWithContext) =>
-                            c.scene_name ?? c.scene_id}
-                    >
-                        {#snippet footer(capture: CaptureWithContext)}
-                            <div class="p-2">
-                                <div class="flex items-center justify-between">
-                                    <div class="text-sm font-medium">
-                                        {capture.scene_name ?? capture.scene_id}
+                    <ItemGrid items={captures} key={(c: CaptureWithContext) => c.id} size="small">
+                        {#snippet card(capture: CaptureWithContext)}
+                            <a href="/admin/captures/{capture.id}" class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50">
+                                {#if capture.image_url}
+                                    <CaptureImage
+                                        src={capture.image_url}
+                                        thumbhash={capture.thumbhash}
+                                        preset="card"
+                                        alt={capture.scene_name ?? capture.scene_id}
+                                        class="w-full"
+                                        containerClass="aspect-video w-full"
+                                    />
+                                {:else}
+                                    <div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+                                        No image
                                     </div>
-                                    {#if capture.freshness !== "fresh"}
-                                        <span
-                                            class="rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[
-                                                capture.freshness
-                                            ]}"
-                                        >
-                                            {capture.freshness}
-                                        </span>
-                                    {/if}
+                                {/if}
+                                <div class="p-2">
+                                    <div class="flex items-center justify-between">
+                                        <div class="text-sm font-medium">
+                                            {capture.scene_name ?? capture.scene_id}
+                                        </div>
+                                        {#if capture.freshness !== "fresh"}
+                                            <span
+                                                class="rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[
+                                                    capture.freshness
+                                                ]}"
+                                            >
+                                                {capture.freshness}
+                                            </span>
+                                        {/if}
+                                    </div>
+                                    <div class="text-xs text-muted-foreground">
+                                        {capture.shader_version}
+                                        {#if capture.profile_name}
+                                            &middot; {capture.profile_name}
+                                        {/if}
+                                    </div>
                                 </div>
-                                <div class="text-xs text-muted-foreground">
-                                    {capture.shader_version}
-                                    {#if capture.profile_name}
-                                        &middot; {capture.profile_name}
-                                    {/if}
-                                </div>
-                            </div>
+                            </a>
                         {/snippet}
-                    </CaptureGridAdmin>
+                    </ItemGrid>
                 </div>
             {/if}
         </FolderCard.Content>

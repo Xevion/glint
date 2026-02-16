@@ -27,7 +27,9 @@ export async function renderTextOverlay(props: TextOverlayProps): Promise<Buffer
 	const vnode = html(renderedHtml);
 
 	// Generate SVG with satori (transparent background)
-	const svg = await satori(vnode, {
+	// satori-html VNode is structurally compatible but types diverge across packages
+	// eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+	const svg = await satori(vnode as any, {
 		width: OG_WIDTH,
 		height: OG_HEIGHT,
 		fonts

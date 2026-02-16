@@ -11,7 +11,16 @@ const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 export default tseslint.config(
 	includeIgnoreFile(gitignorePath),
 	{
-		ignores: ['dist/', '.svelte-kit/', 'build/', 'src/lib/bindings/', 'entrypoint.ts']
+		ignores: [
+			'dist/',
+			'.svelte-kit/',
+			'build/',
+			'src/lib/bindings/',
+			'entrypoint.ts',
+			'.storybook/',
+			'src/**/*.stories.svelte',
+			'src/**/*.stories.ts'
+		]
 	},
 	// Base JS rules
 	js.configs.recommended,

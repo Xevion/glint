@@ -2,7 +2,7 @@
 import { goto } from '$app/navigation';
 import { api } from '$lib/api';
 import type { CaptureDetail, CaptureWithContext } from '$lib/bindings';
-import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
+import { ItemGrid } from '$lib/components/item-grid';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
@@ -378,13 +378,25 @@ function formatMs(value?: number): string {
 				{/if}
 			</div>
 
-			{#if capture.same_shader_scene.length > 0}
-				<Tabs.Content value="shader-scene">
-					<CaptureGridAdmin
-						captures={capture.same_shader_scene}
-						alt={(c: CaptureWithContext) => `${c.shader_name} ${c.shader_version}`}
-					>
-					{#snippet footer(c: CaptureWithContext)}
+		{#if capture.same_shader_scene.length > 0}
+			<Tabs.Content value="shader-scene">
+				<ItemGrid items={capture.same_shader_scene} key={(c: CaptureWithContext) => c.id} size="small">
+				{#snippet card(c: CaptureWithContext)}
+					<a href="/admin/captures/{c.id}" class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50">
+						{#if c.image_url}
+							<CaptureImage
+								src={c.image_url}
+								thumbhash={c.thumbhash}
+								preset="card"
+								alt="{c.shader_name} {c.shader_version}"
+								class="w-full"
+								containerClass="aspect-video w-full"
+							/>
+						{:else}
+							<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+								No image
+							</div>
+						{/if}
 						<div class="p-2">
 							<div class="flex items-center justify-between">
 								<div class="text-sm font-medium">
@@ -405,18 +417,31 @@ function formatMs(value?: number): string {
 								</div>
 							{/if}
 						</div>
-					{/snippet}
-				</CaptureGridAdmin>
-			</Tabs.Content>
-		{/if}
+					</a>
+				{/snippet}
+			</ItemGrid>
+		</Tabs.Content>
+	{/if}
 
-		{#if capture.same_scene.length > 0}
-				<Tabs.Content value="scene">
-					<CaptureGridAdmin
-						captures={capture.same_scene}
-						alt={(c: CaptureWithContext) => `${c.shader_name} in ${c.scene_name ?? 'scene'}`}
-					>
-						{#snippet footer(c: CaptureWithContext)}
+	{#if capture.same_scene.length > 0}
+			<Tabs.Content value="scene">
+				<ItemGrid items={capture.same_scene} key={(c: CaptureWithContext) => c.id} size="small">
+					{#snippet card(c: CaptureWithContext)}
+						<a href="/admin/captures/{c.id}" class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50">
+							{#if c.image_url}
+								<CaptureImage
+									src={c.image_url}
+									thumbhash={c.thumbhash}
+									preset="card"
+									alt="{c.shader_name} in {c.scene_name ?? 'scene'}"
+									class="w-full"
+									containerClass="aspect-video w-full"
+								/>
+							{:else}
+								<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+									No image
+								</div>
+							{/if}
 							<div class="p-2">
 								<div class="text-sm font-medium">{c.shader_name}</div>
 							<div class="text-xs text-muted-foreground">
@@ -426,18 +451,31 @@ function formatMs(value?: number): string {
 								{/if}
 							</div>
 						</div>
-					{/snippet}
-				</CaptureGridAdmin>
-			</Tabs.Content>
-		{/if}
+					</a>
+				{/snippet}
+			</ItemGrid>
+		</Tabs.Content>
+	{/if}
 
-		{#if capture.same_run.length > 0}
-				<Tabs.Content value="run">
-					<CaptureGridAdmin
-						captures={capture.same_run}
-						alt={(c: CaptureWithContext) => `${c.shader_name} - ${c.scene_name ?? 'scene'}`}
-					>
-						{#snippet footer(c: CaptureWithContext)}
+	{#if capture.same_run.length > 0}
+			<Tabs.Content value="run">
+				<ItemGrid items={capture.same_run} key={(c: CaptureWithContext) => c.id} size="small">
+					{#snippet card(c: CaptureWithContext)}
+						<a href="/admin/captures/{c.id}" class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50">
+							{#if c.image_url}
+								<CaptureImage
+									src={c.image_url}
+									thumbhash={c.thumbhash}
+									preset="card"
+									alt="{c.shader_name} - {c.scene_name ?? 'scene'}"
+									class="w-full"
+									containerClass="aspect-video w-full"
+								/>
+							{:else}
+								<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+									No image
+								</div>
+							{/if}
 							<div class="p-2">
 								<div class="text-sm font-medium">{c.shader_name}</div>
 							<div class="text-xs text-muted-foreground">
@@ -447,10 +485,11 @@ function formatMs(value?: number): string {
 								{/if}
 							</div>
 							</div>
-						{/snippet}
-					</CaptureGridAdmin>
-				</Tabs.Content>
-			{/if}
+						</a>
+					{/snippet}
+				</ItemGrid>
+			</Tabs.Content>
+		{/if}
 		</Tabs.Root>
 	{/if}
 </div>

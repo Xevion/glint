@@ -1,18 +1,20 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
 import { createApiClient } from '$lib/api';
+import type { ShaderListItem } from '$lib/bindings';
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
+import { CompactRow, ItemGrid, MiniCard } from '$lib/components/item-grid';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import SectionBoundary from '$lib/components/SectionBoundary.svelte';
-import ShaderCard from '$lib/components/ShaderCard.svelte';
 import BrandIcon from '$lib/components/icons/BrandIcon.svelte';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import * as Select from '$lib/components/ui/select';
 import { formatNumber, formatVersion, getCurseforgeUrl, getModrinthUrl } from '$lib/utils/display';
 import { cfImageUrl } from '$lib/utils/image';
 import { withRetry } from '$lib/utils/retry';
+import { themeStore } from '$lib/stores/theme.svelte';
 import {
 	Camera,
 	ChevronDown,
@@ -25,6 +27,7 @@ import {
 	ImageOff,
 	Layers
 } from '@lucide/svelte';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-svelte';
 import { fly } from 'svelte/transition';
 import type { PageData } from './$types';
 import { type ShaderDetail, _trimShader } from './+page.ts';
@@ -43,7 +46,7 @@ $effect(() => {
 	void data.shader;
 	shaderOverride = null;
 	versionOverride = null;
-	selectedCaptureId = null;
+	_selectedCaptureId = null;
 	selectedProfileId = null;
 	iconErrored = false;
 });
@@ -93,7 +96,7 @@ function formatFeatureName(feature: string): string {
 let selectedProfileId = $state<string | null>(null);
 
 // Lightbox state
-let selectedCaptureId = $state<string | null>(null);
+let _selectedCaptureId = $state<string | null>(null);
 let lightboxOpen = $state(false);
 let lightboxIndex = $state(0);
 let iconErrored = $state(false);
@@ -103,7 +106,7 @@ let fetchGeneration = 0;
 
 async function onVersionChange(versionId: string) {
 	versionOverride = versionId;
-	selectedCaptureId = null;
+	_selectedCaptureId = null;
 	selectedProfileId = null;
 	const generation = ++fetchGeneration;
 	const api = createApiClient(fetch);
@@ -121,7 +124,7 @@ async function onVersionChange(versionId: string) {
 
 async function onProfileChange(profileId: string | null) {
 	selectedProfileId = profileId;
-	selectedCaptureId = null;
+	_selectedCaptureId = null;
 	const generation = ++fetchGeneration;
 	const api = createApiClient(fetch);
 	const params: { versionId?: string; profile_id?: string } = {};
@@ -329,7 +332,7 @@ const ogDescription = $derived.by(() => {
 			</div>
 
 			<!-- Feature & dimension tags -->
-			{#if allFeatures.length > 0 || shader.metadata?.has_custom_textures || (shader.metadata?.dimension_support && shader.metadata.dimension_support.length > 0)}
+			{#if allFeatures.length > 0 || shader.metadata?.has_custom_textures === true || (shader.metadata?.dimension_support && shader.metadata.dimension_support.length > 0)}
 				<div class="mt-3 flex flex-wrap gap-1.5">
 					{#each allFeatures as feature (feature)}
 						<span
@@ -396,7 +399,7 @@ const ogDescription = $derived.by(() => {
 							aria-label="View {capture.scene_name ?? 'capture'} in lightbox"
 							class="shadow-theme-sm group relative cursor-pointer overflow-hidden rounded-lg border border-border transition-all hover:border-primary"
 							onclick={() => {
-								selectedCaptureId = capture.id;
+								_selectedCaptureId = capture.id;
 								openLightbox(i);
 							}}
 						onmouseenter={() => {
@@ -511,15 +514,62 @@ const ogDescription = $derived.by(() => {
 					<h2 class="mb-4 text-lg font-semibold text-foreground">
 						Similar Shaders
 					</h2>
-					<div
-						class="-mx-3 flex snap-x snap-mandatory gap-4 overflow-x-auto px-3 pb-2 sm:-mx-1 sm:px-1"
+
+				<!-- Mobile: compact rows -->
+				<ItemGrid items={data.similarShaders.slice(0, 6)} key={(s: ShaderListItem) => s.id} mode="row" class="md:hidden">
+					{#snippet row(shader: ShaderListItem)}
+							<CompactRow
+								name={shader.name}
+								subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
+								image={shader.image_url}
+								thumbhash={shader.thumbhash}
+								href={resolve('/shaders/[slug]', { slug: shader.slug })}
+							>
+								{#snippet metadata()}
+									{#if shader.categories && shader.categories.length > 0}
+										<div class="flex gap-1">
+											{#each shader.categories.slice(0, 3) as category (category)}
+												<span class="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+													{category}
+												</span>
+											{/each}
+										</div>
+									{:else if shader.upstream_downloads}
+										<span class="text-xs text-muted-foreground">
+											{formatNumber(shader.upstream_downloads)} downloads
+										</span>
+									{/if}
+								{/snippet}
+								{#snippet trailing()}
+									<ChevronRight class="h-4 w-4 text-muted-foreground" />
+								{/snippet}
+							</CompactRow>
+						{/snippet}
+					</ItemGrid>
+
+				<!-- Desktop: horizontal scroll carousel -->
+				<div class="hidden md:block">
+					<OverlayScrollbarsComponent
+						element="div"
+						options={{ overflow: { y: 'hidden' }, scrollbars: { theme: themeStore.isDark ? 'os-theme-light' : 'os-theme-dark', autoHide: 'leave', autoHideDelay: 300 } }}
+						class="os-subtle"
+						defer
 					>
-						{#each data.similarShaders as similar (similar.id)}
-							<div class="w-64 shrink-0 snap-start sm:w-72">
-								<ShaderCard shader={similar} />
-							</div>
-						{/each}
-					</div>
+						<div class="flex gap-4 pb-3">
+							{#each data.similarShaders as shader (shader.id)}
+								<div class="w-44 shrink-0">
+								<MiniCard
+									name={shader.name}
+									subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
+									image={shader.image_url}
+									thumbhash={shader.thumbhash}
+									href={resolve('/shaders/[slug]', { slug: shader.slug })}
+								/>
+								</div>
+							{/each}
+						</div>
+					</OverlayScrollbarsComponent>
+				</div>
 				</div>
 			</SectionBoundary>
 		{/if}
@@ -534,7 +584,7 @@ const ogDescription = $derived.by(() => {
 		onClose={() => (lightboxOpen = false)}
 		onNavigate={(index: number) => {
 			lightboxIndex = index;
-			selectedCaptureId = captures[index]?.id ?? null;
+			_selectedCaptureId = captures[index]?.id ?? null;
 		}}
 	/>
 {/if}

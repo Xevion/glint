@@ -1,10 +1,11 @@
 <script lang="ts">
 import type { CaptureWithContext } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
+import { ItemGrid } from '$lib/components/item-grid';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import { ImageOff } from '@lucide/svelte';
 import type { Snippet } from 'svelte';
-import { fade, scale } from 'svelte/transition';
+import { fade } from 'svelte/transition';
 
 interface Props {
 	captures: CaptureWithContext[];
@@ -29,42 +30,40 @@ let {
 }: Props = $props();
 </script>
 
-{#if captures.length > 0}
-	<div in:fade|local={{ duration: 300, delay: 200 }} class="mb-8">
+<div in:fade|local={{ duration: 300, delay: 200 }} class="mb-8">
+	{#if captures.length > 0}
 		<h2 class="mb-4 text-2xl font-bold text-foreground">{title}</h2>
-		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-			{#each captures as capture, i (capture.id)}
-				<button
-					type="button"
-					onclick={() => onclick?.(capture)}
-					in:scale|local={{ duration: 350, delay: Math.min(i * 50, 400) + 250, start: 0.95 }}
-					class="group relative overflow-hidden rounded-xl transition-transform hover:scale-[1.02]"
-				>
-					<CaptureImage
-						src={capture.image_url}
-						thumbhash={capture.thumbhash}
-						preset="card"
-						alt={alt ? alt(capture) : 'Capture'}
-						class="h-full w-full object-cover"
-						containerClass="aspect-video"
-					/>
+	{/if}
+
+	<ItemGrid
+		items={captures}
+		key={(capture: CaptureWithContext) => capture.id}
+		mode="card"
+		empty={{ icon: ImageOff, title: 'No Captures Yet', message: emptyMessage }}
+	>
+		{#snippet card(capture: CaptureWithContext)}
+			<button
+				type="button"
+				onclick={() => onclick?.(capture)}
+				class="group relative overflow-hidden rounded-xl transition-transform hover:scale-[1.02]"
+			>
+				<CaptureImage
+					src={capture.image_url}
+					thumbhash={capture.thumbhash}
+					preset="card"
+					alt={alt ? alt(capture) : 'Capture'}
+					class="h-full w-full object-cover"
+					containerClass="aspect-video"
+				/>
 				<ImageOverlay hover />
-				<div class="absolute right-0 bottom-0 left-0 p-3 opacity-0 transition-opacity group-hover:opacity-100">
+				<div
+					class="absolute right-0 bottom-0 left-0 p-3 opacity-0 transition-opacity group-hover:opacity-100"
+				>
 					{#if overlay}
 						{@render overlay(capture)}
 					{/if}
 				</div>
-				</button>
-			{/each}
-		</div>
-	</div>
-{:else}
-	<div
-		in:fade|local={{ duration: 300, delay: 200 }}
-		class="mb-8 rounded-xl border border-border bg-card p-12 text-center"
-	>
-		<ImageOff class="mx-auto mb-4 h-16 w-16 text-muted-foreground opacity-30" strokeWidth={1.5} />
-		<h3 class="mb-2 text-lg font-semibold text-card-foreground">No Captures Yet</h3>
-		<p class="text-sm text-muted-foreground">{emptyMessage}</p>
-	</div>
-{/if}
+			</button>
+		{/snippet}
+	</ItemGrid>
+</div>

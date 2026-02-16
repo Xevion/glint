@@ -1,7 +1,8 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
 import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
-import CaptureGridAdmin from '$lib/components/CaptureGridAdmin.svelte';
+import CaptureImage from '$lib/components/CaptureImage.svelte';
+import { ItemGrid } from '$lib/components/item-grid';
 import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
 import SectionBoundary from '$lib/components/SectionBoundary.svelte';
@@ -352,8 +353,23 @@ onDestroy(() => {
 			{#if recentCaptures.length === 0}
 				<p class="text-sm text-muted-foreground">No captures yet</p>
 			{:else}
-				<CaptureGridAdmin captures={recentCaptures}>
-					{#snippet footer(capture: CaptureWithContext)}
+			<ItemGrid items={recentCaptures} key={(c: CaptureWithContext) => c.id} size="small">
+				{#snippet card(capture: CaptureWithContext)}
+					<a href="/admin/captures/{capture.id}" class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50">
+						{#if capture.image_url}
+							<CaptureImage
+								src={capture.image_url}
+								thumbhash={capture.thumbhash}
+								preset="card"
+								alt={capture.shader_name}
+								class="w-full"
+								containerClass="aspect-video w-full"
+							/>
+						{:else}
+							<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+								No image
+							</div>
+						{/if}
 						<div class="space-y-1 p-3">
 							<div class="flex items-center justify-between gap-2">
 								<span class="truncate font-medium text-sm">{capture.shader_name}</span>
@@ -379,8 +395,9 @@ onDestroy(() => {
 								</div>
 							{/if}
 						</div>
-					{/snippet}
-				</CaptureGridAdmin>
+					</a>
+				{/snippet}
+			</ItemGrid>
 			{/if}
 		</div>
 </div>
