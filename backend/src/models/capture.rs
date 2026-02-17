@@ -267,6 +267,7 @@ pub struct CaptureRunItemWithContext {
     pub scene_id: SceneId,
     pub profile_id: Option<ShaderVersionProfileId>,
     pub profile_name: Option<String>,
+    pub preset_id: Option<ScenePresetId>,
     pub status: CaptureRunItemStatus,
     pub capture_id: Option<CaptureId>,
     pub error_message: Option<String>,

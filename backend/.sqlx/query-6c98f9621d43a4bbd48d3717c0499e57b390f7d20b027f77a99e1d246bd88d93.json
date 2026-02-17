@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                cri.id,\n                cri.run_id AS \"run_id: CaptureRunId\",\n                cri.shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                cri.scene_id AS \"scene_id: SceneId\",\n                cri.profile_id AS \"profile_id: ShaderVersionProfileId\",\n                svp.name as \"profile_name?\",\n                cri.status AS \"status!: CaptureRunItemStatus\",\n                cri.capture_id AS \"capture_id: CaptureId\",\n                cri.error_message, cri.error_log, cri.duration_ms,\n                cri.started_at, cri.completed_at,\n                s.name as shader_name,\n                s.slug as shader_slug,\n                sv.version as shader_version,\n                sc.name as scene_name\n            FROM capture_run_items cri\n            JOIN shader_versions sv ON cri.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            JOIN scenes sc ON cri.scene_id = sc.id\n            LEFT JOIN shader_version_profiles svp ON cri.profile_id = svp.id\n            WHERE cri.run_id = $1\n            ORDER BY cri.started_at ASC NULLS LAST\n            ",
+  "query": "\n            SELECT\n                cri.id,\n                cri.run_id AS \"run_id: CaptureRunId\",\n                cri.shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                cri.scene_id AS \"scene_id: SceneId\",\n                cri.profile_id AS \"profile_id: ShaderVersionProfileId\",\n                svp.name as \"profile_name?\",\n                cri.preset_id AS \"preset_id: ScenePresetId\",\n                cri.status AS \"status!: CaptureRunItemStatus\",\n                cri.capture_id AS \"capture_id: CaptureId\",\n                cri.error_message, cri.error_log, cri.duration_ms,\n                cri.started_at, cri.completed_at,\n                s.name as shader_name,\n                s.slug as shader_slug,\n                sv.version as shader_version,\n                sc.name as scene_name\n            FROM capture_run_items cri\n            JOIN shader_versions sv ON cri.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            JOIN scenes sc ON cri.scene_id = sc.id\n            LEFT JOIN shader_version_profiles svp ON cri.profile_id = svp.id\n            WHERE cri.run_id = $1\n            ORDER BY cri.started_at ASC NULLS LAST\n            ",
   "describe": {
     "columns": [
       {
@@ -35,56 +35,61 @@
       },
       {
         "ordinal": 6,
-        "name": "status!: CaptureRunItemStatus",
+        "name": "preset_id: ScenePresetId",
         "type_info": "Text"
       },
       {
         "ordinal": 7,
-        "name": "capture_id: CaptureId",
+        "name": "status!: CaptureRunItemStatus",
         "type_info": "Text"
       },
       {
         "ordinal": 8,
-        "name": "error_message",
+        "name": "capture_id: CaptureId",
         "type_info": "Text"
       },
       {
         "ordinal": 9,
-        "name": "error_log",
+        "name": "error_message",
         "type_info": "Text"
       },
       {
         "ordinal": 10,
+        "name": "error_log",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
         "name": "duration_ms",
         "type_info": "Int4"
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "started_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "completed_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "shader_name",
         "type_info": "Text"
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "shader_slug",
         "type_info": "Text"
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "shader_version",
         "type_info": "Text"
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "scene_name",
         "type_info": "Text"
       }
@@ -101,6 +106,7 @@
       false,
       true,
       false,
+      true,
       false,
       true,
       true,
@@ -114,5 +120,5 @@
       false
     ]
   },
-  "hash": "17e95e85397d2fdba88eb01ddb9131cd0a1c4b0087f6785119380b1f8e826233"
+  "hash": "6c98f9621d43a4bbd48d3717c0499e57b390f7d20b027f77a99e1d246bd88d93"
 }
