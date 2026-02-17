@@ -87,6 +87,12 @@ object Glint {
             }
         }
         KeybindHandler.onTick()
+
+        // Drive scene injection process on the server thread
+        net.minecraft.client.Minecraft.getInstance().singleplayerServer?.execute {
+            com.xevion.glint.scene.InjectionManager
+                .tickInjection()
+        }
     }
 
     private fun registerShutdownHook() {
