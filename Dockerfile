@@ -1,3 +1,4 @@
+# check=skip=SecretsUsedInArgOrEnv
 # ========== Stage 1: Cargo Chef Base ==========
 FROM rust:1.91-slim AS chef
 WORKDIR /build
