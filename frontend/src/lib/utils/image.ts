@@ -27,7 +27,7 @@ export const IMAGE_PRESETS = {
 		fit: 'cover',
 		format: 'auto'
 	},
-	full: { sizes: '100vw', quality: 85, format: 'auto' }
+	full: { sizes: '100vw', quality: 100, format: 'auto' }
 } as const satisfies Record<string, ImagePresetConfig>;
 
 export interface ImagePresetConfig {
