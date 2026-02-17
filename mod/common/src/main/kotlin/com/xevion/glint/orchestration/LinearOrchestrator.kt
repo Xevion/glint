@@ -70,6 +70,12 @@ class LinearOrchestrator {
     private var loadedScene: LoadedScene? = null
     private var injectionProcess: InjectionProcess? = null
 
+    // Server-thread dispatch for injection ticking: prevents queuing multiple
+    // server.execute calls while one is still pending
+    @Volatile private var injectionTickPending = false
+
+    @Volatile private var injectionTickTerminal = false
+
     // Capture state
     private var pendingCapture: CompletableFuture<Path>? = null
     private var sessionDir: File? = null
@@ -275,9 +281,9 @@ class LinearOrchestrator {
                 return
             }
 
-            // Deactivate previous scene if any
+            // Deactivate previous scene if any (must run on server thread)
             loadedScene?.let {
-                sceneInjector.deactivate(level)
+                level.server.execute { sceneInjector.deactivate(level) }
                 loadedScene = null
             }
 
@@ -312,17 +318,39 @@ class LinearOrchestrator {
             return
         }
 
-        // Tick the injection process
-        if (process.tick()) {
+        // Check if a previously dispatched server-thread tick has completed
+        if (injectionTickTerminal) {
+            injectionTickTerminal = false
+            injectionTickPending = false
             injectionProcess = null
             if (process.isComplete) {
                 log.info("Scene injection complete")
-                // Apply FOV and render distance from work item
                 applySceneViewSettings(currentWorkItem()!!)
                 transitionTo(State.ApplyingPreset)
             } else {
                 finishWithError("Scene injection failed: ${process.error}")
             }
+            return
+        }
+
+        // Don't queue another tick if one is already pending on the server thread
+        if (injectionTickPending) return
+
+        // InjectionProcess.tick() operates on ServerLevel (addRegionTicket, chunk loading,
+        // entity spawning, player teleport) — must run on the server thread to avoid
+        // concurrent modification of chunk distance tracking data structures.
+        val server = Minecraft.getInstance().singleplayerServer
+        if (server == null) {
+            finishWithError("No integrated server available for injection tick")
+            return
+        }
+        injectionTickPending = true
+        server.execute {
+            val terminal = process.tick()
+            if (terminal) {
+                injectionTickTerminal = true
+            }
+            injectionTickPending = false
         }
     }
 
@@ -883,13 +911,15 @@ class LinearOrchestrator {
     }
 
     private fun cleanup() {
-        // End any active injection
+        // End any active injection (must run on server thread for chunk ticket removal)
         val level = stagingWorld.getServerLevel()
         if (level != null && loadedScene != null) {
-            sceneInjector.deactivate(level)
+            level.server.execute { sceneInjector.deactivate(level) }
         }
         loadedScene = null
         injectionProcess = null
+        injectionTickPending = false
+        injectionTickTerminal = false
 
         // End 4K session if active
         if (highResSessionActive) {
