@@ -125,6 +125,18 @@
 		   OverlayScrollbars initializes — prevents layout shift on first paint. */
 		overflow: hidden;
 	}
+
+	/* Theme-aware native select & option elements — browsers ignore most CSS
+	   on <option>, but background-color and color are respected on all major
+	   engines (Chromium, Firefox, WebKit). */
+	select {
+		color-scheme: light dark;
+	}
+
+	option {
+		background-color: var(--popover);
+		color: var(--popover-foreground);
+	}
 }
 
 /* Native scrollbars — theme-aware via CSS custom properties, transparent track */

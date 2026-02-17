@@ -130,7 +130,7 @@ const ogImage = $derived(data.shaders[0]?.image_url ?? null);
 			value={data.sort}
 			onchange={(e: Event) => setSort((e.target as HTMLSelectElement).value)}
 			disabled={hasError}
-			class="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+			class="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
 		>
 			<option value="popular">Popular</option>
 			<option value="updated">Recent</option>

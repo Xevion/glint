@@ -119,7 +119,7 @@ function handleCheckboxClick(e: MouseEvent) {
 	<!-- Card Body -->
 	<div class="flex flex-1 flex-col gap-2 px-3 pt-2.5 pb-2">
 		<!-- Header -->
-		<div class="flex flex-wrap items-baseline gap-x-2">
+		<div class="flex items-baseline gap-x-2 overflow-hidden">
 			<a
 				href={resolve('/shaders/[slug]', { slug: shader.slug })}
 				data-clickable
@@ -127,7 +127,7 @@ function handleCheckboxClick(e: MouseEvent) {
 					e.stopPropagation();
 				}}
 				class={cn(
-					'block text-xl font-semibold text-card-foreground transition-colors hover:text-primary',
+					'block truncate text-base font-semibold text-card-foreground transition-colors hover:text-primary',
 					hasAnySelection ? 'cursor-pointer' : ''
 				)}
 			>
