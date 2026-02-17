@@ -3,13 +3,22 @@ package com.xevion.glint.session
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.WorkItem
 import com.xevion.glint.orchestration.CaptureSpec
+import com.xevion.glint.orchestration.LinearOrchestrator
 import com.xevion.glint.orchestration.Orchestrator
+import java.io.File
 
 /**
- * Manages lifecycle of the orchestrator session globally.
+ * Manages lifecycle of orchestrator sessions globally.
+ *
+ * Supports two orchestration modes:
+ * - Interactive ([Orchestrator]) — world-based, UI-driven captures
+ * - Linear ([LinearOrchestrator]) — injection-based, autonomous captures
+ *
+ * Only one orchestration session may be active at a time across both modes.
  */
 object SessionRegistry {
     private val orchestratorManager = SessionManager<Orchestrator>()
+    private val linearOrchestratorManager = SessionManager<LinearOrchestrator>()
 
     /**
      * Starts orchestration with the given capture spec (interactive UI path).
@@ -18,42 +27,57 @@ object SessionRegistry {
     fun startOrchestration(
         spec: CaptureSpec,
         configure: ((Orchestrator) -> Unit)? = null,
-    ): Boolean =
-        orchestratorManager.start(
+    ): Boolean {
+        if (isOrchestrationActive()) return false
+        return orchestratorManager.start(
             name = "Orchestration",
             factory = { Orchestrator().also { configure?.invoke(it) } },
             starter = { it.start(spec) },
             isRunning = { it.isRunning },
         )
+    }
 
     /**
      * Starts linear orchestration with pre-ordered work items (autonomous capture path).
+     * Uses [LinearOrchestrator] with scene package injection instead of world files.
+     *
+     * @param items Pre-sorted work items from the backend
+     * @param runId Capture run ID
+     * @param scenePackages Map of package hash → local ZIP file
+     * @param outputDir Output directory for captures (relative to game directory)
+     * @param configure Optional callback to configure the orchestrator before starting
      * @return true if orchestration started successfully, false if already running
      */
     fun startLinearOrchestration(
         items: List<WorkItem>,
         runId: String,
+        scenePackages: Map<String, File>,
         outputDir: String? = null,
-        configure: ((Orchestrator) -> Unit)? = null,
-    ): Boolean =
-        orchestratorManager.start(
+        configure: ((LinearOrchestrator) -> Unit)? = null,
+    ): Boolean {
+        if (isOrchestrationActive()) return false
+        return linearOrchestratorManager.start(
             name = "Linear Orchestration",
-            factory = { Orchestrator().also { configure?.invoke(it) } },
-            starter = { it.startLinear(items, runId, outputDir) },
+            factory = { LinearOrchestrator().also { configure?.invoke(it) } },
+            starter = { it.start(items, runId, scenePackages, outputDir) },
             isRunning = { it.isRunning },
         )
+    }
 
     /**
      * Ticks active sessions. Must be called every client tick.
      */
     fun tick() {
         orchestratorManager.tick({ it.tick() }, { it.isRunning })
+        linearOrchestratorManager.tick({ it.tick() }, { it.isRunning })
     }
 
     /**
-     * Checks if orchestration is currently active.
+     * Checks if any orchestration is currently active.
      */
-    fun isOrchestrationActive(): Boolean = orchestratorManager.isActive { it.isRunning }
+    fun isOrchestrationActive(): Boolean =
+        orchestratorManager.isActive { it.isRunning } ||
+            linearOrchestratorManager.isActive { it.isRunning }
 
     /**
      * Generic session lifecycle manager.

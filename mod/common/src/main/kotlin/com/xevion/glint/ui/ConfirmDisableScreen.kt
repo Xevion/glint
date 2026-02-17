@@ -51,8 +51,8 @@ class ConfirmDisableScreen(
         }
         minecraft?.setScreen(parent)
 
-        if (parent is GlintMainScreen) {
-            parent.refreshWorlds()
+        if (parent is SceneManagerScreen) {
+            parent.refreshSceneList()
         }
     }
 

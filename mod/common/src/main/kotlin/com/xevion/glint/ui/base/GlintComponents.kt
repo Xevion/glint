@@ -1,8 +1,12 @@
 package com.xevion.glint.ui.base
 
+import com.xevion.glint.scene.LocalPreset
+import com.xevion.glint.scene.SceneState
+import com.xevion.glint.scene.Weather
 import io.wispforest.owo.ui.component.ButtonComponent
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.component.LabelComponent
+import io.wispforest.owo.ui.component.TextBoxComponent
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
 import io.wispforest.owo.ui.core.Color
@@ -13,6 +17,7 @@ import io.wispforest.owo.ui.core.Insets
 import io.wispforest.owo.ui.core.Sizing
 import io.wispforest.owo.ui.core.Surface
 import io.wispforest.owo.ui.core.VerticalAlignment
+import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.CommonComponents
 import net.minecraft.network.chat.Component as McComponent
 
@@ -425,6 +430,87 @@ object GlintComponents {
     }
 
     /**
+     * Creates a scene card for the master list.
+     * Horizontal layout: status thumbnail left, text right.
+     */
+    fun sceneCard(
+        name: String,
+        dimension: String,
+        state: SceneState,
+        presetCount: Int,
+        isSelected: Boolean,
+        isLoaded: Boolean,
+        needsPush: Boolean,
+        onClick: () -> Unit,
+    ): FlowLayout {
+        val card = Containers.horizontalFlow(Sizing.fill(100), Sizing.fixed(GlintTheme.CARD_HEIGHT))
+        card.padding(GlintTheme.paddingSm())
+        card.gap(GlintTheme.GAP_MD)
+        card.verticalAlignment(VerticalAlignment.CENTER)
+        card.cursorStyle(CursorStyle.HAND)
+
+        if (isSelected) {
+            card.surface(Surface.flat(GlintTheme.SELECTED_BG))
+        } else if (isLoaded) {
+            card.surface(Surface.flat(0x33AAFFAA))
+        } else {
+            card.surface(Surface.flat(0x22FFFFFF))
+        }
+
+        val statusIcon =
+            when {
+                needsPush -> "^"
+                state == SceneState.SYNCED -> "="
+                else -> "*"
+            }
+        val statusColor =
+            when {
+                needsPush -> GlintTheme.TEXT_WARNING
+                state == SceneState.SYNCED -> GlintTheme.TEXT_SUCCESS
+                else -> GlintTheme.TEXT_INFO
+            }
+        val thumbnail = Containers.verticalFlow(Sizing.fixed(GlintTheme.CARD_THUMBNAIL_SIZE), Sizing.fixed(GlintTheme.CARD_THUMBNAIL_SIZE))
+        thumbnail.surface(Surface.flat(0x44888888))
+        thumbnail.horizontalAlignment(HorizontalAlignment.CENTER)
+        thumbnail.verticalAlignment(VerticalAlignment.CENTER)
+        thumbnail.child(Components.label(McComponent.literal(statusIcon)).color(Color.ofRgb(statusColor)) as Component)
+        card.child(thumbnail as Component)
+
+        val textContainer = Containers.verticalFlow(Sizing.expand(), Sizing.content())
+        textContainer.gap(GlintTheme.GAP_SM)
+        textContainer.child(itemLabel(name) as Component)
+        val dimensionShort =
+            dimension
+                .substringAfter(":")
+                .replaceFirstChar { it.uppercase() }
+        val detailText = if (presetCount > 0) "$dimensionShort • $presetCount presets" else dimensionShort
+        textContainer.child(itemDetail(detailText) as Component)
+        card.child(textContainer as Component)
+
+        card.mouseDown().subscribe { _, _, button ->
+            if (button == 0) {
+                onClick()
+                true
+            } else {
+                false
+            }
+        }
+
+        if (!isSelected && !isLoaded) {
+            card.mouseEnter().subscribe {
+                card.surface(Surface.flat(GlintTheme.HIGHLIGHT_BG))
+                true
+            }
+            card.mouseLeave().subscribe {
+                card.surface(Surface.flat(0x22FFFFFF))
+                true
+            }
+        }
+
+        return card
+    }
+
+    /**
      * Helper to get status color.
      */
     private fun statusColor(status: String): Int =
@@ -437,6 +523,63 @@ object GlintComponents {
         }
 
     /**
+     * Creates a collapsible section with a clickable header that toggles visibility of its content.
+     */
+    fun collapsibleSection(
+        title: String,
+        defaultExpanded: Boolean = true,
+        builder: FlowLayout.() -> Unit,
+    ): FlowLayout {
+        val outer = Containers.verticalFlow(Sizing.fill(100), Sizing.content())
+        outer.gap(GlintTheme.GAP_SM)
+
+        val content = Containers.verticalFlow(Sizing.fill(100), Sizing.content())
+        content.gap(GlintTheme.GAP_SM)
+        content.padding(Insets.left(GlintTheme.GAP_MD))
+
+        var expanded = defaultExpanded
+
+        val header = Containers.horizontalFlow(Sizing.fill(100), Sizing.content())
+        header.gap(GlintTheme.GAP_SM)
+        header.verticalAlignment(VerticalAlignment.CENTER)
+        header.cursorStyle(CursorStyle.HAND)
+        header.padding(Insets.vertical(2))
+
+        val indicator = Components.label(McComponent.literal(if (expanded) "v" else ">"))
+        indicator.color(Color.ofRgb(GlintTheme.TEXT_SECONDARY))
+
+        val titleLabel = Components.label(McComponent.literal(title))
+        titleLabel.color(Color.ofRgb(GlintTheme.TEXT_PRIMARY))
+
+        header.child(indicator as Component)
+        header.child(titleLabel as Component)
+
+        header.mouseDown().subscribe { _, _, button ->
+            if (button == 0) {
+                expanded = !expanded
+                indicator.text(McComponent.literal(if (expanded) "v" else ">"))
+                if (expanded) {
+                    if (content.parent() == null) outer.child(content as Component)
+                } else {
+                    outer.removeChild(content as Component)
+                }
+                true
+            } else {
+                false
+            }
+        }
+
+        outer.child(header as Component)
+
+        content.builder()
+        if (expanded) {
+            outer.child(content as Component)
+        }
+
+        return outer
+    }
+
+    /**
      * Overload for itemDetail with custom color.
      */
     fun itemDetail(
@@ -446,4 +589,274 @@ object GlintComponents {
         Components
             .label(McComponent.literal(text))
             .color(Color.ofRgb(color))
+
+    /**
+     * Creates a row displaying a preset with action buttons.
+     */
+    fun presetRow(
+        preset: LocalPreset,
+        isDefault: Boolean,
+        isSceneLoaded: Boolean,
+        onEdit: () -> Unit,
+        onDelete: () -> Unit,
+        onApply: () -> Unit,
+    ): FlowLayout {
+        val buttons = mutableListOf<ButtonComponent>()
+
+        if (isSceneLoaded) {
+            buttons.add(
+                smallButton(McComponent.literal("Apply"), width = 40, tooltip = McComponent.literal("Apply this preset's environment")) {
+                    onApply()
+                },
+            )
+        }
+        buttons.add(
+            iconButton("E", tooltip = McComponent.literal("Edit preset")) { onEdit() },
+        )
+        if (!isDefault) {
+            buttons.add(
+                iconButton("X", tooltip = McComponent.literal("Delete preset")) { onDelete() },
+            )
+        }
+
+        return listItemWithButtons(
+            contentBuilder = {
+                child(itemLabel(preset.name) as Component)
+                child(itemDetail("${preset.timeOfDayTicks}t") as Component)
+                child(
+                    itemDetail(
+                        preset.weather.replaceFirstChar { it.uppercase() },
+                        when (preset.weather.lowercase()) {
+                            "clear" -> GlintTheme.TEXT_SUCCESS
+                            "rain" -> GlintTheme.TEXT_INFO
+                            "thunder" -> GlintTheme.TEXT_WARNING
+                            else -> GlintTheme.TEXT_SECONDARY
+                        },
+                    ) as Component,
+                )
+                if (preset.moonPhase != null) {
+                    child(itemDetail("P${preset.moonPhase}") as Component)
+                }
+                if (isDefault) {
+                    child(
+                        itemDetail("Default", GlintTheme.TEXT_MUTED) as Component,
+                    )
+                }
+            },
+            buttons = buttons.toTypedArray(),
+        )
+    }
+
+    /**
+     * Creates an inline form for editing or creating a preset.
+     */
+    fun presetEditForm(
+        initial: LocalPreset?,
+        isSceneLoaded: Boolean,
+        onSave: (LocalPreset) -> Unit,
+        onCancel: () -> Unit,
+    ): FlowLayout {
+        val state = PresetFormState(initial)
+        val form = Containers.verticalFlow(Sizing.fill(100), Sizing.content())
+        form.gap(GlintTheme.GAP_SM)
+        form.padding(Insets.of(GlintTheme.PADDING_SM))
+        form.surface(Surface.flat(0x33FFFFFF))
+
+        val nameBox = Components.textBox(Sizing.fill(60), state.name)
+        nameBox.setMaxLength(64)
+        form.child(labeledRow("Name:", nameBox as Component) as Component)
+
+        val timeBox = Components.textBox(Sizing.fixed(60), state.timeOfDay.toString())
+        timeBox.setMaxLength(5)
+        val timeRow = labeledRow("Time:", timeBox as Component)
+        timeRow.child(itemDetail("(0-24000)") as Component)
+        form.child(timeRow as Component)
+
+        val weatherRow = Containers.horizontalFlow(Sizing.fill(100), Sizing.content())
+        weatherRow.gap(GlintTheme.GAP_SM)
+        weatherRow.verticalAlignment(VerticalAlignment.CENTER)
+        weatherRow.child(itemDetail("Weather:") as Component)
+
+        val intensityBox = Components.textBox(Sizing.fixed(50), "%.1f".format(state.weatherIntensity))
+        intensityBox.setMaxLength(4)
+        val intensityRow = labeledRow("Intensity:", intensityBox as Component)
+        intensityRow.child(itemDetail("(0.0-1.0)") as Component)
+
+        val syncIntensityVisibility = {
+            insertChildAfter(form, intensityRow, weatherRow, state.weather != Weather.CLEAR)
+        }
+
+        val weatherBtn =
+            smallButton(McComponent.literal(state.weatherLabel()), width = 60) { btn ->
+                state.cycleWeather()
+                btn.message = McComponent.literal(state.weatherLabel())
+                syncIntensityVisibility()
+            }
+        weatherRow.child(weatherBtn as Component)
+        form.child(weatherRow as Component)
+
+        if (state.weather != Weather.CLEAR) form.child(intensityRow as Component)
+
+        val moonBtn =
+            smallButton(McComponent.literal("Phase ${state.moonPhase}"), width = 60) { btn ->
+                state.moonPhase = (state.moonPhase + 1) % 8
+                btn.message = McComponent.literal("Phase ${state.moonPhase}")
+            }
+        form.child(labeledRow("Moon:", moonBtn as Component) as Component)
+
+        if (isSceneLoaded) {
+            form.child(
+                buildFromWorldButton(state, timeBox, intensityBox, moonBtn, weatherBtn, syncIntensityVisibility) as Component,
+            )
+        }
+
+        val actionRow = Containers.horizontalFlow(Sizing.fill(100), Sizing.content())
+        actionRow.gap(GlintTheme.GAP_SM)
+        actionRow.child(
+            smallButton(McComponent.literal("Save"), width = 40) {
+                buildPresetFromForm(initial, state, nameBox, timeBox, intensityBox)?.let(onSave)
+            } as Component,
+        )
+        actionRow.child(
+            smallButton(McComponent.literal("Cancel"), width = 50) { onCancel() } as Component,
+        )
+        form.child(actionRow as Component)
+
+        return form
+    }
+
+    /** Mutable form state for [presetEditForm], extracted to reduce function length. */
+    private class PresetFormState(
+        initial: LocalPreset?,
+    ) {
+        var name = initial?.name ?: ""
+        var timeOfDay = initial?.timeOfDayTicks ?: 6000
+        var weather = initial?.weather?.let { Weather.fromString(it) } ?: Weather.CLEAR
+        var weatherIntensity = initial?.weatherIntensity ?: 0.0
+        var moonPhase = initial?.moonPhase ?: 0
+
+        fun weatherLabel(): String = weather.name.lowercase().replaceFirstChar { it.uppercase() }
+
+        fun cycleWeather() {
+            weather =
+                when (weather) {
+                    Weather.CLEAR -> Weather.RAIN
+                    Weather.RAIN -> Weather.THUNDER
+                    Weather.THUNDER -> Weather.CLEAR
+                }
+        }
+    }
+
+    private fun labeledRow(
+        label: String,
+        field: Component,
+    ): FlowLayout {
+        val row = Containers.horizontalFlow(Sizing.fill(100), Sizing.content())
+        row.gap(GlintTheme.GAP_SM)
+        row.verticalAlignment(VerticalAlignment.CENTER)
+        row.child(itemDetail(label) as Component)
+        row.child(field)
+        return row
+    }
+
+    /**
+     * Inserts or removes [child] from [parent] immediately after [anchor].
+     * FlowLayout lacks index-based insertion so we reorder children manually.
+     */
+    private fun insertChildAfter(
+        parent: FlowLayout,
+        child: FlowLayout,
+        anchor: FlowLayout,
+        visible: Boolean,
+    ) {
+        if (!visible) {
+            parent.removeChild(child as Component)
+        } else if (child.parent() == null) {
+            val children = parent.children().toList()
+            val anchorIdx = children.indexOf(anchor as Component)
+            if (anchorIdx >= 0 && anchorIdx < children.size - 1) {
+                val afterAnchor = children.subList(anchorIdx + 1, children.size).toList()
+                for (c in afterAnchor) parent.removeChild(c)
+                parent.child(child as Component)
+                for (c in afterAnchor) parent.child(c)
+            } else {
+                parent.child(child as Component)
+            }
+        }
+    }
+
+    private fun buildFromWorldButton(
+        state: PresetFormState,
+        timeBox: TextBoxComponent,
+        intensityBox: TextBoxComponent,
+        moonBtn: ButtonComponent,
+        weatherBtn: ButtonComponent,
+        syncIntensityVisibility: () -> Unit,
+    ): ButtonComponent =
+        smallButton(
+            McComponent.literal("From World"),
+            width = 75,
+            tooltip = McComponent.literal("Pull current world environment into form"),
+        ) {
+            val mc = Minecraft.getInstance()
+            val server = mc.singleplayerServer ?: return@smallButton
+            val overworld = server.overworld()
+            val dayTime = overworld.dayTime
+
+            state.timeOfDay = (dayTime % 24000L).toInt()
+            timeBox.text(state.timeOfDay.toString())
+
+            state.moonPhase = ((dayTime / 24000L) % 8).toInt()
+            moonBtn.message = McComponent.literal("Phase ${state.moonPhase}")
+
+            state.weather =
+                when {
+                    overworld.isThundering -> Weather.THUNDER
+                    overworld.isRaining -> Weather.RAIN
+                    else -> Weather.CLEAR
+                }
+            weatherBtn.message = McComponent.literal(state.weatherLabel())
+
+            state.weatherIntensity = overworld.getRainLevel(1f).toDouble()
+            intensityBox.text("%.1f".format(state.weatherIntensity))
+
+            syncIntensityVisibility()
+        }
+
+    private fun buildPresetFromForm(
+        initial: LocalPreset?,
+        state: PresetFormState,
+        nameBox: TextBoxComponent,
+        timeBox: TextBoxComponent,
+        intensityBox: TextBoxComponent,
+    ): LocalPreset? {
+        val finalName = nameBox.value.trim()
+        if (finalName.isEmpty()) return null
+
+        val finalTime = timeBox.value.toIntOrNull()?.coerceIn(0, 24000) ?: state.timeOfDay
+        val finalIntensity =
+            if (state.weather != Weather.CLEAR) {
+                intensityBox.value.toDoubleOrNull()?.coerceIn(0.0, 1.0) ?: state.weatherIntensity
+            } else {
+                0.0
+            }
+
+        val slug =
+            initial?.slug
+                ?: finalName
+                    .lowercase()
+                    .replace(Regex("[^a-z0-9]+"), "-")
+                    .trimEnd('-')
+                    .trimStart('-')
+
+        return LocalPreset(
+            name = finalName,
+            slug = slug,
+            timeOfDayTicks = finalTime,
+            weather = state.weather.toMinecraftString(),
+            weatherIntensity = finalIntensity,
+            moonPhase = state.moonPhase,
+            backendPresetId = initial?.backendPresetId,
+        )
+    }
 }

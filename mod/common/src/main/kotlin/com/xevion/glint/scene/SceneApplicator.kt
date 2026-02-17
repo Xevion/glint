@@ -335,6 +335,78 @@ object SceneApplicator {
         return rebuildTriggered
     }
 
+    /**
+     * Applies environment settings (time, weather, moon phase) without a full scene.
+     * Used by preset management to preview environment variants in the current world.
+     */
+    fun applyEnvironment(
+        timeOfDay: Int,
+        weather: Weather,
+        weatherIntensity: Float,
+        moonPhase: Int,
+    ): SceneApplyResult {
+        val mc = Minecraft.getInstance()
+        val server = mc.singleplayerServer
+
+        if (server == null) {
+            log.error("Cannot apply environment - not in single-player")
+            return SceneApplyResult.FAILED
+        }
+
+        val overworld = server.overworld()
+
+        // Compute dayTime that yields the requested moon phase while preserving time of day.
+        // Moon phase = (dayTime / 24000 % 8), so dayTime = moonPhase * 24000 + timeOfDay
+        overworld.dayTime = (moonPhase.toLong() * 24000L) + timeOfDay.toLong()
+        log.debug("Set environment time") {
+            "time" to timeOfDay
+            "moon_phase" to moonPhase
+        }
+
+        when (weather) {
+            Weather.CLEAR -> overworld.setWeatherParameters(6000, 0, false, false)
+            Weather.RAIN -> overworld.setWeatherParameters(0, 6000, true, false)
+            Weather.THUNDER -> overworld.setWeatherParameters(0, 6000, true, true)
+        }
+
+        // Freeze daylight and weather cycles
+        overworld.gameRules.getRule(GameRules.RULE_DAYLIGHT).set(false, server)
+        overworld.gameRules.getRule(GameRules.RULE_WEATHER_CYCLE).set(false, server)
+
+        // Snap weather levels on both server and client
+        val (targetRainLevel, targetThunderLevel) =
+            when (weather) {
+                Weather.CLEAR -> {
+                    0f to 0f
+                }
+
+                Weather.RAIN -> {
+                    (if (weatherIntensity > 0f) weatherIntensity else 1f) to 0f
+                }
+
+                Weather.THUNDER -> {
+                    val level = if (weatherIntensity > 0f) weatherIntensity else 1f
+                    level to level
+                }
+            }
+
+        overworld.setRainLevel(targetRainLevel)
+        overworld.setThunderLevel(targetThunderLevel)
+        mc.level?.let { clientLevel ->
+            clientLevel.setRainLevel(targetRainLevel)
+            clientLevel.setThunderLevel(targetThunderLevel)
+        }
+
+        log.info("Applied environment preset") {
+            "time" to timeOfDay
+            "weather" to weather.name
+            "intensity" to weatherIntensity
+            "moon_phase" to moonPhase
+        }
+
+        return SceneApplyResult.APPLIED
+    }
+
     private fun freezeWorldState(config: SceneConfig) {
         val mc = Minecraft.getInstance()
 

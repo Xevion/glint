@@ -23,6 +23,17 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+/**
+ * Key for looking up run items from capture events.
+ * Uniquely identifies a capture target: (shader, scene, profile, preset).
+ */
+data class CaptureItemKey(
+    val shaderVersionId: String,
+    val sceneId: String,
+    val profileId: String?,
+    val presetId: String?,
+)
+
 /** Resolved item metadata from the work→run item mapping. */
 data class RunItemInfo(
     val itemId: String,
@@ -39,7 +50,7 @@ class RunUploader(
     private val apiUrl: String,
     private val apiToken: String,
     private val runId: String,
-    private val itemLookup: Map<Triple<String, String, String?>, RunItemInfo>,
+    private val itemLookup: Map<CaptureItemKey, RunItemInfo>,
     maxConcurrent: Int = 4,
 ) {
     private val log = Loggers.Orchestration.get()
@@ -62,14 +73,16 @@ class RunUploader(
      */
     fun handleCapture(
         shaderVersionId: String,
+        presetId: String?,
         event: CaptureTakenEvent,
     ) {
-        val key = Triple(shaderVersionId, event.sceneId, event.entry.shader?.profileId)
+        val key = CaptureItemKey(shaderVersionId, event.sceneId, event.entry.shader?.profileId, presetId)
         val info = itemLookup[key]
         if (info == null) {
             log.warn("No run item found for capture") {
                 "scene_id" to event.sceneId
                 "profile_id" to (event.entry.shader?.profileId ?: "null")
+                "preset_id" to (presetId ?: "null")
             }
             return
         }
@@ -129,7 +142,7 @@ class RunUploader(
     fun failAllItems(items: List<WorkItem>) {
         val unsubmittedEntries =
             items.mapNotNull { item ->
-                val key = Triple(item.shaderVersionId, item.sceneId, item.profileId)
+                val key = CaptureItemKey(item.shaderVersionId, item.sceneId, item.profileId, item.presetId)
                 val info = itemLookup[key] ?: return@mapNotNull null
                 if (info.itemId in submittedItemIds) return@mapNotNull null
                 item to info.itemId

@@ -362,42 +362,6 @@ object SceneManager {
     ): Boolean = removeScene(fileName, sceneId)
 
     /**
-     * Updates the apiWorldId for a collection, linking it to a backend world.
-     */
-    fun setApiWorldId(
-        fileName: String,
-        apiWorldId: String,
-    ): Boolean {
-        val collection = loadCollection(fileName) ?: return false
-        if (collection.apiWorldId == apiWorldId) return true
-        return saveCollection(fileName, collection.copy(apiWorldId = apiWorldId))
-    }
-
-    /**
-     * Creates an empty collection for a newly downloaded API world.
-     * If a collection already exists, updates its apiWorldId and folder.
-     */
-    fun addCollectionForApiWorld(
-        worldName: String,
-        folder: String,
-        apiWorldId: String,
-    ): Boolean {
-        val fileName = normalizeFileName(worldName)
-        val existing = loadCollection(fileName)
-        if (existing != null) {
-            return saveCollection(fileName, existing.copy(apiWorldId = apiWorldId, folder = folder))
-        }
-        val collection =
-            SceneCollection(
-                world = worldName,
-                folder = folder,
-                apiWorldId = apiWorldId,
-                scenes = emptyList(),
-            )
-        return saveCollection(fileName, collection)
-    }
-
-    /**
      * Saves a collection to disk synchronously.
      */
     internal fun saveCollection(

@@ -86,6 +86,7 @@ data class CaptureRunItem(
     val sceneId: String,
     val profileId: String? = null,
     val profileName: String? = null,
+    val presetId: String? = null,
     val status: String,
     val captureId: String? = null,
     val errorMessage: String? = null,

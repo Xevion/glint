@@ -2,10 +2,6 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
-import com.xevion.glint.api.HttpClient
-import com.xevion.glint.api.PushResult
-import com.xevion.glint.api.SceneClient
-import com.xevion.glint.api.SceneSyncManager
 import com.xevion.glint.orchestration.CaptureSpec
 import com.xevion.glint.orchestration.ShaderSpec
 import com.xevion.glint.scene.ResolvedScene
@@ -360,85 +356,12 @@ class SceneManagerScreen(
     }
 
     private fun syncAllScenes() {
-        val config = ApiConfig.load()
-
-        if (!config.isValid()) {
-            log.warn("API config not valid - open API Config to set it up")
-            SystemToast.add(
-                minecraft!!.toastManager,
-                SystemToast.SystemToastId.WORLD_ACCESS_FAILURE,
-                McComponent.literal("Cannot sync scenes"),
-                McComponent.literal("API config not set up"),
-            )
-            return
-        }
-
-        val allDiscovery = SceneManager.discoverAllCollections()
-        for (error in allDiscovery.errors) {
-            StatusLog.error("Failed to load ${error.fileName}.json: ${error.message}")
-        }
-        val client = HttpClient(config.apiUrl, token = config.accessToken)
-        var totalScenes = 0
-
-        for ((_, collection) in allDiscovery.collections) {
-            val worldId = collection.apiWorldId ?: continue
-            totalScenes += collection.scenes.size
-
-            java.util.concurrent.CompletableFuture
-                .supplyAsync {
-                    SceneClient.fetchScenes(client, worldId)
-                }.thenAccept { fetchResult ->
-                    fetchResult.fold(
-                        onSuccess = { apiScenes ->
-                            val diff = SceneSyncManager.computeDiff(collection.scenes, apiScenes)
-                            if (!diff.hasChanges) {
-                                log.debug("No changes for ${collection.world}")
-                                return@thenAccept
-                            }
-                            SceneSyncManager
-                                .executePush(diff, worldId, config)
-                                .thenAccept { result ->
-                                    minecraft?.execute {
-                                        when (result) {
-                                            is PushResult.Success -> {
-                                                SystemToast.addOrUpdate(
-                                                    minecraft!!.toastManager,
-                                                    SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
-                                                    McComponent.literal("${collection.world} pushed"),
-                                                    McComponent.literal(
-                                                        "${result.created} created, ${result.updated} updated, ${result.removed} removed",
-                                                    ),
-                                                )
-                                            }
-
-                                            is PushResult.Failure -> {
-                                                SystemToast.addOrUpdate(
-                                                    minecraft!!.toastManager,
-                                                    SystemToast.SystemToastId.WORLD_ACCESS_FAILURE,
-                                                    McComponent.literal("Push failed: ${collection.world}"),
-                                                    McComponent.literal(result.error.userMessage),
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                        },
-                        onFailure = { error ->
-                            log.error("Failed to fetch scenes for ${collection.world}: ${error.message}")
-                        },
-                    )
-                }
-        }
-
-        log.info("Started push") {
-            "scene_count" to totalScenes
-            "world_count" to allDiscovery.collections.size
-        }
+        log.warn("Sync not yet migrated to scene-package model")
         SystemToast.add(
             minecraft!!.toastManager,
-            SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
-            McComponent.literal("Pushing scenes..."),
-            McComponent.literal("$totalScenes scenes across ${allDiscovery.collections.size} worlds"),
+            SystemToast.SystemToastId.WORLD_ACCESS_FAILURE,
+            McComponent.literal("Sync unavailable"),
+            McComponent.literal("Not yet migrated to scene-package model"),
         )
     }
 }

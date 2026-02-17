@@ -23,6 +23,7 @@ class CaptureTakenEvent(
     val entry: CaptureEntry,
     val fileBytes: ByteArray,
     val sceneId: String,
+    val presetId: String? = null,
 )
 
 /**

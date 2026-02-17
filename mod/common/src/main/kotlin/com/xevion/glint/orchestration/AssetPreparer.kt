@@ -1,14 +1,7 @@
 package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.api.GlintJson
 import com.xevion.glint.api.WorkItem
-import com.xevion.glint.scene.SceneManager
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
-import net.minecraft.client.Minecraft
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -17,6 +10,8 @@ import java.security.MessageDigest
 sealed class PrepResult {
     data class Ready(
         val items: List<WorkItem>,
+        /** Map of package hash → local ZIP file for downloaded scene packages. */
+        val scenePackages: Map<String, File>,
     ) : PrepResult()
 
     data class Failed(
@@ -29,23 +24,21 @@ sealed class PrepResult {
 }
 
 /**
- * Prepares assets (shaders, scene definitions) for autonomous capture.
+ * Prepares assets (shaders, scene packages) for autonomous capture.
  *
- * Downloads all unique shaders from the work item list, writes scene
- * definitions to disk, and reports which items are ready for capture.
+ * Downloads all unique shaders and scene packages from the work item list,
+ * caching scene packages by hash to avoid redundant downloads.
  */
 class AssetPreparer(
     private val gameDirectory: File,
 ) {
     private val log = Loggers.Orchestration.get()
-    private val json = GlintJson
 
     /**
      * Prepares all assets needed for the given work items.
      *
-     * Downloads shaders, writes scene definitions, and returns
-     * the items that are ready for capture (items whose shaders
-     * downloaded successfully).
+     * Downloads shaders and scene packages, returning the items that are
+     * ready for capture alongside a map of scene package paths.
      */
     fun prepareAll(items: List<WorkItem>): PrepResult {
         if (items.isEmpty()) return PrepResult.Failed("No work items")
@@ -53,17 +46,21 @@ class AssetPreparer(
         // 1. Download all unique shaders
         val shaderResults = downloadShaders(items)
 
-        // 2. Write scene definitions
-        writeSceneDefinitions(items)
+        // 2. Download all unique scene packages
+        val packageResults = downloadScenePackages(items)
 
-        // 3. Filter items to only those with successfully downloaded shaders
+        // 3. Filter items to only those with successfully downloaded shaders and packages
         val readyItems =
             items.filter { item ->
-                if (item.shaderSlug == "vanilla") {
-                    true
-                } else {
-                    shaderResults[item.shaderVersionId] != null
-                }
+                val shaderReady =
+                    if (item.shaderSlug == "vanilla") {
+                        true
+                    } else {
+                        shaderResults[item.shaderVersionId] != null
+                    }
+                val packageReady =
+                    item.packageHash == null || packageResults.containsKey(item.packageHash)
+                shaderReady && packageReady
             }
 
         if (readyItems.isEmpty()) {
@@ -74,9 +71,10 @@ class AssetPreparer(
             "total_items" to items.size
             "ready_items" to readyItems.size
             "shaders" to shaderResults.size
+            "packages" to packageResults.size
         }
 
-        return PrepResult.Ready(readyItems)
+        return PrepResult.Ready(readyItems, packageResults)
     }
 
     /**
@@ -150,10 +148,79 @@ class AssetPreparer(
             "name" to item.shaderName
             "file" to filename
         }
+        return downloadFile(downloadUrl, targetFile, item.fileHash, "shader")?.let { filename }
+    }
+
+    /**
+     * Downloads all unique scene packages from the work items.
+     * Cached by package hash — unchanged packages are not re-downloaded.
+     * Returns a map of package hash → local file path.
+     */
+    private fun downloadScenePackages(items: List<WorkItem>): Map<String, File> {
+        val results = mutableMapOf<String, File>()
+        val packagesDir = File(gameDirectory, "glint/packages")
+        packagesDir.mkdirs()
+
+        val uniquePackages =
+            items
+                .filter { it.packageUrl != null && it.packageHash != null }
+                .distinctBy { it.packageHash }
+
+        for (item in uniquePackages) {
+            val hash = item.packageHash!!
+            val url = item.packageUrl!!
+            val targetFile = File(packagesDir, "$hash.zip")
+
+            // Cache hit: file exists with matching name (hash-based naming ensures correctness)
+            if (targetFile.exists()) {
+                log.debug("Scene package cached") {
+                    "hash" to hash
+                    "scene" to item.sceneName
+                    "bytes" to targetFile.length()
+                }
+                results[hash] = targetFile
+                continue
+            }
+
+            log.info("Downloading scene package") {
+                "scene" to item.sceneName
+                "hash" to hash
+                "size" to (item.packageSizeBytes ?: -1)
+            }
+
+            val downloaded = downloadFile(url, targetFile, expectedHash = null, label = "scene package")
+            if (downloaded != null) {
+                results[hash] = targetFile
+                log.info("Scene package downloaded") {
+                    "hash" to hash
+                    "bytes" to targetFile.length()
+                }
+            } else {
+                log.error("Failed to download scene package") {
+                    "scene" to item.sceneName
+                    "hash" to hash
+                }
+            }
+        }
+
+        return results
+    }
+
+    /**
+     * Downloads a file from a URL to a target file.
+     * Optionally verifies SHA-1 hash after download.
+     * Returns the target file on success, or null on failure.
+     */
+    private fun downloadFile(
+        url: String,
+        targetFile: File,
+        expectedHash: String?,
+        label: String,
+    ): File? {
         try {
             val connection =
                 java.net
-                    .URI(downloadUrl)
+                    .URI(url)
                     .toURL()
                     .openConnection() as java.net.HttpURLConnection
             connection.requestMethod = "GET"
@@ -161,7 +228,10 @@ class AssetPreparer(
             connection.readTimeout = 120000
 
             if (connection.responseCode !in 200..299) {
-                log.error("Shader download failed") { "status" to connection.responseCode }
+                log.error("Download failed") {
+                    "label" to label
+                    "status" to connection.responseCode
+                }
                 return null
             }
 
@@ -171,13 +241,13 @@ class AssetPreparer(
                 }
             }
 
-            // Verify downloaded file hash
-            if (item.fileHash != null) {
+            // Verify downloaded file hash if expected
+            if (expectedHash != null) {
                 val downloadedHash = sha1Hex(targetFile)
-                if (downloadedHash != item.fileHash) {
-                    log.error("Downloaded shader hash mismatch") {
-                        "file" to filename
-                        "expected" to item.fileHash
+                if (downloadedHash != expectedHash) {
+                    log.error("Downloaded file hash mismatch") {
+                        "label" to label
+                        "expected" to expectedHash
                         "actual" to downloadedHash
                     }
                     targetFile.delete()
@@ -185,17 +255,13 @@ class AssetPreparer(
                 }
             }
 
-            log.info("Shader downloaded") {
-                "file" to filename
-                "bytes" to targetFile.length()
-            }
-            return filename
+            return targetFile
         } catch (e: IOException) {
-            log.error(e, "Failed to download shader")
+            log.error(e, "Failed to download file") { "label" to label }
             targetFile.delete()
             return null
         } catch (e: SecurityException) {
-            log.error(e, "Failed to download shader")
+            log.error(e, "Failed to download file") { "label" to label }
             targetFile.delete()
             return null
         }
@@ -211,64 +277,5 @@ class AssetPreparer(
             }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    /** Writes scene definition JSON files for all scenes referenced by the work items. */
-    private fun writeSceneDefinitions(items: List<WorkItem>) {
-        val scenesDir = File(gameDirectory, "glint/scenes")
-        scenesDir.mkdirs()
-
-        val itemsByScene = items.groupBy { it.sceneSlug }
-
-        for ((sceneSlug, sceneItems) in itemsByScene) {
-            val collectionFile = File(scenesDir, "$sceneSlug.json")
-
-            val sceneElements =
-                sceneItems
-                    .distinctBy { it.sceneId }
-                    .map { item ->
-                        buildJsonObject {
-                            put("id", item.sceneId)
-                            put("name", item.sceneName)
-                            putJsonObject("position") {
-                                put("x", item.sceneX)
-                                put("y", item.sceneY)
-                                put("z", item.sceneZ)
-                            }
-                            putJsonObject("camera") {
-                                put("yaw", item.sceneYaw)
-                                put("pitch", item.scenePitch)
-                            }
-                            put("timeOfDay", item.sceneTimeOfDayTicks)
-                            put("dimension", item.sceneDimension)
-                            put("weather", item.sceneWeather)
-                            put("weatherIntensity", item.sceneWeatherIntensity)
-                            if (item.sceneBiome != null) put("biome", item.sceneBiome)
-                            if (item.sceneMoonPhase != null) put("moonPhase", item.sceneMoonPhase)
-                        }
-                    }
-
-            val mcVersion = Minecraft.getInstance().launchedVersion
-            val collection =
-                buildJsonObject {
-                    put("scene", sceneSlug)
-                    put("version", mcVersion)
-                    put("scenes", JsonArray(sceneElements))
-                }
-
-            collectionFile.writeText(
-                json.encodeToString(
-                    kotlinx.serialization.json.JsonElement
-                        .serializer(),
-                    collection,
-                ),
-            )
-            log.info("Wrote scene collection") {
-                "file" to collectionFile.name
-                "scene_count" to sceneElements.size
-            }
-        }
-
-        SceneManager.clearCache()
     }
 }

@@ -165,6 +165,7 @@ class AutonomousRunner(
                                         shaderVersionId = item.shaderVersionId,
                                         sceneId = item.sceneId,
                                         profileId = item.profileId,
+                                        presetId = item.presetId,
                                     )
                                 },
                         )
@@ -212,12 +213,14 @@ class AutonomousRunner(
             "items" to runItems.size
         }
 
-        // Build lookup: (shaderVersionId, sceneId, profileId) → RunItemInfo
+        // Build lookup: (shaderVersionId, sceneId, profileId, presetId) → RunItemInfo
         val workItemsByKey =
-            workItems.associateBy { Triple(it.shaderVersionId, it.sceneId, it.profileId) }
+            workItems.associateBy {
+                CaptureItemKey(it.shaderVersionId, it.sceneId, it.profileId, it.presetId)
+            }
         val itemLookup =
             runItems.associate { item ->
-                val key = Triple(item.shaderVersionId, item.sceneId, item.profileId)
+                val key = CaptureItemKey(item.shaderVersionId, item.sceneId, item.profileId, item.presetId)
                 val workItem = workItemsByKey[key]
                 val presetId = workItem?.presetId
                 val sceneVersionId =
@@ -255,23 +258,28 @@ class AutonomousRunner(
                     SessionRegistry.startLinearOrchestration(
                         items = result.items,
                         runId = runId,
+                        scenePackages = result.scenePackages,
                         outputDir = "glint/runs/$runId",
                     ) { orchestrator ->
                         orchestrator.onCaptureTaken = { event ->
                             // Find the shaderVersionId for this capture from the work items.
-                            // The event has sceneId + profileId (from ShaderSpec on CaptureEntry);
-                            // we need the shaderVersionId to key into the RunUploader's lookup.
+                            // The event has sceneId + profileId + presetId; we need
+                            // shaderVersionId to key into the RunUploader's lookup.
                             val profileId = event.entry.shader?.profileId
+                            val presetId = event.presetId
                             val matchingItem =
                                 result.items.find { item ->
-                                    item.sceneId == event.sceneId && item.profileId == profileId
+                                    item.sceneId == event.sceneId &&
+                                        item.profileId == profileId &&
+                                        item.presetId == presetId
                                 }
                             if (matchingItem != null) {
-                                uploader.handleCapture(matchingItem.shaderVersionId, event)
+                                uploader.handleCapture(matchingItem.shaderVersionId, presetId, event)
                             } else {
                                 log.warn("No matching work item for capture event") {
                                     "scene_id" to event.sceneId
                                     "profile_id" to (profileId ?: "null")
+                                    "preset_id" to (presetId ?: "null")
                                 }
                             }
                         }

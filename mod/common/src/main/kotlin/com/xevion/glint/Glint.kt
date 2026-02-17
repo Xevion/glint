@@ -106,8 +106,6 @@ object Glint {
     private fun onShutdown() {
         log.info("Shutting down Glint mod")
         AsyncFileIO.shutdown()
-        com.xevion.glint.download.WorldDownloader
-            .cleanupAllDownloads()
         com.xevion.glint.api.SceneSyncManager
             .shutdown()
     }

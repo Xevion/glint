@@ -1,31 +1,18 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
-import com.xevion.glint.api.ApiError
-import com.xevion.glint.api.HttpClient
-import com.xevion.glint.api.PullResult
-import com.xevion.glint.api.PushResult
-import com.xevion.glint.api.SceneClient
-import com.xevion.glint.api.SceneSyncManager
 import com.xevion.glint.api.UrlValidation
-import com.xevion.glint.api.WorldClient
-import com.xevion.glint.api.WorldInfo
-import com.xevion.glint.download.WorldDownloader
-import com.xevion.glint.orchestration.CaptureSpec
-import com.xevion.glint.orchestration.ShaderSpec
-import com.xevion.glint.scene.DiscoveryResult
-import com.xevion.glint.scene.ResolvedScene
-import com.xevion.glint.scene.Scene
+import com.xevion.glint.scene.LocalPreset
+import com.xevion.glint.scene.LocalSceneMetadata
+import com.xevion.glint.scene.LocalSceneStore
 import com.xevion.glint.scene.SceneApplicator
-import com.xevion.glint.scene.SceneCollection
-import com.xevion.glint.scene.SceneConfig
-import com.xevion.glint.scene.SceneManager
-import com.xevion.glint.session.SessionRegistry
+import com.xevion.glint.scene.SceneApplyResult
+import com.xevion.glint.scene.SceneState
+import com.xevion.glint.scene.Weather
 import com.xevion.glint.ui.base.GlintComponents
+import com.xevion.glint.ui.base.GlintDialogScreen
 import com.xevion.glint.ui.base.GlintTabbedScreen
 import com.xevion.glint.ui.base.GlintTheme
-import com.xevion.glint.upload.WorldUploader
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
@@ -34,7 +21,6 @@ import io.wispforest.owo.ui.core.Component
 import io.wispforest.owo.ui.core.HorizontalAlignment
 import io.wispforest.owo.ui.core.Insets
 import io.wispforest.owo.ui.core.Sizing
-import io.wispforest.owo.ui.core.Surface
 import io.wispforest.owo.ui.core.VerticalAlignment
 import net.minecraft.client.gui.screens.Screen
 import java.util.concurrent.CompletableFuture
@@ -46,64 +32,27 @@ import net.minecraft.network.chat.Component as McComponent
 class GlintMainScreen(
     private val lastScreen: Screen?,
 ) : GlintTabbedScreen(McComponent.literal("Glint")) {
-    enum class Tab { WORLDS, SHADERS, CONFIG }
+    enum class Tab { SCENES, SHADERS, CONFIG }
 
-    private var currentTab = Tab.WORLDS
+    private var currentTab = Tab.SCENES
 
-    // World data
-    private var loading = false
-    private var loadError: String? = null
-    private var worldData: List<WorldEntry> = emptyList()
-    private var selectedWorldId: String? = null
+    // Scene data
+    private var sceneEntries: List<SceneListEntry> = emptyList()
+    private var selectedSceneSlug: String? = null
 
-    data class WorldEntry(
-        val id: String,
+    data class SceneListEntry(
+        val slug: String,
         val name: String,
-        val description: String?,
-        val scenes: List<Scene>,
-        val collection: SceneCollection?,
-        val collectionFileName: String?,
-        val apiWorld: WorldInfo?,
-    ) {
-        companion object {
-            fun fromApi(worldInfo: WorldInfo): WorldEntry =
-                WorldEntry(
-                    id = worldInfo.id,
-                    name = worldInfo.name,
-                    description = worldInfo.description,
-                    scenes = emptyList(),
-                    collection = null,
-                    collectionFileName = null,
-                    apiWorld = worldInfo,
-                )
+        val dimension: String,
+        val state: SceneState,
+        val presetCount: Int,
+        val needsPush: Boolean,
+        val isLoaded: Boolean,
+    )
 
-            fun fromLocal(
-                fileName: String,
-                collection: SceneCollection,
-            ): WorldEntry =
-                WorldEntry(
-                    id = fileName,
-                    name = collection.world,
-                    description = "Local scenes",
-                    scenes = collection.scenes,
-                    collection = collection,
-                    collectionFileName = fileName,
-                    apiWorld = null,
-                )
-        }
-
-        val isLocal: Boolean get() = apiWorld == null
-        val sceneCount: Int get() = scenes.size
-
-        val status: String
-            get() =
-                when {
-                    apiWorld != null && collection != null -> "synced"
-                    apiWorld != null -> "remote"
-                    collection != null -> "local"
-                    else -> "unknown"
-                }
-    }
+    // Preset editing state
+    private var editingPresetSlug: String? = null
+    private var addingPreset = false
 
     // Responsive layout tracking
     private var columnCount = 2
@@ -119,7 +68,7 @@ class GlintMainScreen(
 
         super.init()
         setupMasterPanelDeselect {
-            if (currentTab == Tab.WORLDS) deselectWorld()
+            if (currentTab == Tab.SCENES) deselectScene()
         }
 
         // Rebuild panels with recalculated widths (owo-lib reuses the
@@ -127,8 +76,8 @@ class GlintMainScreen(
         refreshMasterContent()
         refreshDetailPanel()
 
-        if (worldData.isEmpty() && currentTab == Tab.WORLDS) {
-            refreshWorlds()
+        if (sceneEntries.isEmpty() && currentTab == Tab.SCENES) {
+            refreshScenes()
         }
     }
 
@@ -143,9 +92,9 @@ class GlintMainScreen(
     override fun buildTabBar(tabs: FlowLayout) {
         tabs.child(
             GlintComponents.tabButton(
-                McComponent.literal("Worlds"),
-                isActive = currentTab == Tab.WORLDS,
-                onClick = { switchTab(Tab.WORLDS) },
+                McComponent.literal("Scenes"),
+                isActive = currentTab == Tab.SCENES,
+                onClick = { switchTab(Tab.SCENES) },
             ) as Component,
         )
         tabs.child(
@@ -173,7 +122,7 @@ class GlintMainScreen(
 
     override fun buildMasterContent(master: FlowLayout) {
         when (currentTab) {
-            Tab.WORLDS -> buildWorldsMaster(master)
+            Tab.SCENES -> buildScenesMaster(master)
             Tab.SHADERS -> buildShadersMaster(master)
             Tab.CONFIG -> buildConfigMaster(master)
         }
@@ -181,99 +130,145 @@ class GlintMainScreen(
 
     override fun buildDetailPanel(detail: FlowLayout) {
         when (currentTab) {
-            Tab.WORLDS -> buildWorldsDetail(detail)
+            Tab.SCENES -> buildScenesDetail(detail)
             Tab.SHADERS -> buildShadersDetail(detail)
             Tab.CONFIG -> buildConfigDetail(detail)
         }
     }
 
-    private fun buildWorldsMaster(master: FlowLayout) {
-        if (loading) {
-            master.child(
-                Components
-                    .label(McComponent.literal("Loading..."))
-                    .color(Color.ofRgb(GlintTheme.TEXT_WARNING)) as Component,
-            )
-            return
-        }
+    private fun buildScenesMaster(master: FlowLayout) {
+        val headerRow = Containers.horizontalFlow(Sizing.fill(100), Sizing.content())
+        headerRow.gap(GlintTheme.GAP_SM)
+        headerRow.verticalAlignment(VerticalAlignment.CENTER)
 
-        if (loadError != null) {
-            master.child(
-                Components
-                    .label(McComponent.literal("Error: $loadError"))
-                    .color(Color.ofRgb(GlintTheme.TEXT_ERROR)) as Component,
-            )
-            return
-        }
+        headerRow.child(
+            GlintComponents.title(McComponent.literal("Scenes")) as Component,
+        )
 
-        if (worldData.isEmpty()) {
-            master.child(
-                Components
-                    .label(McComponent.literal("No worlds found"))
-                    .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
-            )
-            return
-        }
+        val spacer = Containers.horizontalFlow(Sizing.expand(), Sizing.fixed(1))
+        headerRow.child(spacer as Component)
 
-        val fillPercent = 100 / columnCount
-        val chunked = worldData.chunked(columnCount)
-
-        for (row in chunked) {
-            val rowLayout = Containers.horizontalFlow(Sizing.fill(100), Sizing.content())
-            rowLayout.gap(GlintTheme.GAP_MD)
-
-            for (world in row) {
-                val card =
-                    GlintComponents.worldCard(
-                        name = world.name,
-                        sceneCount = world.sceneCount,
-                        status = world.status,
-                        isSelected = world.id == selectedWorldId,
-                        onClick = { selectWorld(world.id) },
-                    )
-                card.sizing(Sizing.fill(fillPercent), Sizing.fixed(GlintTheme.CARD_HEIGHT))
-                rowLayout.child(card as Component)
-            }
-
-            repeat(columnCount - row.size) {
-                val spacer = Containers.horizontalFlow(Sizing.fill(fillPercent), Sizing.fixed(GlintTheme.CARD_HEIGHT))
-                rowLayout.child(spacer as Component)
-            }
-
-            master.child(rowLayout as Component)
-        }
-
-        val addButton =
-            GlintComponents.listItemRow(onClick = { openAddWorldPicker() }) {
-                horizontalAlignment(HorizontalAlignment.CENTER)
-                child(
-                    Components
-                        .label(McComponent.literal("+ Add World"))
-                        .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+        val inSingleplayer = minecraft?.singleplayerServer != null
+        val exportBtn =
+            GlintComponents.smallButton(
+                McComponent.literal("+ New Scene"),
+                width = 80,
+                tooltip =
+                    McComponent.literal(
+                        if (inSingleplayer) {
+                            "Export current position as a new scene"
+                        } else {
+                            "Only available in singleplayer"
+                        },
+                    ),
+            ) {
+                minecraft?.setScreen(
+                    ExportSceneDialog(parentScreen = this) {
+                        refreshScenes()
+                    },
                 )
             }
-        master.child(addButton as Component)
+        exportBtn.active = inSingleplayer
+        headerRow.child(exportBtn as Component)
+
+        master.child(headerRow as Component)
+
+        if (sceneEntries.isEmpty()) {
+            master.child(
+                Components
+                    .label(McComponent.literal("No scenes yet"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
+            )
+            master.child(
+                Components
+                    .label(
+                        McComponent.literal(
+                            "Open a singleplayer world and use '+ New Scene' to export your first scene.",
+                        ),
+                    ).maxWidth(masterTextWidth)
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            return
+        }
+
+        val localScenes = sceneEntries.filter { it.state == SceneState.LOCAL }
+        val syncedScenes = sceneEntries.filter { it.state == SceneState.SYNCED }
+
+        if (localScenes.isNotEmpty()) {
+            master.child(
+                Components
+                    .label(McComponent.literal("Local"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            val sorted = localScenes.sortedByDescending { it.isLoaded }
+            for (entry in sorted) {
+                master.child(
+                    GlintComponents.sceneCard(
+                        name = entry.name,
+                        dimension = entry.dimension,
+                        state = entry.state,
+                        presetCount = entry.presetCount,
+                        isSelected = entry.slug == selectedSceneSlug,
+                        isLoaded = entry.isLoaded,
+                        needsPush = entry.needsPush,
+                        onClick = { selectScene(entry.slug) },
+                    ) as Component,
+                )
+            }
+        }
+
+        if (syncedScenes.isNotEmpty()) {
+            master.child(
+                Components
+                    .label(McComponent.literal("Synced"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            val sorted = syncedScenes.sortedBy { it.name }
+            for (entry in sorted) {
+                master.child(
+                    GlintComponents.sceneCard(
+                        name = entry.name,
+                        dimension = entry.dimension,
+                        state = entry.state,
+                        presetCount = entry.presetCount,
+                        isSelected = entry.slug == selectedSceneSlug,
+                        isLoaded = entry.isLoaded,
+                        needsPush = entry.needsPush,
+                        onClick = { selectScene(entry.slug) },
+                    ) as Component,
+                )
+            }
+        }
     }
 
-    private fun buildWorldsDetail(detail: FlowLayout) {
-        val selectedWorld = worldData.find { it.id == selectedWorldId }
-
-        if (selectedWorld == null) {
+    private fun buildScenesDetail(detail: FlowLayout) {
+        val slug = selectedSceneSlug
+        if (slug == null) {
             detail.horizontalAlignment(HorizontalAlignment.CENTER)
             detail.verticalAlignment(VerticalAlignment.CENTER)
             detail.child(
                 Components
-                    .label(McComponent.literal("No world selected"))
+                    .label(McComponent.literal("No scene selected"))
                     .maxWidth(detailTextWidth)
                     .horizontalTextAlignment(HorizontalAlignment.CENTER)
                     .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
             )
             detail.child(
                 Components
-                    .label(McComponent.literal("Select a world from the list"))
+                    .label(McComponent.literal("Select a scene from the list"))
                     .maxWidth(detailTextWidth)
                     .horizontalTextAlignment(HorizontalAlignment.CENTER)
                     .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+            )
+            return
+        }
+
+        val metadata = LocalSceneStore.loadMetadata(slug)
+        if (metadata == null) {
+            detail.child(
+                Components
+                    .label(McComponent.literal("Failed to load scene metadata"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_ERROR)) as Component,
             )
             return
         }
@@ -283,170 +278,372 @@ class GlintMainScreen(
 
         detail.child(
             GlintComponents
-                .title(McComponent.literal(selectedWorld.name))
+                .title(McComponent.literal(metadata.name))
                 .maxWidth(detailTextWidth) as Component,
         )
-
-        if (selectedWorld.description != null) {
+        if (metadata.description != null) {
             detail.child(
                 GlintComponents
-                    .subtitle(McComponent.literal(selectedWorld.description))
+                    .subtitle(McComponent.literal(metadata.description))
                     .maxWidth(detailTextWidth) as Component,
             )
         }
 
-        // Metadata
-        val metaContainer = Containers.verticalFlow(Sizing.fill(100), Sizing.content())
-        metaContainer.gap(GlintTheme.GAP_SM)
-        metaContainer.child(GlintComponents.itemDetail("Status: ${selectedWorld.status}") as Component)
-        metaContainer.child(GlintComponents.itemDetail("Scenes: ${selectedWorld.sceneCount}") as Component)
-        detail.child(metaContainer as Component)
-
-        // World action buttons
-        buildWorldActionButtons(detail, selectedWorld)
-
-        // Scene list header
         detail.child(
-            Components
-                .label(McComponent.literal("Scenes"))
-                .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
+            GlintComponents.collapsibleSection("Metadata") {
+                child(GlintComponents.itemDetail("Slug: ${metadata.slug}") as Component)
+                child(GlintComponents.itemDetail("Dimension: ${metadata.dimension}") as Component)
+                child(GlintComponents.itemDetail("Minecraft: ${metadata.minecraftVersion}") as Component)
+                child(GlintComponents.itemDetail("State: ${metadata.state}") as Component)
+                child(GlintComponents.itemDetail("Exported: ${metadata.exportedAt}") as Component)
+                val sizeMb = "%.1f".format(metadata.packageSizeBytes / (1024.0 * 1024.0))
+                child(GlintComponents.itemDetail("Package: $sizeMb MB") as Component)
+            } as Component,
         )
 
-        if (selectedWorld.scenes.isEmpty()) {
-            detail.child(
-                Components
-                    .label(McComponent.literal("No scenes defined. Click [+ New Scene] to create one."))
-                    .maxWidth(detailTextWidth)
-                    .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
-            )
-        } else {
-            val sceneScroll =
-                Containers.verticalScroll(
-                    Sizing.fill(100),
-                    Sizing.expand(),
-                    Containers.verticalFlow(Sizing.fill(100), Sizing.content()).also { sceneList ->
-                        sceneList.gap(GlintTheme.GAP_SM)
-                        // Right padding so scene cards don't render under the scrollbar
-                        sceneList.padding(Insets.right(GlintTheme.GAP_MD))
-                        for (scene in selectedWorld.scenes) {
-                            sceneList.child(buildSceneCard(scene, selectedWorld) as Component)
-                        }
-                    },
+        detail.child(
+            GlintComponents.collapsibleSection("Camera") {
+                val cam = metadata.camera
+                child(
+                    GlintComponents.itemDetail(
+                        "Position: %.1f, %.1f, %.1f".format(cam.x, cam.y, cam.z),
+                    ) as Component,
                 )
-            detail.child(sceneScroll as Component)
-        }
+                child(
+                    GlintComponents.itemDetail(
+                        "Rotation: Yaw %.1f, Pitch %.1f".format(cam.yaw, cam.pitch),
+                    ) as Component,
+                )
+                child(GlintComponents.itemDetail("FOV: ${metadata.fov}") as Component)
+                val chunks = (metadata.renderDistance * 2 + 1) * (metadata.renderDistance * 2 + 1)
+                child(
+                    GlintComponents.itemDetail(
+                        "Render Distance: ${metadata.renderDistance} (~$chunks chunks)",
+                    ) as Component,
+                )
+            } as Component,
+        )
 
-        // New Scene button (only in singleplayer)
-        if (minecraft?.singleplayerServer != null) {
-            detail.child(
-                GlintComponents.smallButton(
-                    McComponent.literal("+ New Scene"),
-                    width = 80,
-                    tooltip = McComponent.literal("Capture current position as a new scene"),
-                ) {
-                    openNewSceneDialog(selectedWorld)
-                } as Component,
-            )
-        }
+        detail.child(
+            GlintComponents.collapsibleSection("Environment") {
+                val env = metadata.environment
+                val timeName =
+                    when {
+                        env.time < 1000L -> "Night"
+                        env.time < 6000L -> "Morning"
+                        env.time < 9000L -> "Noon"
+                        env.time < 13000L -> "Afternoon"
+                        env.time < 18000L -> "Evening"
+                        else -> "Night"
+                    }
+                child(GlintComponents.itemDetail("Time: ${env.time} ($timeName)") as Component)
+                val weatherDisplay = env.weather.replaceFirstChar { it.uppercase() }
+                child(GlintComponents.itemDetail("Weather: $weatherDisplay") as Component)
+                if (env.weatherIntensity > 0f) {
+                    child(GlintComponents.itemDetail("Intensity: %.1f".format(env.weatherIntensity)) as Component)
+                }
+                child(GlintComponents.itemDetail("Moon Phase: ${env.moonPhase}") as Component)
+            } as Component,
+        )
+
+        detail.child(
+            buildPresetsSection(slug, metadata) as Component,
+        )
+
+        detail.child(
+            GlintComponents.collapsibleSection("Versions", defaultExpanded = false) {
+                if (metadata.versions.isEmpty()) {
+                    child(
+                        Components
+                            .label(McComponent.literal("No version history"))
+                            .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
+                    )
+                } else {
+                    for ((i, version) in metadata.versions.withIndex()) {
+                        val latest = if (i == 0) " (latest)" else ""
+                        val sizeMb = "%.1f".format(version.sizeBytes / (1024.0 * 1024.0))
+                        child(
+                            GlintComponents.itemDetail(
+                                "v${version.version}$latest — ${version.exportedAt} — $sizeMb MB",
+                            ) as Component,
+                        )
+                    }
+                }
+            } as Component,
+        )
+
+        buildSceneActionBar(detail, metadata)
     }
 
-    private fun buildWorldActionButtons(
+    private fun buildSceneActionBar(
         detail: FlowLayout,
-        world: WorldEntry,
+        metadata: LocalSceneMetadata,
     ) {
         val buttonRow = Containers.horizontalFlow(Sizing.fill(100), Sizing.content())
         buttonRow.gap(GlintTheme.GAP_SM)
         buttonRow.padding(Insets.vertical(GlintTheme.GAP_SM))
 
-        when (world.status) {
-            "remote" -> {
-                val apiWorld = world.apiWorld
-                if (apiWorld?.latestVersion?.fileUrl != null) {
-                    buttonRow.child(
-                        GlintComponents.smallButton(
-                            McComponent.literal("Download"),
-                            width = 65,
-                            tooltip = McComponent.literal("Download world from API"),
-                        ) { downloadWorld(world) } as Component,
+        val config = ApiConfig.load()
+        val canUpload = config.isValid()
+        val isNewUpload = metadata.backend == null
+        val uploadLabel = if (isNewUpload) "Upload" else "Push Update"
+        val uploadBtn =
+            GlintComponents.smallButton(
+                McComponent.literal(uploadLabel),
+                width = if (isNewUpload) 55 else 80,
+                tooltip =
+                    McComponent.literal(
+                        if (canUpload) "Upload scene to backend" else "Configure API connection first",
+                    ),
+            ) {
+                minecraft?.setScreen(
+                    SceneUploadProgressDialog(
+                        parentScreen = this,
+                        slug = metadata.slug,
+                        sceneName = metadata.name,
+                        config = config,
+                        onComplete = { refreshScenes() },
+                    ),
+                )
+            }
+        uploadBtn.active = canUpload
+        buttonRow.child(uploadBtn as Component)
+
+        val inSingleplayer = minecraft?.singleplayerServer != null
+        if (inSingleplayer) {
+            buttonRow.child(
+                GlintComponents.smallButton(
+                    McComponent.literal("Re-export"),
+                    width = 65,
+                    tooltip = McComponent.literal("Re-export scene from current world state"),
+                ) {
+                    minecraft?.setScreen(
+                        ExportSceneDialog(parentScreen = this) { refreshScenes() },
                     )
-                } else {
-                    val btn =
-                        GlintComponents.smallButton(
-                            McComponent.literal("Download"),
-                            width = 65,
-                            tooltip = McComponent.literal("No download available"),
-                        ) { }
-                    btn.active = false
-                    buttonRow.child(btn as Component)
+                } as Component,
+            )
+        }
+
+        buttonRow.child(
+            GlintComponents.smallButton(
+                McComponent.literal("Delete"),
+                width = 50,
+                tooltip = McComponent.literal("Delete this scene"),
+            ) {
+                confirmDeleteScene(metadata.slug, metadata.name)
+            } as Component,
+        )
+
+        detail.child(buttonRow as Component)
+    }
+
+    private fun buildPresetsSection(
+        slug: String,
+        metadata: LocalSceneMetadata,
+    ): FlowLayout {
+        val inSingleplayer = minecraft?.singleplayerServer != null
+
+        return GlintComponents.collapsibleSection("Presets") {
+            if (metadata.presets.isEmpty() && !addingPreset) {
+                child(
+                    Components
+                        .label(McComponent.literal("No presets defined"))
+                        .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
+                )
+            } else {
+                for ((index, preset) in metadata.presets.withIndex()) {
+                    if (editingPresetSlug == preset.slug) {
+                        child(
+                            GlintComponents.presetEditForm(
+                                initial = preset,
+                                isSceneLoaded = inSingleplayer,
+                                onSave = { updated -> savePreset(slug, metadata, updated, replacing = preset.slug) },
+                                onCancel = {
+                                    editingPresetSlug = null
+                                    refreshDetailPanel()
+                                },
+                            ) as Component,
+                        )
+                    } else {
+                        child(
+                            GlintComponents.presetRow(
+                                preset = preset,
+                                isDefault = index == 0,
+                                isSceneLoaded = inSingleplayer,
+                                onEdit = {
+                                    editingPresetSlug = preset.slug
+                                    addingPreset = false
+                                    refreshDetailPanel()
+                                },
+                                onDelete = { deletePreset(slug, metadata, preset.slug) },
+                                onApply = { applyPreset(preset) },
+                            ) as Component,
+                        )
+                    }
                 }
             }
 
-            "local" -> {
-                val config = ApiConfig.load()
-                val canUpload = config.isValid()
-                val uploadBtn =
-                    GlintComponents.smallButton(
-                        McComponent.literal("Upload"),
-                        width = 55,
-                        tooltip =
-                            McComponent.literal(
-                                if (canUpload) "Upload world to API" else "Configure API connection first",
-                            ),
-                    ) { uploadWorld(world) }
-                uploadBtn.active = canUpload
-                buttonRow.child(uploadBtn as Component)
-
-                buttonRow.child(
-                    GlintComponents.smallButton(
-                        McComponent.literal("Delete"),
-                        width = 55,
-                        tooltip = McComponent.literal("Delete local collection"),
-                    ) { confirmDeleteWorld(world) } as Component,
+            if (addingPreset) {
+                val env = metadata.environment
+                val prefilled =
+                    LocalPreset(
+                        name = "",
+                        slug = "",
+                        timeOfDayTicks = env.time.toInt(),
+                        weather = env.weather,
+                        weatherIntensity = env.weatherIntensity.toDouble(),
+                        moonPhase = env.moonPhase,
+                    )
+                child(
+                    GlintComponents.presetEditForm(
+                        initial = prefilled,
+                        isSceneLoaded = inSingleplayer,
+                        onSave = { newPreset -> savePreset(slug, metadata, newPreset, replacing = null) },
+                        onCancel = {
+                            addingPreset = false
+                            refreshDetailPanel()
+                        },
+                    ) as Component,
                 )
-            }
-
-            "synced", "stale" -> {
-                val config = ApiConfig.load()
-                val canUpload = config.isValid()
-                val updateBtn =
+            } else {
+                child(
                     GlintComponents.smallButton(
-                        McComponent.literal("Update"),
-                        width = 55,
-                        tooltip =
-                            McComponent.literal(
-                                if (canUpload) "Upload new world version" else "Configure API connection first",
-                            ),
-                    ) { updateWorldVersion(world) }
-                updateBtn.active = canUpload
-                buttonRow.child(updateBtn as Component)
-
-                buttonRow.child(
-                    GlintComponents.smallButton(
-                        McComponent.literal("Pull"),
-                        width = 40,
-                        tooltip = McComponent.literal("Replace local scenes with API scenes"),
-                    ) { pullWorldScenes(world) } as Component,
-                )
-                buttonRow.child(
-                    GlintComponents.smallButton(
-                        McComponent.literal("Push"),
-                        width = 45,
-                        tooltip = McComponent.literal("Push local scenes to API (preview changes first)"),
-                    ) { pushWorldScenes(world) } as Component,
-                )
-                buttonRow.child(
-                    GlintComponents.smallButton(
-                        McComponent.literal("Delete"),
-                        width = 55,
-                        tooltip = McComponent.literal("Delete local collection"),
-                    ) { confirmDeleteWorld(world) } as Component,
+                        McComponent.literal("+ Add Preset"),
+                        width = 80,
+                    ) {
+                        addingPreset = true
+                        editingPresetSlug = null
+                        refreshDetailPanel()
+                    } as Component,
                 )
             }
         }
+    }
 
-        if (buttonRow.children().isNotEmpty()) {
-            detail.child(buttonRow as Component)
+    private fun savePreset(
+        slug: String,
+        metadata: LocalSceneMetadata,
+        preset: LocalPreset,
+        replacing: String?,
+    ) {
+        val updatedPresets =
+            if (replacing != null) {
+                metadata.presets.map { if (it.slug == replacing) preset else it }
+            } else {
+                metadata.presets + preset
+            }
+        val updatedMetadata = metadata.copy(presets = updatedPresets)
+        LocalSceneStore.saveMetadata(slug, updatedMetadata)
+        editingPresetSlug = null
+        addingPreset = false
+        refreshDetailPanel()
+    }
+
+    private fun deletePreset(
+        slug: String,
+        metadata: LocalSceneMetadata,
+        presetSlug: String,
+    ) {
+        val presetName = metadata.presets.find { it.slug == presetSlug }?.name ?: presetSlug
+        minecraft?.setScreen(
+            object : GlintDialogScreen(McComponent.literal("Delete Preset")) {
+                override fun buildDialog(dialog: FlowLayout) {
+                    dialog.child(
+                        GlintComponents.confirmationContent(
+                            title = McComponent.literal("Delete Preset"),
+                            description = McComponent.literal("Delete preset '$presetName'?"),
+                            confirmText = McComponent.literal("Delete"),
+                            onConfirm = {
+                                val updatedPresets = metadata.presets.filter { it.slug != presetSlug }
+                                val updatedMetadata = metadata.copy(presets = updatedPresets)
+                                LocalSceneStore.saveMetadata(slug, updatedMetadata)
+                                minecraft?.setScreen(this@GlintMainScreen)
+                                refreshDetailPanel()
+                            },
+                            onCancel = { minecraft?.setScreen(this@GlintMainScreen) },
+                        ) as Component,
+                    )
+                }
+            },
+        )
+    }
+
+    private fun applyPreset(preset: LocalPreset) {
+        val weather = Weather.fromString(preset.weather)
+        val result =
+            SceneApplicator.applyEnvironment(
+                timeOfDay = preset.timeOfDayTicks,
+                weather = weather,
+                weatherIntensity = preset.weatherIntensity.toFloat(),
+                moonPhase = preset.moonPhase ?: 0,
+            )
+        if (result == SceneApplyResult.FAILED) {
+            StatusLog.error("Failed to apply preset: ${preset.name}")
+        } else {
+            StatusLog.info("Applied preset: ${preset.name}")
         }
+        rebuildStatusBar()
+    }
+
+    private fun confirmDeleteScene(
+        slug: String,
+        name: String,
+    ) {
+        minecraft?.setScreen(
+            object : GlintDialogScreen(McComponent.literal("Delete Scene")) {
+                override fun buildDialog(dialog: FlowLayout) {
+                    dialog.child(
+                        GlintComponents.confirmationContent(
+                            title = McComponent.literal("Delete Scene"),
+                            description = McComponent.literal("Delete '$name'? This cannot be undone."),
+                            confirmText = McComponent.literal("Delete"),
+                            onConfirm = {
+                                LocalSceneStore.deleteScene(slug)
+                                selectedSceneSlug = null
+                                refreshScenes()
+                                minecraft?.setScreen(this@GlintMainScreen)
+                            },
+                            onCancel = { minecraft?.setScreen(this@GlintMainScreen) },
+                        ) as Component,
+                    )
+                }
+            },
+        )
+    }
+
+    private fun selectScene(slug: String) {
+        selectedSceneSlug = slug
+        editingPresetSlug = null
+        addingPreset = false
+        refreshMasterContent()
+        refreshDetailPanel()
+    }
+
+    private fun deselectScene() {
+        selectedSceneSlug = null
+        editingPresetSlug = null
+        addingPreset = false
+        refreshMasterContent()
+        refreshDetailPanel()
+    }
+
+    fun refreshScenes() {
+        LocalSceneStore.clearCache()
+        val index = LocalSceneStore.loadIndex()
+        sceneEntries =
+            index.scenes.map { (slug, entry) ->
+                SceneListEntry(
+                    slug = slug,
+                    name = entry.name,
+                    dimension = entry.dimension,
+                    state = entry.state,
+                    presetCount = 0,
+                    needsPush = LocalSceneStore.needsPush(slug),
+                    isLoaded = false,
+                )
+            }
+        refreshMasterContent()
+        refreshDetailPanel()
     }
 
     private fun buildShadersMaster(master: FlowLayout) {
@@ -750,106 +947,6 @@ class GlintMainScreen(
             refreshMasterContent()
             refreshDetailPanel()
             rebuildStatusBar()
-            refreshWorlds()
-        }
-    }
-
-    private fun buildSceneCard(
-        scene: Scene,
-        world: WorldEntry,
-    ): FlowLayout {
-        val card = Containers.verticalFlow(Sizing.fill(100), Sizing.content())
-        card.padding(GlintTheme.paddingSm())
-        card.gap(GlintTheme.GAP_SM)
-        card.surface(Surface.flat(0x22FFFFFF))
-
-        // Tooltip with coordinates + dimension
-        val pos = scene.position
-        val tooltipText = "%.0f, %.0f, %.0f - %s".format(pos.x, pos.y, pos.z, scene.dimension.substringAfter(":"))
-        (card as Component).tooltip(McComponent.literal(tooltipText))
-
-        card.child(GlintComponents.itemLabel(scene.name) as Component)
-        card.child(GlintComponents.itemDetail(formatSceneDetails(scene)) as Component)
-
-        val buttonRow = Containers.horizontalFlow(Sizing.content(), Sizing.content())
-        buttonRow.gap(GlintTheme.GAP_SM)
-
-        // Go button
-        val inSingleplayer = minecraft?.singleplayerServer != null
-        val goBtn =
-            GlintComponents.smallButton(
-                McComponent.literal("Go"),
-                tooltip =
-                    if (inSingleplayer) {
-                        McComponent.literal(
-                            "Teleport to scene",
-                        )
-                    } else {
-                        McComponent.literal("Only available in singleplayer")
-                    },
-            ) {
-                teleportToScene(scene, world)
-            }
-        if (!inSingleplayer) goBtn.active = false
-        buttonRow.child(goBtn as Component)
-
-        // Edit button
-        buttonRow.child(
-            GlintComponents.smallButton(
-                McComponent.literal("Edit"),
-                tooltip = McComponent.literal("Edit scene"),
-            ) {
-                openEditSceneDialog(scene, world)
-            } as Component,
-        )
-
-        // Capture button
-        buttonRow.child(
-            GlintComponents.smallButton(
-                McComponent.literal("Capture"),
-                tooltip = McComponent.literal("Capture screenshot"),
-                width = 55,
-            ) {
-                val spec =
-                    CaptureSpec(
-                        sceneIds = listOf(scene.id),
-                        shaders = listOf(ShaderSpec(filename = null)),
-                    )
-                if (SessionRegistry.startOrchestration(spec)) {
-                    StatusLog.info("Started capture for ${scene.name}")
-                    onClose()
-                } else {
-                    StatusLog.error("Failed to start capture")
-                }
-                rebuildStatusBar()
-            } as Component,
-        )
-        card.child(buttonRow as Component)
-
-        // Invisible spacer after buttons to absorb scissor bleed from last rendered button
-        val clipFix = Containers.horizontalFlow(Sizing.fixed(1), Sizing.fixed(1))
-        card.child(clipFix as Component)
-
-        return card
-    }
-
-    private fun formatSceneDetails(scene: Scene): String {
-        val time = formatTime(scene.timeOfDay)
-        val weather =
-            scene.weather.name
-                .lowercase()
-                .replaceFirstChar { it.uppercase() }
-        val dimension = scene.dimension.substringAfter(":")
-        return "$time - $weather - $dimension"
-    }
-
-    private fun formatTime(ticks: Int): String {
-        val hour = ((ticks / 1000 + 6) % 24)
-        return when (hour) {
-            in 0..5 -> "Night"
-            in 6..11 -> "Morning"
-            in 12..17 -> "Afternoon"
-            else -> "Evening"
         }
     }
 
@@ -887,653 +984,6 @@ class GlintMainScreen(
                 minecraft?.setScreen(StatusLogScreen(this))
             } as Component,
         )
-    }
-
-    private fun selectWorld(worldId: String) {
-        selectedWorldId = worldId
-        refreshMasterContent()
-        refreshDetailPanel()
-    }
-
-    private fun deselectWorld() {
-        selectedWorldId = null
-        refreshMasterContent()
-        refreshDetailPanel()
-    }
-
-    private fun teleportToScene(
-        scene: Scene,
-        world: WorldEntry,
-    ) {
-        val collection = world.collection
-        val fileName = world.collectionFileName
-
-        if (collection == null || fileName == null) {
-            StatusLog.error("Cannot teleport: no local collection for ${world.name}")
-            rebuildStatusBar()
-            return
-        }
-
-        val mergedConfig =
-            (scene.config ?: SceneConfig())
-                .mergeWith(collection.defaultConfig)
-                .mergeWith(SceneConfig.DEFAULT)
-
-        val resolved =
-            ResolvedScene(
-                scene = scene,
-                collection = collection,
-                config = mergedConfig,
-                collectionFileName = fileName,
-            )
-
-        StatusLog.info("Teleporting to ${scene.name}...")
-        onClose()
-
-        val result = SceneApplicator.apply(resolved)
-        if (result != com.xevion.glint.scene.SceneApplyResult.FAILED) {
-            StatusLog.info("Applied scene: ${scene.name}")
-        } else {
-            StatusLog.error("Failed to apply scene: ${scene.name}")
-        }
-    }
-
-    private fun pullWorldScenes(world: WorldEntry) {
-        val config = ApiConfig.load()
-        if (!config.isValid()) {
-            StatusLog.warn("API config not valid - open API Config to set it up")
-            rebuildStatusBar()
-            return
-        }
-
-        val apiWorldId = world.apiWorld?.id ?: return
-        val collectionFileName = world.collectionFileName ?: return
-
-        minecraft?.setScreen(
-            ConfirmPullDialog(
-                parent = this,
-                worldName = world.name,
-                localSceneCount = world.sceneCount,
-                onConfirm = {
-                    StatusLog.info("Pulling scenes for ${world.name}...")
-                    rebuildStatusBar()
-
-                    SceneSyncManager
-                        .pullScenes(apiWorldId, collectionFileName, config)
-                        .thenAccept { result ->
-                            minecraft?.execute {
-                                when (result) {
-                                    is PullResult.Success -> {
-                                        StatusLog.info("Pulled ${result.count} scenes for ${world.name}")
-                                    }
-
-                                    is PullResult.Failure -> {
-                                        StatusLog.error("Pull failed: ${result.error.userMessage}")
-                                    }
-                                }
-                                SceneManager.clearCache()
-                                refreshWorlds()
-                                rebuildStatusBar()
-                            }
-                        }
-                },
-            ),
-        )
-    }
-
-    private fun pushWorldScenes(world: WorldEntry) {
-        val config = ApiConfig.load()
-        if (!config.isValid()) {
-            StatusLog.warn("API config not valid - open API Config to set it up")
-            rebuildStatusBar()
-            return
-        }
-
-        val apiWorldId = world.apiWorld?.id ?: return
-
-        StatusLog.info("Computing diff for ${world.name}...")
-        rebuildStatusBar()
-
-        CompletableFuture
-            .supplyAsync {
-                SceneClient.fetchScenes(HttpClient(config.apiUrl, token = config.accessToken), apiWorldId)
-            }.thenAccept { fetchResult ->
-                minecraft?.execute {
-                    fetchResult.fold(
-                        onSuccess = { apiScenes ->
-                            val diff = SceneSyncManager.computeDiff(world.scenes, apiScenes)
-                            if (!diff.hasChanges) {
-                                StatusLog.info("${world.name}: already in sync")
-                                rebuildStatusBar()
-                                return@execute
-                            }
-
-                            minecraft?.setScreen(
-                                PushDiffDialog(
-                                    parent = this,
-                                    worldName = world.name,
-                                    diff = diff,
-                                    onConfirm = {
-                                        StatusLog.info("Pushing changes for ${world.name}...")
-                                        rebuildStatusBar()
-
-                                        SceneSyncManager
-                                            .executePush(diff, apiWorldId, config)
-                                            .thenAccept { result ->
-                                                minecraft?.execute {
-                                                    when (result) {
-                                                        is PushResult.Success -> {
-                                                            StatusLog.info(
-                                                                "${world.name}: ${result.created} created, " +
-                                                                    "${result.updated} updated, ${result.removed} removed",
-                                                            )
-                                                        }
-
-                                                        is PushResult.Failure -> {
-                                                            StatusLog.error("Push failed: ${result.error.userMessage}")
-                                                        }
-                                                    }
-                                                    SceneManager.clearCache()
-                                                    refreshWorlds()
-                                                    rebuildStatusBar()
-                                                }
-                                            }
-                                    },
-                                ),
-                            )
-                        },
-                        onFailure = { error ->
-                            StatusLog.error("Failed to fetch API scenes: ${error.message}")
-                            rebuildStatusBar()
-                        },
-                    )
-                }
-            }
-    }
-
-    private fun downloadWorld(world: WorldEntry) {
-        val apiWorld = world.apiWorld ?: return
-        val fileUrl = apiWorld.latestVersion?.fileUrl ?: return
-
-        StatusLog.info("Starting download: ${world.name}...")
-        rebuildStatusBar()
-
-        val future =
-            WorldDownloader.downloadWorld(
-                worldSlug = apiWorld.slug,
-                worldId = apiWorld.id,
-                fileUrl = fileUrl,
-                expectedHash = null,
-                progressCallback = { },
-            )
-
-        future
-            .thenAccept { worldPath ->
-                minecraft?.execute {
-                    val folderName = worldPath.substringAfterLast("/")
-                    SceneManager.addCollectionForApiWorld(
-                        worldName = apiWorld.name,
-                        folder = folderName,
-                        apiWorldId = apiWorld.id,
-                    )
-                    StatusLog.info("Downloaded: ${world.name}")
-                    SceneManager.clearCache()
-                    refreshWorlds()
-                    rebuildStatusBar()
-
-                    // Auto-pull scenes for the downloaded world
-                    val config = ApiConfig.load()
-                    if (config.isValid()) {
-                        val collectionFileName =
-                            apiWorld.name
-                                .lowercase()
-                                .replace(' ', '_')
-                                .replace(Regex("[^a-z0-9_-]"), "")
-                        SceneSyncManager
-                            .pullScenes(apiWorld.id, collectionFileName, config)
-                            .thenAccept { result ->
-                                minecraft?.execute {
-                                    when (result) {
-                                        is PullResult.Success -> {
-                                            StatusLog.info("Pulled ${result.count} scenes for ${world.name}")
-                                        }
-
-                                        is PullResult.Failure -> {
-                                            StatusLog.warn("Could not pull scenes: ${result.error.userMessage}")
-                                        }
-                                    }
-                                    SceneManager.clearCache()
-                                    refreshWorlds()
-                                    rebuildStatusBar()
-                                }
-                            }
-                    }
-                }
-            }.exceptionally { e ->
-                minecraft?.execute {
-                    StatusLog.error("Download failed: ${e.message}")
-                    rebuildStatusBar()
-                }
-                null
-            }
-
-        minecraft?.setScreen(WorldDownloadDialog(this, world.name, future))
-    }
-
-    private fun confirmDeleteWorld(world: WorldEntry) {
-        val fileName = world.collectionFileName ?: return
-        minecraft?.setScreen(
-            ConfirmDeleteWorldScreen(this, fileName, world.name),
-        )
-    }
-
-    fun executeDeleteWorld(fileName: String) {
-        val mc =
-            net.minecraft.client.Minecraft
-                .getInstance()
-        val sceneFile = java.io.File(mc.gameDirectory, "glint/scenes/$fileName.json")
-
-        if (sceneFile.exists() && sceneFile.delete()) {
-            StatusLog.info("Deleted collection: $fileName")
-            SceneManager.clearCache()
-            selectedWorldId = null
-            refreshWorlds()
-        } else {
-            StatusLog.error("Failed to delete collection: $fileName")
-        }
-        rebuildStatusBar()
-    }
-
-    private fun openNewSceneDialog(world: WorldEntry) {
-        minecraft?.setScreen(
-            SaveSceneDialog(
-                parentScreen = this,
-                worldName = world.name,
-                onSave = {
-                    StatusLog.info("Scene saved to ${world.name}")
-                    SceneManager.clearCache()
-                    refreshWorlds()
-                    rebuildStatusBar()
-                },
-            ),
-        )
-    }
-
-    private fun openEditSceneDialog(
-        scene: Scene,
-        world: WorldEntry,
-    ) {
-        minecraft?.setScreen(
-            SaveSceneDialog(
-                parentScreen = this,
-                worldName = world.name,
-                existingScene = scene,
-                onSave = {
-                    StatusLog.info("Scene '${scene.name}' updated")
-                    SceneManager.clearCache()
-                    refreshWorlds()
-                    rebuildStatusBar()
-                },
-            ),
-        )
-    }
-
-    private fun updateWorldVersion(world: WorldEntry) {
-        val config = ApiConfig.load()
-        if (!config.isValid()) {
-            StatusLog.warn("API config not valid - open API Config to set it up")
-            rebuildStatusBar()
-            return
-        }
-
-        val apiWorld = world.apiWorld ?: return
-
-        val mc =
-            net.minecraft.client.Minecraft
-                .getInstance()
-        val folder = world.collection?.folder ?: world.collectionFileName ?: return
-        val worldDir =
-            listOf(
-                java.io.File(mc.gameDirectory, "glint/worlds/$folder"),
-                java.io.File(mc.gameDirectory, "saves/$folder"),
-            ).firstOrNull { it.exists() && it.isDirectory }
-
-        if (worldDir == null) {
-            StatusLog.error("Could not find world directory for: ${world.name}")
-            rebuildStatusBar()
-            return
-        }
-
-        val currentWorldName = mc.singleplayerServer?.worldData?.levelName
-        val isCurrent = currentWorldName != null && worldDir.name == currentWorldName
-
-        StatusLog.info("Updating world version: ${world.name}...")
-        rebuildStatusBar()
-
-        val future =
-            WorldUploader.uploadWorldVersion(
-                worldDir = worldDir,
-                worldId = apiWorld.id,
-                apiUrl = config.apiUrl,
-                token = config.accessToken,
-                forceSave = isCurrent,
-                progressCallback = { progress ->
-                    minecraft?.execute {
-                        val screen = minecraft?.screen
-                        if (screen is WorldUploadProgressDialog) {
-                            screen.updateProgress(progress)
-                        }
-                    }
-                },
-            )
-
-        // uploadWorldVersion returns CompletableFuture<String> (version ID), but
-        // WorldUploadProgressDialog expects CompletableFuture<WorldInfo>. Adapt by
-        // returning the existing apiWorld on success.
-        val adaptedFuture = future.thenApply { _ -> apiWorld }
-
-        val progressDialog =
-            WorldUploadProgressDialog(
-                parent = this,
-                worldName = world.name,
-                uploadFuture = adaptedFuture,
-                onComplete = { _ ->
-                    StatusLog.info("Updated version: ${world.name}")
-                    SceneManager.clearCache()
-                    refreshWorlds()
-                    rebuildStatusBar()
-                },
-            )
-
-        minecraft?.setScreen(progressDialog)
-    }
-
-    private fun uploadWorld(world: WorldEntry) {
-        val config = ApiConfig.load()
-        if (!config.isValid()) {
-            StatusLog.warn("API config not valid - open API Config to set it up")
-            rebuildStatusBar()
-            return
-        }
-
-        // Resolve the world directory
-        val mc =
-            net.minecraft.client.Minecraft
-                .getInstance()
-        val folder = world.collection?.folder ?: world.collectionFileName ?: return
-        val worldDir =
-            listOf(
-                java.io.File(mc.gameDirectory, "glint/worlds/$folder"),
-                java.io.File(mc.gameDirectory, "saves/$folder"),
-            ).firstOrNull { it.exists() && it.isDirectory }
-
-        if (worldDir == null) {
-            StatusLog.error("Could not find world directory for: ${world.name}")
-            rebuildStatusBar()
-            return
-        }
-
-        // Determine if this is the currently loaded world (needs force-save)
-        val currentWorldName = mc.singleplayerServer?.worldData?.levelName
-        val isCurrent = currentWorldName != null && worldDir.name == currentWorldName
-
-        minecraft?.setScreen(
-            WorldUploadDialog(
-                parentScreen = this,
-                worldDir = worldDir,
-                defaultName = world.name,
-            ) { name, slug, description ->
-                startUpload(worldDir, name, slug, description, isCurrent, config, world)
-            },
-        )
-    }
-
-    private fun uploadWorldFromDir(
-        worldDir: java.io.File,
-        worldName: String,
-    ) {
-        val config = ApiConfig.load()
-        if (!config.isValid()) {
-            StatusLog.warn("API config not valid - open API Config to set it up")
-            rebuildStatusBar()
-            return
-        }
-
-        val mc =
-            net.minecraft.client.Minecraft
-                .getInstance()
-        val currentWorldName = mc.singleplayerServer?.worldData?.levelName
-        val isCurrent = currentWorldName != null && worldDir.name == currentWorldName
-
-        minecraft?.setScreen(
-            WorldUploadDialog(
-                parentScreen = this,
-                worldDir = worldDir,
-                defaultName = worldName,
-            ) { name, slug, description ->
-                startUpload(worldDir, name, slug, description, isCurrent, config, null)
-            },
-        )
-    }
-
-    private fun startUpload(
-        worldDir: java.io.File,
-        name: String,
-        slug: String,
-        description: String?,
-        forceSave: Boolean,
-        config: ApiConfig,
-        existingWorld: WorldEntry?,
-    ) {
-        StatusLog.info("Starting upload: $name...")
-        rebuildStatusBar()
-
-        val progressDialog: WorldUploadProgressDialog
-
-        val future =
-            WorldUploader.uploadWorld(
-                worldDir = worldDir,
-                name = name,
-                slug = slug,
-                description = description,
-                minecraftVersion = "1.21.4",
-                apiUrl = config.apiUrl,
-                token = config.accessToken,
-                forceSave = forceSave,
-                progressCallback = { progress ->
-                    minecraft?.execute {
-                        // Update progress dialog if it's the current screen
-                        val screen = minecraft?.screen
-                        if (screen is WorldUploadProgressDialog) {
-                            screen.updateProgress(progress)
-                        }
-                    }
-                },
-            )
-
-        progressDialog =
-            WorldUploadProgressDialog(
-                parent = this,
-                worldName = name,
-                uploadFuture = future,
-                onComplete = { worldInfo ->
-                    // Auto-link apiWorldId on the local scene collection
-                    val collectionFileName =
-                        existingWorld?.collectionFileName
-                            ?: name
-                                .lowercase()
-                                .replace(' ', '_')
-                                .replace(Regex("[^a-z0-9_-]"), "")
-
-                    SceneManager.addCollectionForApiWorld(
-                        worldName = name,
-                        folder = worldDir.name,
-                        apiWorldId = worldInfo.id,
-                    )
-
-                    StatusLog.info("Uploaded: $name")
-                    SceneManager.clearCache()
-                    refreshWorlds()
-                    rebuildStatusBar()
-                },
-            )
-
-        minecraft?.setScreen(progressDialog)
-    }
-
-    private fun openAddWorldPicker() {
-        val localWorlds = WorldUploader.listLocalWorlds()
-        if (localWorlds.isEmpty()) {
-            StatusLog.warn("No local worlds found in saves/ or glint/worlds/")
-            rebuildStatusBar()
-            return
-        }
-
-        val config = ApiConfig.load()
-        if (!config.isValid()) {
-            StatusLog.warn("API config not valid - configure it in the Config tab first")
-            rebuildStatusBar()
-            return
-        }
-
-        minecraft?.setScreen(
-            WorldPickerDialog(
-                parentScreen = this,
-                worlds = localWorlds,
-            ) { worldDir, worldName ->
-                uploadWorldFromDir(worldDir, worldName)
-            },
-        )
-    }
-
-    fun refreshWorlds() {
-        loading = true
-        loadError = null
-        refreshMasterContent()
-
-        val config = ApiConfig.load()
-        if (config.isValid()) {
-            loadMergedWorlds(config)
-        } else {
-            loadLocalOnlyWorlds()
-        }
-    }
-
-    private fun loadMergedWorlds(config: ApiConfig) {
-        CompletableFuture
-            .supplyAsync {
-                val discovery = SceneManager.discoverAllCollections()
-                val apiResult = WorldClient.listWorlds(HttpClient(config.apiUrl, token = config.accessToken))
-                Pair(discovery, apiResult)
-            }.thenAccept { (discovery, apiResult) ->
-                minecraft?.execute {
-                    loading = false
-                    reportDiscoveryErrors(discovery)
-                    apiResult
-                        .onSuccess { apiWorlds ->
-                            worldData = mergeWorldSources(apiWorlds, discovery.collections)
-                            val apiCount = worldData.count { it.apiWorld != null }
-                            val localCount = worldData.count { it.collection != null }
-                            StatusLog.info("Loaded $apiCount API + $localCount local worlds")
-                            refreshMasterContent()
-                            rebuildStatusBar()
-                        }.onFailure { error ->
-                            Loggers.Ui.get().warn("Failed to load from API, falling back to local") {
-                                "error" to error.message
-                            }
-                            val statusMessage =
-                                when (error) {
-                                    is ApiError.HttpError -> {
-                                        when (error.statusCode) {
-                                            401 -> "Session expired — re-authenticate in Config"
-                                            403 -> "Permission denied by API"
-                                            else -> "API error (HTTP ${error.statusCode}), using local files"
-                                        }
-                                    }
-
-                                    is ApiError.NetworkError -> {
-                                        "API unreachable, using local files"
-                                    }
-
-                                    else -> {
-                                        "API unavailable: ${error.message}"
-                                    }
-                                }
-                            StatusLog.error(statusMessage)
-                            worldData =
-                                discovery.collections.map { (fileName, collection) ->
-                                    WorldEntry.fromLocal(fileName, collection)
-                                }
-                            refreshMasterContent()
-                            rebuildStatusBar()
-                        }
-                }
-            }
-    }
-
-    private fun loadLocalOnlyWorlds() {
-        CompletableFuture
-            .supplyAsync {
-                SceneManager.discoverAllCollections()
-            }.thenAccept { discovery ->
-                minecraft?.execute {
-                    loading = false
-                    reportDiscoveryErrors(discovery)
-                    worldData =
-                        discovery.collections.map { (fileName, collection) ->
-                            WorldEntry.fromLocal(fileName, collection)
-                        }
-                    StatusLog.info("Loaded ${worldData.size} worlds from local files")
-                    refreshMasterContent()
-                    rebuildStatusBar()
-                }
-            }
-    }
-
-    private fun reportDiscoveryErrors(discovery: DiscoveryResult) {
-        for (error in discovery.errors) {
-            StatusLog.error("Failed to load ${error.fileName}.json: ${error.message}")
-        }
-    }
-
-    private fun mergeWorldSources(
-        apiWorlds: List<WorldInfo>,
-        localCollections: List<Pair<String, SceneCollection>>,
-    ): List<WorldEntry> {
-        val result = mutableListOf<WorldEntry>()
-        val matchedLocalFiles = mutableSetOf<String>()
-
-        for (apiWorld in apiWorlds) {
-            val match =
-                localCollections.find { (fileName, collection) ->
-                    collection.apiWorldId == apiWorld.id || fileName == apiWorld.slug
-                }
-
-            if (match != null) {
-                matchedLocalFiles.add(match.first)
-                result.add(
-                    WorldEntry(
-                        id = apiWorld.id,
-                        name = apiWorld.name,
-                        description = apiWorld.description,
-                        scenes = match.second.scenes,
-                        collection = match.second,
-                        collectionFileName = match.first,
-                        apiWorld = apiWorld,
-                    ),
-                )
-            } else {
-                result.add(WorldEntry.fromApi(apiWorld))
-            }
-        }
-
-        for ((fileName, collection) in localCollections) {
-            if (fileName !in matchedLocalFiles) {
-                result.add(WorldEntry.fromLocal(fileName, collection))
-            }
-        }
-
-        return result
     }
 
     override fun onClose() {
