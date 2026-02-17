@@ -97,10 +97,30 @@ mod *args:
 
 # === Database ===
 
-# Start PostgreSQL in Docker and update .env with connection string
+# Manage development services (PostgreSQL + MinIO via docker compose)
 # Commands: start (default), reset, rm
 db cmd="start":
-    bun scripts/db.ts {{cmd}}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{cmd}}" in
+        start)
+            docker compose up -d
+            bun scripts/db-init.ts
+            ;;
+        reset)
+            docker compose up -d
+            docker compose exec postgres psql -U glint -d postgres -c "DROP DATABASE IF EXISTS glint"
+            docker compose exec postgres psql -U glint -d postgres -c "CREATE DATABASE glint"
+            bun scripts/db-init.ts
+            ;;
+        rm)
+            docker compose down
+            ;;
+        *)
+            echo "Unknown command: {{cmd}}" >&2
+            exit 1
+            ;;
+    esac
 
 # Reset database (drops and recreates)
 migrate-reset:
