@@ -131,15 +131,18 @@ export const load: PageLoad = async ({ params, fetch, url }) => {
 	const versionId = url.searchParams.get('version_id') ?? effectiveVersionId;
 	const profileId = url.searchParams.get('profile_id') ?? undefined;
 
-	// Fetch first page of captures from the paginated endpoint for the real total count
-	const capturesResult = await api.shaders.listCaptures(shader.slug, {
-		page: 1,
-		pageSize: CAPTURES_PAGE_SIZE,
-		versionId: versionId ?? undefined,
-		profileId
-	});
-
 	const trimmedShader = _trimShader(shader);
+
+	// Captures list and similar shaders are independent — fetch in parallel
+	const [capturesResult, listResult] = await Promise.all([
+		api.shaders.listCaptures(shader.slug, {
+			page: 1,
+			pageSize: CAPTURES_PAGE_SIZE,
+			versionId: versionId ?? undefined,
+			profileId
+		}),
+		api.shaders.list({ pageSize: 30 })
+	]);
 
 	const capturesData: CapturesPageData = capturesResult.match({
 		Ok: (p) => ({
@@ -156,8 +159,6 @@ export const load: PageLoad = async ({ params, fetch, url }) => {
 		})
 	});
 
-	// Fetch other shaders for the "Similar Shaders" section (mock: random selection)
-	const listResult = await api.shaders.list({ pageSize: 30 });
 	const similarShaders: ShaderListItem[] = listResult.match({
 		Ok: (page) => page.items.filter((s) => s.slug !== params.slug),
 		Err: () => []
