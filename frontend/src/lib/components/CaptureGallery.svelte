@@ -18,6 +18,12 @@ interface Props {
 	onclick?: (capture: CaptureWithContext) => void;
 	/** Alt text for each capture image. Defaults to "Capture". */
 	alt?: (capture: CaptureWithContext) => string;
+	/** Whether more items are available to load (infinite scroll) */
+	hasMore?: boolean;
+	/** Whether more items are currently being loaded */
+	loading?: boolean;
+	/** Called when the scroll sentinel becomes visible */
+	onLoadMore?: () => void;
 }
 
 let {
@@ -26,7 +32,10 @@ let {
 	emptyMessage = 'Captures are being generated.',
 	overlay,
 	onclick,
-	alt
+	alt,
+	hasMore = false,
+	loading = false,
+	onLoadMore
 }: Props = $props();
 </script>
 
@@ -40,6 +49,9 @@ let {
 		key={(capture: CaptureWithContext) => capture.id}
 		mode="card"
 		empty={{ icon: ImageOff, title: 'No Captures Yet', message: emptyMessage }}
+		{hasMore}
+		{loading}
+		{onLoadMore}
 	>
 		{#snippet card(capture: CaptureWithContext)}
 			<button

@@ -2,6 +2,7 @@
 import { resolve } from '$app/paths';
 import { createApiClient } from '$lib/api';
 import type { ShaderListItem } from '$lib/bindings';
+
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { CompactRow, ItemGrid, MiniCard } from '$lib/components/item-grid';
@@ -25,12 +26,14 @@ import {
 	GitCompareArrows,
 	Globe,
 	ImageOff,
-	Layers
+	Layers,
+	LoaderCircle
 } from '@lucide/svelte';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-svelte';
 import { fly } from 'svelte/transition';
 import type { PageData } from './$types';
-import { type ShaderDetail, _trimShader } from './+page.ts';
+import type { GetShaderParams } from '$lib/api/endpoints/shaders';
+import { type ShaderDetail, type ShaderDetailCapture, _trimCapture, _trimShader } from './+page.ts';
 
 interface Props {
 	data: PageData;
@@ -40,6 +43,23 @@ let { data }: Props = $props();
 
 // Local override: set when version changes, cleared on navigation
 let shaderOverride = $state<ShaderDetail | null>(null);
+
+// Pagination state for captures
+const api = createApiClient(fetch);
+let allCaptures = $state<ShaderDetailCapture[]>([]);
+let capturesPage = $state(1);
+let capturesTotal = $state(0);
+let capturesLoading = $state(false);
+const capturesPageSize = 24;
+const hasMoreCaptures = $derived(allCaptures.length < capturesTotal);
+
+// Initialize/reset captures from SSR data when shader page data changes
+$effect(() => {
+	const capturesData = data.capturesData;
+	allCaptures = capturesData.items;
+	capturesPage = capturesData.page;
+	capturesTotal = capturesData.total;
+});
 
 // Reset user overrides when navigating between shader pages
 $effect(() => {
@@ -53,7 +73,7 @@ $effect(() => {
 
 // Core data: prefer override (from version change), fall back to page data
 const shader = $derived(shaderOverride ?? data.shader);
-let captures = $derived(shader.captures);
+let captures = $derived(allCaptures);
 
 // Version selection
 const versions = $derived(shader.versions);
@@ -109,9 +129,17 @@ async function onVersionChange(versionId: string) {
 	_selectedCaptureId = null;
 	selectedProfileId = null;
 	const generation = ++fetchGeneration;
-	const api = createApiClient(fetch);
-	const result = await withRetry(() => api.shaders.getShader(shader.slug, { versionId }));
+
+	const [result, capturesResult] = await Promise.all([
+		withRetry(() => api.shaders.getShader(shader.slug, { versionId })),
+		api.shaders.listCaptures(shader.slug, {
+			page: 1,
+			pageSize: capturesPageSize,
+			versionId
+		})
+	]);
 	if (generation !== fetchGeneration) return;
+
 	result.match({
 		Ok: (updated) => {
 			shaderOverride = _trimShader(updated);
@@ -120,18 +148,38 @@ async function onVersionChange(versionId: string) {
 			console.warn('Failed to fetch shader version:', err.message);
 		}
 	});
+
+	capturesResult.match({
+		Ok: (p) => {
+			allCaptures = p.items.map(_trimCapture);
+			capturesPage = p.page;
+			capturesTotal = p.total;
+		},
+		Err: (err) => {
+			console.warn('Failed to fetch captures for version:', err.message);
+		}
+	});
 }
 
 async function onProfileChange(profileId: string | null) {
 	selectedProfileId = profileId;
 	_selectedCaptureId = null;
 	const generation = ++fetchGeneration;
-	const api = createApiClient(fetch);
-	const params: { versionId?: string; profile_id?: string } = {};
-	if (selectedVersionId) params.versionId = selectedVersionId;
-	if (profileId) params.profile_id = profileId;
-	const result = await withRetry(() => api.shaders.getShader(shader.slug, params));
+	const shaderParams: GetShaderParams = {};
+	if (selectedVersionId) shaderParams.versionId = selectedVersionId;
+	if (profileId) shaderParams.profileId = profileId;
+
+	const [result, capturesResult] = await Promise.all([
+		withRetry(() => api.shaders.getShader(shader.slug, shaderParams)),
+		api.shaders.listCaptures(shader.slug, {
+			page: 1,
+			pageSize: capturesPageSize,
+			versionId: selectedVersionId ?? undefined,
+			profileId: profileId ?? undefined
+		})
+	]);
 	if (generation !== fetchGeneration) return;
+
 	result.match({
 		Ok: (updated) => {
 			shaderOverride = _trimShader(updated);
@@ -140,11 +188,62 @@ async function onProfileChange(profileId: string | null) {
 			console.warn('Failed to fetch shader captures for profile:', err.message);
 		}
 	});
+
+	capturesResult.match({
+		Ok: (p) => {
+			allCaptures = p.items.map(_trimCapture);
+			capturesPage = p.page;
+			capturesTotal = p.total;
+		},
+		Err: (err) => {
+			console.warn('Failed to fetch captures for profile:', err.message);
+		}
+	});
+}
+
+async function loadMoreCaptures() {
+	if (capturesLoading || !hasMoreCaptures) return;
+	capturesLoading = true;
+	const generation = ++fetchGeneration;
+	const nextPage = capturesPage + 1;
+	const result = await api.shaders.listCaptures(shader.slug, {
+		page: nextPage,
+		pageSize: capturesPageSize,
+		versionId: selectedVersionId ?? undefined,
+		profileId: selectedProfileId ?? undefined
+	});
+	if (generation !== fetchGeneration) {
+		capturesLoading = false;
+		return;
+	}
+	result.match({
+		Ok: (paginated) => {
+			allCaptures = [...allCaptures, ...paginated.items.map(_trimCapture)];
+			capturesPage = paginated.page;
+			capturesTotal = paginated.total;
+		},
+		Err: (err) => {
+			console.warn('Failed to load more captures:', err.message);
+		}
+	});
+	capturesLoading = false;
 }
 
 function openLightbox(captureIndex: number) {
 	lightboxIndex = captureIndex;
 	lightboxOpen = true;
+}
+
+// Svelte action for infinite scroll IntersectionObserver
+function observeSentinel(node: HTMLElement) {
+	const observer = new IntersectionObserver(
+		(entries) => {
+			if (entries[0]?.isIntersecting) void loadMoreCaptures();
+		},
+		{ rootMargin: '200px' }
+	);
+	observer.observe(node);
+	return { destroy: () => observer.disconnect() };
 }
 
 // OG metadata
@@ -153,8 +252,7 @@ const ogImage = $derived(firstCapture?.image_url ?? null);
 const ogDescription = $derived.by(() => {
 	const parts = [`${shader.name} shader for Minecraft`];
 	if (selectedVersion) parts.push(`v${selectedVersion.version}`);
-	if (captures.length > 0)
-		parts.push(`${captures.length} screenshot${captures.length === 1 ? '' : 's'}`);
+	if (capturesTotal > 0) parts.push(`${capturesTotal} screenshot${capturesTotal === 1 ? '' : 's'}`);
 	return parts.join(' \u00b7 ');
 });
 </script>
@@ -285,10 +383,10 @@ const ogDescription = $derived.by(() => {
 						</Select.Content>
 					</Select.Root>
 				{/if}
-				<span class="inline-flex items-center gap-1.5">
-					<Camera class="h-3.5 w-3.5" />
-					<span class="font-medium text-card-foreground">{captures.length}</span> scenes
-				</span>
+			<span class="inline-flex items-center gap-1.5">
+				<Camera class="h-3.5 w-3.5" />
+				<span class="font-medium text-card-foreground">{capturesTotal}</span> scenes
+			</span>
 				{#if shader.upstream_downloads}
 					<span class="inline-flex items-center gap-1.5">
 						<Download class="h-3.5 w-3.5" />
@@ -435,6 +533,18 @@ const ogDescription = $derived.by(() => {
 						</button>
 					{/each}
 				</div>
+
+				<!-- Infinite scroll sentinel -->
+				{#if hasMoreCaptures || capturesLoading}
+					<div
+						use:observeSentinel
+						class="flex justify-center py-8"
+					>
+						{#if capturesLoading}
+							<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
+						{/if}
+					</div>
+				{/if}
 			{:else}
 				<div
 					class="flex aspect-video items-center justify-center rounded-xl bg-muted text-muted-foreground"

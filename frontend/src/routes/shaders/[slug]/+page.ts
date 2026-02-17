@@ -39,6 +39,13 @@ export type ShaderDetail = Pick<
 	metadata?: ShaderVersionMetadata;
 };
 
+export interface CapturesPageData {
+	items: ShaderDetailCapture[];
+	total: number;
+	page: number;
+	pageSize: number;
+}
+
 /** Deduplicate authors by name, preferring entries that have a URL. */
 function deduplicateAuthors(authors: ShaderAuthor[]): ShaderDetailAuthor[] {
 	const byName = new Map<string, ShaderDetailAuthor>();
@@ -49,6 +56,19 @@ function deduplicateAuthors(authors: ShaderAuthor[]): ShaderDetailAuthor[] {
 		}
 	}
 	return [...byName.values()];
+}
+
+/** Trim a CaptureWithContext to only the fields needed for the shader detail page. */
+export function _trimCapture(c: CaptureWithContext): ShaderDetailCapture {
+	return pick(c, [
+		'id',
+		'image_url',
+		'thumbhash',
+		'scene_name',
+		'profile_name',
+		'shader_version',
+		'shader_name'
+	]);
 }
 
 export function _trimShader(s: ShaderWithCaptures): ShaderDetail {
@@ -68,23 +88,15 @@ export function _trimShader(s: ShaderWithCaptures): ShaderDetail {
 		]),
 		authors: deduplicateAuthors(s.authors),
 		versions: s.versions.map((v) => pick(v, ['id', 'version', 'capture_count'])),
-		captures: s.captures.map((c) =>
-			pick(c, [
-				'id',
-				'image_url',
-				'thumbhash',
-				'scene_name',
-				'profile_name',
-				'shader_version',
-				'shader_name'
-			])
-		),
+		captures: s.captures.map(_trimCapture),
 		profiles: s.profiles,
 		metadata: s.metadata
 	};
 }
 
-export const load: PageLoad = async ({ params, fetch }) => {
+const CAPTURES_PAGE_SIZE = 24;
+
+export const load: PageLoad = async ({ params, fetch, url }) => {
 	const api = createApiClient(fetch);
 	const result = await api.shaders.getShader(params.slug);
 
@@ -101,9 +113,11 @@ export const load: PageLoad = async ({ params, fetch }) => {
 	// Default fetch returns captures for the latest version. If that version has
 	// no captures but an older one does, re-fetch with the correct version so SSR
 	// data matches the version the UI will select.
+	let effectiveVersionId: string | undefined;
 	if (shader.captures.length === 0) {
 		const versionWithCaptures = shader.versions.find((v) => v.capture_count > 0);
 		if (versionWithCaptures) {
+			effectiveVersionId = versionWithCaptures.id;
 			const refetch = await api.shaders.getShader(params.slug, {
 				versionId: versionWithCaptures.id
 			});
@@ -113,6 +127,35 @@ export const load: PageLoad = async ({ params, fetch }) => {
 		}
 	}
 
+	// Resolve version/profile from URL params or the effective version used above
+	const versionId = url.searchParams.get('version_id') ?? effectiveVersionId;
+	const profileId = url.searchParams.get('profile_id') ?? undefined;
+
+	// Fetch first page of captures from the paginated endpoint for the real total count
+	const capturesResult = await api.shaders.listCaptures(shader.slug, {
+		page: 1,
+		pageSize: CAPTURES_PAGE_SIZE,
+		versionId: versionId ?? undefined,
+		profileId
+	});
+
+	const trimmedShader = _trimShader(shader);
+
+	const capturesData: CapturesPageData = capturesResult.match({
+		Ok: (p) => ({
+			items: p.items.map(_trimCapture),
+			total: p.total,
+			page: p.page,
+			pageSize: p.page_size
+		}),
+		Err: () => ({
+			items: trimmedShader.captures,
+			total: trimmedShader.captures.length,
+			page: 1,
+			pageSize: CAPTURES_PAGE_SIZE
+		})
+	});
+
 	// Fetch other shaders for the "Similar Shaders" section (mock: random selection)
 	const listResult = await api.shaders.list({ pageSize: 30 });
 	const similarShaders: ShaderListItem[] = listResult.match({
@@ -120,5 +163,5 @@ export const load: PageLoad = async ({ params, fetch }) => {
 		Err: () => []
 	});
 
-	return { shader: _trimShader(shader), similarShaders };
+	return { shader: trimmedShader, capturesData, similarShaders };
 };

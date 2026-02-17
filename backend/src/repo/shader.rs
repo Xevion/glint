@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, warn};
 
 use crate::db::DbPool;
 use crate::error::{AppResult, OptionNotFoundExt, SqlxResultExt};
@@ -26,82 +26,77 @@ impl ShaderRepo {
     /// from an active scene (i.e. shaders with thumbnails).
     ///
     /// Uses `COUNT(*) OVER()` to compute the total in a single query.
+    /// Supports optional name search (ILIKE) and sort order.
     /// Returns `(shaders, total)`.
-    #[instrument(skip(executor, page), level = "debug")]
+    #[instrument(skip(db, page), level = "debug")]
     pub async fn list_with_captures(
-        executor: impl sqlx::PgExecutor<'_>,
+        db: &DbPool,
         page: &Page,
+        search: Option<&str>,
+        sort: Option<&str>,
     ) -> AppResult<(Vec<Shader>, i64)> {
-        use chrono::{DateTime, Utc};
+        use sqlx::QueryBuilder;
 
+        let search_pattern = search.filter(|q| !q.is_empty()).map(|q| {
+            format!(
+                "%{}%",
+                q.replace('\\', "\\\\")
+                    .replace('%', "\\%")
+                    .replace('_', "\\_")
+            )
+        });
+
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
+            "SELECT s.*, COUNT(*) OVER() AS total FROM shaders s
+             WHERE EXISTS (
+                 SELECT 1 FROM captures c
+                 JOIN shader_versions sv ON c.shader_version_id = sv.id
+                 JOIN scenes sc ON c.scene_id = sc.id
+                 WHERE sv.shader_id = s.id
+                   AND c.status = 'completed'
+                   AND c.image_url IS NOT NULL
+                   AND sc.active = TRUE
+             )",
+        );
+
+        if let Some(ref pattern) = search_pattern {
+            qb.push(" AND s.name ILIKE ");
+            qb.push_bind(pattern.as_str());
+        }
+
+        let sort_value = sort.unwrap_or("popular");
+        match sort_value {
+            "name" => qb.push(" ORDER BY s.name ASC"),
+            "updated" => qb.push(" ORDER BY s.updated_at DESC"),
+            "popular" => {
+                qb.push(" ORDER BY s.view_count DESC, s.upstream_downloads DESC NULLS LAST")
+            }
+            other => {
+                warn!(sort = other, "Unknown sort value, defaulting to popular");
+                qb.push(" ORDER BY s.view_count DESC, s.upstream_downloads DESC NULLS LAST")
+            }
+        };
+
+        qb.push(" LIMIT ");
+        qb.push_bind(page.limit_i64());
+        qb.push(" OFFSET ");
+        qb.push_bind(page.offset_i64());
+
+        #[derive(sqlx::FromRow)]
         struct Row {
-            id: ShaderId,
-            name: String,
-            slug: String,
-            description: Option<String>,
-            modrinth_id: Option<String>,
-            curseforge_id: Option<String>,
-            website_url: Option<String>,
-            icon_url: Option<String>,
-            source_url: Option<String>,
-            license_id: Option<String>,
-            upstream_downloads: Option<i64>,
-            upstream_updated_at: Option<DateTime<Utc>>,
-            last_synced_at: Option<DateTime<Utc>>,
-            created_at: DateTime<Utc>,
-            updated_at: DateTime<Utc>,
-            view_count: i64,
+            #[sqlx(flatten)]
+            shader: Shader,
             total: i64,
         }
 
-        let rows = sqlx::query_as!(
-            Row,
-            r#"
-            SELECT
-                s.*,
-                COUNT(*) OVER() AS "total!"
-            FROM shaders s
-            WHERE EXISTS (
-                SELECT 1 FROM captures c
-                JOIN shader_versions sv ON c.shader_version_id = sv.id
-                JOIN scenes sc ON c.scene_id = sc.id
-                WHERE sv.shader_id = s.id
-                  AND c.status = 'completed'
-                  AND c.image_url IS NOT NULL
-                  AND sc.active = TRUE
-            )
-            ORDER BY s.name
-            LIMIT $1 OFFSET $2
-            "#,
-            page.limit_i64(),
-            page.offset_i64(),
-        )
-        .fetch_all(executor)
-        .await
-        .context("failed to list shaders with captures")?;
+        let rows: Vec<Row> = qb
+            .build_query_as()
+            .fetch_all(db)
+            .await
+            .context("failed to list shaders with captures")?;
 
         let total = rows.first().map_or(0, |r| r.total);
-        let shaders = rows
-            .into_iter()
-            .map(|r| Shader {
-                id: r.id,
-                name: r.name,
-                slug: r.slug,
-                description: r.description,
-                modrinth_id: r.modrinth_id,
-                curseforge_id: r.curseforge_id,
-                website_url: r.website_url,
-                icon_url: r.icon_url,
-                source_url: r.source_url,
-                license_id: r.license_id,
-                upstream_downloads: r.upstream_downloads,
-                upstream_updated_at: r.upstream_updated_at,
-                last_synced_at: r.last_synced_at,
-                created_at: r.created_at,
-                updated_at: r.updated_at,
-                view_count: r.view_count,
-            })
-            .collect();
+        let shaders = rows.into_iter().map(|r| r.shader).collect();
 
         debug!(total, "Listed shaders with captures (paginated)");
         Ok((shaders, total))

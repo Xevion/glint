@@ -6,9 +6,9 @@ use crate::{
     id::{self, ShaderVersionId, ShaderVersionProfileId},
     middleware::client_ip::ClientIp,
     models::{
-        CaptureStatus, CreateShaderRequest, CreateShaderVersionRequest, PageQuery, Paginated,
-        Shader, ShaderListItem, ShaderVersion, ShaderVersionProfile, ShaderWithCaptures,
-        UpdateShaderRequest,
+        CaptureStatus, CaptureWithContext, CreateShaderRequest, CreateShaderVersionRequest,
+        PageQuery, Paginated, Shader, ShaderListItem, ShaderVersion, ShaderVersionProfile,
+        ShaderWithCaptures, UpdateShaderRequest,
     },
     repo::{
         CaptureRepo, ExtractionRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo,
@@ -38,6 +38,7 @@ pub fn router() -> Router<AppState> {
             "/{id}",
             get(get_shader).put(update_shader).delete(delete_shader),
         )
+        .route("/{id}/captures", get(list_shader_captures))
         .route("/{id}/versions", post(create_shader_version))
         .route(
             "/{id}/versions/{version_id}/profiles",
@@ -117,15 +118,69 @@ fn viewer_hash(ip: &str, user_agent: &str) -> String {
     hex::encode(&result[..8])
 }
 
+#[derive(CustomDebug, Deserialize)]
+struct ShaderListQuery {
+    #[serde(flatten)]
+    page: PageQuery,
+    /// Full-text search on shader name (case-insensitive ILIKE)
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
+    q: Option<String>,
+    /// Sort order: "popular" (default), "name", "updated"
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
+    sort: Option<String>,
+}
+
 /// GET /api/shaders - Paginated list of shaders with enrichment (public)
 #[instrument(skip(state))]
 async fn list_shaders(
     State(state): State<AppState>,
-    Query(params): Query<PageQuery>,
+    Query(params): Query<ShaderListQuery>,
 ) -> AppResult<Json<Paginated<ShaderListItem>>> {
-    let p = params.normalize();
-    let (items, total) = ShaderService::list_enriched(state.db(), &p).await?;
+    let p = params.page.normalize();
+    let (items, total) =
+        ShaderService::list_enriched(state.db(), &p, params.q.as_deref(), params.sort.as_deref())
+            .await?;
     Ok(Json(Paginated::new(items, total, &p)))
+}
+
+#[derive(CustomDebug, Deserialize)]
+struct ShaderCapturesQuery {
+    #[serde(flatten)]
+    page: PageQuery,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
+    version_id: Option<String>,
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
+    profile_id: Option<ShaderVersionProfileId>,
+}
+
+/// GET /api/shaders/{id}/captures - Paginated captures for a shader (public)
+#[instrument(skip(state))]
+async fn list_shader_captures(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(query): Query<ShaderCapturesQuery>,
+) -> AppResult<Json<Paginated<CaptureWithContext>>> {
+    let db = state.db();
+
+    let shader = ShaderRepo::find_by_slug(db, &id)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Shader '{}' not found", id)))?;
+
+    let p = query.page.normalize();
+
+    let filters = CaptureFilters {
+        shader_id: Some(shader.id),
+        version_id: query.version_id.map(ShaderVersionId::from),
+        profile_id: query.profile_id.map(|id| id.0),
+        status: Some(CaptureStatus::Completed),
+        scene_active: Some(true),
+        ..Default::default()
+    };
+
+    let (items, total) =
+        CaptureRepo::list_with_context(db, &filters, Some(&p), CaptureDistinct::PerScene).await?;
+
+    Ok(Json(Paginated::new(items, total.unwrap_or(0), &p)))
 }
 
 #[derive(CustomDebug, Deserialize)]

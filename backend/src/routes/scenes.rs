@@ -16,8 +16,9 @@ use crate::{
     auth::AdminUser,
     error::{AppError, AppResult, OptionNotFoundExt},
     models::{
-        CaptureStatus, CreateSceneRequest, Scene, SceneListItem, SceneWithCaptures,
-        SceneWithVersion, SceneWithWorld, UpdateSceneMetadataRequest, UpdateSceneRequest,
+        CaptureStatus, CaptureWithContext, CreateSceneRequest, PageQuery, Paginated, Scene,
+        SceneListItem, SceneWithCaptures, SceneWithVersion, SceneWithWorld,
+        UpdateSceneMetadataRequest, UpdateSceneRequest,
     },
     repo::{
         CaptureRepo, SceneRepo, SceneVersionRepo, SlugRedirectRepo, TagRepo, WorldRepo,
@@ -44,6 +45,7 @@ pub fn router() -> Router<AppState> {
                 .put(update_scene)
                 .delete(disable_scene),
         )
+        .route("/by-slug/{slug}/captures", get(list_scene_captures))
 }
 
 /// GET /api/scenes - List active scenes with enrichment (public), optionally filtered by world_id
@@ -413,4 +415,33 @@ async fn batch_disable_scenes(
 ) -> AppResult<StatusCode> {
     SceneRepo::batch_disable(state.db(), &body.slugs, &params.world_id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/scenes/by-slug/{slug}/captures - Paginated captures for a scene (public)
+#[instrument(skip(state))]
+async fn list_scene_captures(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Query(params): Query<PageQuery>,
+) -> AppResult<Json<Paginated<CaptureWithContext>>> {
+    let db = state.db();
+
+    let scene = SceneRepo::find_active_by_slug(db, &slug)
+        .await?
+        .first()
+        .cloned()
+        .ok_or_else(|| AppError::NotFound(format!("Scene '{}' not found", slug)))?;
+
+    let p = params.normalize();
+
+    let filters = CaptureFilters {
+        scene_id: Some(scene.id),
+        status: Some(CaptureStatus::Completed),
+        ..Default::default()
+    };
+
+    let (items, total) =
+        CaptureRepo::list_with_context(db, &filters, Some(&p), CaptureDistinct::PerShader).await?;
+
+    Ok(Json(Paginated::new(items, total.unwrap_or(0), &p)))
 }

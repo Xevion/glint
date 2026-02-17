@@ -1,16 +1,16 @@
 <script lang="ts">
-import { api } from '$lib/api';
-import { useRetry } from '$lib/api/retry.svelte';
 import type { ShaderListItem } from '$lib/bindings';
 import BrowseToolbar from '$lib/components/BrowseToolbar.svelte';
 import { CompactRow, ItemGrid, ViewToggle } from '$lib/components/item-grid';
 import type { GridMode } from '$lib/components/item-grid';
 import Meta from '$lib/components/Meta.svelte';
+import Pagination from '$lib/components/Pagination.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
-import { AlertTriangle, ChevronRight, LoaderCircle, Search } from '@lucide/svelte';
-import { untrack } from 'svelte';
+import { AlertTriangle, ChevronRight, Search, X } from '@lucide/svelte';
+import { goto, invalidateAll } from '$app/navigation';
+import { page } from '$app/stores';
 import { fly } from 'svelte/transition';
 import type { PageData } from './$types';
 
@@ -19,54 +19,63 @@ interface Props {
 }
 let { data }: Props = $props();
 
-const shaderRetry = untrack(() =>
-	useRetry(() => api.shaders.list(), {
-		initial: data.error
-			? undefined
-			: { items: data.shaders, total: data.total, page: 1, page_size: data.total }
-	})
-);
-
-const shaders = $derived(shaderRetry.data?.items ?? []);
-const loadError = $derived(data.error);
-const hasError = $derived(!!shaderRetry.error || (!!loadError && !shaderRetry.data));
-
-// Filter state
-let searchQuery = $state('');
-let sortBy = $state<'popular' | 'name' | 'updated'>('popular');
+// Client-side state
 let viewMode = $state<GridMode>('card');
+let searchOverride = $state<string | undefined>(undefined);
+const searchInput = $derived(searchOverride ?? data.q);
+let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
-const filteredShaders = $derived.by(() => {
-	let result = shaders.filter((shader: (typeof shaders)[0]) => {
-		if (searchQuery && !shader.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-		return true;
-	});
-
-	// Sort
-	result = [...result].sort((a, b) => {
-		switch (sortBy) {
-			case 'popular': {
-				// Primary: view count, secondary: upstream downloads
-				const viewDiff = b.view_count - a.view_count;
-				if (viewDiff !== 0) return viewDiff;
-				return (b.upstream_downloads ?? 0) - (a.upstream_downloads ?? 0);
-			}
-			case 'name':
-				return a.name.localeCompare(b.name);
-			case 'updated':
-				return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-			default:
-				return 0;
-		}
-	});
-
-	return result;
+// Clear override when URL-driven data catches up (browser back/forward, navigation)
+$effect(() => {
+	void data.q;
+	searchOverride = undefined;
 });
 
-const hasFilters = $derived(searchQuery !== '');
+// Clean up debounce timer on unmount
+$effect(() => {
+	return () => clearTimeout(debounceTimer);
+});
+
+// Navigation helpers
+function onSearchInput(value: string) {
+	searchOverride = value;
+	clearTimeout(debounceTimer);
+	debounceTimer = setTimeout(() => {
+		const url = new URL($page.url);
+		if (value) url.searchParams.set('q', value);
+		else url.searchParams.delete('q');
+		url.searchParams.set('page', '1');
+		void goto(url.toString(), { keepFocus: true });
+	}, 300);
+}
+
+function clearSearch() {
+	searchOverride = '';
+	clearTimeout(debounceTimer);
+	const url = new URL($page.url);
+	url.searchParams.delete('q');
+	url.searchParams.set('page', '1');
+	void goto(url.toString(), { keepFocus: true });
+}
+
+function navigateToPage(p: number) {
+	const url = new URL($page.url);
+	url.searchParams.set('page', String(p));
+	void goto(url.toString(), { keepFocus: true });
+}
+
+function setSort(sort: string) {
+	const url = new URL($page.url);
+	url.searchParams.set('sort', sort);
+	url.searchParams.set('page', '1');
+	void goto(url.toString(), { keepFocus: true });
+}
+
+const hasError = $derived(!!data.error);
+const hasFilters = $derived(data.q !== '');
 
 // OG image: use the most popular shader's capture image
-const ogImage = $derived(shaders[0]?.image_url ?? null);
+const ogImage = $derived(data.shaders[0]?.image_url ?? null);
 </script>
 
 <Meta
@@ -83,7 +92,7 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 			Shaders
 			{#if !hasError}
 				<span class="ml-1 text-lg font-normal text-muted-foreground"
-					>({filteredShaders.length})</span
+					>({data.total})</span
 				>
 			{/if}
 		</h1>
@@ -100,15 +109,26 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 			<Input
 				type="text"
 				placeholder="Search..."
-				bind:value={searchQuery}
+				value={searchInput}
+				oninput={(e: Event) => onSearchInput((e.target as HTMLInputElement).value)}
 				disabled={hasError}
-				class="w-full pr-3 pl-9 sm:w-48 sm:focus:w-64"
+				class="w-full pr-8 pl-9 sm:w-48 sm:focus:w-64"
 			/>
+			{#if hasFilters}
+				<button
+					class="absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+					onclick={clearSearch}
+					aria-label="Clear search"
+				>
+					<X class="h-3.5 w-3.5" />
+				</button>
+			{/if}
 		</div>
 
 		<!-- Sort -->
 		<select
-			bind:value={sortBy}
+			value={data.sort}
+			onchange={(e: Event) => setSort((e.target as HTMLSelectElement).value)}
 			disabled={hasError}
 			class="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
 		>
@@ -116,18 +136,6 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 			<option value="updated">Recent</option>
 			<option value="name">A-Z</option>
 		</select>
-
-		{#if hasFilters}
-			<Button
-				variant="ghost"
-				size="sm"
-				onclick={() => {
-					searchQuery = '';
-				}}
-			>
-				Clear
-			</Button>
-		{/if}
 
 		<!-- Spacer pushes view toggle to the right -->
 		<div class="flex-1"></div>
@@ -143,25 +151,19 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 			</div>
 			<h3 class="text-lg font-semibold text-foreground">Failed to load shaders</h3>
 			<p class="mt-1 max-w-md text-sm text-foreground/70">
-				{shaderRetry.error?.message ?? loadError ?? 'Something went wrong'}
+				{data.error ?? 'Something went wrong'}
 			</p>
 			<Button
 				variant="outline"
 				class="mt-4"
-				disabled={shaderRetry.loading}
-				onclick={() => shaderRetry.retry()}
+				onclick={() => void invalidateAll()}
 			>
-				{#if shaderRetry.loading}
-					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-					Retrying...
-				{:else}
-					Try again
-				{/if}
+				Try again
 			</Button>
 		</div>
 	{:else}
 		<ItemGrid
-			items={filteredShaders}
+			items={data.shaders}
 			key={(s: ShaderListItem) => s.id}
 			mode={viewMode}
 			size="medium"
@@ -199,5 +201,12 @@ const ogImage = $derived(shaders[0]?.image_url ?? null);
 				</CompactRow>
 			{/snippet}
 		</ItemGrid>
+
+		<Pagination
+			totalCount={data.total}
+			page={data.page}
+			pageSize={data.pageSize}
+			onPageChange={(p: number) => navigateToPage(p)}
+		/>
 	{/if}
 </div>

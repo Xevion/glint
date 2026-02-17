@@ -1,5 +1,6 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
+import { createApiClient } from '$lib/api';
 import type { CaptureWithContext } from '$lib/bindings';
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureGallery from '$lib/components/CaptureGallery.svelte';
@@ -16,23 +17,64 @@ interface Props {
 
 let { data }: Props = $props();
 const scene = $derived(data.scene);
-const captures = $derived(scene.captures);
+
+// --- Infinite scroll state for captures grid ---
+const api = createApiClient(fetch);
+const capturesPageSize = 24;
+
+let allCaptures = $state<CaptureWithContext[]>([]);
+let capturesPage = $state(1);
+let capturesTotal = $state(0);
+let capturesLoading = $state(false);
+const hasMoreCaptures = $derived(allCaptures.length < capturesTotal);
+
+// Initialize from SSR data
+$effect(() => {
+	const d = data.capturesData;
+	allCaptures = d.items;
+	capturesPage = d.page;
+	capturesTotal = d.total;
+});
+
+async function loadMoreCaptures() {
+	if (capturesLoading || !hasMoreCaptures) return;
+	capturesLoading = true;
+	const nextPage = capturesPage + 1;
+	const result = await api.scenes.listCaptures(data.scene.slug, {
+		page: nextPage,
+		pageSize: capturesPageSize
+	});
+	result.match({
+		Ok: (paginated) => {
+			allCaptures = [...allCaptures, ...paginated.items];
+			capturesPage = paginated.page;
+			capturesTotal = paginated.total;
+		},
+		Err: (err) => {
+			console.warn('Failed to load more captures:', err.message);
+		}
+	});
+	capturesLoading = false;
+}
+
+// Use original scene captures for the shader thumbnail strip (not paginated)
+const sceneCaptures = $derived(scene.captures);
 
 // Selected capture for the main preview
 let selectedCapture = $state<CaptureWithContext | null>(null);
 
-// Initialize selected capture when captures change
+// Initialize selected capture when scene captures change
 $effect(() => {
-	if (captures.length > 0 && !selectedCapture) {
-		selectedCapture = captures[0];
+	if (sceneCaptures.length > 0 && !selectedCapture) {
+		selectedCapture = sceneCaptures[0];
 	}
 });
 
-// Group captures by shader
+// Group captures by shader (from full scene data, not paginated)
 const capturesByShader = $derived.by(() => {
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- ephemeral map inside $derived.by
 	const map = new Map<string, CaptureWithContext>();
-	for (const capture of captures) {
+	for (const capture of sceneCaptures) {
 		if (!map.has(capture.shader_slug)) {
 			map.set(capture.shader_slug, capture);
 		}
@@ -63,11 +105,11 @@ const timeLabel = $derived.by(() => {
 });
 
 // OG metadata
-const ogImage = $derived(captures[0]?.image_url ?? null);
+const ogImage = $derived(sceneCaptures[0]?.image_url ?? null);
 const ogDescription = $derived.by(() => {
 	const parts = [`${scene.name} scene for Minecraft shader comparison`];
-	if (captures.length > 0)
-		parts.push(`${captures.length} shader screenshot${captures.length === 1 ? '' : 's'}`);
+	if (sceneCaptures.length > 0)
+		parts.push(`${sceneCaptures.length} shader screenshot${sceneCaptures.length === 1 ? '' : 's'}`);
 	return parts.join(' \u00b7 ');
 });
 </script>
@@ -214,14 +256,17 @@ const ogDescription = $derived.by(() => {
 				</div>
 			</div>
 
-		<!-- Captures Grid -->
-		<CaptureGallery
-			{captures}
-			title="Shader Renders"
-			emptyMessage="Captures for this scene are being generated."
-			onclick={(capture: CaptureWithContext) => (selectedCapture = capture)}
-			alt={(capture: CaptureWithContext) => `${capture.shader_name} render`}
-		>
+	<!-- Captures Grid -->
+	<CaptureGallery
+		captures={allCaptures}
+		title="Shader Renders"
+		emptyMessage="Captures for this scene are being generated."
+		onclick={(capture: CaptureWithContext) => (selectedCapture = capture)}
+		alt={(capture: CaptureWithContext) => `${capture.shader_name} render`}
+		hasMore={hasMoreCaptures}
+		loading={capturesLoading}
+		onLoadMore={loadMoreCaptures}
+	>
 		{#snippet overlay(capture: CaptureWithContext)}
 			<CaptureBadges
 				shaderName={capture.shader_name}

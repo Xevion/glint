@@ -26,8 +26,13 @@ impl ShaderService {
     ///
     /// Returns `(items, total)` where total is the count before pagination.
     #[instrument(skip(db), level = "debug")]
-    pub async fn list_enriched(db: &DbPool, page: &Page) -> AppResult<(Vec<ShaderListItem>, i64)> {
-        let (shaders, total) = ShaderRepo::list_with_captures(db, page).await?;
+    pub async fn list_enriched(
+        db: &DbPool,
+        page: &Page,
+        search: Option<&str>,
+        sort: Option<&str>,
+    ) -> AppResult<(Vec<ShaderListItem>, i64)> {
+        let (shaders, total) = ShaderRepo::list_with_captures(db, page, search, sort).await?;
 
         if shaders.is_empty() {
             return Ok((vec![], total));
