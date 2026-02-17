@@ -11,7 +11,13 @@ import type {
 } from '$lib/bindings';
 import { ItemGrid } from '$lib/components/item-grid';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminCaptureCard, AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
+import {
+	AdminCaptureCard,
+	AdminDetailField,
+	AdminDetailHeader,
+	createAdminAction,
+	createAdminForm
+} from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
@@ -42,7 +48,6 @@ import {
 	SkipForward,
 	Trash2
 } from '@lucide/svelte';
-import { untrack } from 'svelte';
 import type { PageData } from './$types';
 
 const PLATFORM_URL_PATTERN =
@@ -69,30 +74,38 @@ function humanize(key: string): string {
 		.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-let saving = $state(false);
+const form = createAdminForm({
+	source: () => shader,
+	fields: {
+		name: (s) => s.name,
+		description: (s) => s.description ?? '',
+		modrinth_id: (s) => s.modrinth_id ?? '',
+		curseforge_id: (s) => s.curseforge_id ?? '',
+		website_url: (s) => s.website_url ?? ''
+	},
+	onSave: (changes, source) => {
+		const request: UpdateShaderRequest = {};
+		for (const [key, value] of Object.entries(changes)) {
+			// Required fields (name) keep their value; optional fields convert empty → undefined
+			(request as Record<string, unknown>)[key] = key === 'name' ? value : value || undefined;
+		}
+		return api.admin.updateShader(source.id, request);
+	}
+});
+
+const deleteAction = createAdminAction({
+	action: () => api.admin.deleteShader(shader.id),
+	onSuccess: () => void goto('/admin/shaders'),
+	setError: (msg) => (form.error = msg)
+});
+
 let syncing = $state(false);
-let actionLoading = $state(false);
-let error = $state<string | null>(null);
 let syncSuccess = $state(false);
 let showDeleteConfirm = $state(false);
 let linkDialogOpen = $state(false);
 let linkUrl = $state('');
 let linkError = $state<string | null>(null);
 let linking = $state(false);
-
-let editName = $state('');
-let editDescription = $state('');
-let editModrinthId = $state('');
-let editCurseforgeId = $state('');
-let editWebsiteUrl = $state('');
-
-let isDirty = $derived(
-	editName !== shader.name ||
-		editDescription !== (shader.description ?? '') ||
-		editModrinthId !== (shader.modrinth_id ?? '') ||
-		editCurseforgeId !== (shader.curseforge_id ?? '') ||
-		editWebsiteUrl !== (shader.website_url ?? '')
-);
 
 let hasLinkedPlatform = $derived(!!shader.modrinth_id || !!shader.curseforge_id);
 let canLinkMorePlatforms = $derived(!shader.modrinth_id || !shader.curseforge_id);
@@ -115,52 +128,9 @@ let syncStatus = $derived.by<'never' | 'fresh' | 'stale' | 'very-stale'>(() => {
 	return 'fresh';
 });
 
-$effect(() => {
-	void shader.id;
-	untrack(() => {
-		editName = shader.name;
-		editDescription = shader.description ?? '';
-		editModrinthId = shader.modrinth_id ?? '';
-		editCurseforgeId = shader.curseforge_id ?? '';
-		editWebsiteUrl = shader.website_url ?? '';
-	});
-});
-
-async function handleSave() {
-	saving = true;
-	error = null;
-
-	try {
-		const request: UpdateShaderRequest = {};
-		if (editName !== shader.name) request.name = editName;
-		if (editDescription !== (shader.description ?? ''))
-			request.description = editDescription || undefined;
-		if (editModrinthId !== (shader.modrinth_id ?? ''))
-			request.modrinth_id = editModrinthId || undefined;
-		if (editCurseforgeId !== (shader.curseforge_id ?? ''))
-			request.curseforge_id = editCurseforgeId || undefined;
-		if (editWebsiteUrl !== (shader.website_url ?? ''))
-			request.website_url = editWebsiteUrl || undefined;
-
-		if (Object.keys(request).length === 0) return;
-
-		const result = await api.admin.updateShader(shader.id, request);
-		result.match({
-			Ok: () => {
-				void invalidateAll();
-			},
-			Err: (err) => {
-				error = err.message;
-			}
-		});
-	} finally {
-		saving = false;
-	}
-}
-
 async function handleSync() {
 	syncing = true;
-	error = null;
+	form.error = null;
 	syncSuccess = false;
 
 	try {
@@ -172,7 +142,7 @@ async function handleSync() {
 				setTimeout(() => (syncSuccess = false), 3000);
 			},
 			Err: (err) => {
-				error = err.message;
+				form.error = err.message;
 			}
 		});
 	} finally {
@@ -232,23 +202,6 @@ function handleLinkKeydown(e: KeyboardEvent) {
 		void handleLink();
 	}
 }
-
-async function confirmDelete() {
-	actionLoading = true;
-	try {
-		const result = await api.admin.deleteShader(shader.id);
-		result.match({
-			Ok: () => {
-				void goto('/admin/shaders');
-			},
-			Err: (err) => {
-				error = err.message;
-			}
-		});
-	} finally {
-		actionLoading = false;
-	}
-}
 </script>
 
 <svelte:head><title>{shader.name} - Glint</title></svelte:head>
@@ -271,8 +224,8 @@ async function confirmDelete() {
         {/snippet}
     </AdminDetailHeader>
 
-    {#if error}
-        <Alert variant="destructive">{error}</Alert>
+    {#if form.error}
+        <Alert variant="destructive">{form.error}</Alert>
     {/if}
 
     {#if syncSuccess}
@@ -293,7 +246,7 @@ async function confirmDelete() {
                 variant="destructive"
                 size="sm"
                 onclick={() => (showDeleteConfirm = true)}
-                disabled={actionLoading}
+                disabled={deleteAction.loading}
             >
                 <Trash2 class="mr-2 h-4 w-4" />
                 Delete
@@ -499,14 +452,14 @@ async function confirmDelete() {
                 <div class="space-y-4">
                     <div class="grid gap-2">
                         <Label for="name">Name</Label>
-                        <Input id="name" bind:value={editName} />
+                        <Input id="name" bind:value={form.fields.name} />
                     </div>
 
                     <div class="grid gap-2">
                         <Label for="description">Description</Label>
                         <Textarea
                             id="description"
-                            bind:value={editDescription}
+                            bind:value={form.fields.description}
                             rows={3}
                         />
                     </div>
@@ -515,7 +468,7 @@ async function confirmDelete() {
                         <Label for="modrinth_id">Modrinth ID</Label>
                         <Input
                             id="modrinth_id"
-                            bind:value={editModrinthId}
+                            bind:value={form.fields.modrinth_id}
                             placeholder="e.g., abc123"
                         />
                     </div>
@@ -524,7 +477,7 @@ async function confirmDelete() {
                         <Label for="curseforge_id">CurseForge ID</Label>
                         <Input
                             id="curseforge_id"
-                            bind:value={editCurseforgeId}
+                            bind:value={form.fields.curseforge_id}
                             placeholder="e.g., 123456"
                         />
                     </div>
@@ -533,17 +486,17 @@ async function confirmDelete() {
                         <Label for="website_url">Website URL</Label>
                         <Input
                             id="website_url"
-                            bind:value={editWebsiteUrl}
+                            bind:value={form.fields.website_url}
                             placeholder="e.g., https://example.com"
                         />
                     </div>
 
                     <div class="flex justify-end">
                         <Button
-                            onclick={handleSave}
-                            disabled={saving || !isDirty}
+                            onclick={form.save}
+                            disabled={form.saving || !form.isDirty}
                         >
-                            {saving ? "Saving..." : "Save Changes"}
+                            {form.saving ? "Saving..." : "Save Changes"}
                         </Button>
                     </div>
                 </div>
@@ -1238,5 +1191,5 @@ async function confirmDelete() {
     title="Delete Shader"
     description={`Delete shader "${shader.name}"? This cannot be undone.`}
     confirmLabel="Delete"
-    onConfirm={confirmDelete}
+    onConfirm={deleteAction.execute}
 />

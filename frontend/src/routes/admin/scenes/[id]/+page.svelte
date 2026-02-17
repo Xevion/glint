@@ -9,7 +9,13 @@ import type {
 import { ItemGrid } from '$lib/components/item-grid';
 import { freshnessColors } from '$lib/utils/status';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminCaptureCard, AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
+import {
+	AdminCaptureCard,
+	AdminDetailField,
+	AdminDetailHeader,
+	createAdminAction,
+	createAdminForm
+} from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
@@ -18,7 +24,6 @@ import { Label } from '$lib/components/ui/label';
 import { StatusBadge } from '$lib/components/ui/status-badge';
 import { Textarea } from '$lib/components/ui/textarea';
 import { RotateCcw, Trash2 } from '@lucide/svelte';
-import { untrack } from 'svelte';
 import type { PageData } from './$types';
 
 interface Props {
@@ -29,83 +34,34 @@ let scene: SceneWithVersion = $derived(data.scene);
 let captures: CaptureWithContext[] = $derived(data.captures);
 let captureCount: number = $derived(data.captureCount);
 
-let saving = $state(false);
-let actionLoading = $state(false);
-let error = $state<string | null>(null);
-let showDisableConfirm = $state(false);
-
-let editName = $state('');
-let editDescription = $state('');
-
-let isDirty = $derived(editName !== scene.name || editDescription !== (scene.description ?? ''));
-
-$effect(() => {
-	void scene.id;
-	untrack(() => {
-		editName = scene.name;
-		editDescription = scene.description ?? '';
-	});
+const form = createAdminForm({
+	source: () => scene,
+	fields: {
+		name: (s) => s.name,
+		description: (s) => s.description ?? ''
+	},
+	onSave: (changes, source) => {
+		const request: UpdateSceneMetadataRequest = {};
+		for (const [key, value] of Object.entries(changes)) {
+			(request as Record<string, unknown>)[key] = key === 'name' ? value : value || undefined;
+		}
+		return api.admin.updateScene(source.id, request);
+	}
 });
 
-async function handleSave() {
-	saving = true;
-	error = null;
+const disableAction = createAdminAction({
+	action: () => api.admin.disableScene(scene.id),
+	onSuccess: () => void goto('/admin/scenes'),
+	setError: (msg) => (form.error = msg)
+});
 
-	try {
-		const request: UpdateSceneMetadataRequest = {};
-		if (editName !== scene.name) request.name = editName;
-		if (editDescription !== (scene.description ?? ''))
-			request.description = editDescription || undefined;
+const reactivateAction = createAdminAction({
+	action: () => api.admin.reactivateScene(scene.id),
+	onSuccess: () => void invalidateAll(),
+	setError: (msg) => (form.error = msg)
+});
 
-		if (Object.keys(request).length === 0) return;
-
-		const result = await api.admin.updateScene(scene.id, request);
-		result.match({
-			Ok: () => {
-				void invalidateAll();
-			},
-			Err: (err) => {
-				error = err.message;
-			}
-		});
-	} finally {
-		saving = false;
-	}
-}
-
-async function confirmDisable() {
-	actionLoading = true;
-	try {
-		const result = await api.admin.disableScene(scene.id);
-		result.match({
-			Ok: () => {
-				void goto('/admin/scenes');
-			},
-			Err: (err) => {
-				error = err.message;
-			}
-		});
-	} finally {
-		actionLoading = false;
-	}
-}
-
-async function handleReactivate() {
-	actionLoading = true;
-	try {
-		const result = await api.admin.reactivateScene(scene.id);
-		result.match({
-			Ok: () => {
-				void invalidateAll();
-			},
-			Err: (err) => {
-				error = err.message;
-			}
-		});
-	} finally {
-		actionLoading = false;
-	}
-}
+let showDisableConfirm = $state(false);
 </script>
 
 <svelte:head><title>{scene.name} - Glint</title></svelte:head>
@@ -125,32 +81,32 @@ async function handleReactivate() {
 	{#if !scene.active}
 		<Alert variant="warning" class="flex items-center justify-between">
 			<span>This scene is inactive and will not be included in captures.</span>
-			<Button variant="outline" size="sm" onclick={handleReactivate} disabled={actionLoading}>
-				<RotateCcw class="mr-1 h-3 w-3" />
-				{actionLoading ? 'Reactivating...' : 'Reactivate'}
-			</Button>
+		<Button variant="outline" size="sm" onclick={reactivateAction.execute} disabled={reactivateAction.loading}>
+			<RotateCcw class="mr-1 h-3 w-3" />
+			{reactivateAction.loading ? 'Reactivating...' : 'Reactivate'}
+		</Button>
 		</Alert>
 	{/if}
 
-	{#if error}
-		<Alert variant="destructive">{error}</Alert>
+	{#if form.error}
+		<Alert variant="destructive">{form.error}</Alert>
 	{/if}
 
 	<!-- Edit Section -->
 	<div class="space-y-4 rounded-lg border bg-card p-4">
 		<div class="grid gap-2">
 			<Label for="name">Name</Label>
-			<Input id="name" bind:value={editName} />
+			<Input id="name" bind:value={form.fields.name} />
 		</div>
 
 		<div class="grid gap-2">
 			<Label for="description">Description</Label>
-			<Textarea id="description" bind:value={editDescription} rows={3} />
+			<Textarea id="description" bind:value={form.fields.description} rows={3} />
 		</div>
 
 		<div class="flex justify-end">
-			<Button onclick={handleSave} disabled={saving || !isDirty}>
-				{saving ? 'Saving...' : 'Save Changes'}
+			<Button onclick={form.save} disabled={form.saving || !form.isDirty}>
+				{form.saving ? 'Saving...' : 'Save Changes'}
 			</Button>
 		</div>
 	</div>
@@ -248,7 +204,7 @@ async function handleReactivate() {
 	<!-- Actions -->
 	{#if scene.active}
 		<div class="border-t pt-4">
-		<Button variant="destructive" onclick={() => (showDisableConfirm = true)} disabled={actionLoading}>
+		<Button variant="destructive" onclick={() => (showDisableConfirm = true)} disabled={disableAction.loading}>
 			<Trash2 class="mr-2 h-4 w-4" />
 			Disable Scene
 		</Button>
@@ -261,5 +217,5 @@ async function handleReactivate() {
 	title="Disable Scene"
 	description={`Disable scene "${scene.name}"? It will be hidden from captures.`}
 	confirmLabel="Disable"
-	onConfirm={confirmDisable}
+	onConfirm={disableAction.execute}
 />

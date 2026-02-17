@@ -6,7 +6,7 @@ import { ItemGrid } from '$lib/components/item-grid';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminBreadcrumb, AdminCaptureCard } from '$lib/components/admin';
+import { AdminBreadcrumb, AdminCaptureCard, createAdminAction } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
@@ -24,9 +24,14 @@ let { data }: Props = $props();
 let capture: CaptureDetail = $derived(data.capture);
 
 let error = $state<string | null>(null);
-let actionLoading = $state(false);
 let showDeleteConfirm = $state(false);
 let lightboxOpen = $state(false);
+
+const deleteAction = createAdminAction({
+	action: () => api.admin.deleteCapture(capture.id),
+	onSuccess: () => void goto('/admin/captures'),
+	setError: (msg) => (error = msg)
+});
 
 // Build breadcrumb segments
 let breadcrumbs = $derived.by(() => {
@@ -100,23 +105,6 @@ let viewAllHref = $derived.by(() => {
 	}
 });
 
-async function confirmDelete() {
-	actionLoading = true;
-	try {
-		const result = await api.admin.deleteCapture(capture.id);
-		result.match({
-			Ok: () => {
-				void goto('/admin/captures');
-			},
-			Err: (err) => {
-				error = err.message;
-			}
-		});
-	} finally {
-		actionLoading = false;
-	}
-}
-
 function formatFps(value?: number): string {
 	if (value == null) return '\u2014';
 	return value.toFixed(1);
@@ -159,7 +147,7 @@ function formatMs(value?: number): string {
 			variant="destructive"
 			size="icon"
 			onclick={() => (showDeleteConfirm = true)}
-			disabled={actionLoading}
+			disabled={deleteAction.loading}
 			aria-label="Delete capture"
 		>
 			<Trash2 class="h-4 w-4" />
@@ -457,7 +445,7 @@ function formatMs(value?: number): string {
 	title="Delete Capture"
 	description={`Delete capture for ${capture.shader_name}?`}
 	confirmLabel="Delete"
-	onConfirm={confirmDelete}
+	onConfirm={deleteAction.execute}
 />
 
 {#if lightboxOpen && capture.image_url}
