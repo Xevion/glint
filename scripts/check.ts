@@ -270,8 +270,7 @@ const checks: Check[] = [
 	{
 		name: 'backend-audit',
 		subsystem: 'security',
-		cmd: ['cargo', 'audit'],
-		cwd: 'backend'
+		cmd: ['cargo', 'audit', '-f', 'backend/Cargo.lock']
 	},
 	{
 		name: 'frontend-audit',
