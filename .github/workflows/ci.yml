@@ -56,7 +56,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libdav1d-dev
+        run: sudo apt-get update && sudo apt-get install -y libdav1d-dev mold
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -133,6 +133,10 @@ jobs:
         working-directory: frontend
         run: bunx svelte-kit sync
 
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: bunx playwright install chromium --with-deps
+
       - name: Run tests
         working-directory: frontend
         run: bun run test
@@ -162,7 +166,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libdav1d-dev
+        run: sudo apt-get update && sudo apt-get install -y libdav1d-dev mold
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -220,8 +224,7 @@ jobs:
         uses: taiki-e/install-action@cargo-audit
 
       - name: Rust security audit
-        working-directory: backend
-        run: cargo audit
+        run: cargo audit -f backend/Cargo.lock
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
