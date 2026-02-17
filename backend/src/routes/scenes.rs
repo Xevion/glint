@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Redirect, Response},
-    routing::{delete, get, put},
+    routing::{delete, get, patch, put},
 };
 use serde::Deserialize;
 use tracing::instrument;
@@ -14,10 +14,12 @@ use validator::Validate;
 use crate::{
     auth::AdminUser,
     error::{AppError, AppResult, OptionNotFoundExt},
+    id::ScenePresetId,
     models::{
-        CaptureStatus, CaptureWithContext, CreateSceneRequest, PageQuery, Paginated, Scene,
-        SceneListAdmin, SceneListItem, SceneWithCaptures, SceneWithVersion,
-        UpdateSceneMetadataRequest, UpdateSceneRequest,
+        CaptureStatus, CaptureWithContext, CreatePresetRequest, CreateSceneRequest, PageQuery,
+        Paginated, ReorderPresetsRequest, Scene, SceneListAdmin, SceneListItem, ScenePreset,
+        SceneWithCaptures, SceneWithVersion, UpdatePresetRequest, UpdateSceneMetadataRequest,
+        UpdateSceneRequest,
     },
     repo::{
         CaptureRepo, ScenePresetRepo, SceneRepo, SceneVersionRepo, SlugRedirectRepo, TagRepo,
@@ -45,6 +47,16 @@ pub fn router() -> Router<AppState> {
                 .delete(disable_scene),
         )
         .route("/by-slug/{slug}/captures", get(list_scene_captures))
+        // Preset CRUD
+        .route(
+            "/by-slug/{slug}/presets",
+            get(list_presets).post(create_preset),
+        )
+        .route(
+            "/by-slug/{slug}/presets/{preset_slug}",
+            patch(update_preset).delete(delete_preset),
+        )
+        .route("/by-slug/{slug}/presets/reorder", patch(reorder_presets))
 }
 
 /// GET /api/scenes - List active scenes with enrichment (public)
@@ -401,4 +413,168 @@ async fn list_scene_captures(
         CaptureRepo::list_with_context(db, &filters, Some(&p), CaptureDistinct::PerShader).await?;
 
     Ok(Json(Paginated::new(items, total.unwrap_or(0), &p)))
+}
+
+// ---------------------------------------------------------------------------
+// Preset CRUD Handlers
+// ---------------------------------------------------------------------------
+
+/// Helper to resolve a scene by slug (first active match).
+async fn resolve_scene_by_slug(state: &AppState, slug: &str) -> AppResult<Scene> {
+    SceneRepo::find_active_by_slug(state.db(), slug)
+        .await?
+        .into_iter()
+        .next()
+        .or_not_found("Scene", slug)
+}
+
+/// GET /api/scenes/by-slug/{slug}/presets — List presets for a scene (public)
+#[instrument(skip(state))]
+async fn list_presets(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+) -> AppResult<Json<Vec<ScenePreset>>> {
+    let scene = resolve_scene_by_slug(&state, &slug).await?;
+    let presets = ScenePresetRepo::list_by_scene(state.db(), scene.id.as_ref()).await?;
+    Ok(Json(presets))
+}
+
+/// POST /api/scenes/by-slug/{slug}/presets — Create a new preset (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
+async fn create_preset(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Json(request): Json<CreatePresetRequest>,
+) -> AppResult<(StatusCode, Json<ScenePreset>)> {
+    request.validate()?;
+
+    let scene = resolve_scene_by_slug(&state, &slug).await?;
+
+    // Check uniqueness of preset slug within this scene
+    if ScenePresetRepo::find_by_slug(state.db(), scene.id.as_ref(), &request.slug)
+        .await?
+        .is_some()
+    {
+        return Err(AppError::Conflict(format!(
+            "Preset with slug '{}' already exists in scene '{}'",
+            request.slug, slug
+        )));
+    }
+
+    let id = ScenePresetId::generate();
+    let sort_order = ScenePresetRepo::max_sort_order(state.db(), scene.id.as_ref()).await? + 1;
+
+    let preset = ScenePresetRepo::create(
+        state.db(),
+        id.as_ref(),
+        scene.id.as_ref(),
+        &request.name,
+        &request.slug,
+        request.time_of_day_ticks,
+        &request.weather,
+        request.weather_intensity,
+        request.moon_phase,
+        sort_order,
+    )
+    .await?;
+
+    Ok((StatusCode::CREATED, Json(preset)))
+}
+
+/// Path parameters for preset operations by slug.
+#[derive(Debug, Deserialize)]
+struct PresetPathParams {
+    slug: String,
+    preset_slug: String,
+}
+
+/// PATCH /api/scenes/by-slug/{slug}/presets/{preset_slug} — Update preset (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
+async fn update_preset(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Path(params): Path<PresetPathParams>,
+    Json(request): Json<UpdatePresetRequest>,
+) -> AppResult<Json<ScenePreset>> {
+    request.validate()?;
+
+    let scene = resolve_scene_by_slug(&state, &params.slug).await?;
+    let preset = ScenePresetRepo::find_by_slug(state.db(), scene.id.as_ref(), &params.preset_slug)
+        .await?
+        .or_not_found("Preset", &params.preset_slug)?;
+
+    let updated = ScenePresetRepo::update(
+        state.db(),
+        preset.id.as_ref(),
+        request.name.as_deref(),
+        request.time_of_day_ticks,
+        request.weather.as_deref(),
+        request.weather_intensity,
+        request.moon_phase,
+    )
+    .await?;
+
+    Ok(Json(updated))
+}
+
+/// DELETE /api/scenes/by-slug/{slug}/presets/{preset_slug} — Delete preset (admin)
+///
+/// Cannot delete the last preset for a scene.
+#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
+async fn delete_preset(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Path(params): Path<PresetPathParams>,
+) -> AppResult<StatusCode> {
+    let scene = resolve_scene_by_slug(&state, &params.slug).await?;
+    let preset = ScenePresetRepo::find_by_slug(state.db(), scene.id.as_ref(), &params.preset_slug)
+        .await?
+        .or_not_found("Preset", &params.preset_slug)?;
+
+    // Cannot delete the last preset
+    let count = ScenePresetRepo::count_by_scene(state.db(), scene.id.as_ref()).await?;
+    if count <= 1 {
+        return Err(AppError::BadRequest(
+            "Cannot delete the last preset for a scene".into(),
+        ));
+    }
+
+    ScenePresetRepo::delete(state.db(), preset.id.as_ref()).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// PATCH /api/scenes/by-slug/{slug}/presets/reorder — Reorder presets (admin)
+#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
+async fn reorder_presets(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Json(request): Json<ReorderPresetsRequest>,
+) -> AppResult<Json<Vec<ScenePreset>>> {
+    request.validate()?;
+
+    let scene = resolve_scene_by_slug(&state, &slug).await?;
+
+    // Validate that all provided preset IDs belong to this scene
+    let existing_presets = ScenePresetRepo::list_by_scene(state.db(), scene.id.as_ref()).await?;
+    let existing_ids: std::collections::HashSet<&str> =
+        existing_presets.iter().map(|p| p.id.as_ref()).collect();
+    let unknown: Vec<&str> = request
+        .preset_ids
+        .iter()
+        .filter(|id| !existing_ids.contains(id.as_str()))
+        .map(|s| s.as_str())
+        .collect();
+    if !unknown.is_empty() {
+        return Err(AppError::BadRequest(format!(
+            "Preset IDs not found in scene '{}': {}",
+            slug,
+            unknown.join(", ")
+        )));
+    }
+
+    let presets =
+        ScenePresetRepo::reorder(state.db(), scene.id.as_ref(), &request.preset_ids).await?;
+    Ok(Json(presets))
 }

@@ -92,6 +92,11 @@
         "ordinal": 17,
         "name": "render_distance",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 18,
+        "name": "minecraft_version",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -117,7 +122,8 @@
       true,
       true,
       false,
-      false
+      false,
+      true
     ]
   },
   "hash": "8b9f9429dfe5b7293bf93e758d36b462b6d058d5c8d9a819788fe6a4114d949e"

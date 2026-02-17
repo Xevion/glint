@@ -209,6 +209,24 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    services.spawn("upload-cleanup", {
+        let pool = pool.clone();
+        |ctx| async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(3600));
+            while ctx.tick(&mut interval).await {
+                match glint::repo::PendingSceneUploadRepo::cleanup_expired(&pool).await {
+                    Ok(count) if count > 0 => {
+                        info!(count, "Purged expired pending uploads");
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "Failed to purge expired pending uploads");
+                    }
+                    _ => {}
+                }
+            }
+        }
+    });
+
     // Configure CORS. SvelteKit's universal fetch enforces CORS during SSR using
     // the page's origin, so the frontend origin (wherever SvelteKit is served)
     // must be included in cors_origins.

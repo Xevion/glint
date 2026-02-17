@@ -13,13 +13,15 @@
 
 -- Latest scene version per scene (by created_at DESC, id DESC tiebreaker).
 -- Includes package and rendering fields from the scene-packages migration.
+-- Drop and recreate to accommodate new minecraft_version column.
+DROP VIEW IF EXISTS latest_scene_versions CASCADE;
 CREATE OR REPLACE VIEW latest_scene_versions AS
 SELECT DISTINCT ON (scene_id)
     id, scene_id, x, y, z, pitch, yaw,
     time_of_day_ticks, weather, weather_intensity, moon_phase, biome,
     fov, render_distance,
     package_url, package_hash, package_size_bytes,
-    created_at
+    created_at, minecraft_version
 FROM scene_versions
 ORDER BY scene_id, created_at DESC, id DESC;
 

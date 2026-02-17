@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Context;
 use tracing::{debug, instrument};
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::id::{SceneId, SceneVersionId};
 use chrono::{DateTime, Utc};
 
@@ -33,6 +33,7 @@ struct SceneListAdminRow {
     version_weather_intensity: Option<f64>,
     version_moon_phase: Option<i32>,
     version_biome: Option<String>,
+    version_minecraft_version: Option<String>,
     version_package_url: Option<String>,
     version_package_hash: Option<String>,
     version_package_size_bytes: Option<i64>,
@@ -45,8 +46,10 @@ struct SceneListAdminRow {
     capture_count: Option<i64>,
 }
 
-impl From<SceneListAdminRow> for SceneListAdmin {
-    fn from(row: SceneListAdminRow) -> Self {
+impl TryFrom<SceneListAdminRow> for SceneListAdmin {
+    type Error = AppError;
+
+    fn try_from(row: SceneListAdminRow) -> Result<Self, Self::Error> {
         let version = row
             .version_id
             .map(|vid| SceneVersion {
@@ -62,6 +65,7 @@ impl From<SceneListAdminRow> for SceneListAdmin {
                 weather_intensity: row.version_weather_intensity.unwrap_or(0.0),
                 moon_phase: row.version_moon_phase,
                 biome: row.version_biome,
+                minecraft_version: row.version_minecraft_version,
                 package_url: row.version_package_url,
                 package_hash: row.version_package_hash,
                 package_size_bytes: row.version_package_size_bytes,
@@ -69,8 +73,13 @@ impl From<SceneListAdminRow> for SceneListAdmin {
                 render_distance: row.version_render_distance.unwrap_or(16),
                 created_at: row.version_created_at.unwrap_or(row.created_at),
             })
-            .expect("scene must have at least one version (post-migration invariant)");
-        Self {
+            .ok_or_else(|| {
+                AppError::Internal(anyhow::anyhow!(
+                    "scene '{}' has no version (post-migration invariant violated)",
+                    row.id
+                ))
+            })?;
+        Ok(Self {
             scene: Scene {
                 id: SceneId(row.id),
                 name: row.name,
@@ -84,7 +93,7 @@ impl From<SceneListAdminRow> for SceneListAdmin {
             image_url: row.image_url,
             thumbhash: row.thumbhash,
             capture_count: row.capture_count.unwrap_or(0),
-        }
+        })
     }
 }
 
@@ -315,6 +324,7 @@ impl SceneRepo {
                 lsv.weather_intensity AS version_weather_intensity,
                 lsv.moon_phase AS version_moon_phase,
                 lsv.biome AS version_biome,
+                lsv.minecraft_version AS version_minecraft_version,
                 lsv.package_url AS version_package_url,
                 lsv.package_hash AS version_package_hash,
                 lsv.package_size_bytes AS version_package_size_bytes,
@@ -340,7 +350,10 @@ impl SceneRepo {
         .await
         .context("failed to list all scenes")?;
 
-        let scenes: Vec<SceneListAdmin> = rows.into_iter().map(Into::into).collect();
+        let scenes: Vec<SceneListAdmin> = rows
+            .into_iter()
+            .map(SceneListAdmin::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
         debug!(count = scenes.len(), "Listed all scenes");
         Ok(scenes)
     }
@@ -455,12 +468,74 @@ impl SceneVersionRepo {
         Ok(rows.into_iter().map(|v| (v.scene_id.clone(), v)).collect())
     }
 
+    /// Create a new scene_version with all fields including package data.
+    /// Used by the upload confirmation flow.
+    #[allow(clippy::too_many_arguments)]
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn create_with_package(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+        scene_id: &str,
+        x: f64,
+        y: f64,
+        z: f64,
+        pitch: f64,
+        yaw: f64,
+        time_of_day_ticks: i32,
+        weather: &str,
+        weather_intensity: f64,
+        moon_phase: Option<i32>,
+        biome: Option<&str>,
+        minecraft_version: &str,
+        package_url: &str,
+        package_hash: &str,
+        package_size_bytes: i64,
+        fov: i32,
+        render_distance: i32,
+    ) -> AppResult<SceneVersion> {
+        sqlx::query_as!(
+            SceneVersion,
+            r#"
+            INSERT INTO scene_versions
+                (id, scene_id, x, y, z, pitch, yaw,
+                 time_of_day_ticks, weather, weather_intensity, moon_phase, biome,
+                 minecraft_version, package_url, package_hash, package_size_bytes,
+                 fov, render_distance, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, now())
+            RETURNING *
+            "#,
+            id,
+            scene_id,
+            x,
+            y,
+            z,
+            pitch,
+            yaw,
+            time_of_day_ticks,
+            weather,
+            weather_intensity,
+            moon_phase,
+            biome,
+            minecraft_version,
+            package_url,
+            package_hash,
+            package_size_bytes,
+            fov,
+            render_distance,
+        )
+        .fetch_one(executor)
+        .await
+        .context(format!(
+            "failed to create scene version with package for '{}'",
+            scene_id
+        ))
+        .map_err(Into::into)
+    }
+
     /// Internal helper: insert a new scene_version row from a CreateSceneRequest.
     ///
     /// Package fields (package_url, package_hash, package_size_bytes) and rendering
     /// overrides (fov, render_distance) are not set here — they use DB defaults.
-    /// Scene packages are uploaded separately and attached to versions via a
-    /// dedicated endpoint (not yet implemented).
     pub(crate) async fn create_inner(
         executor: impl sqlx::PgExecutor<'_>,
         id: &str,
@@ -583,5 +658,141 @@ impl ScenePresetRepo {
             .context(format!("failed to delete preset '{}'", id))?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    /// Find a preset by scene_id + preset slug.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn find_by_slug(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_id: &str,
+        slug: &str,
+    ) -> AppResult<Option<ScenePreset>> {
+        sqlx::query_as!(
+            ScenePreset,
+            "SELECT * FROM scene_presets WHERE scene_id = $1 AND slug = $2",
+            scene_id,
+            slug
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!(
+            "failed to find preset '{}' for scene '{}'",
+            slug, scene_id
+        ))
+        .map_err(Into::into)
+    }
+
+    /// Count the number of presets for a scene.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn count_by_scene(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_id: &str,
+    ) -> AppResult<i64> {
+        let count = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM scene_presets WHERE scene_id = $1",
+            scene_id
+        )
+        .fetch_one(executor)
+        .await
+        .context(format!("failed to count presets for scene '{}'", scene_id))?;
+
+        Ok(count.unwrap_or(0))
+    }
+
+    /// Get the max sort_order for presets in a scene (for appending new presets).
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn max_sort_order(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_id: &str,
+    ) -> AppResult<i32> {
+        let max = sqlx::query_scalar!(
+            "SELECT MAX(sort_order) FROM scene_presets WHERE scene_id = $1",
+            scene_id
+        )
+        .fetch_one(executor)
+        .await
+        .context(format!(
+            "failed to get max sort_order for scene '{}'",
+            scene_id
+        ))?;
+
+        Ok(max.unwrap_or(-1))
+    }
+
+    /// Update a preset's fields. Only non-None fields are updated.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn update(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+        name: Option<&str>,
+        time_of_day_ticks: Option<i32>,
+        weather: Option<&str>,
+        weather_intensity: Option<f64>,
+        moon_phase: Option<i32>,
+    ) -> AppResult<ScenePreset> {
+        sqlx::query_as!(
+            ScenePreset,
+            r#"
+            UPDATE scene_presets SET
+                name = COALESCE($2, name),
+                time_of_day_ticks = COALESCE($3, time_of_day_ticks),
+                weather = COALESCE($4, weather),
+                weather_intensity = COALESCE($5, weather_intensity),
+                moon_phase = COALESCE($6, moon_phase),
+                updated_at = now()
+            WHERE id = $1
+            RETURNING *
+            "#,
+            id,
+            name,
+            time_of_day_ticks,
+            weather,
+            weather_intensity,
+            moon_phase,
+        )
+        .fetch_one(executor)
+        .await
+        .context(format!("failed to update preset '{}'", id))
+        .map_err(Into::into)
+    }
+
+    /// Reorder presets by setting sort_order based on position in the given ID list.
+    /// Uses a transaction to update all presets atomically.
+    #[instrument(skip(pool), level = "debug")]
+    pub async fn reorder(
+        pool: &crate::db::DbPool,
+        scene_id: &str,
+        preset_ids: &[String],
+    ) -> AppResult<Vec<ScenePreset>> {
+        let mut tx = pool.begin().await.context("failed to begin transaction")?;
+
+        for (idx, preset_id) in preset_ids.iter().enumerate() {
+            sqlx::query!(
+                "UPDATE scene_presets SET sort_order = $1, updated_at = now() WHERE id = $2 AND scene_id = $3",
+                idx as i32,
+                preset_id,
+                scene_id,
+            )
+            .execute(&mut *tx)
+            .await
+            .context(format!("failed to update sort_order for preset '{}'", preset_id))?;
+        }
+
+        let presets = sqlx::query_as!(
+            ScenePreset,
+            "SELECT * FROM scene_presets WHERE scene_id = $1 ORDER BY sort_order ASC, name ASC",
+            scene_id
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .context(format!(
+            "failed to list presets after reorder for scene '{}'",
+            scene_id
+        ))?;
+
+        tx.commit()
+            .await
+            .context("failed to commit preset reorder")?;
+        Ok(presets)
     }
 }

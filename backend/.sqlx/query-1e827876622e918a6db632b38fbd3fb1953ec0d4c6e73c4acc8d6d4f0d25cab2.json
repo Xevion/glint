@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT * FROM scene_versions\n            WHERE scene_id = $1\n            ORDER BY created_at DESC, id DESC\n            LIMIT 1\n            ",
+  "query": "\n            INSERT INTO scene_versions\n                (id, scene_id, x, y, z, pitch, yaw,\n                 time_of_day_ticks, weather, weather_intensity, moon_phase, biome,\n                 minecraft_version, package_url, package_hash, package_size_bytes,\n                 fov, render_distance, created_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, now())\n            RETURNING *\n            ",
   "describe": {
     "columns": [
       {
@@ -101,7 +101,24 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Text",
+        "Text",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Int4",
+        "Text",
+        "Float8",
+        "Int4",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8",
+        "Int4",
+        "Int4"
       ]
     },
     "nullable": [
@@ -126,5 +143,5 @@
       true
     ]
   },
-  "hash": "6157e474cd7becc8a557faf8a3c1da4de7a0964f3eda3519484774baaab38e08"
+  "hash": "1e827876622e918a6db632b38fbd3fb1953ec0d4c6e73c4acc8d6d4f0d25cab2"
 }

@@ -16,8 +16,8 @@ pub mod work;
 
 // Re-export ID types for convenience
 pub use crate::id::{
-    BackgroundId, CaptureId, CaptureRunId, SceneId, ScenePresetId, SceneVersionId, ShaderId,
-    ShaderVersionId, ShaderVersionProfileId,
+    BackgroundId, CaptureId, CaptureRunId, PendingSceneUploadId, SceneId, ScenePresetId,
+    SceneVersionId, ShaderId, ShaderVersionId, ShaderVersionProfileId,
 };
 
 // Re-export all public types so existing `use crate::models::Foo` imports continue to work.
@@ -36,9 +36,11 @@ pub use extraction::{ExtractionStatus, ShaderVersionMetadata, ShaderVersionProfi
 pub use featured::FeaturedPair;
 pub use pagination::{Page, PageQuery, Paginated};
 pub use scene::{
-    Camera, CreateSceneRequest, Position, Scene, SceneListAdmin, SceneListItem, ScenePreset,
-    SceneVersion, SceneWithCaptures, SceneWithVersion, UpdateSceneMetadataRequest,
-    UpdateSceneRequest,
+    Camera, CompleteUploadRequest, CompleteUploadResponse, CreatePresetRequest, CreateSceneRequest,
+    InitiateNewSceneUploadRequest, InitiateVersionUploadRequest, PendingSceneUpload, Position,
+    ReorderPresetsRequest, Scene, SceneListAdmin, SceneListItem, ScenePreset, SceneVersion,
+    SceneWithCaptures, SceneWithVersion, UpdatePresetRequest, UpdateSceneMetadataRequest,
+    UpdateSceneRequest, UploadInitiatedResponse,
 };
 pub use shader::{
     CreateShaderRequest, CreateShaderVersionRequest, ExtractionSummary, Shader, ShaderAdopted,

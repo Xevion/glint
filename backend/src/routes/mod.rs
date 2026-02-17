@@ -8,6 +8,7 @@ mod device;
 mod extraction;
 mod featured;
 mod runs;
+mod scene_uploads;
 mod scenes;
 mod shaders;
 mod sitemap;
@@ -92,6 +93,12 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
                 .layer(cache_short.clone()),
         )
         .nest("/scenes", scenes::router().layer(cache_short.clone()))
+        .nest(
+            "/scenes",
+            scene_uploads::router()
+                .layer(no_store.clone())
+                .layer(make_layer(&rl.agent, "agent")),
+        )
         .nest("/captures", captures::router().layer(cache_short))
         .nest("/stats", stats::router().layer(cache_stats))
         .nest("/users", users::router())

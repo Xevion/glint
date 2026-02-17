@@ -118,3 +118,4 @@ define_id!(BackgroundId);
 define_id!(CaptureId);
 define_id!(CaptureRunId);
 define_id!(ShaderVersionProfileId);
+define_id!(PendingSceneUploadId);

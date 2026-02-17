@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT * FROM pending_scene_uploads\n            WHERE id = $1 AND expires_at > now()\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "scene_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "scene_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "scene_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "scene_dimension",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "scene_description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "minecraft_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "r2_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "71e49b756a3efa5e7c27627809cadafeb34aa91b4354f13b73c57103562d97bd"
+}

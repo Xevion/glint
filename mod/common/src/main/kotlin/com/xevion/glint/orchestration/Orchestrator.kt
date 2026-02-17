@@ -606,7 +606,7 @@ class Orchestrator {
         var currentScenes = mutableListOf<SceneEntry>()
 
         for (item in items) {
-            val worldFolder = item.worldSlug
+            val worldFolder = item.sceneSlug
             val groupKey = item.shaderVersionId to item.profileId
 
             // World transition — flush current world

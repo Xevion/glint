@@ -41,6 +41,13 @@
         "null"
       ]
     },
+    "preset_moon_phase": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
     "preset_name": {
       "type": [
         "string",
@@ -52,6 +59,26 @@
         "string",
         "null"
       ]
+    },
+    "preset_time_of_day_ticks": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
+    "preset_weather": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "preset_weather_intensity": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "double"
     },
     "profile_id": {
       "type": [
@@ -80,6 +107,12 @@
     },
     "scene_id": {
       "type": "string"
+    },
+    "scene_minecraft_version": {
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "scene_moon_phase": {
       "type": [

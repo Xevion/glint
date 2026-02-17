@@ -7,7 +7,7 @@ use validator::{Validate, ValidationError};
 
 use super::capture::CaptureWithContext;
 use super::taxonomy::Tag;
-use crate::id::{SceneId, ScenePresetId, SceneVersionId};
+use crate::id::{PendingSceneUploadId, SceneId, ScenePresetId, SceneVersionId};
 
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
@@ -43,6 +43,7 @@ pub struct SceneVersion {
     pub package_url: Option<String>,
     pub package_hash: Option<String>,
     pub package_size_bytes: Option<i64>,
+    pub minecraft_version: Option<String>,
     pub fov: i32,
     pub render_distance: i32,
     #[ts(type = "string")]
@@ -129,6 +130,16 @@ fn validate_weather(value: &str) -> Result<(), ValidationError> {
     }
 }
 
+fn validate_slug(slug: &str) -> Result<(), ValidationError> {
+    if !slug
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
+        return Err(ValidationError::new("invalid_slug_format"));
+    }
+    Ok(())
+}
+
 /// Helper types for scene position and camera
 #[derive(Debug, Deserialize, Serialize, Validate)]
 pub struct Position {
@@ -151,6 +162,7 @@ pub struct Camera {
 /// Create scene request (from mod - includes name, no description/tags)
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateSceneRequest {
+    #[validate(length(min = 1, max = 100), custom(function = "validate_slug"))]
     pub slug: String,
     pub name: String,
     #[validate(nested)]
@@ -195,4 +207,154 @@ pub struct UpdateSceneRequest {
 pub struct UpdateSceneMetadataRequest {
     pub name: Option<String>,
     pub description: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Scene Package Upload Types
+// ---------------------------------------------------------------------------
+
+/// DB row for pending scene package uploads (initiate → confirm flow).
+/// Internal type — not serialized to API responses.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct PendingSceneUpload {
+    pub id: String,
+    pub scene_id: Option<String>,
+    pub scene_name: Option<String>,
+    pub scene_slug: Option<String>,
+    pub scene_dimension: Option<String>,
+    pub scene_description: Option<String>,
+    pub minecraft_version: String,
+    pub file_hash: String,
+    pub size_bytes: i64,
+    pub r2_key: String,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+/// POST /api/scenes — Initiate upload for a NEW scene (agent).
+/// Creates a pending upload record with scene metadata, returns presigned URL.
+#[derive(Debug, Deserialize, Validate)]
+pub struct InitiateNewSceneUploadRequest {
+    #[validate(length(min = 1, max = 100))]
+    pub name: String,
+    #[validate(length(min = 1, max = 100), custom(function = "validate_slug"))]
+    pub slug: String,
+    pub description: Option<String>,
+    #[validate(length(min = 1, max = 50))]
+    pub dimension: String,
+    #[validate(length(min = 1, max = 20))]
+    pub minecraft_version: String,
+    #[validate(length(min = 1))]
+    pub file_hash: String,
+    #[validate(range(min = 1))]
+    pub size_bytes: i64,
+}
+
+/// POST /api/scenes/{slug}/versions — Initiate upload for an EXISTING scene (agent).
+#[derive(Debug, Deserialize, Validate)]
+pub struct InitiateVersionUploadRequest {
+    #[validate(length(min = 1))]
+    pub file_hash: String,
+    #[validate(range(min = 1))]
+    pub size_bytes: i64,
+    #[validate(length(min = 1, max = 20))]
+    pub minecraft_version: String,
+}
+
+/// Response from upload initiation endpoints.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct UploadInitiatedResponse {
+    pub upload_id: PendingSceneUploadId,
+    pub upload_url: String,
+}
+
+/// Environment settings within a scene version.
+#[derive(Debug, Deserialize, Validate)]
+pub struct Environment {
+    #[validate(range(min = 0, max = 24000))]
+    pub time_of_day_ticks: i32,
+    #[validate(custom(function = "validate_weather"))]
+    pub weather: String,
+    #[serde(default)]
+    #[validate(range(min = 0.0, max = 1.0))]
+    pub weather_intensity: f64,
+    #[validate(range(min = 0, max = 7))]
+    pub moon_phase: Option<i32>,
+}
+
+/// POST /api/scenes/uploads/{upload_id}/complete — Confirm upload and create scene version.
+#[derive(Debug, Deserialize, Validate)]
+pub struct CompleteUploadRequest {
+    #[validate(length(min = 1))]
+    pub file_hash: String,
+    #[validate(nested)]
+    pub camera: Camera,
+    #[validate(nested)]
+    pub environment: Environment,
+    #[validate(range(min = 30, max = 110))]
+    pub fov: i32,
+    #[validate(range(min = 2, max = 64))]
+    pub render_distance: i32,
+    pub biome: Option<String>,
+    #[validate(nested)]
+    pub position: Position,
+}
+
+/// Response from upload confirmation.
+#[skip_serializing_none]
+#[derive(Debug, Serialize, TS)]
+#[ts(export, optional_fields)]
+pub struct CompleteUploadResponse {
+    pub scene_id: SceneId,
+    pub scene_version_id: SceneVersionId,
+    pub preset_id: Option<ScenePresetId>,
+}
+
+// ---------------------------------------------------------------------------
+// Scene Preset CRUD Types
+// ---------------------------------------------------------------------------
+
+/// POST /api/scenes/{slug}/presets — Create a new preset.
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreatePresetRequest {
+    #[validate(length(min = 1, max = 100))]
+    pub name: String,
+    #[validate(length(min = 1, max = 100), custom(function = "validate_slug"))]
+    pub slug: String,
+    #[validate(range(min = 0, max = 24000))]
+    pub time_of_day_ticks: i32,
+    #[validate(custom(function = "validate_weather"))]
+    pub weather: String,
+    #[serde(default)]
+    #[validate(range(min = 0.0, max = 1.0))]
+    pub weather_intensity: f64,
+    #[validate(range(min = 0, max = 7))]
+    pub moon_phase: Option<i32>,
+}
+
+/// PATCH /api/scenes/{slug}/presets/{preset_slug} — Update a preset.
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdatePresetRequest {
+    #[validate(length(min = 1, max = 100))]
+    pub name: Option<String>,
+    #[validate(range(min = 0, max = 24000))]
+    pub time_of_day_ticks: Option<i32>,
+    #[validate(custom(function = "validate_weather"))]
+    pub weather: Option<String>,
+    #[validate(range(min = 0.0, max = 1.0))]
+    pub weather_intensity: Option<f64>,
+    // Note: COALESCE in the update query can't clear this to NULL.
+    // If clearing moon_phase is needed, switch to double-option pattern.
+    #[validate(range(min = 0, max = 7))]
+    pub moon_phase: Option<i32>,
+}
+
+/// PATCH /api/scenes/{slug}/presets/reorder — Reorder presets.
+#[derive(Debug, Deserialize, Validate)]
+pub struct ReorderPresetsRequest {
+    /// Ordered list of preset IDs. The sort_order of each preset
+    /// is set to its index in this array.
+    #[validate(length(min = 1, max = 100))]
+    pub preset_ids: Vec<String>,
 }
