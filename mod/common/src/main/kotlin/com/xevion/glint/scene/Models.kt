@@ -216,6 +216,10 @@ enum class Weather {
 
     fun toMinecraftString(): String = name.lowercase()
 
+    val displayName: String get() = name.lowercase().replaceFirstChar { it.uppercase() }
+
+    fun next(): Weather = entries[(ordinal + 1) % entries.size]
+
     companion object {
         fun fromString(value: String): Weather =
             when (value.lowercase()) {

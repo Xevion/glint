@@ -169,47 +169,12 @@ object SceneApplicator {
             return
         }
 
-        // Set time of day on server
         val overworld = server.overworld()
         overworld.dayTime = scene.timeOfDay.toLong()
         log.debug("Set server time") { "time" to scene.timeOfDay }
 
-        // Set weather on server using the public API
-        when (scene.weather) {
-            Weather.CLEAR -> {
-                overworld.setWeatherParameters(6000, 0, false, false)
-                log.debug("Set weather") { "weather" to "CLEAR" }
-            }
-
-            Weather.RAIN -> {
-                overworld.setWeatherParameters(0, 6000, true, false)
-                log.debug("Set weather") { "weather" to "RAIN" }
-            }
-
-            Weather.THUNDER -> {
-                overworld.setWeatherParameters(0, 6000, true, true)
-                log.debug("Set weather") { "weather" to "THUNDER" }
-            }
-        }
-    }
-
-    /** Compute the target rain/thunder levels for a scene. */
-    private fun weatherLevelsFor(scene: Scene): Pair<Float, Float> {
-        val intensity = scene.weatherIntensity
-        return when (scene.weather) {
-            Weather.CLEAR -> {
-                0f to 0f
-            }
-
-            Weather.RAIN -> {
-                (if (intensity > 0f) intensity else 1f) to 0f
-            }
-
-            Weather.THUNDER -> {
-                val level = if (intensity > 0f) intensity else 1f
-                level to level
-            }
-        }
+        scene.weather.applyParameters(overworld)
+        log.debug("Set weather") { "weather" to scene.weather.name }
     }
 
     /**
@@ -225,20 +190,14 @@ object SceneApplicator {
     fun snapWeatherLevels(scene: Scene) {
         val mc = Minecraft.getInstance()
         val server = mc.singleplayerServer ?: return
-
-        val (targetRainLevel, targetThunderLevel) = weatherLevelsFor(scene)
-
         val overworld = server.overworld()
-        overworld.setRainLevel(targetRainLevel)
-        overworld.setThunderLevel(targetThunderLevel)
-        mc.level?.let { clientLevel ->
-            clientLevel.setRainLevel(targetRainLevel)
-            clientLevel.setThunderLevel(targetThunderLevel)
-        }
 
+        scene.weather.snapLevels(overworld, scene.weatherIntensity)
+
+        val (targetRain, targetThunder) = scene.weather.levels(scene.weatherIntensity)
         log.debug("Weather levels snapped") {
-            "rain" to targetRainLevel
-            "thunder" to targetThunderLevel
+            "rain" to targetRain
+            "thunder" to targetThunder
         }
     }
 
@@ -363,39 +322,13 @@ object SceneApplicator {
             "moon_phase" to moonPhase
         }
 
-        when (weather) {
-            Weather.CLEAR -> overworld.setWeatherParameters(6000, 0, false, false)
-            Weather.RAIN -> overworld.setWeatherParameters(0, 6000, true, false)
-            Weather.THUNDER -> overworld.setWeatherParameters(0, 6000, true, true)
-        }
+        weather.applyParameters(overworld)
 
         // Freeze daylight and weather cycles
         overworld.gameRules.getRule(GameRules.RULE_DAYLIGHT).set(false, server)
         overworld.gameRules.getRule(GameRules.RULE_WEATHER_CYCLE).set(false, server)
 
-        // Snap weather levels on both server and client
-        val (targetRainLevel, targetThunderLevel) =
-            when (weather) {
-                Weather.CLEAR -> {
-                    0f to 0f
-                }
-
-                Weather.RAIN -> {
-                    (if (weatherIntensity > 0f) weatherIntensity else 1f) to 0f
-                }
-
-                Weather.THUNDER -> {
-                    val level = if (weatherIntensity > 0f) weatherIntensity else 1f
-                    level to level
-                }
-            }
-
-        overworld.setRainLevel(targetRainLevel)
-        overworld.setThunderLevel(targetThunderLevel)
-        mc.level?.let { clientLevel ->
-            clientLevel.setRainLevel(targetRainLevel)
-            clientLevel.setThunderLevel(targetThunderLevel)
-        }
+        weather.snapLevels(overworld, weatherIntensity)
 
         log.info("Applied environment preset") {
             "time" to timeOfDay

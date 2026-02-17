@@ -736,15 +736,10 @@ object GlintComponents {
         var weatherIntensity = initial?.weatherIntensity ?: 0.0
         var moonPhase = initial?.moonPhase ?: 0
 
-        fun weatherLabel(): String = weather.name.lowercase().replaceFirstChar { it.uppercase() }
+        fun weatherLabel(): String = weather.displayName
 
         fun cycleWeather() {
-            weather =
-                when (weather) {
-                    Weather.CLEAR -> Weather.RAIN
-                    Weather.RAIN -> Weather.THUNDER
-                    Weather.THUNDER -> Weather.CLEAR
-                }
+            weather = weather.next()
         }
     }
 
@@ -758,6 +753,26 @@ object GlintComponents {
         row.child(itemDetail(label) as Component)
         row.child(field)
         return row
+    }
+
+    /**
+     * Vertical label-above-field container for form inputs.
+     * Use the [builder] lambda to add child components to the container.
+     */
+    fun labeledField(
+        label: String,
+        builder: FlowLayout.() -> Unit,
+    ): FlowLayout {
+        val container = Containers.verticalFlow(Sizing.content(), Sizing.content())
+        container.horizontalAlignment(HorizontalAlignment.LEFT)
+        container.gap(GlintTheme.GAP_SM)
+        container.child(
+            Components
+                .label(McComponent.literal(label))
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+        )
+        container.builder()
+        return container
     }
 
     /**

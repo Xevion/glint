@@ -258,7 +258,7 @@ class SaveSceneDialog(
         )
         weatherButton =
             GlintComponents.smallButton(
-                McComponent.literal(formatWeather(selectedWeather)),
+                McComponent.literal(selectedWeather.displayName),
                 width = 70,
             ) { cycleWeather() }
         weatherRow.child(weatherButton as Component)
@@ -294,10 +294,8 @@ class SaveSceneDialog(
     }
 
     private fun cycleWeather() {
-        val values = Weather.entries
-        val nextIndex = (values.indexOf(selectedWeather) + 1) % values.size
-        selectedWeather = values[nextIndex]
-        weatherButton.setMessage(McComponent.literal(formatWeather(selectedWeather)))
+        selectedWeather = selectedWeather.next()
+        weatherButton.setMessage(McComponent.literal(selectedWeather.displayName))
     }
 
     private fun formatPosition(): String {
@@ -309,8 +307,6 @@ class SaveSceneDialog(
         val cam = capturedCamera ?: return "unknown"
         return "Yaw %.1f, Pitch %.1f".format(cam.yaw, cam.pitch)
     }
-
-    private fun formatWeather(weather: Weather): String = weather.name.lowercase().replaceFirstChar { it.uppercase() }
 
     private fun validateInput() {
         val id = sceneIdInput.value.trim()
