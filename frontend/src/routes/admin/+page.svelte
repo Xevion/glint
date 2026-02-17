@@ -1,7 +1,7 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
 import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
-import CaptureImage from '$lib/components/CaptureImage.svelte';
+import { AdminCaptureCard } from '$lib/components/admin';
 import { ItemGrid } from '$lib/components/item-grid';
 import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
@@ -354,49 +354,35 @@ onDestroy(() => {
 				<p class="text-sm text-muted-foreground">No captures yet</p>
 			{:else}
 			<ItemGrid items={recentCaptures} key={(c: CaptureWithContext) => c.id} size="small">
-				{#snippet card(capture: CaptureWithContext)}
-					<a href="/admin/captures/{capture.id}" class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50">
-						{#if capture.image_url}
-							<CaptureImage
-								src={capture.image_url}
-								thumbhash={capture.thumbhash}
-								preset="card"
-								alt={capture.shader_name}
-								class="w-full"
-								containerClass="aspect-video w-full"
-							/>
-						{:else}
-							<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
-								No image
-							</div>
-						{/if}
-						<div class="space-y-1 p-3">
-							<div class="flex items-center justify-between gap-2">
-								<span class="truncate font-medium text-sm">{capture.shader_name}</span>
-								{#if capture.scene_name}
-									<span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{capture.scene_name}</span>
-								{/if}
-							</div>
-							<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-								<span>{capture.shader_version}</span>
-							{#if capture.profile_name}
-								<span>&middot; {capture.profile_name}</span>
-							{/if}
-								{#if capture.resolution_width && capture.resolution_height}
-									<span>&middot; {capture.resolution_width}&times;{capture.resolution_height}</span>
-								{/if}
-								{#if capture.file_size_bytes}
-									<span>&middot; {formatBytes(capture.file_size_bytes)}</span>
-								{/if}
-							</div>
-							{#if capture.captured_at}
-								<div class="text-xs text-muted-foreground">
-									<TimeAgo timestamp={capture.captured_at} />
-								</div>
+			{#snippet card(capture: CaptureWithContext)}
+				<AdminCaptureCard {capture}>
+					<div class="space-y-1 p-3">
+						<div class="flex items-center justify-between gap-2">
+							<span class="truncate font-medium text-sm">{capture.shader_name}</span>
+							{#if capture.scene_name}
+								<span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{capture.scene_name}</span>
 							{/if}
 						</div>
-					</a>
-				{/snippet}
+						<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+							<span>{capture.shader_version}</span>
+						{#if capture.profile_name}
+							<span>&middot; {capture.profile_name}</span>
+						{/if}
+							{#if capture.resolution_width && capture.resolution_height}
+								<span>&middot; {capture.resolution_width}&times;{capture.resolution_height}</span>
+							{/if}
+							{#if capture.file_size_bytes}
+								<span>&middot; {formatBytes(capture.file_size_bytes)}</span>
+							{/if}
+						</div>
+						{#if capture.captured_at}
+							<div class="text-xs text-muted-foreground">
+								<TimeAgo timestamp={capture.captured_at} />
+							</div>
+						{/if}
+					</div>
+				</AdminCaptureCard>
+			{/snippet}
 			</ItemGrid>
 			{/if}
 		</div>

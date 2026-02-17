@@ -6,7 +6,7 @@ import { ItemGrid } from '$lib/components/item-grid';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminBreadcrumb } from '$lib/components/admin';
+import { AdminBreadcrumb, AdminCaptureCard } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
@@ -381,44 +381,30 @@ function formatMs(value?: number): string {
 		{#if capture.same_shader_scene.length > 0}
 			<Tabs.Content value="shader-scene">
 				<ItemGrid items={capture.same_shader_scene} key={(c: CaptureWithContext) => c.id} size="small">
-				{#snippet card(c: CaptureWithContext)}
-					<a href="/admin/captures/{c.id}" class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50">
-						{#if c.image_url}
-							<CaptureImage
-								src={c.image_url}
-								thumbhash={c.thumbhash}
-								preset="card"
-								alt="{c.shader_name} {c.shader_version}"
-								class="w-full"
-								containerClass="aspect-video w-full"
-							/>
-						{:else}
-							<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
-								No image
-							</div>
-						{/if}
-						<div class="p-2">
-							<div class="flex items-center justify-between">
-								<div class="text-sm font-medium">
-								{c.shader_version}
-								{#if c.profile_name}
-									&middot; {c.profile_name}
-								{/if}
-							</div>
-							{#if c.freshness !== 'fresh'}
-								<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[c.freshness]}">
-										{c.freshness}
-									</span>
-								{/if}
-							</div>
-							{#if c.captured_at}
-								<div class="text-xs text-muted-foreground">
-									<TimeAgo timestamp={c.captured_at} />
-								</div>
+			{#snippet card(c: CaptureWithContext)}
+				<AdminCaptureCard capture={c} alt="{c.shader_name} {c.shader_version}">
+					<div class="p-2">
+						<div class="flex items-center justify-between">
+							<div class="text-sm font-medium">
+							{c.shader_version}
+							{#if c.profile_name}
+								&middot; {c.profile_name}
 							{/if}
 						</div>
-					</a>
-				{/snippet}
+						{#if c.freshness !== 'fresh'}
+							<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[c.freshness]}">
+									{c.freshness}
+								</span>
+							{/if}
+						</div>
+						{#if c.captured_at}
+							<div class="text-xs text-muted-foreground">
+								<TimeAgo timestamp={c.captured_at} />
+							</div>
+						{/if}
+					</div>
+				</AdminCaptureCard>
+			{/snippet}
 			</ItemGrid>
 		</Tabs.Content>
 	{/if}
@@ -426,33 +412,19 @@ function formatMs(value?: number): string {
 	{#if capture.same_scene.length > 0}
 			<Tabs.Content value="scene">
 				<ItemGrid items={capture.same_scene} key={(c: CaptureWithContext) => c.id} size="small">
-					{#snippet card(c: CaptureWithContext)}
-						<a href="/admin/captures/{c.id}" class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50">
-							{#if c.image_url}
-								<CaptureImage
-									src={c.image_url}
-									thumbhash={c.thumbhash}
-									preset="card"
-									alt="{c.shader_name} in {c.scene_name ?? 'scene'}"
-									class="w-full"
-									containerClass="aspect-video w-full"
-								/>
-							{:else}
-								<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
-									No image
-								</div>
+				{#snippet card(c: CaptureWithContext)}
+					<AdminCaptureCard capture={c} alt="{c.shader_name} in {c.scene_name ?? 'scene'}">
+						<div class="p-2">
+							<div class="text-sm font-medium">{c.shader_name}</div>
+						<div class="text-xs text-muted-foreground">
+							{c.shader_version}
+							{#if c.profile_name}
+								&middot; {c.profile_name}
 							{/if}
-							<div class="p-2">
-								<div class="text-sm font-medium">{c.shader_name}</div>
-							<div class="text-xs text-muted-foreground">
-								{c.shader_version}
-								{#if c.profile_name}
-									&middot; {c.profile_name}
-								{/if}
-							</div>
 						</div>
-					</a>
-				{/snippet}
+					</div>
+				</AdminCaptureCard>
+			{/snippet}
 			</ItemGrid>
 		</Tabs.Content>
 	{/if}
@@ -460,33 +432,19 @@ function formatMs(value?: number): string {
 	{#if capture.same_run.length > 0}
 			<Tabs.Content value="run">
 				<ItemGrid items={capture.same_run} key={(c: CaptureWithContext) => c.id} size="small">
-					{#snippet card(c: CaptureWithContext)}
-						<a href="/admin/captures/{c.id}" class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50">
-							{#if c.image_url}
-								<CaptureImage
-									src={c.image_url}
-									thumbhash={c.thumbhash}
-									preset="card"
-									alt="{c.shader_name} - {c.scene_name ?? 'scene'}"
-									class="w-full"
-									containerClass="aspect-video w-full"
-								/>
-							{:else}
-								<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
-									No image
-								</div>
+				{#snippet card(c: CaptureWithContext)}
+					<AdminCaptureCard capture={c} alt="{c.shader_name} - {c.scene_name ?? 'scene'}">
+						<div class="p-2">
+							<div class="text-sm font-medium">{c.shader_name}</div>
+						<div class="text-xs text-muted-foreground">
+							{c.scene_name ?? c.scene_id}
+							{#if c.profile_name}
+								&middot; {c.profile_name}
 							{/if}
-							<div class="p-2">
-								<div class="text-sm font-medium">{c.shader_name}</div>
-							<div class="text-xs text-muted-foreground">
-								{c.scene_name ?? c.scene_id}
-								{#if c.profile_name}
-									&middot; {c.profile_name}
-								{/if}
-							</div>
-							</div>
-						</a>
-					{/snippet}
+						</div>
+						</div>
+					</AdminCaptureCard>
+				{/snippet}
 				</ItemGrid>
 			</Tabs.Content>
 		{/if}

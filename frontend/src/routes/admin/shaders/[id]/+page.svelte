@@ -9,10 +9,9 @@ import type {
 	ShaderWithCaptures,
 	UpdateShaderRequest
 } from '$lib/bindings';
-import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ItemGrid } from '$lib/components/item-grid';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
+import { AdminCaptureCard, AdminDetailField, AdminDetailHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
@@ -1202,21 +1201,7 @@ async function confirmDelete() {
                     </div>
                     <ItemGrid items={captures} key={(c: CaptureWithContext) => c.id} size="small">
                         {#snippet card(capture: CaptureWithContext)}
-                            <a href="/admin/captures/{capture.id}" class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50">
-                                {#if capture.image_url}
-                                    <CaptureImage
-                                        src={capture.image_url}
-                                        thumbhash={capture.thumbhash}
-                                        preset="card"
-                                        alt={capture.scene_name ?? capture.scene_id}
-                                        class="w-full"
-                                        containerClass="aspect-video w-full"
-                                    />
-                                {:else}
-                                    <div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
-                                        No image
-                                    </div>
-                                {/if}
+                            <AdminCaptureCard {capture} alt={capture.scene_name ?? capture.scene_id}>
                                 <div class="p-2">
                                     <div class="flex items-center justify-between">
                                         <div class="text-sm font-medium">
@@ -1239,7 +1224,7 @@ async function confirmDelete() {
                                         {/if}
                                     </div>
                                 </div>
-                            </a>
+                            </AdminCaptureCard>
                         {/snippet}
                     </ItemGrid>
                 </div>
