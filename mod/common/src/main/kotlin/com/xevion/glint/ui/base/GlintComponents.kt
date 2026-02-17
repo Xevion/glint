@@ -1,6 +1,7 @@
 package com.xevion.glint.ui.base
 
 import com.xevion.glint.scene.LocalPreset
+import com.xevion.glint.scene.SceneFormatting
 import com.xevion.glint.scene.SceneState
 import com.xevion.glint.scene.Weather
 import io.wispforest.owo.ui.component.ButtonComponent
@@ -622,7 +623,7 @@ object GlintComponents {
         return listItemWithButtons(
             contentBuilder = {
                 child(itemLabel(preset.name) as Component)
-                child(itemDetail("${preset.timeOfDayTicks}t") as Component)
+                child(itemDetail(SceneFormatting.formatTime(preset.timeOfDayTicks)) as Component)
                 child(
                     itemDetail(
                         preset.weather.replaceFirstChar { it.uppercase() },
@@ -635,7 +636,7 @@ object GlintComponents {
                     ) as Component,
                 )
                 if (preset.moonPhase != null) {
-                    child(itemDetail("P${preset.moonPhase}") as Component)
+                    child(itemDetail(SceneFormatting.moonPhaseName(preset.moonPhase!!)) as Component)
                 }
                 if (isDefault) {
                     child(
@@ -698,9 +699,9 @@ object GlintComponents {
         if (state.weather != Weather.CLEAR) form.child(intensityRow as Component)
 
         val moonBtn =
-            smallButton(McComponent.literal("Phase ${state.moonPhase}"), width = 60) { btn ->
+            smallButton(McComponent.literal(SceneFormatting.moonPhaseName(state.moonPhase)), width = 60) { btn ->
                 state.moonPhase = (state.moonPhase + 1) % 8
-                btn.message = McComponent.literal("Phase ${state.moonPhase}")
+                btn.message = McComponent.literal(SceneFormatting.moonPhaseName(state.moonPhase))
             }
         form.child(labeledRow("Moon:", moonBtn as Component) as Component)
 

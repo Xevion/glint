@@ -9,6 +9,7 @@ import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
 import { AlertTriangle, Camera, ChevronRight, Search } from '@lucide/svelte';
+import { formatTimeTicks } from '$lib/utils/display';
 import { fade, fly } from 'svelte/transition';
 import type { PageData } from './$types';
 
@@ -34,13 +35,6 @@ const hasFilters = $derived(searchQuery !== '');
 
 // OG image: first scene's representative capture
 const ogImage = $derived(scenes[0]?.image_url ?? null);
-
-function timeOfDay(ticks: number): string {
-	if (ticks >= 23000 || ticks < 6000) return 'Dawn';
-	if (ticks >= 6000 && ticks < 12000) return 'Day';
-	if (ticks >= 12000 && ticks < 18000) return 'Dusk';
-	return 'Night';
-}
 </script>
 
 <Meta
@@ -146,7 +140,7 @@ function timeOfDay(ticks: number): string {
 								</Badge>
 							{/if}
 							<span class="text-xs text-muted-foreground">
-								{timeOfDay(scene.version.time_of_day_ticks)}
+								{formatTimeTicks(scene.version.time_of_day_ticks)}
 							</span>
 							{#if scene.capture_count > 0}
 								<span class="flex items-center gap-1 text-xs text-muted-foreground">

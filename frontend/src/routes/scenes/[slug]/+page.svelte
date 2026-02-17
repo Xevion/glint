@@ -8,6 +8,7 @@ import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
 
+import { formatMoonPhase, formatTimeTicks } from '$lib/utils/display';
 import { fly } from 'svelte/transition';
 import type { PageData } from './$types';
 
@@ -96,12 +97,7 @@ const weatherLabel = $derived.by(() => {
 const timeLabel = $derived.by(() => {
 	const v = scene.version;
 	if (!v) return null;
-	const ticks = v.time_of_day_ticks;
-	const hours = Math.floor(ticks / 1000);
-	if (hours < 6) return 'Night';
-	if (hours < 12) return 'Morning';
-	if (hours < 18) return 'Day';
-	return 'Evening';
+	return formatTimeTicks(v.time_of_day_ticks);
 });
 
 // OG metadata
@@ -240,6 +236,12 @@ const ogDescription = $derived.by(() => {
 								<div class="flex items-center justify-between text-sm">
 									<span class="text-muted-foreground">Weather</span>
 									<span class="font-medium text-foreground">{weatherLabel}</span>
+								</div>
+							{/if}
+							{#if scene.version.moon_phase != null}
+								<div class="flex items-center justify-between text-sm">
+									<span class="text-muted-foreground">Moon</span>
+									<span class="font-medium text-foreground">{formatMoonPhase(scene.version.moon_phase)}</span>
 								</div>
 							{/if}
 						</div>

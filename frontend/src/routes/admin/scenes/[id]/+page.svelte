@@ -8,6 +8,7 @@ import type {
 	UpdateSceneMetadataRequest
 } from '$lib/bindings';
 import { ItemGrid } from '$lib/components/item-grid';
+import { formatMoonPhase, formatTimeTicks } from '$lib/utils/display';
 import { freshnessColors } from '$lib/utils/status';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import {
@@ -306,7 +307,7 @@ function handleDragEnd() {
 			{scene.dimension}
 		</AdminDetailField>
 		<AdminDetailField label="Time of Day">
-			{scene.version.time_of_day_ticks} ticks
+			{formatTimeTicks(scene.version.time_of_day_ticks)}
 		</AdminDetailField>
 		<AdminDetailField label="Weather">
 			<span class="capitalize">{scene.version.weather}</span>
@@ -323,7 +324,7 @@ function handleDragEnd() {
 		{/if}
 		{#if scene.version.moon_phase != null}
 			<AdminDetailField label="Moon Phase">
-				{scene.version.moon_phase}
+				{formatMoonPhase(scene.version.moon_phase)}
 			</AdminDetailField>
 		{/if}
 			<AdminDetailField label="Created">
@@ -366,10 +367,10 @@ function handleDragEnd() {
 							{/if}
 						</div>
 						<div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-							<span>{preset.time_of_day_ticks} ticks</span>
+							<span>{formatTimeTicks(preset.time_of_day_ticks)}</span>
 							<span class="capitalize">{preset.weather}{preset.weather_intensity > 0 ? ` (${preset.weather_intensity.toFixed(2)})` : ''}</span>
 							{#if preset.moon_phase != null}
-								<span>Moon: {preset.moon_phase}</span>
+								<span>{formatMoonPhase(preset.moon_phase)}</span>
 							{/if}
 						</div>
 					</div>

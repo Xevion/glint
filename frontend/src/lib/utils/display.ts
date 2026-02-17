@@ -116,3 +116,54 @@ export function formatGameVersions(versions: string[] | null | undefined): strin
 export function formatVersion(version: string): string {
 	return /^\d/.test(version) ? `v${version}` : version;
 }
+
+/**
+ * Convert Minecraft time ticks to a human-readable clock string with period label.
+ * Tick 0 = 6:00 AM in Minecraft. Each 1000 ticks = 1 hour.
+ * Returns format like "6:00 AM (Noon)" or "7:30 PM (Night)".
+ */
+export function formatTimeTicks(ticks: number): string {
+	const normalizedTicks = ((ticks % 24000) + 24000) % 24000;
+	const hour = (Math.floor(normalizedTicks / 1000) + 6) % 24;
+	const minute = Math.floor(((normalizedTicks % 1000) * 60) / 1000);
+	const amPm = hour < 12 ? 'AM' : 'PM';
+	const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+	const timeStr = `${displayHour}:${minute.toString().padStart(2, '0')} ${amPm}`;
+	const label = getTimeLabel(hour);
+	return `${timeStr} (${label})`;
+}
+
+function getTimeLabel(hour: number): string {
+	if (hour >= 4 && hour < 6) return 'Dawn';
+	if (hour >= 6 && hour < 10) return 'Morning';
+	if (hour >= 10 && hour < 14) return 'Noon';
+	if (hour >= 14 && hour < 18) return 'Afternoon';
+	if (hour >= 18 && hour < 20) return 'Dusk';
+	return 'Night';
+}
+
+const MOON_PHASES: { emoji: string; name: string }[] = [
+	{ emoji: '🌕', name: 'Full Moon' },
+	{ emoji: '🌖', name: 'Waning Gibbous' },
+	{ emoji: '🌗', name: 'Third Quarter' },
+	{ emoji: '🌘', name: 'Waning Crescent' },
+	{ emoji: '🌑', name: 'New Moon' },
+	{ emoji: '🌒', name: 'Waxing Crescent' },
+	{ emoji: '🌓', name: 'First Quarter' },
+	{ emoji: '🌔', name: 'Waxing Gibbous' }
+];
+
+/**
+ * Get moon phase display info (emoji + name) for a Minecraft moon phase value (0-7).
+ */
+export function getMoonPhaseDisplay(phase: number): { emoji: string; name: string } {
+	return MOON_PHASES[phase] ?? { emoji: '🌕', name: 'Unknown' };
+}
+
+/**
+ * Format a moon phase value as "emoji Name" string.
+ */
+export function formatMoonPhase(phase: number): string {
+	const { emoji, name } = getMoonPhaseDisplay(phase);
+	return `${emoji} ${name}`;
+}

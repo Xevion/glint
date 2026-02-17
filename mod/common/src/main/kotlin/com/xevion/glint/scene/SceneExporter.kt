@@ -61,7 +61,7 @@ object SceneExporter {
 
             val environment =
                 PackageEnvironment(
-                    time = serverLevel.dayTime(),
+                    time = (serverLevel.dayTime() % 24000).toInt(),
                     weather =
                         when {
                             serverLevel.isThundering -> "thunder"

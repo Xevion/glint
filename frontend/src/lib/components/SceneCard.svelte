@@ -6,6 +6,7 @@ import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import { StatusBadge } from '$lib/components/ui/status-badge';
 import { cn } from '$lib/utils';
 import {
+	formatTimeTicks,
 	getBiomeDisplayName,
 	getDimensionDisplayName,
 	getWeatherDisplayName
@@ -27,16 +28,7 @@ interface Props {
 
 let { scene, class: className }: Props = $props();
 
-// Determine time of day from ticks (0-24000, where 0=6am, 6000=noon, 18000=midnight)
-function getTimeOfDay(ticks: number): string {
-	const normalizedTicks = ticks % 24000;
-	if (normalizedTicks < 1000) return 'dawn';
-	if (normalizedTicks < 11000) return 'day';
-	if (normalizedTicks < 13000) return 'dusk';
-	return 'night';
-}
-
-const timeOfDay = $derived(getTimeOfDay(scene.version.time_of_day_ticks));
+const timeOfDay = $derived(formatTimeTicks(scene.version.time_of_day_ticks));
 
 function handleCardClick() {
 	void goto(resolve('/scenes/[slug]', { slug: scene.slug }), { invalidateAll: true });

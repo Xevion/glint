@@ -9,6 +9,7 @@ import com.xevion.glint.scene.Scene
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneCollection
 import com.xevion.glint.scene.SceneConfig
+import com.xevion.glint.scene.SceneFormatting
 import com.xevion.glint.scene.SceneManager
 import com.xevion.glint.scene.SceneVariant
 import com.xevion.glint.session.SessionRegistry
@@ -199,23 +200,13 @@ class SceneManagerScreen(
     }
 
     private fun formatSceneDetails(scene: Scene): String {
-        val time = formatTime(scene.timeOfDay)
+        val time = SceneFormatting.formatTime(scene.timeOfDay)
         val weather =
             scene.weather.name
                 .lowercase()
                 .replaceFirstChar { it.uppercase() }
         val dimension = scene.dimension.substringAfter(":")
         return "$time | $weather | $dimension"
-    }
-
-    private fun formatTime(ticks: Int): String {
-        val hour = ((ticks / 1000 + 6) % 24)
-        return when (hour) {
-            in 0..5 -> "Night"
-            in 6..11 -> "Morning"
-            in 12..17 -> "Afternoon"
-            else -> "Evening"
-        }
     }
 
     private fun resolveScene(

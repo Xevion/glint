@@ -7,6 +7,7 @@ import com.xevion.glint.scene.LocalSceneMetadata
 import com.xevion.glint.scene.LocalSceneStore
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneApplyResult
+import com.xevion.glint.scene.SceneFormatting
 import com.xevion.glint.scene.SceneState
 import com.xevion.glint.scene.Weather
 import com.xevion.glint.ui.base.GlintComponents
@@ -327,22 +328,13 @@ class GlintMainScreen(
         detail.child(
             GlintComponents.collapsibleSection("Environment") {
                 val env = metadata.environment
-                val timeName =
-                    when {
-                        env.time < 1000L -> "Night"
-                        env.time < 6000L -> "Morning"
-                        env.time < 9000L -> "Noon"
-                        env.time < 13000L -> "Afternoon"
-                        env.time < 18000L -> "Evening"
-                        else -> "Night"
-                    }
-                child(GlintComponents.itemDetail("Time: ${env.time} ($timeName)") as Component)
+                child(GlintComponents.itemDetail("Time: ${SceneFormatting.formatTime(env.time)}") as Component)
                 val weatherDisplay = env.weather.replaceFirstChar { it.uppercase() }
                 child(GlintComponents.itemDetail("Weather: $weatherDisplay") as Component)
                 if (env.weatherIntensity > 0f) {
                     child(GlintComponents.itemDetail("Intensity: %.1f".format(env.weatherIntensity)) as Component)
                 }
-                child(GlintComponents.itemDetail("Moon Phase: ${env.moonPhase}") as Component)
+                child(GlintComponents.itemDetail("Moon: ${SceneFormatting.moonPhaseName(env.moonPhase)}") as Component)
             } as Component,
         )
 
@@ -489,7 +481,7 @@ class GlintMainScreen(
                     LocalPreset(
                         name = "",
                         slug = "",
-                        timeOfDayTicks = env.time.toInt(),
+                        timeOfDayTicks = env.time,
                         weather = env.weather,
                         weatherIntensity = env.weatherIntensity.toDouble(),
                         moonPhase = env.moonPhase,

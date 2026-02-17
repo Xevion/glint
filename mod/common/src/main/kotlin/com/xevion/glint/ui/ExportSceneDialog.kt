@@ -4,6 +4,7 @@ import com.xevion.glint.Loggers
 import com.xevion.glint.scene.LocalSceneMetadata
 import com.xevion.glint.scene.LocalSceneStore
 import com.xevion.glint.scene.SceneExporter
+import com.xevion.glint.scene.SceneFormatting
 import com.xevion.glint.scene.ScenePackageMeta
 import com.xevion.glint.scene.SceneState
 import com.xevion.glint.scene.scenePackageJson
@@ -195,16 +196,7 @@ class ExportSceneDialog(
         )
         val envText =
             if (level != null) {
-                val time = level.dayTime % 24000
-                val timeName =
-                    when {
-                        time < 1000L -> "Night"
-                        time < 6000L -> "Morning"
-                        time < 9000L -> "Noon"
-                        time < 13000L -> "Afternoon"
-                        time < 18000L -> "Evening"
-                        else -> "Night"
-                    }
+                val time = (level.dayTime % 24000).toInt()
                 val weather =
                     when {
                         level.isThundering -> "Thunder"
@@ -212,7 +204,7 @@ class ExportSceneDialog(
                         else -> "Clear"
                     }
                 val moonPhase = level.getMoonPhase()
-                "Time: $time ($timeName)  Weather: $weather  Moon: $moonPhase"
+                "Time: ${SceneFormatting.formatTime(time)}  Weather: $weather  Moon: ${SceneFormatting.moonPhaseName(moonPhase)}"
             } else {
                 "unknown"
             }

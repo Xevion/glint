@@ -39,7 +39,7 @@ data class CameraPosition(
 
 @Serializable
 data class PackageEnvironment(
-    val time: Long,
+    val time: Int,
     val weather: String = "clear",
     @SerialName("weather_intensity") val weatherIntensity: Float = 0f,
     @SerialName("moon_phase") val moonPhase: Int = 0,

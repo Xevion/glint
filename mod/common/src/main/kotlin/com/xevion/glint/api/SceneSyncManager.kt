@@ -228,7 +228,7 @@ object SceneSyncManager {
                                 ),
                             environment =
                                 UploadEnvironment(
-                                    timeOfDayTicks = metadata.environment.time.toInt(),
+                                    timeOfDayTicks = metadata.environment.time,
                                     weather = metadata.environment.weather,
                                     weatherIntensity = metadata.environment.weatherIntensity.toDouble(),
                                     moonPhase = metadata.environment.moonPhase,
