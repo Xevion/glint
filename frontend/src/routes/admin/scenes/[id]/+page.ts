@@ -1,5 +1,6 @@
 import { createApiClient, ApiErrorType } from '$lib/api';
 import { pageError } from '$lib/api/errors';
+import type { ScenePreset } from '$lib/bindings';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params, fetch }) => {
@@ -23,5 +24,11 @@ export const load: PageLoad = async ({ params, fetch }) => {
 		Err: (err) => err.throw()
 	});
 
-	return { scene, captures: capturesData.items, captureCount: capturesData.total };
+	const presetsRes = await api.admin.listPresets(scene.slug);
+	const presets = presetsRes.match({
+		Ok: (p) => p,
+		Err: () => [] as ScenePreset[]
+	});
+
+	return { scene, captures: capturesData.items, captureCount: capturesData.total, presets };
 };

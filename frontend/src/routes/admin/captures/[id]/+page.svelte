@@ -222,12 +222,17 @@ function formatMs(value?: number): string {
 						{/if}
 					</dd>
 
-				{#if capture.profile_name}
-					<dt class="text-muted-foreground">Profile</dt>
-					<dd>{capture.profile_name}</dd>
-				{/if}
+			{#if capture.profile_name}
+				<dt class="text-muted-foreground">Profile</dt>
+				<dd>{capture.profile_name}</dd>
+			{/if}
 
-					<dt class="text-muted-foreground">Resolution</dt>
+			{#if capture.preset_name}
+				<dt class="text-muted-foreground">Preset</dt>
+				<dd>{capture.preset_name}</dd>
+			{/if}
+
+				<dt class="text-muted-foreground">Resolution</dt>
 					<dd>
 						{capture.resolution_width && capture.resolution_height
 							? `${capture.resolution_width}\u00d7${capture.resolution_height}`

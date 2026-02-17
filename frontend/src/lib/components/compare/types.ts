@@ -5,6 +5,7 @@ export type ShaderDisplayInfo = Pick<Shader, 'name'> & {
 	version: string;
 	author?: string | null;
 	profile_name?: string | null;
+	preset_name?: string | null;
 };
 
 /** Comparison display modes */

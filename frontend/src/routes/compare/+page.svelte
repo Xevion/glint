@@ -24,7 +24,7 @@ type CompareImageOption = ImageOption & { shader: ShaderDisplayInfo };
 
 const images: CompareImageOption[] = $derived(
 	data.captures.map((c) => {
-		const suffix = [c.shader_version, c.profile_name].filter(Boolean).join(' · ');
+		const suffix = [c.shader_version, c.profile_name, c.preset_name].filter(Boolean).join(' · ');
 		return {
 			url: c.image_url,
 			label: suffix ? `${c.shader_name} (${suffix})` : c.shader_name,
@@ -33,7 +33,8 @@ const images: CompareImageOption[] = $derived(
 				name: c.shader_name,
 				version: c.shader_version,
 				author: c.shader_author ?? null,
-				profile_name: c.profile_name
+				profile_name: c.profile_name,
+				preset_name: c.preset_name
 			}
 		};
 	})

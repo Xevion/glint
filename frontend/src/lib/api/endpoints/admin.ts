@@ -14,6 +14,7 @@ import type {
 	StorageCleanupResult,
 	StorageStats,
 	UpdateSceneMetadataRequest,
+	ScenePreset,
 	UpdateShaderRequest,
 	User,
 	UserWithSessions,
@@ -22,6 +23,27 @@ import type {
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
+
+interface CreatePresetRequest {
+	name: string;
+	slug: string;
+	time_of_day_ticks: number;
+	weather: string;
+	weather_intensity?: number;
+	moon_phase?: number;
+}
+
+interface UpdatePresetRequest {
+	name?: string;
+	time_of_day_ticks?: number;
+	weather?: string;
+	weather_intensity?: number;
+	moon_phase?: number;
+}
+
+interface ReorderPresetsRequest {
+	preset_ids: string[];
+}
 
 export class AdminEndpoints extends ApiClient {
 	listShaders(params?: {
@@ -75,6 +97,44 @@ export class AdminEndpoints extends ApiClient {
 
 	reactivateScene(id: string): Promise<Result<Scene, ApiError>> {
 		return this.put<Scene>(`/api/scenes/${encodeURIComponent(id)}/reactivate`, {});
+	}
+
+	listPresets(sceneSlug: string): Promise<Result<ScenePreset[], ApiError>> {
+		return this.get<ScenePreset[]>(`/api/scenes/by-slug/${encodeURIComponent(sceneSlug)}/presets`);
+	}
+
+	createPreset(
+		sceneSlug: string,
+		request: CreatePresetRequest
+	): Promise<Result<ScenePreset, ApiError>> {
+		return this.post<ScenePreset>(
+			`/api/scenes/by-slug/${encodeURIComponent(sceneSlug)}/presets`,
+			request
+		);
+	}
+
+	updatePreset(
+		sceneSlug: string,
+		presetSlug: string,
+		request: UpdatePresetRequest
+	): Promise<Result<ScenePreset, ApiError>> {
+		return this.patch<ScenePreset>(
+			`/api/scenes/by-slug/${encodeURIComponent(sceneSlug)}/presets/${encodeURIComponent(presetSlug)}`,
+			request
+		);
+	}
+
+	deletePreset(sceneSlug: string, presetSlug: string): Promise<Result<null, ApiError>> {
+		return this.delete(
+			`/api/scenes/by-slug/${encodeURIComponent(sceneSlug)}/presets/${encodeURIComponent(presetSlug)}`
+		);
+	}
+
+	reorderPresets(sceneSlug: string, presetIds: string[]): Promise<Result<ScenePreset[], ApiError>> {
+		return this.patch<ScenePreset[]>(
+			`/api/scenes/by-slug/${encodeURIComponent(sceneSlug)}/presets/reorder`,
+			{ preset_ids: presetIds } satisfies ReorderPresetsRequest
+		);
 	}
 
 	listCaptures(params?: {
