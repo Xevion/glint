@@ -177,14 +177,8 @@ onMount(() => {
 		}, 800);
 	});
 
-	const observer = new MutationObserver(debouncedHeightUpdate);
-
-	observer.observe(document.body, {
-		childList: true,
-		subtree: true,
-		attributes: true,
-		attributeFilter: ['style', 'class']
-	});
+	const observer = new ResizeObserver(debouncedHeightUpdate);
+	observer.observe(document.documentElement);
 
 	window.addEventListener('resize', updateDimensions);
 
