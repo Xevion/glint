@@ -19,7 +19,7 @@ interface Props {
 let { data }: Props = $props();
 const scene = $derived(data.scene);
 
-// --- Infinite scroll state for captures grid ---
+// Infinite scroll state for captures grid
 const api = createApiClient(fetch);
 const capturesPageSize = 24;
 

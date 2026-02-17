@@ -22,7 +22,7 @@ pub struct StorageBucket {
     pub bucket_bytes: i64,
 }
 
-// --- Audit types ---
+// Audit types
 
 /// A single object found in R2 during audit
 #[derive(Debug, Serialize, TS)]

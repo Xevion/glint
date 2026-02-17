@@ -32,7 +32,7 @@ import {
 } from '@lucide/svelte';
 import type { PageData } from './$types';
 
-// --- My Shaders data (from SSR load) ---
+// My Shaders data (from SSR load)
 interface Props {
 	data: PageData;
 }
@@ -40,7 +40,7 @@ let { data }: Props = $props();
 let shaders = $derived(data.shaders);
 let shadersError = $derived(data.error);
 
-// --- Tab state (synced to URL) ---
+// Tab state (synced to URL)
 type PageTab = 'my-shaders' | 'discover';
 let activeTab = $state<PageTab>((page.url.searchParams.get('tab') as PageTab) || 'my-shaders');
 
@@ -60,7 +60,7 @@ function handleTabChange(tab: string) {
 	}
 }
 
-// --- My Shaders table config ---
+// My Shaders table config
 const columns = [
 	{ id: 'icon', key: 'icon_url', name: '', hideOnMobile: true },
 	{ id: 'name', key: 'name', name: 'Name', cardTitle: true },
@@ -96,7 +96,7 @@ function formatTerseTime(dateStr: string): string {
 	return 'Now';
 }
 
-// --- Discover state ---
+// Discover state
 const PAGE_SIZE = 20;
 
 let discoverLoaded = $state(false);

@@ -264,7 +264,7 @@ fn split_whitespace_tokens(value: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
-    // --- Task 4 tests ---
+    // Task 4 tests
 
     #[test]
     fn test_simple_profile() {
@@ -361,7 +361,7 @@ mod tests {
         );
     }
 
-    // --- Task 5 tests ---
+    // Task 5 tests
 
     #[test]
     fn test_main_screen() {

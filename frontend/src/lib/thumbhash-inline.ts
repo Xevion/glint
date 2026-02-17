@@ -13,7 +13,7 @@
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: vendored algorithm, intentionally self-contained
 function initThumbhashes(): void {
-	// --- Begin vendored thumbhash decode (MIT, github.com/evanw/thumbhash) ---
+	// Begin vendored thumbhash decode (MIT, github.com/evanw/thumbhash)
 
 	function thumbHashToApproximateAspectRatio(hash: Uint8Array): number {
 		const header = hash[3];
@@ -204,7 +204,7 @@ function initThumbhashes(): void {
 		return 'data:image/png;base64,' + btoa(String.fromCharCode(...bytes));
 	}
 
-	// --- End vendored thumbhash decode ---
+	// End vendored thumbhash decode
 
 	document.querySelectorAll<HTMLElement>('[data-thumbhash]').forEach((el) => {
 		const b64 = el.dataset.thumbhash;

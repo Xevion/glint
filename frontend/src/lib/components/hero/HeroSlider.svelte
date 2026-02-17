@@ -17,12 +17,12 @@ interface Props {
 
 let { pairs, overlayVisible = $bindable(true) }: Props = $props();
 
-// --- Constants ---
+// Constants
 const SWEEP_MS = 600;
 const SWAP_DELAY = 50;
 const RESUME_AFTER_DRAG = 3000;
 
-// --- Showcase movement patterns ---
+// Showcase movement patterns
 // Each pattern is a series of divider positions the slider visits during the
 // matched-scene showcase phase. Every pattern starts and ends at 0.5 so the
 // sweep-out always begins from center.
@@ -72,14 +72,14 @@ const SHOWCASE_PATTERNS: ShowcasePattern[] = [
 	}
 ];
 
-// --- Orientation cycle ---
+// Orientation cycle
 const ORIENTATIONS: Orientation[] = ['vertical', 'horizontal', 'diagonal'];
 
-// --- Image pools (SliderSide arrays derived from pairs) ---
+// Image pools (SliderSide arrays derived from pairs)
 const leftPool = $derived<SliderSide[]>(pairs.map((p) => pairToSides(p).left));
 const rightPool = $derived<SliderSide[]>(pairs.map((p) => pairToSides(p).right));
 
-// --- Transition state machine ---
+// Transition state machine
 type TransitionState = 'resting' | 'showcase' | 'sweep-out' | 'swapping' | 'sweep-in';
 
 const TRANSITION_GRAPH: Record<TransitionState, TransitionState | null> = {
@@ -100,7 +100,7 @@ function advanceTo(target: TransitionState) {
 	transitionState = target;
 }
 
-// --- Pattern selection (avoid repeating the same pattern consecutively) ---
+// Pattern selection (avoid repeating the same pattern consecutively)
 let lastPatternIndex = -1;
 
 function pickPattern(): ShowcasePattern {
@@ -113,7 +113,7 @@ function pickPattern(): ShowcasePattern {
 	return SHOWCASE_PATTERNS[idx];
 }
 
-// --- State ---
+// State
 let transitionState = $state<TransitionState>('resting');
 let dividerPosition = $state(0.5);
 let orientation = $state<Orientation>('vertical');
@@ -145,11 +145,11 @@ const isAnimating = $derived(transitionState !== 'resting');
 // Dot indicators: tracks the last pair explicitly synced (via init or dot click).
 let activePairIndex = $state(0);
 
-// --- Timers & Tween ---
+// Timers & Tween
 const timers = createTimerGroup('cycle', 'resume', 'swap', 'overlay');
 const tween = createTween();
 
-// --- Drag smoothing (rAF chase loop) ---
+// Drag smoothing (rAF chase loop)
 // Instead of snapping to cursor, the divider chases the target with exponential decay.
 // Higher DRAG_SPEED = snappier response. 15 feels responsive with a slight trail.
 const DRAG_SPEED = 15;
@@ -204,7 +204,7 @@ function scheduleOverlayRestore() {
 	}, RESUME_AFTER_DRAG);
 }
 
-// --- Display sync ---
+// Display sync
 
 function syncLeftFromIndex(idx: number) {
 	displayLeft = leftPool[idx];
@@ -214,7 +214,7 @@ function syncRightFromIndex(idx: number) {
 	displayRight = rightPool[idx];
 }
 
-// --- Transition state machine ---
+// Transition state machine
 
 function startCycle() {
 	clearCycleTimers();
@@ -347,7 +347,7 @@ function clearCycleTimers() {
 	timers.swap.clear();
 }
 
-// --- User interaction ---
+// User interaction
 
 function handleDrag(pos: number) {
 	dragTarget = pos;

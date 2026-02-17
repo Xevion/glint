@@ -415,9 +415,7 @@ async fn list_scene_captures(
     Ok(Json(Paginated::new(items, total.unwrap_or(0), &p)))
 }
 
-// ---------------------------------------------------------------------------
-// Preset CRUD Handlers
-// ---------------------------------------------------------------------------
+// Preset CRUD handlers
 
 /// Helper to resolve a scene by slug (first active match).
 async fn resolve_scene_by_slug(state: &AppState, slug: &str) -> AppResult<Scene> {

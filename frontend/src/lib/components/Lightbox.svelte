@@ -121,7 +121,7 @@ $effect(() => {
 	}
 });
 
-// --- Navigation ---
+// Navigation
 
 function navigateTo(newIndex: number) {
 	if (newIndex < 0 || newIndex >= captures.length) return;
@@ -160,7 +160,7 @@ async function animateNavigation(targetOffset: number, newIndex: number) {
 	isAnimating = false;
 }
 
-// --- Event Handlers ---
+// Event Handlers
 
 function handleKeydown(e: KeyboardEvent) {
 	switch (e.key) {

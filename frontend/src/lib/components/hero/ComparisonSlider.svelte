@@ -44,7 +44,7 @@ $effect(() => {
 
 const clipPaths = $derived(computeClipPaths(dividerPosition, orientation));
 
-// --- Pointer interaction (on the whole container) ---
+// Pointer interaction (on the whole container)
 
 function getPositionFromEvent(clientX: number, clientY: number): number {
 	if (!containerEl) return dividerPosition;
@@ -96,7 +96,7 @@ function handlePointerUp(e: PointerEvent) {
 	onDragEnd?.();
 }
 
-// --- Keyboard interaction (WAI-ARIA slider pattern) ---
+// Keyboard interaction (WAI-ARIA slider pattern)
 
 const STEP_SMALL = 0.01;
 const STEP_LARGE = 0.1;

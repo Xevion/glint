@@ -20,9 +20,7 @@ const DERIVED_DISTANCE_THRESHOLD: f64 = 2.0;
 /// 512 blocks ≈ 32 chunks of overlap.
 const PROXIMITY_DISTANCE_THRESHOLD: f64 = 512.0;
 
-// ---------------------------------------------------------------------------
-// Intermediate grouping types (not exported — internal to ordering logic)
-// ---------------------------------------------------------------------------
+// Intermediate grouping types — internal to ordering logic, not exported.
 
 /// Items for a single (shader_version, profile).
 struct ProfileGroup {
@@ -57,10 +55,6 @@ struct SceneCluster {
     derived_subclusters: Vec<Vec<WorkItem>>,
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
 /// Reorder work items for optimal capture execution.
 ///
 /// Assumes the input is already sorted by shader popularity → profile
@@ -75,9 +69,7 @@ pub fn optimize_execution_order(items: Vec<WorkItem>) -> Vec<WorkItem> {
     flatten_to_execution_order(shader_groups)
 }
 
-// ---------------------------------------------------------------------------
 // Step 1: Group into hierarchy
-// ---------------------------------------------------------------------------
 
 /// Group flat work items into Shader → Profile hierarchy.
 ///
@@ -117,9 +109,7 @@ fn group_into_hierarchy(items: Vec<WorkItem>) -> Vec<ShaderGroup> {
     shaders
 }
 
-// ---------------------------------------------------------------------------
 // Step 2: Scene clustering
-// ---------------------------------------------------------------------------
 
 /// Euclidean distance in the XZ plane (Y is height, irrelevant for chunk overlap).
 fn xz_distance(x1: f64, z1: f64, x2: f64, z2: f64) -> f64 {
@@ -241,9 +231,7 @@ fn recompute_centroid(cluster: &mut SceneCluster) {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Step 3: Nearest-neighbor scene ordering
-// ---------------------------------------------------------------------------
 
 /// Order scene clusters using greedy nearest-neighbor traversal.
 ///
@@ -293,9 +281,7 @@ fn order_clusters_nearest_neighbor(mut clusters: Vec<SceneCluster>) -> Vec<Scene
     ordered
 }
 
-// ---------------------------------------------------------------------------
 // Step 4: Flatten back to Vec<WorkItem>
-// ---------------------------------------------------------------------------
 
 /// Flatten the grouped hierarchy back into a flat list in execution order.
 fn flatten_to_execution_order(shaders: Vec<ShaderGroup>) -> Vec<WorkItem> {
@@ -316,10 +302,6 @@ fn flatten_to_execution_order(shaders: Vec<ShaderGroup>) -> Vec<WorkItem> {
 
     result
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

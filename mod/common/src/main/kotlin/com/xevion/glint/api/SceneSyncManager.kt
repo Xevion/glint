@@ -470,7 +470,7 @@ object SceneSyncManager {
     }
 }
 
-// --- Result types ---
+// Result types
 
 sealed class ReconcileResult {
     data class Success(

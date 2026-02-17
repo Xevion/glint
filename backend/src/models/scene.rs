@@ -209,9 +209,7 @@ pub struct UpdateSceneMetadataRequest {
     pub description: Option<String>,
 }
 
-// ---------------------------------------------------------------------------
-// Scene Package Upload Types
-// ---------------------------------------------------------------------------
+// Scene package upload types
 
 /// DB row for pending scene package uploads (initiate → confirm flow).
 /// Internal type — not serialized to API responses.
@@ -311,9 +309,7 @@ pub struct CompleteUploadResponse {
     pub preset_id: Option<ScenePresetId>,
 }
 
-// ---------------------------------------------------------------------------
-// Scene Preset CRUD Types
-// ---------------------------------------------------------------------------
+// Scene preset CRUD types
 
 /// POST /api/scenes/{slug}/presets — Create a new preset.
 #[derive(Debug, Deserialize, Validate)]
