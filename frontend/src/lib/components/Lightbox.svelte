@@ -35,10 +35,8 @@ const nextCapture = $derived(
 const swipeSpring = new Spring(0, { stiffness: 0.3, damping: 0.8 });
 let containerWidth = $state(0);
 let swipeOffset = $state(0);
-let isSwipeDragging = $state(false);
-
 // Display offset: raw pixel offset during drag, spring-driven during animation
-const displayOffset = $derived(isSwipeDragging ? swipeOffset : swipeSpring.current);
+const displayOffset = $derived(gesture.type === 'swiping' ? swipeOffset : swipeSpring.current);
 
 // Navigation animation tracking
 let swipeGeneration = 0;
@@ -58,24 +56,25 @@ const placeholderUrl = $derived(decodeThumbhash(currentCapture?.thumbhash));
 // Zoom and pan state
 let zoomLevel = $state(1);
 let panOffset = $state({ x: 0, y: 0 });
-let isDragging = $state(false);
-let dragStart = $state({ x: 0, y: 0 });
-let panStart = $state({ x: 0, y: 0 });
 let imageLoaded = $state(false);
 let imageErrored = $state(false);
 let imgEl = $state<HTMLImageElement | null>(null);
 
-// Swipe/gesture detection
-let swipeStartX = 0;
-let swipeStartY = 0;
+// Gesture state machine — exactly one gesture active at a time
+type GestureState =
+	| { type: 'idle' }
+	| { type: 'pending'; startX: number; startY: number }
+	| { type: 'swiping'; startX: number }
+	| {
+			type: 'panning';
+			dragStart: { x: number; y: number };
+			panStart: { x: number; y: number };
+	  }
+	| { type: 'pinching'; lastDistance: number; startZoom: number };
+
+let gesture = $state<GestureState>({ type: 'idle' });
 let hasMoved = false;
 let suppressClick = false;
-let axisLocked: 'x' | 'y' | null = null;
-
-// Pinch-to-zoom tracking
-let isPinching = $state(false);
-let lastPinchDistance = 0;
-let pinchStartZoom = 1;
 
 // Reset zoom and loaded state when navigating to a different image
 $effect(() => {
@@ -200,116 +199,123 @@ function handleDblClick(e: MouseEvent) {
 }
 
 function handlePointerDown(e: PointerEvent) {
-	if (isPinching || isAnimating) return;
+	if (gesture.type === 'pinching' || isAnimating) return;
 
-	swipeStartX = e.clientX;
-	swipeStartY = e.clientY;
 	hasMoved = false;
-	axisLocked = null;
 	velocitySamples = [];
 	swipeOffset = 0;
 
 	if (zoomLevel > 1) {
-		isDragging = true;
-		dragStart = { x: e.clientX, y: e.clientY };
-		panStart = { x: panOffset.x, y: panOffset.y };
+		gesture = {
+			type: 'panning',
+			dragStart: { x: e.clientX, y: e.clientY },
+			panStart: { x: panOffset.x, y: panOffset.y }
+		};
+	} else {
+		gesture = { type: 'pending', startX: e.clientX, startY: e.clientY };
 	}
 
 	(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 }
 
-function handlePointerMove(e: PointerEvent) {
-	if (isPinching) return;
-
-	const dx = e.clientX - swipeStartX;
-	const dy = e.clientY - swipeStartY;
-	const absDx = Math.abs(dx);
-	const absDy = Math.abs(dy);
-
-	if (absDx > 5 || absDy > 5) hasMoved = true;
-
-	// Zoom-pan mode
-	if (isDragging && zoomLevel > 1) {
-		panOffset = {
-			x: panStart.x + (e.clientX - dragStart.x) / zoomLevel,
-			y: panStart.y + (e.clientY - dragStart.y) / zoomLevel
-		};
-		return;
-	}
-
-	if (zoomLevel > 1) return;
-
-	// Lock axis after 10px of deliberate movement
-	if (!axisLocked && (absDx > 10 || absDy > 10)) {
-		axisLocked = absDx >= absDy ? 'x' : 'y';
-	}
-
-	if (axisLocked !== 'x') return;
-
-	isSwipeDragging = true;
-	let offset = dx;
-
-	// Edge friction: resist when no adjacent image exists
+function applySwipe(e: PointerEvent, startX: number) {
+	let offset = e.clientX - startX;
 	if ((offset > 0 && !hasPrev) || (offset < 0 && !hasNext)) {
 		offset *= 0.35;
 	}
-
 	swipeOffset = offset;
 
-	// Track velocity
 	const now = performance.now();
 	velocitySamples.push({ x: e.clientX, t: now });
 	if (velocitySamples.length > 4) velocitySamples.shift();
 }
 
-function handlePointerUp(_e: PointerEvent) {
-	if (isPinching) return;
+function handlePointerMove(e: PointerEvent) {
+	switch (gesture.type) {
+		case 'idle':
+		case 'pinching':
+			return;
+		case 'panning': {
+			const dx = e.clientX - gesture.dragStart.x;
+			const dy = e.clientY - gesture.dragStart.y;
+			if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasMoved = true;
+			panOffset = {
+				x: gesture.panStart.x + dx / zoomLevel,
+				y: gesture.panStart.y + dy / zoomLevel
+			};
+			return;
+		}
+		case 'pending': {
+			const dx = e.clientX - gesture.startX;
+			const dy = e.clientY - gesture.startY;
+			const absDx = Math.abs(dx);
+			const absDy = Math.abs(dy);
+			if (absDx > 5 || absDy > 5) hasMoved = true;
 
-	// Zoom-pan release
-	if (zoomLevel > 1) {
-		if (hasMoved) suppressClick = true;
-		isDragging = false;
-		return;
-	}
+			// Need 10px of deliberate movement to commit to an axis
+			if (absDx <= 10 && absDy <= 10) return;
 
-	// Swipe release
-	if (isSwipeDragging) {
-		suppressClick = true;
-		isSwipeDragging = false;
-
-		const offset = swipeOffset;
-
-		// Compute velocity from recent samples
-		let velocity = 0;
-		if (velocitySamples.length >= 2) {
-			const last = velocitySamples[velocitySamples.length - 1];
-			const prev = velocitySamples[velocitySamples.length - 2];
-			const dt = last.t - prev.t;
-			if (dt > 0 && dt < 50) {
-				velocity = (last.x - prev.x) / dt; // px/ms, positive = moving right
+			if (absDx >= absDy) {
+				const { startX } = gesture;
+				gesture = { type: 'swiping', startX };
+				applySwipe(e, startX);
+			} else {
+				// Vertical movement — no gesture to perform
+				gesture = { type: 'idle' };
 			}
+			return;
 		}
-
-		// Sync spring to current drag position (no visual jump)
-		void swipeSpring.set(offset, { instant: true });
-
-		const positionThreshold = containerWidth * 0.33;
-		const velocityThreshold = 0.4; // px/ms
-
-		if ((offset < -positionThreshold || velocity < -velocityThreshold) && hasNext) {
-			void animateNavigation(-containerWidth, currentIndex + 1);
-		} else if ((offset > positionThreshold || velocity > velocityThreshold) && hasPrev) {
-			void animateNavigation(containerWidth, currentIndex - 1);
-		} else {
-			// Spring back to center
-			void swipeSpring.set(0);
+		case 'swiping': {
+			applySwipe(e, gesture.startX);
+			return;
 		}
-		return;
 	}
+}
 
-	// Non-swipe movement still suppresses click (prevents accidental close)
-	if (hasMoved) {
-		suppressClick = true;
+function handlePointerUp(_e: PointerEvent) {
+	switch (gesture.type) {
+		case 'pinching':
+			return;
+		case 'panning':
+			if (hasMoved) suppressClick = true;
+			gesture = { type: 'idle' };
+			return;
+		case 'swiping': {
+			suppressClick = true;
+			const offset = swipeOffset;
+
+			// Compute velocity from recent samples
+			let velocity = 0;
+			if (velocitySamples.length >= 2) {
+				const last = velocitySamples[velocitySamples.length - 1];
+				const prev = velocitySamples[velocitySamples.length - 2];
+				const dt = last.t - prev.t;
+				if (dt > 0 && dt < 50) {
+					velocity = (last.x - prev.x) / dt; // px/ms, positive = moving right
+				}
+			}
+
+			// Sync spring to current drag position (no visual jump)
+			void swipeSpring.set(offset, { instant: true });
+			gesture = { type: 'idle' };
+
+			const positionThreshold = containerWidth * 0.33;
+			const velocityThreshold = 0.4; // px/ms
+
+			if ((offset < -positionThreshold || velocity < -velocityThreshold) && hasNext) {
+				void animateNavigation(-containerWidth, currentIndex + 1);
+			} else if ((offset > positionThreshold || velocity > velocityThreshold) && hasPrev) {
+				void animateNavigation(containerWidth, currentIndex - 1);
+			} else {
+				void swipeSpring.set(0);
+			}
+			return;
+		}
+		default:
+			// idle or pending — no gesture to finalize
+			if (hasMoved) suppressClick = true;
+			gesture = { type: 'idle' };
+			return;
 	}
 }
 
@@ -330,28 +336,30 @@ function handleContainerClick(e: MouseEvent) {
 
 function handleTouchStart(e: TouchEvent) {
 	if (e.touches.length === 2) {
-		isPinching = true;
 		const dx = e.touches[0].clientX - e.touches[1].clientX;
 		const dy = e.touches[0].clientY - e.touches[1].clientY;
-		lastPinchDistance = Math.hypot(dx, dy);
-		pinchStartZoom = zoomLevel;
+		gesture = {
+			type: 'pinching',
+			lastDistance: Math.hypot(dx, dy),
+			startZoom: zoomLevel
+		};
 	}
 }
 
 function handleTouchMove(e: TouchEvent) {
-	if (e.touches.length === 2 && isPinching) {
+	if (e.touches.length === 2 && gesture.type === 'pinching') {
 		e.preventDefault();
 		const dx = e.touches[0].clientX - e.touches[1].clientX;
 		const dy = e.touches[0].clientY - e.touches[1].clientY;
 		const distance = Math.hypot(dx, dy);
-		zoomLevel = Math.min(5, Math.max(1, pinchStartZoom * (distance / lastPinchDistance)));
+		zoomLevel = Math.min(5, Math.max(1, gesture.startZoom * (distance / gesture.lastDistance)));
 		if (zoomLevel === 1) panOffset = { x: 0, y: 0 };
 	}
 }
 
 function handleTouchEnd(e: TouchEvent) {
-	if (e.touches.length < 2 && isPinching) {
-		isPinching = false;
+	if (e.touches.length < 2 && gesture.type === 'pinching') {
+		gesture = { type: 'idle' };
 		suppressClick = true;
 	}
 }
@@ -407,8 +415,8 @@ function handleTouchEnd(e: TouchEvent) {
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<div
 			class="relative h-[90vh] w-[90vw] select-none overflow-hidden"
-			class:cursor-grab={zoomLevel > 1 && !isDragging}
-			class:cursor-grabbing={isDragging}
+			class:cursor-grab={zoomLevel > 1 && gesture.type !== 'panning'}
+			class:cursor-grabbing={gesture.type === 'panning'}
 			style:touch-action="none"
 			role="img"
 			tabindex="-1"
@@ -474,7 +482,7 @@ function handleTouchEnd(e: TouchEvent) {
 				style:transform="translateX({displayOffset}px)"
 			>
 				<div
-					style="transform: scale({zoomLevel}) translate({panOffset.x}px, {panOffset.y}px); transition: transform {isDragging ? '0s' : '0.15s'} ease;"
+					style="transform: scale({zoomLevel}) translate({panOffset.x}px, {panOffset.y}px); transition: transform {gesture.type === 'panning' ? '0s' : '0.15s'} ease;"
 					class="grid max-h-[90vh] max-w-[90vw]"
 					style:grid-template="1fr / 1fr"
 				>
