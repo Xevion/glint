@@ -4,8 +4,7 @@ import { api } from '$lib/api';
 import type {
 	CaptureWithContext,
 	SceneWithVersion,
-	UpdateSceneMetadataRequest,
-	WorldWithDetails
+	UpdateSceneMetadataRequest
 } from '$lib/bindings';
 import { ItemGrid } from '$lib/components/item-grid';
 import { freshnessColors } from '$lib/utils/status';
@@ -27,7 +26,6 @@ interface Props {
 }
 let { data }: Props = $props();
 let scene: SceneWithVersion = $derived(data.scene);
-let world: WorldWithDetails | null = $derived(data.world);
 let captures: CaptureWithContext[] = $derived(data.captures);
 let captureCount: number = $derived(data.captureCount);
 
@@ -166,14 +164,6 @@ async function handleReactivate() {
 			<AdminDetailField label="Slug">
 				{scene.slug}
 			</AdminDetailField>
-		<AdminDetailField label="World">
-			<a
-				href="/admin/worlds/{scene.world_id}"
-				class="text-primary hover:underline"
-			>
-				{world?.name ?? scene.world_id}
-			</a>
-		</AdminDetailField>
 		<AdminDetailField label="Position">
 			<code class="text-xs">
 				{scene.version.x.toFixed(1)}, {scene.version.y.toFixed(1)}, {scene.version.z.toFixed(1)}

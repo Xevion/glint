@@ -1,16 +1,15 @@
 //! Post-processing for work items: spatial clustering and execution ordering.
 //!
-//! The SQL layer returns work items grouped by world → shader popularity → profile.
+//! The SQL layer returns work items grouped by shader popularity → profile.
 //! This module refines the scene ordering within each profile pass using spatial
 //! clustering and nearest-neighbor traversal to minimize expensive transitions.
 //!
 //! **Execution cost hierarchy** (most to least expensive):
-//! 1. World load (~10-30s)
-//! 2. Shader load ≈ Profile switch (~2-5s)
-//! 3. Scene teleport (~1-3s)
-//! 4. Derived scene transition (~0.1s) — same position, different time/weather
+//! 1. Shader load ≈ Profile switch (~2-5s)
+//! 2. Scene teleport (~1-3s)
+//! 3. Preset transition (~0.1s) — same position, different time/weather
 
-use crate::id::{SceneId, ShaderVersionId, ShaderVersionProfileId, WorldId};
+use crate::id::{SceneId, ShaderVersionId, ShaderVersionProfileId};
 use crate::models::WorkItem;
 
 /// Scenes within this XZ distance are "derived" — same spot, different time/weather.
@@ -25,22 +24,16 @@ const PROXIMITY_DISTANCE_THRESHOLD: f64 = 512.0;
 // Intermediate grouping types (not exported — internal to ordering logic)
 // ---------------------------------------------------------------------------
 
-/// Items for a single (shader_version, profile) within one world.
+/// Items for a single (shader_version, profile).
 struct ProfileGroup {
     profile_id: Option<ShaderVersionProfileId>,
     items: Vec<WorkItem>,
 }
 
-/// Items for a single shader_version within one world.
+/// Items for a single shader_version.
 struct ShaderGroup {
     shader_version_id: ShaderVersionId,
     profiles: Vec<ProfileGroup>,
-}
-
-/// Items for a single world.
-struct WorldGroup {
-    world_id: WorldId,
-    shaders: Vec<ShaderGroup>,
 }
 
 /// A scene and its position, with all work items for that scene.
@@ -56,11 +49,11 @@ struct SceneCluster {
     /// Centroid position for nearest-neighbor selection between clusters.
     centroid_x: f64,
     centroid_z: f64,
-    /// Derived sub-clusters within this proximity cluster. Each sub-cluster
+    /// Preset sub-clusters within this proximity cluster. Each sub-cluster
     /// contains scenes at the same position (< 2 blocks apart), sorted by
     /// `time_of_day_ticks` ASC. Transitioning within a sub-cluster costs ~0.1s
-    /// (just time/weather change). Transitioning between sub-clusters costs
-    /// ~1-3s (teleport within shared chunks).
+    /// (just time/weather/preset change). Transitioning between sub-clusters
+    /// costs ~1-3s (teleport within shared chunks).
     derived_subclusters: Vec<Vec<WorkItem>>,
 }
 
@@ -70,7 +63,7 @@ struct SceneCluster {
 
 /// Reorder work items for optimal capture execution.
 ///
-/// Assumes the input is already sorted by world → shader popularity → profile
+/// Assumes the input is already sorted by shader popularity → profile
 /// from the SQL layer. Refines scene ordering within each profile pass using
 /// spatial clustering and nearest-neighbor traversal.
 pub fn optimize_execution_order(items: Vec<WorkItem>) -> Vec<WorkItem> {
@@ -78,43 +71,31 @@ pub fn optimize_execution_order(items: Vec<WorkItem>) -> Vec<WorkItem> {
         return items;
     }
 
-    let world_groups = group_into_hierarchy(items);
-    flatten_to_execution_order(world_groups)
+    let shader_groups = group_into_hierarchy(items);
+    flatten_to_execution_order(shader_groups)
 }
 
 // ---------------------------------------------------------------------------
 // Step 1: Group into hierarchy
 // ---------------------------------------------------------------------------
 
-/// Group flat work items into World → Shader → Profile hierarchy.
+/// Group flat work items into Shader → Profile hierarchy.
 ///
-/// Preserves the SQL ordering within each level (world order, shader popularity
-/// order, profile sort order).
-fn group_into_hierarchy(items: Vec<WorkItem>) -> Vec<WorldGroup> {
-    let mut worlds: Vec<WorldGroup> = Vec::new();
+/// Preserves the SQL ordering within each level (shader popularity order,
+/// profile sort order).
+fn group_into_hierarchy(items: Vec<WorkItem>) -> Vec<ShaderGroup> {
+    let mut shaders: Vec<ShaderGroup> = Vec::new();
 
     for item in items {
-        // Find or create WorldGroup
-        let world = match worlds.last_mut() {
-            Some(w) if w.world_id == item.world_id => w,
-            _ => {
-                worlds.push(WorldGroup {
-                    world_id: item.world_id.clone(),
-                    shaders: Vec::new(),
-                });
-                worlds.last_mut().unwrap()
-            }
-        };
-
-        // Find or create ShaderGroup within world
-        let shader = match world.shaders.last_mut() {
+        // Find or create ShaderGroup
+        let shader = match shaders.last_mut() {
             Some(s) if s.shader_version_id == item.shader_version_id => s,
             _ => {
-                world.shaders.push(ShaderGroup {
+                shaders.push(ShaderGroup {
                     shader_version_id: item.shader_version_id.clone(),
                     profiles: Vec::new(),
                 });
-                world.shaders.last_mut().unwrap()
+                shaders.last_mut().unwrap()
             }
         };
 
@@ -133,7 +114,7 @@ fn group_into_hierarchy(items: Vec<WorkItem>) -> Vec<WorldGroup> {
         profile.items.push(item);
     }
 
-    worlds
+    shaders
 }
 
 // ---------------------------------------------------------------------------
@@ -317,19 +298,17 @@ fn order_clusters_nearest_neighbor(mut clusters: Vec<SceneCluster>) -> Vec<Scene
 // ---------------------------------------------------------------------------
 
 /// Flatten the grouped hierarchy back into a flat list in execution order.
-fn flatten_to_execution_order(worlds: Vec<WorldGroup>) -> Vec<WorkItem> {
+fn flatten_to_execution_order(shaders: Vec<ShaderGroup>) -> Vec<WorkItem> {
     let mut result = Vec::new();
 
-    for world in worlds {
-        for shader in world.shaders {
-            for profile in shader.profiles {
-                let clusters = cluster_scenes(profile.items);
-                let ordered_clusters = order_clusters_nearest_neighbor(clusters);
+    for shader in shaders {
+        for profile in shader.profiles {
+            let clusters = cluster_scenes(profile.items);
+            let ordered_clusters = order_clusters_nearest_neighbor(clusters);
 
-                for cluster in ordered_clusters {
-                    for subcluster in cluster.derived_subclusters {
-                        result.extend(subcluster);
-                    }
+            for cluster in ordered_clusters {
+                for subcluster in cluster.derived_subclusters {
+                    result.extend(subcluster);
                 }
             }
         }
@@ -345,12 +324,11 @@ fn flatten_to_execution_order(worlds: Vec<WorldGroup>) -> Vec<WorkItem> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id::{SceneId, ShaderId, ShaderVersionId, ShaderVersionProfileId, WorldId};
+    use crate::id::{SceneId, ShaderId, ShaderVersionId, ShaderVersionProfileId};
 
     /// Create a minimal WorkItem for testing. Only fields relevant to ordering
     /// are set meaningfully; the rest use placeholder values.
     fn make_item(
-        world_id: &str,
         shader_version_id: &str,
         profile_id: Option<&str>,
         scene_id: &str,
@@ -380,13 +358,14 @@ mod tests {
             scene_weather_intensity: 0.0,
             scene_moon_phase: None,
             scene_biome: None,
-            world_id: WorldId(world_id.to_string()),
-            world_slug: world_id.to_string(),
-            world_name: world_id.to_string(),
-            world_file_url: None,
-            world_file_hash: None,
-            world_size_bytes: None,
-            world_version_id: None,
+            preset_id: None,
+            preset_name: None,
+            preset_slug: None,
+            package_url: None,
+            package_hash: None,
+            package_size_bytes: None,
+            scene_fov: 70,
+            scene_render_distance: 16,
             scene_version_id: None,
             profile_id: profile_id.map(|p| ShaderVersionProfileId(p.to_string())),
             profile_name: profile_id.map(|p| p.to_string()),
@@ -398,13 +377,12 @@ mod tests {
         items.iter().map(|i| i.scene_id.0.as_str()).collect()
     }
 
-    /// Extract (world, shader, profile, scene) tuples for full ordering assertions.
-    fn item_keys(items: &[WorkItem]) -> Vec<(&str, &str, Option<&str>, &str)> {
+    /// Extract (shader, profile, scene) tuples for full ordering assertions.
+    fn item_keys(items: &[WorkItem]) -> Vec<(&str, Option<&str>, &str)> {
         items
             .iter()
             .map(|i| {
                 (
-                    i.world_id.0.as_str(),
                     i.shader_version_id.0.as_str(),
                     i.profile_id.as_ref().map(|p| p.0.as_str()),
                     i.scene_id.0.as_str(),
@@ -421,7 +399,7 @@ mod tests {
 
     #[test]
     fn test_single_item_passthrough() {
-        let items = vec![make_item("w1", "sv1", None, "s1", 0.0, 0.0, 6000)];
+        let items = vec![make_item("sv1", None, "s1", 0.0, 0.0, 6000)];
         let result = optimize_execution_order(items);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].scene_id.0, "s1");
@@ -432,9 +410,9 @@ mod tests {
         // Three scenes at the same position (distance=0), different time_of_day.
         // Should be ordered by time_of_day ASC.
         let items = vec![
-            make_item("w1", "sv1", None, "hills_night", 100.0, 200.0, 13000),
-            make_item("w1", "sv1", None, "hills_sunset", 100.0, 200.0, 18000),
-            make_item("w1", "sv1", None, "hills", 100.0, 200.0, 1500),
+            make_item("sv1", None, "hills_night", 100.0, 200.0, 13000),
+            make_item("sv1", None, "hills_sunset", 100.0, 200.0, 18000),
+            make_item("sv1", None, "hills", 100.0, 200.0, 1500),
         ];
 
         let result = optimize_execution_order(items);
@@ -446,31 +424,31 @@ mod tests {
 
     #[test]
     fn test_hierarchy_preserved() {
-        // World order and shader/profile grouping should be maintained.
+        // Shader/profile grouping should be maintained.
         let items = vec![
-            make_item("w1", "sv1", Some("low"), "s1", 0.0, 0.0, 6000),
-            make_item("w1", "sv1", Some("low"), "s2", 100.0, 100.0, 6000),
-            make_item("w1", "sv1", Some("high"), "s1", 0.0, 0.0, 6000),
-            make_item("w1", "sv1", Some("high"), "s2", 100.0, 100.0, 6000),
-            make_item("w2", "sv2", None, "s3", 50.0, 50.0, 6000),
+            make_item("sv1", Some("low"), "s1", 0.0, 0.0, 6000),
+            make_item("sv1", Some("low"), "s2", 100.0, 100.0, 6000),
+            make_item("sv1", Some("high"), "s1", 0.0, 0.0, 6000),
+            make_item("sv1", Some("high"), "s2", 100.0, 100.0, 6000),
+            make_item("sv2", None, "s3", 50.0, 50.0, 6000),
         ];
 
         let result = optimize_execution_order(items);
         let keys = item_keys(&result);
 
-        // w1 items come before w2 items
-        let w1_end = keys.iter().rposition(|(w, _, _, _)| *w == "w1").unwrap();
-        let w2_start = keys.iter().position(|(w, _, _, _)| *w == "w2").unwrap();
-        assert!(w1_end < w2_start, "world grouping broken");
+        // sv1 items come before sv2 items
+        let sv1_end = keys.iter().rposition(|(sv, _, _)| *sv == "sv1").unwrap();
+        let sv2_start = keys.iter().position(|(sv, _, _)| *sv == "sv2").unwrap();
+        assert!(sv1_end < sv2_start, "shader grouping broken");
 
-        // Within w1/sv1, "low" profiles come before "high" profiles
+        // Within sv1, "low" profiles come before "high" profiles
         let low_end = keys
             .iter()
-            .rposition(|(_, _, p, _)| *p == Some("low"))
+            .rposition(|(_, p, _)| *p == Some("low"))
             .unwrap();
         let high_start = keys
             .iter()
-            .position(|(_, _, p, _)| *p == Some("high"))
+            .position(|(_, p, _)| *p == Some("high"))
             .unwrap();
         assert!(low_end < high_start, "profile grouping broken");
     }
@@ -482,9 +460,9 @@ mod tests {
         // - C at (2000, 0): far away → separate cluster
         // Nearest-neighbor from the larger cluster (A+B) should visit C last.
         let items = vec![
-            make_item("w1", "sv1", None, "a", 0.0, 0.0, 6000),
-            make_item("w1", "sv1", None, "c", 2000.0, 0.0, 6000),
-            make_item("w1", "sv1", None, "b", 100.0, 0.0, 6000),
+            make_item("sv1", None, "a", 0.0, 0.0, 6000),
+            make_item("sv1", None, "c", 2000.0, 0.0, 6000),
+            make_item("sv1", None, "b", 100.0, 0.0, 6000),
         ];
 
         let result = optimize_execution_order(items);
@@ -512,36 +490,12 @@ mod tests {
         // Each profile should get the same scene ordering independently.
         // Two profiles, three derived scenes each.
         let items = vec![
-            make_item("w1", "sv1", Some("low"), "hills_night", 100.0, 200.0, 13000),
-            make_item("w1", "sv1", Some("low"), "hills", 100.0, 200.0, 1500),
-            make_item(
-                "w1",
-                "sv1",
-                Some("low"),
-                "hills_sunset",
-                100.0,
-                200.0,
-                18000,
-            ),
-            make_item(
-                "w1",
-                "sv1",
-                Some("high"),
-                "hills_night",
-                100.0,
-                200.0,
-                13000,
-            ),
-            make_item("w1", "sv1", Some("high"), "hills", 100.0, 200.0, 1500),
-            make_item(
-                "w1",
-                "sv1",
-                Some("high"),
-                "hills_sunset",
-                100.0,
-                200.0,
-                18000,
-            ),
+            make_item("sv1", Some("low"), "hills_night", 100.0, 200.0, 13000),
+            make_item("sv1", Some("low"), "hills", 100.0, 200.0, 1500),
+            make_item("sv1", Some("low"), "hills_sunset", 100.0, 200.0, 18000),
+            make_item("sv1", Some("high"), "hills_night", 100.0, 200.0, 13000),
+            make_item("sv1", Some("high"), "hills", 100.0, 200.0, 1500),
+            make_item("sv1", Some("high"), "hills_sunset", 100.0, 200.0, 18000),
         ];
 
         let result = optimize_execution_order(items);
@@ -565,8 +519,8 @@ mod tests {
     fn test_derived_threshold_boundary() {
         // Scenes at exactly 1.9 blocks apart should be in the same derived subcluster
         let items = vec![
-            make_item("w1", "sv1", None, "s1", 0.0, 0.0, 6000),
-            make_item("w1", "sv1", None, "s2", 1.9, 0.0, 12000),
+            make_item("sv1", None, "s1", 0.0, 0.0, 6000),
+            make_item("sv1", None, "s2", 1.9, 0.0, 12000),
         ];
 
         let clusters = cluster_scenes(items);
@@ -593,8 +547,8 @@ mod tests {
         // Scenes at 3.0 blocks apart should be in separate derived subclusters
         // but same proximity cluster (< 512 blocks)
         let items = vec![
-            make_item("w1", "sv1", None, "s1", 0.0, 0.0, 6000),
-            make_item("w1", "sv1", None, "s2", 3.0, 0.0, 12000),
+            make_item("sv1", None, "s1", 0.0, 0.0, 6000),
+            make_item("sv1", None, "s2", 3.0, 0.0, 12000),
         ];
 
         let clusters = cluster_scenes(items);
@@ -611,11 +565,11 @@ mod tests {
         // Simulate the actual Glint data: Hills/Hills Night/Hills Sunset at same
         // position, Mountain Lake nearby (21 shared chunks), Mesa far away.
         let items = vec![
-            make_item("glint", "sv1", None, "hills", 100.0, 200.0, 1500),
-            make_item("glint", "sv1", None, "hills_night", 100.0, 200.0, 13000),
-            make_item("glint", "sv1", None, "hills_sunset", 100.0, 200.0, 18000),
-            make_item("glint", "sv1", None, "mountain_lake", 250.0, 150.0, 6000),
-            make_item("glint", "sv1", None, "mesa", 5000.0, 3000.0, 6000),
+            make_item("sv1", None, "hills", 100.0, 200.0, 1500),
+            make_item("sv1", None, "hills_night", 100.0, 200.0, 13000),
+            make_item("sv1", None, "hills_sunset", 100.0, 200.0, 18000),
+            make_item("sv1", None, "mountain_lake", 250.0, 150.0, 6000),
+            make_item("sv1", None, "mesa", 5000.0, 3000.0, 6000),
         ];
 
         let result = optimize_execution_order(items);

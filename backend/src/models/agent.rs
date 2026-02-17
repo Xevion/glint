@@ -9,18 +9,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-/// World information for a capture run
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct WorldInfo {
-    pub id: String,
-    pub slug: String,
-    pub name: String,
-    pub file_url: Option<String>,
-    pub file_hash: Option<String>,
-    pub size_bytes: Option<i64>,
-}
-
 // Agent Request Types
 
 /// A file entry in a prepare-upload request, with metadata for R2 key generation.
@@ -96,7 +84,6 @@ pub enum OrchestrationStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CaptureSessionData {
-    pub world_name: String,
     pub scene_id: String,
     pub session_dir: String,
     pub started_at: String,

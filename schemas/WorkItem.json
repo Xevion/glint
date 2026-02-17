@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "WorkItem",
-  "description": "A single work item: one (shader_version, scene, profile) triple to capture",
+  "description": "A single work item: one (shader_version, scene, preset, profile) tuple to capture",
   "type": "object",
   "properties": {
     "download_url": {
@@ -11,6 +11,43 @@
       ]
     },
     "file_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "package_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "package_size_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int64"
+    },
+    "package_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "preset_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "preset_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "preset_slug": {
       "type": [
         "string",
         "null"
@@ -37,6 +74,10 @@
     "scene_dimension": {
       "type": "string"
     },
+    "scene_fov": {
+      "type": "integer",
+      "format": "int32"
+    },
     "scene_id": {
       "type": "string"
     },
@@ -53,6 +94,10 @@
     "scene_pitch": {
       "type": "number",
       "format": "double"
+    },
+    "scene_render_distance": {
+      "type": "integer",
+      "format": "int32"
     },
     "scene_slug": {
       "type": "string"
@@ -104,40 +149,6 @@
     },
     "version": {
       "type": "string"
-    },
-    "world_file_hash": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "world_file_url": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "world_id": {
-      "type": "string"
-    },
-    "world_name": {
-      "type": "string"
-    },
-    "world_size_bytes": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "int64"
-    },
-    "world_slug": {
-      "type": "string"
-    },
-    "world_version_id": {
-      "type": [
-        "string",
-        "null"
-      ]
     }
   },
   "required": [
@@ -158,8 +169,7 @@
     "scene_time_of_day_ticks",
     "scene_weather",
     "scene_weather_intensity",
-    "world_id",
-    "world_slug",
-    "world_name"
+    "scene_fov",
+    "scene_render_distance"
   ]
 }

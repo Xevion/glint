@@ -7,7 +7,6 @@ import {
 	BookOpen,
 	Camera,
 	Cloud,
-	Globe,
 	HardDrive,
 	Layers,
 	LayoutDashboard,
@@ -70,7 +69,6 @@ const sceneFilters = [
 const adminItems = [
 	{ href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
 	{ href: '/admin/shaders', label: 'Shaders', icon: Sparkles },
-	{ href: '/admin/worlds', label: 'Worlds', icon: Globe },
 	{ href: '/admin/scenes', label: 'Scenes', icon: Mountain },
 	{ href: '/admin/captures', label: 'Captures', icon: Camera },
 	{ href: '/admin/runs', label: 'Runs', icon: Activity },

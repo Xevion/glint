@@ -25,28 +25,18 @@
       },
       {
         "ordinal": 4,
-        "name": "world_id",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 5,
         "name": "dimension",
         "type_info": "Text"
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "active",
         "type_info": "Bool"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "created_at",
         "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 8,
-        "name": "parent_scene_id",
-        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -63,9 +53,7 @@
       true,
       false,
       false,
-      false,
-      false,
-      true
+      false
     ]
   },
   "hash": "27620467aa62c6cfe6a93603c2603cb257b61284a1024a82468095f7f904939f"

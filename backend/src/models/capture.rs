@@ -8,8 +8,8 @@ use sqlx::FromRow;
 use ts_rs::TS;
 
 use crate::id::{
-    CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderVersionId, ShaderVersionProfileId,
-    WorldVersionId,
+    CaptureId, CaptureRunId, SceneId, ScenePresetId, SceneVersionId, ShaderVersionId,
+    ShaderVersionProfileId,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
@@ -208,7 +208,7 @@ pub struct Capture {
     pub thumbhash: Option<String>,
     pub file_size_bytes: Option<i64>,
     pub content_type: Option<String>,
-    pub world_version_id: Option<WorldVersionId>,
+    pub preset_id: Option<ScenePresetId>,
     pub scene_version_id: Option<SceneVersionId>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
@@ -244,6 +244,7 @@ pub struct CaptureRunItem {
     pub shader_version_id: ShaderVersionId,
     pub scene_id: SceneId,
     pub profile_id: Option<ShaderVersionProfileId>,
+    pub preset_id: Option<ScenePresetId>,
     pub status: CaptureRunItemStatus,
     pub capture_id: Option<CaptureId>,
     pub error_message: Option<String>,
@@ -287,9 +288,9 @@ pub struct CaptureRunItemWithContext {
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub enum CaptureFreshness {
-    /// Latest capture for its target, world + scene versions match current
+    /// Latest capture for its target, scene version and preset match current
     Fresh,
-    /// Latest capture for its target, but world or scene version is outdated
+    /// Latest capture for its target, but scene version or preset is outdated
     Stale,
     /// A newer capture exists for this target — this capture is obsolete
     Superseded,
@@ -341,6 +342,10 @@ pub struct CaptureWithContext {
     // Scene context
     pub scene_name: Option<String>,
     pub scene_slug: Option<String>,
+    // Preset context
+    pub preset_id: Option<ScenePresetId>,
+    pub preset_name: Option<String>,
+    pub preset_slug: Option<String>,
     // Freshness status
     pub freshness: CaptureFreshness,
 }
@@ -367,7 +372,6 @@ pub struct CaptureDetail {
     pub iris_version: Option<String>,
     pub gpu_model: Option<String>,
     pub content_type: Option<String>,
-    pub world_version_id: Option<WorldVersionId>,
     pub scene_version_id: Option<SceneVersionId>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,

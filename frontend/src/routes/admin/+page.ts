@@ -12,7 +12,6 @@ export const load: PageLoad = async ({ fetch }) => {
 
 	const [
 		shadersRes,
-		worldsRes,
 		scenesRes,
 		capturesRes,
 		usersRes,
@@ -23,7 +22,6 @@ export const load: PageLoad = async ({ fetch }) => {
 		storageGrowthRes
 	] = await Promise.all([
 		api.shaders.list(),
-		api.worlds.list(),
 		api.scenes.list(),
 		api.admin.listCaptures(),
 		api.admin.listUsers(),
@@ -40,14 +38,6 @@ export const load: PageLoad = async ({ fetch }) => {
 		Ok: (v) => v.total,
 		Err: (e) => {
 			errors.shaders = e.message;
-			return 0;
-		}
-	});
-
-	const worldCount = worldsRes.match({
-		Ok: (v) => v.length,
-		Err: (e) => {
-			errors.worlds = e.message;
 			return 0;
 		}
 	});
@@ -115,7 +105,6 @@ export const load: PageLoad = async ({ fetch }) => {
 
 	return {
 		shaderCount,
-		worldCount,
 		sceneCount,
 		captureCount,
 		userCount,

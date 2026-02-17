@@ -4,11 +4,10 @@ import type { PageLoad } from './$types';
 
 const CAPTURES_PAGE_SIZE = 24;
 
-export const load: PageLoad = async ({ params, fetch, url }) => {
+export const load: PageLoad = async ({ params, fetch }) => {
 	const api = createApiClient(fetch);
-	const worldId = url.searchParams.get('worldId');
 
-	const result = await api.scenes.getBySlug(params.slug, worldId ?? undefined);
+	const result = await api.scenes.getBySlug(params.slug);
 
 	const scene = result.match({
 		Ok: (scenes) => {

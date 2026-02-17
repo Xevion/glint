@@ -52,6 +52,7 @@ pub struct CreateRunItemRequest {
     pub shader_version_id: String,
     pub scene_id: String,
     pub profile_id: Option<String>,
+    pub preset_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,8 +73,8 @@ pub struct ClaimItemRequest {
     pub resolution_width: i32,
     pub resolution_height: i32,
     pub captured_at: chrono::DateTime<chrono::Utc>,
-    /// World version this capture was taken against (from WorkItem)
-    pub world_version_id: String,
+    /// Preset ID this capture was taken against (from WorkItem)
+    pub preset_id: Option<String>,
     /// Scene version this capture was taken against (from WorkItem)
     pub scene_version_id: String,
 }
@@ -143,19 +144,21 @@ async fn create_run(
                 item.shader_version_id.clone(),
                 item.scene_id.clone(),
                 item.profile_id.clone(),
+                item.preset_id.clone(),
             )
         })
         .collect();
 
     let items: Vec<_> = owned_items
         .iter()
-        .map(|(id, rid, sv, sc, p)| {
+        .map(|(id, rid, sv, sc, p, pr)| {
             (
                 id.as_str(),
                 rid.as_str(),
                 sv.as_str(),
                 sc.as_str(),
                 p.as_deref(),
+                pr.as_deref(),
             )
         })
         .collect();
@@ -280,7 +283,7 @@ async fn claim_item(
         Some(request.resolution_width),
         Some(request.resolution_height),
         Some(request.captured_at),
-        Some(&request.world_version_id),
+        request.preset_id.as_deref(),
         Some(&request.scene_version_id),
         CaptureStatus::Uploading,
     )

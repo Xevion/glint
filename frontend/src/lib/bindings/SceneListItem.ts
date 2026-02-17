@@ -2,6 +2,5 @@
 import type { SceneId } from "./SceneId";
 import type { SceneVersion } from "./SceneVersion";
 import type { Tag } from "./Tag";
-import type { WorldId } from "./WorldId";
 
-export type SceneListItem = { version: SceneVersion, tags: Array<Tag>, image_url?: string, thumbhash?: string, capture_count: number, id: SceneId, name: string, slug: string, description?: string, world_id: WorldId, dimension: string, parent_scene_id?: string, active: boolean, created_at: string, };
+export type SceneListItem = { version: SceneVersion, tags: Array<Tag>, image_url?: string, thumbhash?: string, capture_count: number, id: SceneId, name: string, slug: string, description?: string, dimension: string, active: boolean, created_at: string, };

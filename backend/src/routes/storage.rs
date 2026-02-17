@@ -20,7 +20,7 @@ use crate::repo::{CaptureRepo, StorageRepo};
 use crate::state::AppState;
 
 /// Known R2 key prefixes.
-const KNOWN_PREFIXES: &[&str] = &["captures", "worlds", "backgrounds", "_uploads"];
+const KNOWN_PREFIXES: &[&str] = &["captures", "packages", "backgrounds", "_uploads"];
 
 #[derive(CustomDebug, Deserialize)]
 struct GrowthParams {
@@ -122,12 +122,7 @@ async fn storage_audit(
     let mut referenced_keys: HashSet<String> = HashSet::new();
 
     for db_ref in &db_refs {
-        let key = if db_ref.table == "pending_uploads" {
-            // pending_uploads.url is already a key
-            db_ref.url.clone()
-        } else {
-            r2_config.key_from_url(&db_ref.url)
-        };
+        let key = r2_config.key_from_url(&db_ref.url);
         referenced_keys.insert(key);
     }
 
@@ -169,11 +164,7 @@ async fn storage_audit(
     // 5. Check for missing R2 objects (DB references with no R2 object)
     let mut missing = Vec::new();
     for db_ref in &db_refs {
-        let key = if db_ref.table == "pending_uploads" {
-            db_ref.url.clone()
-        } else {
-            r2_config.key_from_url(&db_ref.url)
-        };
+        let key = r2_config.key_from_url(&db_ref.url);
 
         if !r2_key_set.contains(key.as_str()) {
             missing.push(AuditReference {
@@ -185,13 +176,9 @@ async fn storage_audit(
         }
     }
 
-    // 6. Check for URL mismatches (non-pending_uploads only)
+    // 6. Check for URL mismatches
     let mut url_mismatches = Vec::new();
     for db_ref in &db_refs {
-        if db_ref.table == "pending_uploads" {
-            continue;
-        }
-
         let key = r2_config.key_from_url(&db_ref.url);
         let expected_url = r2_config.public_url_for_key(&key);
 
@@ -257,13 +244,7 @@ async fn storage_cleanup(
 
     let referenced_keys: HashSet<String> = db_refs
         .iter()
-        .map(|r| {
-            if r.table == "pending_uploads" {
-                r.url.clone()
-            } else {
-                r2_config.key_from_url(&r.url)
-            }
-        })
+        .map(|r| r2_config.key_from_url(&r.url))
         .collect();
 
     let mut results = Vec::with_capacity(request.keys.len());

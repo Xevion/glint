@@ -1,26 +1,24 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
-use tracing::{debug, instrument, warn};
+use tracing::{debug, instrument};
 
-use crate::error::{AppError, AppResult};
-use crate::id::{SceneId, SceneVersionId, WorldId};
+use crate::error::AppResult;
+use crate::id::{SceneId, SceneVersionId};
 use chrono::{DateTime, Utc};
 
 use crate::models::{
-    CreateSceneRequest, Scene, SceneVersion, SceneWithWorld, UpdateSceneMetadataRequest,
-    UpdateSceneRequest,
+    CreateSceneRequest, Scene, SceneListAdmin, ScenePreset, SceneVersion,
+    UpdateSceneMetadataRequest, UpdateSceneRequest,
 };
 
-/// Helper struct for joined scene/world query (includes latest version via lateral join)
-struct SceneWithWorldRow {
+/// Helper struct for joined scene query (includes latest version via lateral join)
+struct SceneListAdminRow {
     id: String,
     name: String,
     slug: String,
     description: Option<String>,
-    world_id: String,
     dimension: String,
-    parent_scene_id: Option<String>,
     active: bool,
     created_at: DateTime<Utc>,
     // Latest version fields (nullable — scene might have no versions yet)
@@ -35,17 +33,20 @@ struct SceneWithWorldRow {
     version_weather_intensity: Option<f64>,
     version_moon_phase: Option<i32>,
     version_biome: Option<String>,
+    version_package_url: Option<String>,
+    version_package_hash: Option<String>,
+    version_package_size_bytes: Option<i64>,
+    version_fov: Option<i32>,
+    version_render_distance: Option<i32>,
     version_created_at: Option<DateTime<Utc>>,
-    // World + enrichment
-    world_name: Option<String>,
-    world_slug: Option<String>,
+    // Enrichment
     image_url: Option<String>,
     thumbhash: Option<String>,
     capture_count: Option<i64>,
 }
 
-impl From<SceneWithWorldRow> for SceneWithWorld {
-    fn from(row: SceneWithWorldRow) -> Self {
+impl From<SceneListAdminRow> for SceneListAdmin {
+    fn from(row: SceneListAdminRow) -> Self {
         let version = row
             .version_id
             .map(|vid| SceneVersion {
@@ -61,6 +62,11 @@ impl From<SceneWithWorldRow> for SceneWithWorld {
                 weather_intensity: row.version_weather_intensity.unwrap_or(0.0),
                 moon_phase: row.version_moon_phase,
                 biome: row.version_biome,
+                package_url: row.version_package_url,
+                package_hash: row.version_package_hash,
+                package_size_bytes: row.version_package_size_bytes,
+                fov: row.version_fov.unwrap_or(70),
+                render_distance: row.version_render_distance.unwrap_or(16),
                 created_at: row.version_created_at.unwrap_or(row.created_at),
             })
             .expect("scene must have at least one version (post-migration invariant)");
@@ -70,18 +76,14 @@ impl From<SceneWithWorldRow> for SceneWithWorld {
                 name: row.name,
                 slug: row.slug,
                 description: row.description,
-                world_id: WorldId(row.world_id),
                 dimension: row.dimension,
-                parent_scene_id: row.parent_scene_id,
                 active: row.active,
                 created_at: row.created_at,
             },
             version,
-            world_name: row.world_name,
             image_url: row.image_url,
             thumbhash: row.thumbhash,
             capture_count: row.capture_count.unwrap_or(0),
-            world_slug: row.world_slug,
         }
     }
 }
@@ -116,26 +118,7 @@ impl SceneRepo {
         Ok(scenes)
     }
 
-    /// List scenes by world
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn list_by_world(
-        executor: impl sqlx::PgExecutor<'_>,
-        world_id: &str,
-    ) -> AppResult<Vec<Scene>> {
-        let scenes = sqlx::query_as!(
-            Scene,
-            "SELECT * FROM scenes WHERE world_id = $1 AND active = TRUE ORDER BY name",
-            world_id
-        )
-        .fetch_all(executor)
-        .await
-        .context(format!("failed to list scenes for world '{}'", world_id))?;
-
-        debug!(count = scenes.len(), "Listed scenes for world");
-        Ok(scenes)
-    }
-
-    /// Find active scenes by slug (scenes can share slugs across worlds)
+    /// Find active scenes by slug (globally unique now)
     #[instrument(skip(executor), level = "debug")]
     pub async fn find_active_by_slug(
         executor: impl sqlx::PgExecutor<'_>,
@@ -153,46 +136,19 @@ impl SceneRepo {
         Ok(scenes)
     }
 
-    /// Find active scene by slug and world_id (unique)
+    /// Check if an active scene with the given slug already exists
     #[instrument(skip(executor), level = "debug")]
-    pub async fn find_by_slug_and_world(
+    pub async fn exists_by_slug(
         executor: impl sqlx::PgExecutor<'_>,
         slug: &str,
-        world_id: &str,
-    ) -> AppResult<Option<Scene>> {
-        sqlx::query_as!(
-            Scene,
-            "SELECT * FROM scenes WHERE slug = $1 AND world_id = $2 AND active = TRUE",
-            slug,
-            world_id
-        )
-        .fetch_optional(executor)
-        .await
-        .context(format!(
-            "failed to find scene '{}' in world '{}'",
-            slug, world_id
-        ))
-        .map_err(Into::into)
-    }
-
-    /// Check if a scene slug exists in a world (active only)
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn exists_by_slug_in_world(
-        executor: impl sqlx::PgExecutor<'_>,
-        slug: &str,
-        world_id: &str,
     ) -> AppResult<bool> {
         let result = sqlx::query_scalar!(
-            "SELECT 1 as one FROM scenes WHERE world_id = $1 AND slug = $2 AND active = TRUE",
-            world_id,
+            "SELECT 1 as one FROM scenes WHERE slug = $1 AND active = TRUE",
             slug
         )
         .fetch_optional(executor)
         .await
-        .context(format!(
-            "failed to check scene existence '{}' in world '{}'",
-            slug, world_id
-        ))?;
+        .context(format!("failed to check scene existence '{}'", slug))?;
 
         Ok(result.is_some())
     }
@@ -207,37 +163,17 @@ impl SceneRepo {
     ) -> AppResult<(Scene, SceneVersion)> {
         let mut tx = pool.begin().await.context("failed to begin transaction")?;
 
-        // Enforce max derivative depth of 1 (no grandchildren: A→B is ok, A→B→C is not)
-        if let Some(parent_id) = &req.parent_scene_id {
-            let parent_has_parent = sqlx::query_scalar!(
-                "SELECT parent_scene_id FROM scenes WHERE id = $1",
-                parent_id
-            )
-            .fetch_optional(&mut *tx)
-            .await
-            .context("failed to check parent scene")?
-            .flatten();
-
-            if parent_has_parent.is_some() {
-                return Err(AppError::BadRequest(
-                    "Cannot create a derivative of a derivative scene".into(),
-                ));
-            }
-        }
-
         let scene = sqlx::query_as!(
             Scene,
             r#"
-            INSERT INTO scenes (id, name, slug, world_id, dimension, parent_scene_id, active, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, TRUE, now())
+            INSERT INTO scenes (id, name, slug, dimension, active, created_at)
+            VALUES ($1, $2, $3, $4, TRUE, now())
             RETURNING *
             "#,
             id,
             req.name,
             req.slug,
-            req.world_id.as_ref(),
             req.dimension,
-            req.parent_scene_id,
         )
         .fetch_one(&mut *tx)
         .await
@@ -254,8 +190,10 @@ impl SceneRepo {
     }
 
     /// Update a scene by creating a new scene_version with the new config.
-    /// Also cascades to derivatives: any scene with parent_scene_id = id
-    /// gets a new version with the same config.
+    ///
+    /// Only sets positioning/camera/environment fields from the mod's update request.
+    /// Package and rendering fields (fov, render_distance) use DB defaults and are
+    /// managed through a separate scene package upload flow.
     #[instrument(skip(pool, req), level = "debug")]
     pub async fn update(
         pool: &crate::db::DbPool,
@@ -296,87 +234,23 @@ impl SceneRepo {
         .await
         .context(format!("failed to create scene version for '{}'", id))?;
 
-        // Cascade to derivative scenes (children with parent_scene_id = id)
-        let derivatives: Vec<String> = sqlx::query_scalar!(
-            "SELECT id FROM scenes WHERE parent_scene_id = $1 AND active = TRUE",
-            id
-        )
-        .fetch_all(&mut *tx)
-        .await
-        .context("failed to list derivative scenes")?;
-
-        // For each derivative, create a new version that inherits position/camera
-        // from the parent but preserves the derivative's own environment overrides
-        // (time_of_day, weather, etc.) from its latest version.
-        for child_id in &derivatives {
-            let child_version_id = crate::id::generate_id();
-            let result = sqlx::query!(
-                r#"
-                INSERT INTO scene_versions (id, scene_id, x, y, z, pitch, yaw, time_of_day_ticks, weather, weather_intensity, moon_phase, biome, created_at)
-                SELECT $1, $2, $3, $4, $5, $6, $7,
-                    child_v.time_of_day_ticks,
-                    child_v.weather,
-                    child_v.weather_intensity,
-                    child_v.moon_phase,
-                    child_v.biome,
-                    now()
-                FROM (
-                    SELECT * FROM scene_versions
-                    WHERE scene_id = $2
-                    ORDER BY created_at DESC, id DESC
-                    LIMIT 1
-                ) child_v
-                "#,
-                child_version_id,
-                child_id,
-                req.position.x,
-                req.position.y,
-                req.position.z,
-                req.camera.pitch,
-                req.camera.yaw,
-            )
-            .execute(&mut *tx)
-            .await
-            .context(format!("failed to cascade version to derivative '{}'", child_id))?;
-
-            if result.rows_affected() == 0 {
-                warn!(
-                    parent_id = id,
-                    child_id = child_id.as_str(),
-                    "Derivative cascade skipped: child scene has no existing versions"
-                );
-            }
-        }
-
-        if !derivatives.is_empty() {
-            debug!(
-                count = derivatives.len(),
-                "Cascaded version to derivative scenes"
-            );
-        }
-
         tx.commit().await.context("failed to commit scene update")?;
         Ok((scene, version))
     }
 
-    /// Disable a scene (soft delete)
+    /// Disable an active scene by slug (soft delete)
     #[instrument(skip(executor), level = "debug")]
-    pub async fn disable(
+    pub async fn disable_by_slug(
         executor: impl sqlx::PgExecutor<'_>,
         slug: &str,
-        world_id: &str,
     ) -> AppResult<bool> {
         let result = sqlx::query!(
-            "UPDATE scenes SET active = FALSE WHERE slug = $1 AND world_id = $2 AND active = TRUE",
+            "UPDATE scenes SET active = FALSE WHERE slug = $1 AND active = TRUE",
             slug,
-            world_id
         )
         .execute(executor)
         .await
-        .context(format!(
-            "failed to disable scene '{}' in world '{}'",
-            slug, world_id
-        ))?;
+        .context(format!("failed to disable scene '{}'", slug))?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -400,9 +274,9 @@ impl SceneRepo {
     /// Includes a preview thumbnail per scene, preferring the vanilla shader's
     /// latest capture, then falling back to the most-downloaded shader's capture.
     #[instrument(skip(executor), level = "debug")]
-    pub async fn list_all(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<SceneWithWorld>> {
+    pub async fn list_all(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<SceneListAdmin>> {
         let rows = sqlx::query_as!(
-            SceneWithWorldRow,
+            SceneListAdminRow,
             r#"
             WITH scene_captures_ranked AS (
                 SELECT
@@ -428,8 +302,8 @@ impl SceneRepo {
                 GROUP BY scene_id
             )
             SELECT
-                sc.id, sc.name, sc.slug, sc.description, sc.world_id,
-                sc.dimension, sc.parent_scene_id, sc.active, sc.created_at,
+                sc.id, sc.name, sc.slug, sc.description,
+                sc.dimension, sc.active, sc.created_at,
                 lsv.id AS version_id,
                 lsv.x AS version_x,
                 lsv.y AS version_y,
@@ -441,9 +315,12 @@ impl SceneRepo {
                 lsv.weather_intensity AS version_weather_intensity,
                 lsv.moon_phase AS version_moon_phase,
                 lsv.biome AS version_biome,
+                lsv.package_url AS version_package_url,
+                lsv.package_hash AS version_package_hash,
+                lsv.package_size_bytes AS version_package_size_bytes,
+                lsv.fov AS version_fov,
+                lsv.render_distance AS version_render_distance,
                 lsv.created_at AS version_created_at,
-                w.name as world_name,
-                w.slug as world_slug,
                 cr.image_url,
                 cr.thumbhash,
                 cnt.capture_count
@@ -454,7 +331,6 @@ impl SceneRepo {
                 ORDER BY sv2.created_at DESC, sv2.id DESC
                 LIMIT 1
             ) lsv ON TRUE
-            LEFT JOIN worlds w ON sc.world_id = w.id
             LEFT JOIN scene_captures_ranked cr ON cr.scene_id = sc.id AND cr.rn = 1
             LEFT JOIN scene_counts cnt ON cnt.scene_id = sc.id
             ORDER BY sc.name
@@ -464,7 +340,7 @@ impl SceneRepo {
         .await
         .context("failed to list all scenes")?;
 
-        let scenes: Vec<SceneWithWorld> = rows.into_iter().map(Into::into).collect();
+        let scenes: Vec<SceneListAdmin> = rows.into_iter().map(Into::into).collect();
         debug!(count = scenes.len(), "Listed all scenes");
         Ok(scenes)
     }
@@ -495,17 +371,15 @@ impl SceneRepo {
         .map_err(Into::into)
     }
 
-    /// Batch disable scenes by slugs within a world
+    /// Batch disable scenes by slugs
     #[instrument(skip(executor), level = "debug")]
     pub async fn batch_disable(
         executor: impl sqlx::PgExecutor<'_>,
         slugs: &[String],
-        world_id: &str,
     ) -> AppResult<u64> {
         let result = sqlx::query!(
-            "UPDATE scenes SET active = FALSE WHERE slug = ANY($1) AND world_id = $2 AND active = TRUE",
+            "UPDATE scenes SET active = FALSE WHERE slug = ANY($1) AND active = TRUE",
             slugs,
-            world_id
         )
         .execute(executor)
         .await
@@ -582,6 +456,11 @@ impl SceneVersionRepo {
     }
 
     /// Internal helper: insert a new scene_version row from a CreateSceneRequest.
+    ///
+    /// Package fields (package_url, package_hash, package_size_bytes) and rendering
+    /// overrides (fov, render_distance) are not set here — they use DB defaults.
+    /// Scene packages are uploaded separately and attached to versions via a
+    /// dedicated endpoint (not yet implemented).
     pub(crate) async fn create_inner(
         executor: impl sqlx::PgExecutor<'_>,
         id: &str,
@@ -615,5 +494,94 @@ impl SceneVersionRepo {
             scene_id
         ))
         .map_err(Into::into)
+    }
+}
+
+pub struct ScenePresetRepo;
+
+impl ScenePresetRepo {
+    /// List all presets for a scene, ordered by sort_order
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_by_scene(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_id: &str,
+    ) -> AppResult<Vec<ScenePreset>> {
+        let presets = sqlx::query_as!(
+            ScenePreset,
+            r#"
+            SELECT * FROM scene_presets
+            WHERE scene_id = $1
+            ORDER BY sort_order ASC, name ASC
+            "#,
+            scene_id
+        )
+        .fetch_all(executor)
+        .await
+        .context(format!("failed to list presets for scene '{}'", scene_id))?;
+
+        debug!(count = presets.len(), "Listed scene presets");
+        Ok(presets)
+    }
+
+    /// Find a single preset by ID
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn find_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+    ) -> AppResult<Option<ScenePreset>> {
+        sqlx::query_as!(ScenePreset, "SELECT * FROM scene_presets WHERE id = $1", id)
+            .fetch_optional(executor)
+            .await
+            .context(format!("failed to find preset '{}'", id))
+            .map_err(Into::into)
+    }
+
+    /// Create a new scene preset
+    #[allow(clippy::too_many_arguments)]
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn create(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+        scene_id: &str,
+        name: &str,
+        slug: &str,
+        time_of_day_ticks: i32,
+        weather: &str,
+        weather_intensity: f64,
+        moon_phase: Option<i32>,
+        sort_order: i32,
+    ) -> AppResult<ScenePreset> {
+        sqlx::query_as!(
+            ScenePreset,
+            r#"
+            INSERT INTO scene_presets (id, scene_id, name, slug, time_of_day_ticks, weather, weather_intensity, moon_phase, sort_order, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now())
+            RETURNING *
+            "#,
+            id,
+            scene_id,
+            name,
+            slug,
+            time_of_day_ticks,
+            weather,
+            weather_intensity,
+            moon_phase,
+            sort_order,
+        )
+        .fetch_one(executor)
+        .await
+        .context(format!("failed to create preset '{}' for scene '{}'", name, scene_id))
+        .map_err(Into::into)
+    }
+
+    /// Delete a preset by ID
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn delete(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<bool> {
+        let result = sqlx::query!("DELETE FROM scene_presets WHERE id = $1", id)
+            .execute(executor)
+            .await
+            .context(format!("failed to delete preset '{}'", id))?;
+
+        Ok(result.rows_affected() > 0)
     }
 }

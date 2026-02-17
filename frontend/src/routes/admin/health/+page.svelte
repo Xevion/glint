@@ -106,9 +106,8 @@ const BADGE_VARIANTS: Record<TargetHealth, 'default' | 'secondary' | 'destructiv
 };
 
 const STALE_REASON_LABELS: Record<StaleReason, string> = {
-	world_updated: 'World updated',
 	scene_updated: 'Scene updated',
-	both_updated: 'World + scene updated'
+	preset_edited: 'Preset edited'
 };
 
 function relativeTime(iso: string): string {
@@ -354,9 +353,7 @@ async function refresh() {
 							</Table.Cell>
 							<Table.Cell class="p-3 text-muted-foreground">{item.version}</Table.Cell>
 							<Table.Cell class="p-3">
-								<a href="/admin/scenes/{item.scene_id}" class="hover:underline">{item.scene_name}</a>
-								<span class="text-muted-foreground"> / </span>
-								<a href="/admin/worlds/{item.world_id}" class="text-muted-foreground hover:underline">{item.world_name}</a>
+							<a href="/admin/scenes/{item.scene_id}" class="hover:underline">{item.scene_name}</a>
 							</Table.Cell>
 							<Table.Cell class="p-3 text-muted-foreground">{item.profile_name ?? '—'}</Table.Cell>
 						</Table.Row>

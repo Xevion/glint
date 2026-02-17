@@ -5,12 +5,10 @@ use crate::db::DbPool;
 
 pub struct StorageRepo;
 
-/// A reference from a database row to an R2 URL or key.
+/// A reference from a database row to an R2 URL.
 pub struct DbReference {
     pub table: &'static str,
     pub row_id: String,
-    /// For URL-based columns, this is the full URL.
-    /// For `pending_uploads.upload_key`, this is the raw R2 key.
     pub url: String,
 }
 
@@ -36,18 +34,18 @@ impl StorageRepo {
             });
         }
 
-        // World versions
+        // Scene versions (package_url)
         let versions =
-            sqlx::query("SELECT id, file_url FROM world_versions WHERE file_url IS NOT NULL")
+            sqlx::query("SELECT id, package_url FROM scene_versions WHERE package_url IS NOT NULL")
                 .fetch_all(pool)
                 .await
-                .context("Failed to query world version URLs")?;
+                .context("Failed to query scene version package URLs")?;
 
         for row in versions {
             let id: String = row.get("id");
-            let url: String = row.get("file_url");
+            let url: String = row.get("package_url");
             refs.push(DbReference {
-                table: "world_versions",
+                table: "scene_versions",
                 row_id: id,
                 url,
             });
@@ -66,22 +64,6 @@ impl StorageRepo {
                 table: "backgrounds",
                 row_id: id,
                 url,
-            });
-        }
-
-        // Pending uploads (upload_key is already a key, not a URL)
-        let pending = sqlx::query("SELECT upload_id, upload_key FROM pending_uploads")
-            .fetch_all(pool)
-            .await
-            .context("Failed to query pending uploads")?;
-
-        for row in pending {
-            let id: String = row.get("upload_id");
-            let key: String = row.get("upload_key");
-            refs.push(DbReference {
-                table: "pending_uploads",
-                row_id: id,
-                url: key,
             });
         }
 

@@ -2,9 +2,9 @@
 import type { CaptureId } from "./CaptureId";
 import type { CaptureStatus } from "./CaptureStatus";
 import type { SceneId } from "./SceneId";
+import type { ScenePresetId } from "./ScenePresetId";
 import type { SceneVersionId } from "./SceneVersionId";
 import type { ShaderVersionId } from "./ShaderVersionId";
 import type { ShaderVersionProfileId } from "./ShaderVersionProfileId";
-import type { WorldVersionId } from "./WorldVersionId";
 
-export type Capture = { id: CaptureId, shader_version_id: ShaderVersionId, scene_id: SceneId, profile_id?: ShaderVersionProfileId, image_url?: string, image_path?: string, video_url?: string, avg_fps?: number, min_fps?: number, max_fps?: number, frame_time_avg?: number, frame_time_p99?: number, minecraft_version?: string, iris_version?: string, gpu_model?: string, resolution_width?: number, resolution_height?: number, captured_at?: string, status: CaptureStatus, error_message?: string, thumbhash?: string, file_size_bytes?: number, content_type?: string, world_version_id?: WorldVersionId, scene_version_id?: SceneVersionId, created_at: string, updated_at: string, };
+export type Capture = { id: CaptureId, shader_version_id: ShaderVersionId, scene_id: SceneId, profile_id?: ShaderVersionProfileId, image_url?: string, image_path?: string, video_url?: string, avg_fps?: number, min_fps?: number, max_fps?: number, frame_time_avg?: number, frame_time_p99?: number, minecraft_version?: string, iris_version?: string, gpu_model?: string, resolution_width?: number, resolution_height?: number, captured_at?: string, status: CaptureStatus, error_message?: string, thumbhash?: string, file_size_bytes?: number, content_type?: string, preset_id?: ScenePresetId, scene_version_id?: SceneVersionId, created_at: string, updated_at: string, };

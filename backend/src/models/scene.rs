@@ -7,8 +7,7 @@ use validator::{Validate, ValidationError};
 
 use super::capture::CaptureWithContext;
 use super::taxonomy::Tag;
-use super::world::World;
-use crate::id::{SceneId, SceneVersionId, WorldId};
+use crate::id::{SceneId, ScenePresetId, SceneVersionId};
 
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
@@ -18,15 +17,13 @@ pub struct Scene {
     pub name: String,
     pub slug: String,
     pub description: Option<String>,
-    pub world_id: WorldId,
     pub dimension: String,
-    pub parent_scene_id: Option<String>,
     pub active: bool,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
 }
 
-/// A specific revision of a Scene's config (position, camera, weather, etc.)
+/// A specific revision of a Scene's config (position, camera, scene package, etc.)
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
 #[ts(export, optional_fields)]
@@ -43,6 +40,11 @@ pub struct SceneVersion {
     pub weather_intensity: f64,
     pub moon_phase: Option<i32>,
     pub biome: Option<String>,
+    pub package_url: Option<String>,
+    pub package_hash: Option<String>,
+    pub package_size_bytes: Option<i64>,
+    pub fov: i32,
+    pub render_distance: i32,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
 }
@@ -69,6 +71,26 @@ pub struct SceneListItem {
     pub capture_count: i64,
 }
 
+/// A preset within a scene (time/weather/moon_phase variation)
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, TS)]
+#[ts(export, optional_fields)]
+pub struct ScenePreset {
+    pub id: ScenePresetId,
+    pub scene_id: SceneId,
+    pub name: String,
+    pub slug: String,
+    pub time_of_day_ticks: i32,
+    pub weather: String,
+    pub weather_intensity: f64,
+    pub moon_phase: Option<i32>,
+    pub sort_order: i32,
+    #[ts(type = "string")]
+    pub created_at: DateTime<Utc>,
+    #[ts(type = "string")]
+    pub updated_at: DateTime<Utc>,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
 #[ts(export, optional_fields)]
@@ -76,19 +98,17 @@ pub struct SceneWithCaptures {
     #[serde(flatten)]
     pub scene: Scene,
     pub version: SceneVersion,
-    pub world: Option<World>,
+    pub presets: Vec<ScenePreset>,
     pub captures: Vec<CaptureWithContext>,
 }
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, TS)]
 #[ts(export, optional_fields)]
-pub struct SceneWithWorld {
+pub struct SceneListAdmin {
     #[serde(flatten)]
     pub scene: Scene,
     pub version: SceneVersion,
-    pub world_name: Option<String>,
-    pub world_slug: Option<String>,
     pub image_url: Option<String>,
     pub thumbhash: Option<String>,
     pub capture_count: i64,
@@ -131,7 +151,6 @@ pub struct Camera {
 /// Create scene request (from mod - includes name, no description/tags)
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateSceneRequest {
-    pub world_id: WorldId,
     pub slug: String,
     pub name: String,
     #[validate(nested)]
@@ -139,7 +158,6 @@ pub struct CreateSceneRequest {
     #[validate(nested)]
     pub camera: Camera,
     pub dimension: String,
-    pub parent_scene_id: Option<String>,
     #[validate(range(min = 0, max = 24000))]
     pub time_of_day: i32,
     #[validate(custom(function = "validate_weather"))]
@@ -155,7 +173,6 @@ pub struct CreateSceneRequest {
 /// Update scene request (from mod - no name/description/tags, only positioning)
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdateSceneRequest {
-    pub world_id: WorldId,
     #[validate(nested)]
     pub position: Position,
     #[validate(nested)]

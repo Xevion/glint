@@ -98,13 +98,9 @@
         "total_captures": {
           "type": "integer",
           "format": "int32"
-        },
-        "world_name": {
-          "type": "string"
         }
       },
       "required": [
-        "world_name",
         "scene_id",
         "session_dir",
         "started_at",

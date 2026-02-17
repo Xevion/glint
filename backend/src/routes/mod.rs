@@ -16,8 +16,6 @@ mod storage;
 mod user;
 mod users;
 mod work;
-mod worlds;
-
 use axum::{Router, routing::get};
 use tracing::instrument;
 
@@ -75,10 +73,6 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
             device::router().layer(make_layer(&rl.device, "device")),
         )
         .nest(
-            "/worlds",
-            worlds::router().layer(make_layer(&rl.upload, "upload")),
-        )
-        .nest(
             "/runs",
             runs::router()
                 .layer(no_store.clone())
@@ -111,7 +105,7 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         .nest("/admin/capture-health", capture_health::router())
         .nest("/admin/shaders", extraction::router())
         .nest("/admin/storage", storage::router())
-        // Intentional double rate limiting: routes like /auth, /device, and /worlds
+        // Intentional double rate limiting: routes like /auth and /device
         // have tier-specific limiters that enforce tight per-category budgets. The
         // global limiter below acts as an overall request ceiling across all routes.
         // Requests to tier-specific routes consume tokens from both their tier bucket

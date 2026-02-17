@@ -166,17 +166,6 @@ async fn main() -> anyhow::Result<()> {
     // Spawn background services with graceful shutdown support
     let services = ServiceRunner::new();
 
-    let cleanup_bucket = config
-        .r2
-        .bucket
-        .clone()
-        .unwrap_or_else(|| "glint".to_string());
-    services.spawn("upload-cleanup", {
-        let pool = pool.clone();
-        let s3 = s3_client.clone();
-        |ctx| services::upload_cleanup::cleanup_expired_uploads(ctx, pool, s3, cleanup_bucket)
-    });
-
     services.spawn("metadata-worker", {
         let pool = pool.clone();
         let http = http_client.clone();

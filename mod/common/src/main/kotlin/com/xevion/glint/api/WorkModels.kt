@@ -27,13 +27,14 @@ data class WorkItem(
     val sceneWeatherIntensity: Double,
     val sceneMoonPhase: Int? = null,
     val sceneBiome: String? = null,
-    val worldId: String,
-    val worldSlug: String,
-    val worldName: String,
-    val worldFileUrl: String? = null,
-    val worldFileHash: String? = null,
-    val worldSizeBytes: Long? = null,
-    val worldVersionId: String? = null,
+    val presetId: String? = null,
+    val presetName: String? = null,
+    val presetSlug: String? = null,
+    val packageUrl: String? = null,
+    val packageHash: String? = null,
+    val packageSizeBytes: Long? = null,
+    val sceneFov: Int = 70,
+    val sceneRenderDistance: Int = 16,
     val sceneVersionId: String? = null,
     val profileId: String? = null,
     val profileName: String? = null,
@@ -53,6 +54,7 @@ data class CreateRunItemRequest(
     val shaderVersionId: String,
     val sceneId: String,
     val profileId: String? = null,
+    val presetId: String? = null,
 )
 
 /** Response from creating or completing a capture run. */
@@ -110,7 +112,7 @@ data class ClaimItemRequest(
     val resolutionWidth: Int,
     val resolutionHeight: Int,
     val capturedAt: String,
-    val worldVersionId: String,
+    val presetId: String? = null,
     val sceneVersionId: String,
 )
 

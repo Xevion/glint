@@ -12,7 +12,7 @@ export type StorageAuditResult = {
  */
 orphaned: Array<AuditObject>, 
 /**
- * Objects under _uploads/ with no pending_uploads record
+ * Objects under _uploads/ (orphaned staging files)
  */
 stale_staging: Array<AuditObject>, 
 /**

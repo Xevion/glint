@@ -13,6 +13,9 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
         .execute(pool)
         .await?;
     sqlx::query!("DELETE FROM captures").execute(pool).await?;
+    sqlx::query!("DELETE FROM scene_presets")
+        .execute(pool)
+        .await?;
     sqlx::query!("DELETE FROM scene_versions")
         .execute(pool)
         .await?;
@@ -23,24 +26,6 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
     sqlx::query!("DELETE FROM shaders WHERE slug != 'vanilla'")
         .execute(pool)
         .await?;
-    sqlx::query!("DELETE FROM worlds").execute(pool).await?;
-
-    // Seed sample world
-    sqlx::query!(
-        r#"
-        INSERT INTO worlds (id, slug, name, description, minecraft_version)
-        VALUES ($1, $2, $3, $4, $5)
-        "#,
-        "world-001",
-        "demo-world",
-        "Demo World",
-        "Sample world with various test scenes",
-        "1.21.4"
-    )
-    .execute(pool)
-    .await?;
-
-    info!("Seeded 1 world");
 
     // Seed sample scenes (identity + config tuples)
     let scenes = vec![
@@ -49,7 +34,6 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
             "Village Sunset",
             "village-sunset",
             "Village at sunset with warm lighting",
-            "world-001",
             "minecraft:overworld",
             // version config
             100.5_f64,
@@ -67,7 +51,6 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
             "Mountain Noon",
             "mountain-noon",
             "Mountain vista at midday",
-            "world-001",
             "minecraft:overworld",
             -50.0_f64,
             120.0_f64,
@@ -84,7 +67,6 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
             "Nether Portal",
             "nether-portal",
             "Active nether portal with particles",
-            "world-001",
             "minecraft:the_nether",
             0.0_f64,
             70.0_f64,
@@ -98,34 +80,18 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
         ),
     ];
 
-    for (
-        id,
-        name,
-        slug,
-        desc,
-        world_id,
-        dimension,
-        x,
-        y,
-        z,
-        pitch,
-        yaw,
-        time,
-        weather,
-        intensity,
-        biome,
-    ) in &scenes
+    for (id, name, slug, desc, dimension, x, y, z, pitch, yaw, time, weather, intensity, biome) in
+        &scenes
     {
         sqlx::query!(
             r#"
-            INSERT INTO scenes (id, name, slug, description, world_id, dimension)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO scenes (id, name, slug, description, dimension)
+            VALUES ($1, $2, $3, $4, $5)
             "#,
             *id,
             *name,
             *slug,
             *desc as &str,
-            *world_id,
             *dimension,
         )
         .execute(pool)
@@ -154,6 +120,71 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
     }
 
     info!(count = scenes.len(), "Seeded scenes");
+
+    // Seed scene presets (time/weather variations per scene)
+    let presets = vec![
+        (
+            "preset-001",
+            "scene-001",
+            "Default",
+            "default",
+            12000_i32,
+            "clear",
+            0.0_f64,
+            0,
+        ),
+        (
+            "preset-002",
+            "scene-001",
+            "Rainy",
+            "rainy",
+            12000_i32,
+            "rain",
+            0.8_f64,
+            1,
+        ),
+        (
+            "preset-003",
+            "scene-002",
+            "Default",
+            "default",
+            6000_i32,
+            "clear",
+            0.0_f64,
+            0,
+        ),
+        (
+            "preset-004",
+            "scene-003",
+            "Default",
+            "default",
+            6000_i32,
+            "clear",
+            0.0_f64,
+            0,
+        ),
+    ];
+
+    for (id, scene_id, name, slug, time, weather, intensity, sort_order) in &presets {
+        sqlx::query!(
+            r#"
+            INSERT INTO scene_presets (id, scene_id, name, slug, time_of_day_ticks, weather, weather_intensity, sort_order)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            "#,
+            *id,
+            *scene_id,
+            *name,
+            *slug,
+            *time,
+            *weather,
+            *intensity,
+            *sort_order,
+        )
+        .execute(pool)
+        .await?;
+    }
+
+    info!(count = presets.len(), "Seeded scene presets");
 
     // Seed sample shader
     sqlx::query!(
@@ -188,23 +219,34 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
 
     info!("Seeded 1 shader version");
 
-    // Seed sample captures (pending status)
+    // Seed sample captures (pending status, with preset_id)
     let captures = vec![
-        ("capture-001", "shader-version-001", "scene-001"),
-        ("capture-002", "shader-version-001", "scene-002"),
-        ("capture-003", "vanilla-1.21.4", "scene-001"),
-        ("capture-004", "vanilla-1.21.4", "scene-002"),
+        (
+            "capture-001",
+            "shader-version-001",
+            "scene-001",
+            "preset-001",
+        ),
+        (
+            "capture-002",
+            "shader-version-001",
+            "scene-002",
+            "preset-003",
+        ),
+        ("capture-003", "vanilla-1.21.4", "scene-001", "preset-001"),
+        ("capture-004", "vanilla-1.21.4", "scene-002", "preset-003"),
     ];
 
-    for (id, shader_version_id, scene_id) in &captures {
+    for (id, shader_version_id, scene_id, preset_id) in &captures {
         sqlx::query!(
             r#"
-            INSERT INTO captures (id, shader_version_id, scene_id, status)
-            VALUES ($1, $2, $3, 'pending')
+            INSERT INTO captures (id, shader_version_id, scene_id, preset_id, status)
+            VALUES ($1, $2, $3, $4, 'completed')
             "#,
             *id,
             *shader_version_id,
-            *scene_id
+            *scene_id,
+            *preset_id,
         )
         .execute(pool)
         .await?;

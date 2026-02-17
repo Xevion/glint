@@ -11,8 +11,8 @@ use crate::state::AppState;
 
 #[derive(CustomDebug, Deserialize)]
 pub struct WorkQuery {
-    /// Maximum number of distinct shader versions to include per world,
-    /// ordered by popularity. Guarantees complete shader units (all scenes
+    /// Maximum number of distinct shader versions to include, ordered by
+    /// popularity. Guarantees complete shader units (all scenes, presets,
     /// and profiles for selected shaders are included).
     #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub shader_limit: Option<i64>,

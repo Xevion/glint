@@ -24,16 +24,12 @@ async fn capture_health_handles_null_profile_name(pool: sqlx::PgPool) {
     // combination, which triggers the LEFT JOIN NULL on profile_name.
     // Seed data as individual statements (PostgreSQL prepared statements
     // don't support multiple commands in a single query).
-    sqlx::query("INSERT INTO worlds (id, slug, name, minecraft_version) VALUES ('w1', 'test-world', 'Test World', '1.21.4')")
-        .execute(&pool).await.expect("insert world");
-    sqlx::query("INSERT INTO world_versions (id, world_id) VALUES ('wv1', 'w1')")
-        .execute(&pool)
-        .await
-        .expect("insert world_version");
-    sqlx::query("INSERT INTO scenes (id, name, slug, world_id, active) VALUES ('sc1', 'Test Scene', 'test-scene', 'w1', TRUE)")
+    sqlx::query("INSERT INTO scenes (id, name, slug, active) VALUES ('sc1', 'Test Scene', 'test-scene', TRUE)")
         .execute(&pool).await.expect("insert scene");
-    sqlx::query("INSERT INTO scene_versions (id, scene_id, x, y, z, pitch, yaw, time_of_day_ticks) VALUES ('sv1', 'sc1', 0, 64, 0, 0, 0, 6000)")
+    sqlx::query("INSERT INTO scene_versions (id, scene_id, x, y, z, pitch, yaw, time_of_day_ticks, weather, weather_intensity) VALUES ('sv1', 'sc1', 0, 64, 0, 0, 0, 6000, 'clear', 0)")
         .execute(&pool).await.expect("insert scene_version");
+    sqlx::query("INSERT INTO scene_presets (id, scene_id, name, slug, time_of_day_ticks, weather, weather_intensity, sort_order, created_at, updated_at) VALUES ('sp1', 'sc1', 'Default', 'default', 6000, 'clear', 0, 0, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')")
+        .execute(&pool).await.expect("insert scene_preset");
     sqlx::query(
         "INSERT INTO shaders (id, name, slug) VALUES ('sh1', 'Test Shader', 'test-shader')",
     )
@@ -84,10 +80,8 @@ async fn capture_health_handles_null_profile_name(pool: sqlx::PgPool) {
 async fn run_items_with_context_handles_null_profile_name(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("failed to apply views");
 
-    // Seed: world, scene, shader, shader_version (no profiles).
-    sqlx::query("INSERT INTO worlds (id, slug, name, minecraft_version) VALUES ('w1', 'test-world', 'Test World', '1.21.4')")
-        .execute(&pool).await.expect("insert world");
-    sqlx::query("INSERT INTO scenes (id, name, slug, world_id, active) VALUES ('sc1', 'Test Scene', 'test-scene', 'w1', TRUE)")
+    // Seed: scene, shader, shader_version (no profiles).
+    sqlx::query("INSERT INTO scenes (id, name, slug, active) VALUES ('sc1', 'Test Scene', 'test-scene', TRUE)")
         .execute(&pool).await.expect("insert scene");
     sqlx::query(
         "INSERT INTO shaders (id, name, slug) VALUES ('sh1', 'Test Shader', 'test-shader')",
@@ -131,7 +125,7 @@ async fn run_items_with_context_handles_null_profile_name(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_missing_when_no_captures(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
@@ -154,7 +148,7 @@ async fn test_health_missing_when_no_captures(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_completed_when_fresh_capture(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
@@ -164,9 +158,9 @@ async fn test_health_completed_when_fresh_capture(pool: sqlx::PgPool) {
         "shv1",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2026, 1, 15),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;
@@ -186,51 +180,11 @@ async fn test_health_completed_when_fresh_capture(pool: sqlx::PgPool) {
     check!(target.stale_reason.is_none());
 }
 
-/// Capture with old world version → Stale(WorldUpdated).
-#[sqlx::test]
-async fn test_health_stale_when_world_updated(pool: sqlx::PgPool) {
-    apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
-    seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
-    seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
-
-    // Capture references the current world version wv1
-    seed_capture_full(
-        &pool,
-        "cap1",
-        "shv1",
-        "sc1",
-        None,
-        "completed",
-        ts(2026, 1, 15),
-        Some("wv1"),
-        Some("sv1"),
-    )
-    .await;
-
-    // Insert a newer world version — makes wv1 outdated
-    seed_world_version(&pool, "wv2", "w1").await;
-
-    let health = CaptureHealthRepo::get_capture_health(&pool)
-        .await
-        .expect("get_capture_health");
-
-    let target = health
-        .targets
-        .iter()
-        .find(|t| t.shader_name == "Test Shader")
-        .expect("test shader target");
-
-    check!(target.status == TargetHealth::Stale);
-    let_assert!(Some(reason) = &target.stale_reason);
-    check!(*reason == StaleReason::WorldUpdated);
-}
-
 /// Capture with old scene version → Stale(SceneUpdated).
 #[sqlx::test]
 async fn test_health_stale_when_scene_updated(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
@@ -241,9 +195,9 @@ async fn test_health_stale_when_scene_updated(pool: sqlx::PgPool) {
         "shv1",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2026, 1, 15),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;
@@ -266,52 +220,11 @@ async fn test_health_stale_when_scene_updated(pool: sqlx::PgPool) {
     check!(*reason == StaleReason::SceneUpdated);
 }
 
-/// Both world and scene outdated → Stale(BothUpdated).
-#[sqlx::test]
-async fn test_health_stale_when_both_updated(pool: sqlx::PgPool) {
-    apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
-    seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
-    seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
-
-    // Capture references current versions
-    seed_capture_full(
-        &pool,
-        "cap1",
-        "shv1",
-        "sc1",
-        None,
-        "completed",
-        ts(2026, 1, 15),
-        Some("wv1"),
-        Some("sv1"),
-    )
-    .await;
-
-    // Insert newer versions of both
-    seed_world_version(&pool, "wv2", "w1").await;
-    seed_scene_version(&pool, "sv2", "sc1").await;
-
-    let health = CaptureHealthRepo::get_capture_health(&pool)
-        .await
-        .expect("get_capture_health");
-
-    let target = health
-        .targets
-        .iter()
-        .find(|t| t.shader_name == "Test Shader")
-        .expect("test shader target");
-
-    check!(target.status == TargetHealth::Stale);
-    let_assert!(Some(reason) = &target.stale_reason);
-    check!(*reason == StaleReason::BothUpdated);
-}
-
 /// capture_failure_count >= 3 → Failed.
 #[sqlx::test]
 async fn test_health_failed_when_failure_count_at_cap(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
     seed_shader_version_with_failures(&pool, "shv1", "sh1", "1.0.0", 3).await;
 
@@ -333,7 +246,7 @@ async fn test_health_failed_when_failure_count_at_cap(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_failed_overrides_missing(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
     seed_shader_version_with_failures(&pool, "shv1", "sh1", "1.0.0", 4).await;
     // No captures inserted
@@ -357,7 +270,7 @@ async fn test_health_failed_overrides_missing(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_failed_overrides_stale(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
     seed_shader_version_with_failures(&pool, "shv1", "sh1", "1.0.0", 3).await;
 
@@ -368,15 +281,15 @@ async fn test_health_failed_overrides_stale(pool: sqlx::PgPool) {
         "shv1",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2026, 1, 15),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;
 
-    // Make it stale
-    seed_world_version(&pool, "wv2", "w1").await;
+    // Make it stale by adding a newer scene version
+    seed_scene_version(&pool, "sv2", "sc1").await;
 
     let health = CaptureHealthRepo::get_capture_health(&pool)
         .await
@@ -397,7 +310,7 @@ async fn test_health_failed_overrides_stale(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_null_profile_id_and_name(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
@@ -419,7 +332,7 @@ async fn test_health_null_profile_id_and_name(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_with_profiles_shows_info(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
     seed_profile(&pool, "prof-low", "shv1", "Low", 1).await;
@@ -455,7 +368,7 @@ async fn test_health_with_profiles_shows_info(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_mixed_profiles_correct_count(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     // Shader A: 2 profiles
     seed_shader(&pool, "shA", "shader-a", "Shader A").await;
@@ -499,7 +412,7 @@ async fn test_health_mixed_profiles_correct_count(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_summary_all_missing(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-one", "Shader One").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -523,13 +436,13 @@ async fn test_health_summary_all_missing(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_summary_mixed_statuses(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     // Shader B: failure_count=3, no capture → Failed
     seed_shader(&pool, "shB", "shader-b", "Shader B").await;
     seed_shader_version_with_failures(&pool, "shvB", "shB", "2.0.0", 3).await;
 
-    // Shader C: stale capture (old world version) → Stale
+    // Shader C: stale capture (old scene version) → Stale
     seed_shader(&pool, "shC", "shader-c", "Shader C").await;
     seed_shader_version(&pool, "shvC", "shC", "3.0.0").await;
     seed_capture_full(
@@ -538,17 +451,17 @@ async fn test_health_summary_mixed_statuses(pool: sqlx::PgPool) {
         "shvC",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2026, 1, 10),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;
-    // Add newer world version to make Shader C stale
-    seed_world_version(&pool, "wv2", "w1").await;
+    // Add newer scene version to make Shader C stale
+    seed_scene_version(&pool, "sv2", "sc1").await;
 
     // Shader A: fresh capture → Completed
-    // Inserted AFTER wv2 so the capture references the latest world version.
+    // Inserted AFTER sv2 so the capture references the latest scene version.
     seed_shader(&pool, "shA", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shvA", "shA", "1.0.0").await;
     seed_capture_full(
@@ -557,10 +470,10 @@ async fn test_health_summary_mixed_statuses(pool: sqlx::PgPool) {
         "shvA",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2026, 1, 15),
-        Some("wv2"),
-        Some("sv1"),
+        Some("sv2"),
     )
     .await;
 
@@ -594,11 +507,10 @@ async fn test_health_summary_mixed_statuses(pool: sqlx::PgPool) {
     check!(a_target.status == TargetHealth::Completed);
     // Shader B is Failed (failure_count >= 3)
     check!(b_target.status == TargetHealth::Failed);
-    // Shader C is Stale (world updated after capture)
+    // Shader C is Stale (scene updated after capture)
     check!(c_target.status == TargetHealth::Stale);
 
-    // Vanilla has no captures AND the world was updated (wv2 is now latest),
-    // but it has no capture at all so it's Missing (not Stale).
+    // Vanilla has no captures — Missing (not Stale).
     check!(vanilla_target.status == TargetHealth::Missing);
 
     // Verify summary counts match
@@ -614,7 +526,7 @@ async fn test_health_summary_mixed_statuses(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_ignores_non_completed_captures(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
@@ -625,9 +537,9 @@ async fn test_health_ignores_non_completed_captures(pool: sqlx::PgPool) {
         "shv1",
         "sc1",
         None,
+        Some("sp1"),
         "failed",
         ts(2026, 1, 15),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;
@@ -651,37 +563,37 @@ async fn test_health_ignores_non_completed_captures(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn test_health_uses_most_recent_capture(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
-    // Older capture: fresh at the time (references wv1)
+    // Older capture: fresh at the time (references sv1)
     seed_capture_full(
         &pool,
         "cap-old",
         "shv1",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2026, 1, 10),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;
 
-    // Insert newer world version
-    seed_world_version(&pool, "wv2", "w1").await;
+    // Insert newer scene version
+    seed_scene_version(&pool, "sv2", "sc1").await;
 
-    // Newer capture: references old wv1 (stale against new wv2)
+    // Newer capture: still references old sv1 (stale against new sv2)
     seed_capture_full(
         &pool,
         "cap-new",
         "shv1",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2026, 1, 20),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;
@@ -696,17 +608,17 @@ async fn test_health_uses_most_recent_capture(pool: sqlx::PgPool) {
         .find(|t| t.shader_name == "Test Shader")
         .expect("test shader target");
 
-    // The most recent capture (cap-new) is stale because wv2 is now the latest world version
+    // The most recent capture (cap-new) is stale because sv2 is now the latest scene version
     check!(target.status == TargetHealth::Stale);
     let_assert!(Some(reason) = &target.stale_reason);
-    check!(*reason == StaleReason::WorldUpdated);
+    check!(*reason == StaleReason::SceneUpdated);
 }
 
 /// Results ordered by shader name ASC.
 #[sqlx::test]
 async fn test_health_ordered_by_shader_name(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     // Insert in non-alphabetical order
     seed_shader(&pool, "shC", "charlie", "Charlie").await;

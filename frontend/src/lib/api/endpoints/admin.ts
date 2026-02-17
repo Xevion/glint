@@ -5,7 +5,7 @@ import type {
 	Paginated,
 	Scene,
 	SceneWithVersion,
-	SceneWithWorld,
+	SceneListAdmin,
 	Shader,
 	ShaderListItem,
 	ShaderWithCaptures,
@@ -15,12 +15,9 @@ import type {
 	StorageStats,
 	UpdateSceneMetadataRequest,
 	UpdateShaderRequest,
-	UpdateWorldRequest,
 	User,
 	UserWithSessions,
-	WorkItem,
-	WorldVersion,
-	WorldWithDetails
+	WorkItem
 } from '$lib/bindings';
 import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
@@ -60,24 +57,8 @@ export class AdminEndpoints extends ApiClient {
 		});
 	}
 
-	getWorld(id: string): Promise<Result<WorldWithDetails, ApiError>> {
-		return this.get<WorldWithDetails>(`/api/worlds/${encodeURIComponent(id)}`);
-	}
-
-	updateWorld(id: string, request: UpdateWorldRequest): Promise<Result<WorldWithDetails, ApiError>> {
-		return this.put<WorldWithDetails>(`/api/worlds/${encodeURIComponent(id)}`, request);
-	}
-
-	deleteWorld(id: string): Promise<Result<null, ApiError>> {
-		return this.delete(`/api/worlds/${encodeURIComponent(id)}`);
-	}
-
-	listWorldVersions(worldId: string): Promise<Result<WorldVersion[], ApiError>> {
-		return this.get<WorldVersion[]>(`/api/worlds/${encodeURIComponent(worldId)}/versions`);
-	}
-
-	listScenes(): Promise<Result<SceneWithWorld[], ApiError>> {
-		return this.get<SceneWithWorld[]>('/api/scenes/all');
+	listScenes(): Promise<Result<SceneListAdmin[], ApiError>> {
+		return this.get<SceneListAdmin[]>('/api/scenes/all');
 	}
 
 	getScene(id: string): Promise<Result<SceneWithVersion, ApiError>> {

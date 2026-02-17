@@ -1,0 +1,176 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH scene_captures_ranked AS (\n                SELECT\n                    c.scene_id,\n                    c.image_url,\n                    c.thumbhash,\n                    ROW_NUMBER() OVER (\n                        PARTITION BY c.scene_id\n                        ORDER BY\n                            CASE WHEN sh.slug = 'vanilla' THEN 0 ELSE 1 END,\n                            COALESCE(sh.upstream_downloads, 0) DESC,\n                            c.captured_at DESC NULLS LAST\n                    ) AS rn\n                FROM captures c\n                JOIN shader_versions sv ON sv.id = c.shader_version_id\n                JOIN shaders sh ON sh.id = sv.shader_id\n                WHERE c.status = 'completed' AND c.image_url IS NOT NULL\n            ),\n            scene_counts AS (\n                SELECT scene_id, COUNT(*) AS capture_count\n                FROM captures\n                WHERE status = 'completed'\n                GROUP BY scene_id\n            )\n            SELECT\n                sc.id, sc.name, sc.slug, sc.description,\n                sc.dimension, sc.active, sc.created_at,\n                lsv.id AS version_id,\n                lsv.x AS version_x,\n                lsv.y AS version_y,\n                lsv.z AS version_z,\n                lsv.pitch AS version_pitch,\n                lsv.yaw AS version_yaw,\n                lsv.time_of_day_ticks AS version_time_of_day_ticks,\n                lsv.weather AS version_weather,\n                lsv.weather_intensity AS version_weather_intensity,\n                lsv.moon_phase AS version_moon_phase,\n                lsv.biome AS version_biome,\n                lsv.package_url AS version_package_url,\n                lsv.package_hash AS version_package_hash,\n                lsv.package_size_bytes AS version_package_size_bytes,\n                lsv.fov AS version_fov,\n                lsv.render_distance AS version_render_distance,\n                lsv.created_at AS version_created_at,\n                cr.image_url,\n                cr.thumbhash,\n                cnt.capture_count\n            FROM scenes sc\n            LEFT JOIN LATERAL (\n                SELECT * FROM scene_versions sv2\n                WHERE sv2.scene_id = sc.id\n                ORDER BY sv2.created_at DESC, sv2.id DESC\n                LIMIT 1\n            ) lsv ON TRUE\n            LEFT JOIN scene_captures_ranked cr ON cr.scene_id = sc.id AND cr.rn = 1\n            LEFT JOIN scene_counts cnt ON cnt.scene_id = sc.id\n            ORDER BY sc.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "dimension",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "version_x",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 9,
+        "name": "version_y",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 10,
+        "name": "version_z",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 11,
+        "name": "version_pitch",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 12,
+        "name": "version_yaw",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 13,
+        "name": "version_time_of_day_ticks",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "version_weather",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "version_weather_intensity",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 16,
+        "name": "version_moon_phase",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 17,
+        "name": "version_biome",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "version_package_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "version_package_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "version_package_size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 21,
+        "name": "version_fov",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 22,
+        "name": "version_render_distance",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 23,
+        "name": "version_created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 24,
+        "name": "image_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 25,
+        "name": "thumbhash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 26,
+        "name": "capture_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "7bd4af84085b6bfde5390d583c45bf235ed397e37c6f557b5637ee691727dda6"
+}

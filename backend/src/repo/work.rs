@@ -5,8 +5,7 @@ use tracing::{debug, instrument};
 use crate::db::DbPool;
 use crate::error::AppResult;
 use crate::id::{
-    SceneId, SceneVersionId, ShaderId, ShaderVersionId, ShaderVersionProfileId, WorldId,
-    WorldVersionId,
+    SceneId, ScenePresetId, SceneVersionId, ShaderId, ShaderVersionId, ShaderVersionProfileId,
 };
 use crate::models::WorkItem;
 use crate::repo::work_ordering;
@@ -18,17 +17,17 @@ const MAX_ITEMS: i64 = 5000;
 pub struct WorkRepo;
 
 impl WorkRepo {
-    /// Compute the list of (shader_version, scene, profile_id) triples that still
-    /// need captures, ordered for optimal capture execution.
+    /// Compute the list of (shader_version, scene, preset, profile) tuples that
+    /// still need captures, ordered for optimal capture execution.
     ///
-    /// SQL handles filtering, shader-count batching (selecting the top N most
-    /// popular shaders per world), and coarse ordering (world → shader popularity
-    /// → profile). Rust post-processing then refines scene ordering within each
-    /// profile pass using spatial clustering and nearest-neighbor traversal.
+    /// SQL handles filtering and shader-count batching (selecting the top N most
+    /// popular shaders globally). Rust post-processing refines scene ordering
+    /// within each profile pass using spatial clustering and nearest-neighbor
+    /// traversal.
     ///
     /// `shader_limit` controls how many distinct shader versions are included
-    /// per world (ordered by popularity). This guarantees complete shader units
-    /// in each batch — no partial shaders.
+    /// (ordered by popularity). This guarantees complete shader units in each
+    /// batch — no partial shaders.
     ///
     /// JIT compilation is disabled because the planner's inflated cost estimate
     /// (cross-join fanout) triggers LLVM JIT that takes ~750ms on a query that
@@ -56,18 +55,17 @@ impl WorkRepo {
                 WHERE status = 'completed'
             ),
             best_captures AS (
-                SELECT DISTINCT ON (shader_version_id, scene_id, profile_id)
-                    shader_version_id, scene_id, profile_id, freshness
+                SELECT DISTINCT ON (shader_version_id, scene_id, preset_id, profile_id)
+                    shader_version_id, scene_id, preset_id, profile_id, freshness
                 FROM captures_with_freshness
                 WHERE status IN ('completed', 'uploading')
-                ORDER BY shader_version_id, scene_id, profile_id, captured_at DESC
+                ORDER BY shader_version_id, scene_id, preset_id, profile_id, captured_at DESC
             ),
-            -- Identify eligible work items (same filtering as before)
             eligible AS (
                 SELECT
                     tm.shader_version_id,
                     tm.scene_id,
-                    tm.world_id,
+                    tm.preset_id,
                     tm.profile_id,
                     sh.id AS shader_id,
                     COALESCE(sh.upstream_downloads, 0) AS downloads,
@@ -77,22 +75,20 @@ impl WorkRepo {
                 JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id
                 JOIN shaders sh ON sh.id = sv.shader_id
                 JOIN scenes sc ON sc.id = tm.scene_id
-                JOIN worlds w ON w.id = tm.world_id
                 LEFT JOIN has_captures hc ON hc.shader_version_id = tm.shader_version_id
                 LEFT JOIN best_captures bc
                     ON bc.shader_version_id = tm.shader_version_id
                     AND bc.scene_id = tm.scene_id
+                    AND (bc.preset_id IS NOT DISTINCT FROM tm.preset_id)
                     AND (bc.profile_id IS NOT DISTINCT FROM tm.profile_id)
                 WHERE ($2 OR sv.capture_failure_count < 3)
                   AND ($2 OR bc.shader_version_id IS NULL OR bc.freshness != 'fresh')
                   AND ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))
                   AND ($4::text IS NULL OR sc.slug = ANY(string_to_array($4, ',')))
             ),
-            -- Rank shaders by popularity within each world, selecting top N
             ranked_shaders AS (
-                SELECT DISTINCT shader_version_id, world_id,
+                SELECT DISTINCT shader_version_id,
                     DENSE_RANK() OVER (
-                        PARTITION BY world_id
                         ORDER BY has_existing_captures ASC,
                                  downloads DESC,
                                  shader_name ASC
@@ -104,7 +100,6 @@ impl WorkRepo {
                 FROM eligible e
                 JOIN ranked_shaders rs
                     ON rs.shader_version_id = e.shader_version_id
-                    AND rs.world_id = e.world_id
                 WHERE rs.shader_rank <= $1
             )
             SELECT
@@ -129,13 +124,14 @@ impl WorkRepo {
                 lsv.weather_intensity AS "scene_weather_intensity!",
                 lsv.moon_phase AS scene_moon_phase,
                 lsv.biome AS scene_biome,
-                w.id AS "world_id!: WorldId",
-                w.slug AS "world_slug!",
-                w.name AS "world_name!",
-                lwv.file_url AS world_file_url,
-                lwv.file_hash AS world_file_hash,
-                lwv.size_bytes AS world_size_bytes,
-                lwv.id AS "world_version_id: WorldVersionId",
+                s.preset_id AS "preset_id: ScenePresetId",
+                sp.name AS preset_name,
+                sp.slug AS preset_slug,
+                lsv.package_url,
+                lsv.package_hash,
+                lsv.package_size_bytes,
+                lsv.fov AS "scene_fov!",
+                lsv.render_distance AS "scene_render_distance!",
                 lsv.id AS "scene_version_id: SceneVersionId",
                 s.profile_id AS "profile_id: ShaderVersionProfileId",
                 svp.name AS "profile_name?"
@@ -143,12 +139,10 @@ impl WorkRepo {
             JOIN latest_shader_versions sv ON sv.id = s.shader_version_id
             JOIN shaders sh ON sh.id = s.shader_id
             JOIN scenes sc ON sc.id = s.scene_id
-            JOIN worlds w ON w.id = s.world_id
-            LEFT JOIN latest_world_versions lwv ON lwv.world_id = w.id
             JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id
+            LEFT JOIN scene_presets sp ON sp.id = s.preset_id
             LEFT JOIN shader_version_profiles svp ON svp.id = s.profile_id
             ORDER BY
-                w.name ASC,
                 s.has_existing_captures ASC,
                 s.downloads DESC,
                 sh.name ASC,

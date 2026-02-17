@@ -7,7 +7,6 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, put},
 };
-use custom_debug_derive::Debug as CustomDebug;
 use serde::Deserialize;
 use tracing::instrument;
 use validator::Validate;
@@ -17,11 +16,11 @@ use crate::{
     error::{AppError, AppResult, OptionNotFoundExt},
     models::{
         CaptureStatus, CaptureWithContext, CreateSceneRequest, PageQuery, Paginated, Scene,
-        SceneListItem, SceneWithCaptures, SceneWithVersion, SceneWithWorld,
+        SceneListAdmin, SceneListItem, SceneWithCaptures, SceneWithVersion,
         UpdateSceneMetadataRequest, UpdateSceneRequest,
     },
     repo::{
-        CaptureRepo, SceneRepo, SceneVersionRepo, SlugRedirectRepo, TagRepo, WorldRepo,
+        CaptureRepo, ScenePresetRepo, SceneRepo, SceneVersionRepo, SlugRedirectRepo, TagRepo,
         capture::{CaptureDistinct, CaptureFilters},
     },
     state::AppState,
@@ -48,19 +47,12 @@ pub fn router() -> Router<AppState> {
         .route("/by-slug/{slug}/captures", get(list_scene_captures))
 }
 
-/// GET /api/scenes - List active scenes with enrichment (public), optionally filtered by world_id
+/// GET /api/scenes - List active scenes with enrichment (public)
 #[instrument(skip(state))]
-async fn list_scenes_public(
-    State(state): State<AppState>,
-    Query(params): Query<SceneQuery>,
-) -> AppResult<Json<Vec<SceneListItem>>> {
+async fn list_scenes_public(State(state): State<AppState>) -> AppResult<Json<Vec<SceneListItem>>> {
     let db = state.db();
 
-    let scenes = if let Some(ref world_id) = params.world_id {
-        SceneRepo::list_by_world(db, world_id).await?
-    } else {
-        SceneRepo::list_active(db).await?
-    };
+    let scenes = SceneRepo::list_active(db).await?;
 
     let (tags, thumbnails, counts) = tokio::try_join!(
         TagRepo::list_all_for_scenes(db),
@@ -105,15 +97,9 @@ async fn list_scenes_public(
 async fn list_scenes_all(
     _admin: AdminUser,
     State(state): State<AppState>,
-) -> AppResult<Json<Vec<SceneWithWorld>>> {
+) -> AppResult<Json<Vec<SceneListAdmin>>> {
     let scenes = SceneRepo::list_all(state.db()).await?;
     Ok(Json(scenes))
-}
-
-#[derive(CustomDebug, Deserialize)]
-struct SceneQuery {
-    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
-    world_id: Option<String>,
 }
 
 /// Response type for scene-by-slug endpoint: JSON data, 301 redirect, or 304 not modified.
@@ -178,18 +164,9 @@ fn etag_matches(headers: &HeaderMap, etag: &str) -> bool {
 async fn get_scene_by_slug(
     State(state): State<AppState>,
     Path(slug): Path<String>,
-    Query(params): Query<SceneQuery>,
     headers: HeaderMap,
 ) -> Result<SceneSlugResponse, AppError> {
-    // Fetch all scenes with this slug (world-scoped), optionally filtered by world_id
-    let scenes = if let Some(ref world_id) = params.world_id {
-        match SceneRepo::find_by_slug_and_world(state.db(), &slug, world_id).await? {
-            Some(scene) => vec![scene],
-            None => vec![],
-        }
-    } else {
-        SceneRepo::find_active_by_slug(state.db(), &slug).await?
-    };
+    let scenes = SceneRepo::find_active_by_slug(state.db(), &slug).await?;
 
     // If no scenes found, check redirect table before returning 404
     if scenes.is_empty() {
@@ -197,10 +174,7 @@ async fn get_scene_by_slug(
             SlugRedirectRepo::find_entity_id(state.db(), "scene", &slug).await?
             && let Some(scene) = SceneRepo::find_by_id(state.db(), &entity_id).await?
         {
-            let mut url = format!("/api/scenes/by-slug/{}", scene.slug);
-            if let Some(ref wid) = params.world_id {
-                url.push_str(&format!("?worldId={wid}"));
-            }
+            let url = format!("/api/scenes/by-slug/{}", scene.slug);
             return Ok(SceneSlugResponse::Redirect(Redirect::permanent(&url)));
         }
         return Err(AppError::NotFound(format!("Scene '{}' not found", slug)));
@@ -214,9 +188,9 @@ async fn get_scene_by_slug(
             status: Some(CaptureStatus::Completed),
             ..Default::default()
         };
-        let (world, version, (captures, _)) = tokio::try_join!(
-            WorldRepo::find_by_id(state.db(), scene.world_id.as_ref()),
+        let (version, presets, (captures, _)) = tokio::try_join!(
             SceneVersionRepo::get_latest(state.db(), scene.id.as_ref()),
+            ScenePresetRepo::list_by_scene(state.db(), scene.id.as_ref()),
             CaptureRepo::list_with_context(
                 state.db(),
                 &scene_filters,
@@ -232,7 +206,7 @@ async fn get_scene_by_slug(
         results.push(SceneWithCaptures {
             scene,
             version,
-            world,
+            presets,
             captures,
         });
     }
@@ -280,17 +254,10 @@ async fn create_scene(
 ) -> AppResult<(StatusCode, Json<SceneWithVersion>)> {
     request.validate()?;
 
-    // Verify world exists
-    if !WorldRepo::exists_by_id(state.db(), request.world_id.as_ref()).await? {
-        return Err(AppError::NotFound("World not found".into()));
-    }
-
-    // Check world-scoped slug uniqueness (only active scenes)
-    if SceneRepo::exists_by_slug_in_world(state.db(), &request.slug, request.world_id.as_ref())
-        .await?
-    {
+    // Check global slug uniqueness (only active scenes)
+    if SceneRepo::exists_by_slug(state.db(), &request.slug).await? {
         return Err(AppError::Conflict(format!(
-            "Scene with slug '{}' already exists in this world",
+            "Scene with slug '{}' already exists",
             request.slug
         )));
     }
@@ -305,11 +272,6 @@ async fn create_scene(
 }
 
 /// PUT /api/scenes/by-slug/{slug} - Update scene by slug (admin)
-#[derive(Debug, Deserialize)]
-struct WorldIdParam {
-    world_id: String,
-}
-
 #[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
 async fn update_scene(
     _admin: AdminUser,
@@ -319,12 +281,14 @@ async fn update_scene(
 ) -> AppResult<Json<SceneWithVersion>> {
     request.validate()?;
 
-    // Find scene (world-scoped, active only)
-    let scene = SceneRepo::find_by_slug_and_world(state.db(), &slug, request.world_id.as_ref())
+    // Find scene by slug (globally unique)
+    let scene = SceneRepo::find_active_by_slug(state.db(), &slug)
         .await?
+        .into_iter()
+        .next()
         .or_not_found("Scene", &slug)?;
 
-    // Create new version (and cascade to derivatives)
+    // Create new version
     let (updated, version) = SceneRepo::update(state.db(), scene.id.as_ref(), &request).await?;
 
     Ok(Json(SceneWithVersion {
@@ -351,9 +315,8 @@ async fn disable_scene(
     _admin: AdminUser,
     State(state): State<AppState>,
     Path(slug): Path<String>,
-    Query(params): Query<WorldIdParam>,
 ) -> AppResult<StatusCode> {
-    let disabled = SceneRepo::disable(state.db(), &slug, &params.world_id).await?;
+    let disabled = SceneRepo::disable_by_slug(state.db(), &slug).await?;
 
     if !disabled {
         return Err(AppError::NotFound(format!("Scene '{}' not found", slug)));
@@ -400,20 +363,14 @@ struct BatchDisableRequest {
     slugs: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct BatchDisableQuery {
-    world_id: String,
-}
-
-/// DELETE /api/scenes/batch - Batch disable scenes by slug within a world (admin)
+/// DELETE /api/scenes/batch - Batch disable scenes by slug (admin)
 #[instrument(skip(state, _admin, body), fields(user_id = _admin.user.id))]
 async fn batch_disable_scenes(
     _admin: AdminUser,
     State(state): State<AppState>,
-    Query(params): Query<BatchDisableQuery>,
     Json(body): Json<BatchDisableRequest>,
 ) -> AppResult<StatusCode> {
-    SceneRepo::batch_disable(state.db(), &body.slugs, &params.world_id).await?;
+    SceneRepo::batch_disable(state.db(), &body.slugs).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

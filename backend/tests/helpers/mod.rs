@@ -15,50 +15,17 @@ pub const VANILLA_SHADER_ID: &str = "vanilla";
 pub const VANILLA_SHADER_SLUG: &str = "vanilla";
 pub const VANILLA_VERSION_ID: &str = "vanilla-1.21.4";
 
-// -- World helpers --
-
-pub async fn seed_world(pool: &PgPool, id: &str, slug: &str, name: &str) {
-    sqlx::query(
-        "INSERT INTO worlds (id, slug, name, minecraft_version) VALUES ($1, $2, $3, '1.21.4')",
-    )
-    .bind(id)
-    .bind(slug)
-    .bind(name)
-    .execute(pool)
-    .await
-    .expect("seed_world");
-}
-
-pub async fn seed_world_version(pool: &PgPool, id: &str, world_id: &str) {
-    sqlx::query("INSERT INTO world_versions (id, world_id) VALUES ($1, $2)")
-        .bind(id)
-        .bind(world_id)
-        .execute(pool)
-        .await
-        .expect("seed_world_version");
-}
-
 // -- Scene helpers --
 
-pub async fn seed_scene(
-    pool: &PgPool,
-    id: &str,
-    slug: &str,
-    name: &str,
-    world_id: &str,
-    active: bool,
-) {
-    sqlx::query(
-        "INSERT INTO scenes (id, name, slug, world_id, active) VALUES ($1, $2, $3, $4, $5)",
-    )
-    .bind(id)
-    .bind(name)
-    .bind(slug)
-    .bind(world_id)
-    .bind(active)
-    .execute(pool)
-    .await
-    .expect("seed_scene");
+pub async fn seed_scene(pool: &PgPool, id: &str, slug: &str, name: &str, active: bool) {
+    sqlx::query("INSERT INTO scenes (id, name, slug, active) VALUES ($1, $2, $3, $4)")
+        .bind(id)
+        .bind(name)
+        .bind(slug)
+        .bind(active)
+        .execute(pool)
+        .await
+        .expect("seed_scene");
 }
 
 pub async fn seed_scene_version(pool: &PgPool, id: &str, scene_id: &str) {
@@ -170,23 +137,25 @@ pub async fn seed_profile(pool: &PgPool, id: &str, version_id: &str, name: &str,
 
 // -- Capture helpers --
 
-/// Insert a minimal capture. `status` should be 'pending', 'completed', 'uploading', 'failed', etc.
+/// Insert a minimal capture. `status` should be 'completed', 'uploading', 'failed', etc.
 pub async fn seed_capture(
     pool: &PgPool,
     id: &str,
     shader_version_id: &str,
     scene_id: &str,
     profile_id: Option<&str>,
+    preset_id: Option<&str>,
     status: &str,
 ) {
     sqlx::query(
-        "INSERT INTO captures (id, shader_version_id, scene_id, profile_id, status, captured_at) \
-         VALUES ($1, $2, $3, $4, $5, now())",
+        "INSERT INTO captures (id, shader_version_id, scene_id, profile_id, preset_id, status, captured_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, now())",
     )
     .bind(id)
     .bind(shader_version_id)
     .bind(scene_id)
     .bind(profile_id)
+    .bind(preset_id)
     .bind(status)
     .execute(pool)
     .await
@@ -200,50 +169,74 @@ pub async fn seed_capture_full(
     shader_version_id: &str,
     scene_id: &str,
     profile_id: Option<&str>,
+    preset_id: Option<&str>,
     status: &str,
     captured_at: DateTime<Utc>,
-    world_version_id: Option<&str>,
     scene_version_id: Option<&str>,
 ) {
     sqlx::query(
-        "INSERT INTO captures (id, shader_version_id, scene_id, profile_id, status, captured_at, world_version_id, scene_version_id) \
+        "INSERT INTO captures (id, shader_version_id, scene_id, profile_id, preset_id, status, captured_at, scene_version_id) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(id)
     .bind(shader_version_id)
     .bind(scene_id)
     .bind(profile_id)
+    .bind(preset_id)
     .bind(status)
     .bind(captured_at)
-    .bind(world_version_id)
     .bind(scene_version_id)
     .execute(pool)
     .await
     .expect("seed_capture_full");
 }
 
-// -- Composite helpers --
+// -- Scene preset helpers --
 
-/// Create a minimal world + world_version + scene + scene_version.
-/// Returns (world_id, world_version_id, scene_id, scene_version_id).
-pub async fn setup_basic_world_and_scene(
+pub async fn seed_scene_preset(
     pool: &PgPool,
-) -> (&'static str, &'static str, &'static str, &'static str) {
-    seed_world(pool, "w1", "test-world", "Test World").await;
-    seed_world_version(pool, "wv1", "w1").await;
-    seed_scene(pool, "sc1", "test-scene", "Test Scene", "w1", true).await;
-    seed_scene_version(pool, "sv1", "sc1").await;
-    ("w1", "wv1", "sc1", "sv1")
+    id: &str,
+    scene_id: &str,
+    name: &str,
+    slug: &str,
+    time_of_day_ticks: i32,
+) {
+    // Set created_at/updated_at to a fixed past timestamp so test captures
+    // with ts(2025, ...) or ts(2026, ...) aren't marked stale due to
+    // captured_at < preset.updated_at.
+    sqlx::query(
+        "INSERT INTO scene_presets (id, scene_id, name, slug, time_of_day_ticks, weather, weather_intensity, sort_order, created_at, updated_at) \
+         VALUES ($1, $2, $3, $4, $5, 'clear', 0, 0, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')",
+    )
+    .bind(id)
+    .bind(scene_id)
+    .bind(name)
+    .bind(slug)
+    .bind(time_of_day_ticks)
+    .execute(pool)
+    .await
+    .expect("seed_scene_preset");
 }
 
-/// Create a world with two active scenes.
-pub async fn setup_world_with_two_scenes(pool: &PgPool) {
-    seed_world(pool, "w1", "test-world", "Test World").await;
-    seed_world_version(pool, "wv1", "w1").await;
-    seed_scene(pool, "sc1", "scene-a", "Scene A", "w1", true).await;
+// -- Composite helpers --
+
+/// Create a minimal scene + scene_version + scene_preset.
+/// Returns (scene_id, scene_version_id, preset_id).
+pub async fn setup_basic_scene(pool: &PgPool) -> (&'static str, &'static str, &'static str) {
+    seed_scene(pool, "sc1", "test-scene", "Test Scene", true).await;
     seed_scene_version(pool, "sv1", "sc1").await;
-    seed_scene(pool, "sc2", "scene-b", "Scene B", "w1", true).await;
+    seed_scene_preset(pool, "sp1", "sc1", "Default", "default", 6000).await;
+    ("sc1", "sv1", "sp1")
+}
+
+/// Create two active scenes with scene versions and presets.
+pub async fn setup_two_scenes(pool: &PgPool) {
+    seed_scene(pool, "sc1", "scene-a", "Scene A", true).await;
+    seed_scene_version(pool, "sv1", "sc1").await;
+    seed_scene_preset(pool, "sp1", "sc1", "Default", "default", 6000).await;
+    seed_scene(pool, "sc2", "scene-b", "Scene B", true).await;
     seed_scene_version(pool, "sv2", "sc2").await;
+    seed_scene_preset(pool, "sp2", "sc2", "Default", "default-b", 6000).await;
 }
 
 /// Utility: a fixed timestamp for deterministic tests.

@@ -12,7 +12,6 @@ import net.minecraft.client.Minecraft
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
-import java.util.concurrent.CompletionException
 
 /** Result of preparing all assets for a set of work items. */
 sealed class PrepResult {
@@ -30,9 +29,9 @@ sealed class PrepResult {
 }
 
 /**
- * Prepares assets (worlds, shaders, scene definitions) for autonomous capture.
+ * Prepares assets (shaders, scene definitions) for autonomous capture.
  *
- * Downloads all unique worlds and shaders from the work item list, writes scene
+ * Downloads all unique shaders from the work item list, writes scene
  * definitions to disk, and reports which items are ready for capture.
  */
 class AssetPreparer(
@@ -44,36 +43,27 @@ class AssetPreparer(
     /**
      * Prepares all assets needed for the given work items.
      *
-     * Downloads worlds and shaders, writes scene definitions, and returns
-     * the items that are ready for capture (items whose worlds/shaders
+     * Downloads shaders, writes scene definitions, and returns
+     * the items that are ready for capture (items whose shaders
      * downloaded successfully).
      */
     fun prepareAll(items: List<WorkItem>): PrepResult {
         if (items.isEmpty()) return PrepResult.Failed("No work items")
 
-        // 1. Download all unique worlds
-        val worldFolders = downloadWorlds(items)
-        if (worldFolders.isEmpty()) {
-            return PrepResult.Failed("Failed to download any worlds")
-        }
-
-        // 2. Download all unique shaders
+        // 1. Download all unique shaders
         val shaderResults = downloadShaders(items)
 
-        // 3. Write scene definitions
+        // 2. Write scene definitions
         writeSceneDefinitions(items)
 
-        // 4. Filter items to only those with successfully downloaded assets
+        // 3. Filter items to only those with successfully downloaded shaders
         val readyItems =
             items.filter { item ->
-                val worldReady = item.worldId in worldFolders
-                val shaderReady =
-                    if (item.shaderSlug == "vanilla") {
-                        true
-                    } else {
-                        shaderResults[item.shaderVersionId] != null
-                    }
-                worldReady && shaderReady
+                if (item.shaderSlug == "vanilla") {
+                    true
+                } else {
+                    shaderResults[item.shaderVersionId] != null
+                }
             }
 
         if (readyItems.isEmpty()) {
@@ -83,107 +73,10 @@ class AssetPreparer(
         log.info("Asset preparation complete") {
             "total_items" to items.size
             "ready_items" to readyItems.size
-            "worlds" to worldFolders.size
             "shaders" to shaderResults.size
         }
 
         return PrepResult.Ready(readyItems)
-    }
-
-    /**
-     * Downloads all unique worlds from the work items.
-     * Returns a map of world ID → world folder name for successfully downloaded worlds.
-     */
-    private fun downloadWorlds(items: List<WorkItem>): Map<String, String> {
-        val savesDir = File(gameDirectory, "saves")
-        val worldFolders = mutableMapOf<String, String>()
-
-        val uniqueWorlds =
-            items
-                .distinctBy { it.worldId }
-                .map { item ->
-                    WorldTarget(
-                        id = item.worldId,
-                        slug = item.worldSlug,
-                        name = item.worldName,
-                        fileUrl = item.worldFileUrl,
-                        fileHash = item.worldFileHash,
-                    )
-                }
-
-        for (world in uniqueWorlds) {
-            val existingDir = File(savesDir, world.slug)
-            if (existingDir.exists() && existingDir.isDirectory) {
-                log.debug("World already present") { "slug" to world.slug }
-                worldFolders[world.id] = world.slug
-                continue
-            }
-
-            val fileUrl = world.fileUrl
-            if (fileUrl == null) {
-                log.error("No download URL for world") { "name" to world.name }
-                continue
-            }
-
-            log.info("Downloading world") {
-                "name" to world.name
-                "slug" to world.slug
-            }
-            try {
-                var lastProgressLog = 0L
-                val folderPath =
-                    com.xevion.glint.download.WorldDownloader
-                        .downloadWorld(
-                            worldSlug = world.slug,
-                            worldId = world.id,
-                            fileUrl = fileUrl,
-                            expectedHash = world.fileHash,
-                            progressCallback = { progress ->
-                                val now = System.currentTimeMillis()
-                                val isTerminal = progress.state != com.xevion.glint.download.DownloadProgress.State.DOWNLOADING
-                                if (isTerminal || now - lastProgressLog >= 1000) {
-                                    lastProgressLog = now
-                                    log.debug("World download progress") {
-                                        "slug" to world.slug
-                                        "progress" to progress
-                                    }
-                                }
-                            },
-                        ).join()
-
-                val downloadedDir = File(gameDirectory, folderPath)
-                val levelDat = File(downloadedDir, "level.dat")
-
-                if (levelDat.exists()) {
-                    val targetDir = File(savesDir, world.slug)
-                    downloadedDir.copyRecursively(targetDir, overwrite = true)
-                    worldFolders[world.id] = world.slug
-                    log.info("World installed") { "slug" to world.slug }
-                } else {
-                    val subfolders = downloadedDir.listFiles()?.filter { it.isDirectory } ?: emptyList()
-                    val worldSubfolder = subfolders.find { File(it, "level.dat").exists() }
-                    if (worldSubfolder != null) {
-                        val targetDir = File(savesDir, world.slug)
-                        worldSubfolder.copyRecursively(targetDir, overwrite = true)
-                        worldFolders[world.id] = world.slug
-                        log.info("World installed") {
-                            "slug" to world.slug
-                            "subfolder" to worldSubfolder.name
-                        }
-                    } else {
-                        log.error("Downloaded world has no level.dat") { "path" to downloadedDir.absolutePath }
-                    }
-                }
-            } catch (e: CompletionException) {
-                log.error(e.cause ?: e, "Failed to download world") { "slug" to world.slug }
-            } catch (e: IOException) {
-                log.error(e, "Failed to download world") { "slug" to world.slug }
-            } catch (e: SecurityException) {
-                log.error(e, "Failed to download world") { "slug" to world.slug }
-            }
-        }
-
-        return worldFolders
     }
 
     /**
@@ -325,13 +218,13 @@ class AssetPreparer(
         val scenesDir = File(gameDirectory, "glint/scenes")
         scenesDir.mkdirs()
 
-        val itemsByWorld = items.groupBy { it.worldSlug }
+        val itemsByScene = items.groupBy { it.sceneSlug }
 
-        for ((worldSlug, worldItems) in itemsByWorld) {
-            val collectionFile = File(scenesDir, "$worldSlug.json")
+        for ((sceneSlug, sceneItems) in itemsByScene) {
+            val collectionFile = File(scenesDir, "$sceneSlug.json")
 
             val sceneElements =
-                worldItems
+                sceneItems
                     .distinctBy { it.sceneId }
                     .map { item ->
                         buildJsonObject {
@@ -358,8 +251,7 @@ class AssetPreparer(
             val mcVersion = Minecraft.getInstance().launchedVersion
             val collection =
                 buildJsonObject {
-                    put("world", worldSlug)
-                    put("folder", worldSlug)
+                    put("scene", sceneSlug)
                     put("version", mcVersion)
                     put("scenes", JsonArray(sceneElements))
                 }
@@ -379,12 +271,4 @@ class AssetPreparer(
 
         SceneManager.clearCache()
     }
-
-    private data class WorldTarget(
-        val id: String,
-        val slug: String,
-        val name: String,
-        val fileUrl: String?,
-        val fileHash: String?,
-    )
 }

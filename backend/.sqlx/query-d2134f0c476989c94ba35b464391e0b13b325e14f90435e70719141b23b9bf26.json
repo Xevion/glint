@@ -67,6 +67,31 @@
         "ordinal": 12,
         "name": "created_at",
         "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "package_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "package_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "package_size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 16,
+        "name": "fov",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 17,
+        "name": "render_distance",
+        "type_info": "Int4"
       }
     ],
     "parameters": {
@@ -98,6 +123,11 @@
       false,
       true,
       true,
+      false,
+      true,
+      true,
+      true,
+      false,
       false
     ]
   },

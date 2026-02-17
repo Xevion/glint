@@ -33,7 +33,7 @@ pub struct AuditObject {
     #[serde(with = "chrono::serde::ts_seconds")]
     #[ts(type = "number")]
     pub last_modified: DateTime<Utc>,
-    /// The R2 key prefix (e.g. "captures", "worlds", "_uploads")
+    /// The R2 key prefix (e.g. "captures", "packages", "_uploads")
     pub prefix: String,
 }
 
@@ -54,7 +54,7 @@ pub struct AuditReference {
 pub struct StorageAuditResult {
     /// Objects in R2 with no matching DB row
     pub orphaned: Vec<AuditObject>,
-    /// Objects under _uploads/ with no pending_uploads record
+    /// Objects under _uploads/ (orphaned staging files)
     pub stale_staging: Vec<AuditObject>,
     /// DB rows referencing R2 URLs where the object doesn't exist in R2
     pub missing: Vec<AuditReference>,

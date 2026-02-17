@@ -2,10 +2,23 @@ use anyhow::Context;
 use tracing::{debug, instrument, warn};
 
 use crate::error::{AppResult, OptionNotFoundExt};
-use crate::id::{CaptureId, CaptureRunId, SceneId, ShaderVersionId, ShaderVersionProfileId};
+use crate::id::{
+    CaptureId, CaptureRunId, SceneId, ScenePresetId, ShaderVersionId, ShaderVersionProfileId,
+};
 use crate::models::{
     CaptureRun, CaptureRunItem, CaptureRunItemStatus, CaptureRunItemWithContext, CaptureRunStatus,
 };
+
+/// Tuple for batch-inserting run items:
+/// `(id, run_id, shader_version_id, scene_id, profile_id, preset_id)`
+type RunItemTuple<'a> = (
+    &'a str,
+    &'a str,
+    &'a str,
+    &'a str,
+    Option<&'a str>,
+    Option<&'a str>,
+);
 
 pub struct CaptureRunRepo;
 
@@ -156,7 +169,7 @@ impl CaptureRunRepo {
     #[instrument(skip(executor, items), level = "debug")]
     pub async fn insert_items(
         executor: impl sqlx::PgExecutor<'_>,
-        items: &[(&str, &str, &str, &str, Option<&str>)], // (id, run_id, shader_version_id, scene_id, profile_id)
+        items: &[RunItemTuple<'_>],
     ) -> AppResult<()> {
         if items.is_empty() {
             return Ok(());
@@ -167,17 +180,19 @@ impl CaptureRunRepo {
         let sv_ids: Vec<&str> = items.iter().map(|i| i.2).collect();
         let scene_ids: Vec<&str> = items.iter().map(|i| i.3).collect();
         let profiles: Vec<Option<&str>> = items.iter().map(|i| i.4).collect();
+        let presets: Vec<Option<&str>> = items.iter().map(|i| i.5).collect();
 
         sqlx::query!(
             r#"
-            INSERT INTO capture_run_items (id, run_id, shader_version_id, scene_id, profile_id, status)
-            SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::text[]), unnest($4::text[]), unnest($5::text[]), 'pending'
+            INSERT INTO capture_run_items (id, run_id, shader_version_id, scene_id, profile_id, preset_id, status)
+            SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::text[]), unnest($4::text[]), unnest($5::text[]), unnest($6::text[]), 'pending'
             "#,
             &ids as &[&str],
             &run_ids as &[&str],
             &sv_ids as &[&str],
             &scene_ids as &[&str],
             &profiles as &[Option<&str>],
+            &presets as &[Option<&str>],
         )
         .execute(executor)
         .await
@@ -252,6 +267,7 @@ impl CaptureRunRepo {
                 shader_version_id AS "shader_version_id: ShaderVersionId",
                 scene_id AS "scene_id: SceneId",
                 profile_id AS "profile_id: ShaderVersionProfileId",
+                preset_id AS "preset_id: ScenePresetId",
                 status AS "status!: CaptureRunItemStatus",
                 capture_id AS "capture_id: CaptureId",
                 error_message, error_log, duration_ms,
@@ -296,6 +312,7 @@ impl CaptureRunRepo {
                 shader_version_id AS "shader_version_id: ShaderVersionId",
                 scene_id AS "scene_id: SceneId",
                 profile_id AS "profile_id: ShaderVersionProfileId",
+                preset_id AS "preset_id: ScenePresetId",
                 status AS "status!: CaptureRunItemStatus",
                 capture_id AS "capture_id: CaptureId",
                 error_message, error_log, duration_ms,

@@ -1,5 +1,5 @@
 import { createApiClient } from '$lib/api';
-import type { SceneWithWorld } from '$lib/bindings';
+import type { SceneListAdmin } from '$lib/bindings';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => {
@@ -8,6 +8,6 @@ export const load: PageLoad = async ({ fetch }) => {
 
 	return result.match({
 		Ok: (scenes) => ({ scenes, error: null as string | null }),
-		Err: (err) => ({ scenes: [] as SceneWithWorld[], error: err.message })
+		Err: (err) => ({ scenes: [] as SceneListAdmin[], error: err.message })
 	});
 };

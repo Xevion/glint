@@ -10,7 +10,6 @@ import { SceneEndpoints } from './endpoints/scenes';
 import { ShaderEndpoints } from './endpoints/shaders';
 import { StatsEndpoints } from './endpoints/stats';
 import { UserEndpoints } from './endpoints/user';
-import { WorldsEndpoints } from './endpoints/worlds';
 
 /**
  * Create API client with optional custom fetch function
@@ -34,7 +33,6 @@ export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
 		backgrounds: new BackgroundEndpoints(url, fetchFn),
 		admin: new AdminEndpoints(url, fetchFn),
 		adopt: new AdoptEndpoints(url, fetchFn),
-		worlds: new WorldsEndpoints(url, fetchFn),
 		device: new DeviceEndpoints(url, fetchFn),
 		runs: new RunEndpoints(url, fetchFn),
 		featured: new FeaturedEndpoints(url, fetchFn),

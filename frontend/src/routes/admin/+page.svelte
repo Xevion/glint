@@ -13,7 +13,6 @@ import {
 	Activity,
 	ArrowRight,
 	Camera,
-	Globe,
 	HardDrive,
 	HeartPulse,
 	Mountain,
@@ -42,7 +41,6 @@ interface Props {
 let { data }: Props = $props();
 
 let shaderCount: number = $derived(data.shaderCount);
-let worldCount: number = $derived(data.worldCount);
 let sceneCount: number = $derived(data.sceneCount);
 let captureCount: number = $derived(data.captureCount);
 let userCount: number = $derived(data.userCount);
@@ -85,7 +83,6 @@ interface StatCard {
 
 const statCards = $derived<StatCard[]>([
 	{ label: 'Shaders', count: shaderCount, href: '/admin/shaders', icon: Sparkles },
-	{ label: 'Worlds', count: worldCount, href: '/admin/worlds', icon: Globe },
 	{ label: 'Scenes', count: sceneCount, href: '/admin/scenes', icon: Mountain },
 	{ label: 'Captures', count: captureCount, href: '/admin/captures', icon: Camera },
 	{ label: 'Runs', count: runCount, href: '/admin/runs', icon: Activity },
@@ -176,7 +173,7 @@ onDestroy(() => {
 	{/if}
 
 	<!-- Stats Grid -->
-		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
 			{#each statCards as card (card.label)}
 				<a
 					href={card.href}

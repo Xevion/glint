@@ -31,12 +31,10 @@ pub enum TargetHealth {
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub enum StaleReason {
-    /// The world has been updated since the capture
-    WorldUpdated,
-    /// The scene has been updated since the capture
+    /// The scene version has been updated since the capture
     SceneUpdated,
-    /// Both world and scene have been updated since the capture
-    BothUpdated,
+    /// The preset has been edited since the capture
+    PresetEdited,
 }
 
 impl<'r> sqlx::Decode<'r, sqlx::Postgres> for TargetHealth {
@@ -114,8 +112,8 @@ struct CaptureHealthRow {
     capture_failure_count: i32,
     last_capture_at: Option<DateTime<Utc>>,
     status: TargetHealth,
-    world_outdated: bool,
     scene_outdated: bool,
+    preset_outdated: bool,
 }
 
 pub struct CaptureHealthRepo;
@@ -136,17 +134,17 @@ impl CaptureHealthRepo {
             CaptureHealthRow,
             r#"
             WITH best_captures AS (
-                SELECT DISTINCT ON (shader_version_id, scene_id, profile_id)
+                SELECT DISTINCT ON (shader_version_id, scene_id, preset_id, profile_id)
                     shader_version_id,
                     scene_id,
+                    preset_id,
                     profile_id,
                     captured_at,
                     freshness,
-                    world_version_id,
                     scene_version_id
                 FROM captures_with_freshness
                 WHERE status IN ('completed', 'uploading')
-                ORDER BY shader_version_id, scene_id, profile_id, captured_at DESC
+                ORDER BY shader_version_id, scene_id, preset_id, profile_id, captured_at DESC
             )
             SELECT
                 sh.id AS "shader_id!: ShaderId",
@@ -167,8 +165,8 @@ impl CaptureHealthRepo {
                     WHEN bc.freshness != 'fresh' THEN 'stale'
                     ELSE 'completed'
                 END AS "status!: TargetHealth",
-                COALESCE(bc.world_version_id IS NOT NULL AND bc.world_version_id IS DISTINCT FROM lwv.id, FALSE) AS "world_outdated!",
-                COALESCE(bc.scene_version_id IS NOT NULL AND bc.scene_version_id IS DISTINCT FROM lsv.id, FALSE) AS "scene_outdated!"
+                COALESCE(bc.scene_version_id IS NOT NULL AND bc.scene_version_id IS DISTINCT FROM lsv.id, FALSE) AS "scene_outdated!",
+                COALESCE(sp.id IS NOT NULL AND bc.captured_at < sp.updated_at, FALSE) AS "preset_outdated!"
             FROM capture_target_matrix tm
             JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id
             JOIN shaders sh ON sh.id = sv.shader_id
@@ -176,9 +174,10 @@ impl CaptureHealthRepo {
             LEFT JOIN best_captures bc
                 ON bc.shader_version_id = tm.shader_version_id
                 AND bc.scene_id = tm.scene_id
+                AND (bc.preset_id IS NOT DISTINCT FROM tm.preset_id)
                 AND (bc.profile_id IS NOT DISTINCT FROM tm.profile_id)
             LEFT JOIN shader_version_profiles svp ON svp.id = tm.profile_id
-            LEFT JOIN latest_world_versions lwv ON lwv.world_id = sc.world_id
+            LEFT JOIN scene_presets sp ON sp.id = tm.preset_id
             LEFT JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id
             ORDER BY sh.name ASC, sv.version DESC, sc.name ASC, tm.profile_id NULLS LAST
             "#
@@ -192,13 +191,11 @@ impl CaptureHealthRepo {
             .into_iter()
             .map(|row| {
                 let stale_reason = if row.status == TargetHealth::Stale {
-                    Some(match (row.world_outdated, row.scene_outdated) {
-                        (true, true) => StaleReason::BothUpdated,
-                        (true, false) => StaleReason::WorldUpdated,
-                        (false, true) => StaleReason::SceneUpdated,
+                    Some(match (row.scene_outdated, row.preset_outdated) {
+                        (true, _) => StaleReason::SceneUpdated,
+                        (false, true) => StaleReason::PresetEdited,
                         // Fallback: freshness was non-fresh but neither flag tripped
-                        // (shouldn't happen, but handle gracefully)
-                        (false, false) => StaleReason::WorldUpdated,
+                        (false, false) => StaleReason::SceneUpdated,
                     })
                 } else {
                     None

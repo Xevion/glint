@@ -529,7 +529,7 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
     // Set up world + scene
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     // Create a custom shader (non-vanilla) with no profiles
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;
@@ -570,7 +570,7 @@ async fn test_adding_profiles_changes_health_targets(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
     // Set up world + scene
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     // Create a custom shader with no profiles
     seed_shader(&pool, "sh1", "test-shader", "Test Shader").await;

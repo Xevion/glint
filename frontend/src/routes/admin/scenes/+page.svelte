@@ -1,19 +1,19 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
-import type { SceneWithWorld } from '$lib/bindings';
+import type { SceneListAdmin } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminPageHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import * as Checkbox from '$lib/components/ui/checkbox';
-import { Camera, CloudSun, Globe, MapPin } from '@lucide/svelte';
+import { MapPin } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 interface Props {
 	data: PageData;
 }
 let { data }: Props = $props();
-let scenes: SceneWithWorld[] = $derived(data.scenes);
+let scenes: SceneListAdmin[] = $derived(data.scenes);
 let refreshing = $state(false);
 let showInactive = $state(false);
 let error = $derived(data.error);
@@ -24,10 +24,6 @@ async function refresh() {
 	refreshing = true;
 	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
 	refreshing = false;
-}
-
-function formatDimension(dim: string): string {
-	return dim.split(':').pop() ?? dim;
 }
 </script>
 
@@ -110,30 +106,6 @@ function formatDimension(dim: string): string {
 								{scene.description}
 							</p>
 						{/if}
-
-						<!-- Stats row -->
-						<div
-							class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
-						>
-							{#if scene.world_name}
-								<span class="inline-flex items-center gap-1" title="World">
-									<Globe class="h-3 w-3" />
-									{scene.world_name}
-								</span>
-							{/if}
-							<span class="inline-flex items-center gap-1" title="Dimension">
-								<MapPin class="h-3 w-3" />
-								{formatDimension(scene.dimension)}
-							</span>
-						<span class="inline-flex items-center gap-1" title="Weather">
-							<CloudSun class="h-3 w-3" />
-							<span class="capitalize">{scene.version.weather}</span>
-						</span>
-							<span class="inline-flex items-center gap-1" title="Captures">
-								<Camera class="h-3 w-3" />
-								{scene.capture_count} capture{scene.capture_count !== 1 ? 's' : ''}
-							</span>
-						</div>
 
 						<!-- Timestamps -->
 						<div

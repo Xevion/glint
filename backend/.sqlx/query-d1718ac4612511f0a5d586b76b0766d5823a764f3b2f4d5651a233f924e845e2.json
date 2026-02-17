@@ -1,0 +1,94 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id,\n                run_id AS \"run_id: CaptureRunId\",\n                shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                scene_id AS \"scene_id: SceneId\",\n                profile_id AS \"profile_id: ShaderVersionProfileId\",\n                preset_id AS \"preset_id: ScenePresetId\",\n                status AS \"status!: CaptureRunItemStatus\",\n                capture_id AS \"capture_id: CaptureId\",\n                error_message, error_log, duration_ms,\n                started_at, completed_at\n            FROM capture_run_items WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "run_id: CaptureRunId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "shader_version_id: ShaderVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "scene_id: SceneId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "profile_id: ShaderVersionProfileId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "preset_id: ScenePresetId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "status!: CaptureRunItemStatus",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "capture_id: CaptureId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "error_log",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "duration_ms",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "d1718ac4612511f0a5d586b76b0766d5823a764f3b2f4d5651a233f924e845e2"
+}

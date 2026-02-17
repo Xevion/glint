@@ -3,4 +3,4 @@
 /**
  * Why a capture target is stale (only present when status == Stale)
  */
-export type StaleReason = "world_updated" | "scene_updated" | "both_updated";
+export type StaleReason = "scene_updated" | "preset_edited";

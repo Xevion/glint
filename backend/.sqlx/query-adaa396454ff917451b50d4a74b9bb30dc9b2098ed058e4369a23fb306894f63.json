@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM scene_presets",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "adaa396454ff917451b50d4a74b9bb30dc9b2098ed058e4369a23fb306894f63"
+}

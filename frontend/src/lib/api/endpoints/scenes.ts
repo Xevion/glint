@@ -17,14 +17,10 @@ export class SceneEndpoints extends ApiClient {
 	}
 
 	/**
-	 * Get scenes by slug with world and captures (returns array for multi-world support)
+	 * Get scene by slug with captures
 	 */
-	getBySlug(slug: string, worldId?: string): Promise<Result<SceneWithCaptures[], ApiError>> {
-		const searchParams = new URLSearchParams();
-		if (worldId) searchParams.set('world_id', worldId);
-		const query = searchParams.toString();
-		const url = `/api/scenes/by-slug/${encodeURIComponent(slug)}${query ? `?${query}` : ''}`;
-		return this.get<SceneWithCaptures[]>(url);
+	getBySlug(slug: string): Promise<Result<SceneWithCaptures[], ApiError>> {
+		return this.get<SceneWithCaptures[]>(`/api/scenes/by-slug/${encodeURIComponent(slug)}`);
 	}
 
 	/**

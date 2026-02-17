@@ -5,6 +5,6 @@
  */
 export type AuditObject = { key: string, size: number, last_modified: number, 
 /**
- * The R2 key prefix (e.g. "captures", "worlds", "_uploads")
+ * The R2 key prefix (e.g. "captures", "packages", "_uploads")
  */
 prefix: string, };

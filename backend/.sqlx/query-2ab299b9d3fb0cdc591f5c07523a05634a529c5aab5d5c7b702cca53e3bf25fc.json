@@ -1,0 +1,90 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO scene_presets (id, scene_id, name, slug, time_of_day_ticks, weather, weather_intensity, moon_phase, sort_order, created_at, updated_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now())\n            RETURNING *\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "scene_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "time_of_day_ticks",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "weather",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "weather_intensity",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "moon_phase",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "sort_order",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int4",
+        "Text",
+        "Float8",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2ab299b9d3fb0cdc591f5c07523a05634a529c5aab5d5c7b702cca53e3bf25fc"
+}

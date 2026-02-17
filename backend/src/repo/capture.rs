@@ -8,8 +8,8 @@ use tracing::{debug, instrument};
 use crate::db::DbPool;
 use crate::error::{AppResult, OptionNotFoundExt};
 use crate::id::{
-    CaptureId, CaptureRunId, SceneId, SceneVersionId, ShaderId, ShaderVersionId,
-    ShaderVersionProfileId, WorldVersionId,
+    CaptureId, CaptureRunId, SceneId, ScenePresetId, SceneVersionId, ShaderId, ShaderVersionId,
+    ShaderVersionProfileId,
 };
 use crate::models::{
     Capture, CaptureDetail, CaptureFreshness, CaptureListItem, CaptureRunStatus, CaptureStatus,
@@ -65,7 +65,7 @@ impl CaptureRepo {
                 resolution_height, captured_at,
                 status AS "status!: CaptureStatus",
                 error_message, thumbhash, file_size_bytes, content_type,
-                world_version_id AS "world_version_id: WorldVersionId",
+                preset_id AS "preset_id: ScenePresetId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
                 created_at, updated_at
             FROM captures WHERE id = $1"#,
@@ -166,7 +166,7 @@ impl CaptureRepo {
                 resolution_height, captured_at,
                 status AS "status!: CaptureStatus",
                 error_message, thumbhash, file_size_bytes, content_type,
-                world_version_id AS "world_version_id: WorldVersionId",
+                preset_id AS "preset_id: ScenePresetId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
                 created_at, updated_at
             FROM captures WHERE shader_version_id = $1 ORDER BY created_at DESC"#,
@@ -201,7 +201,7 @@ impl CaptureRepo {
                 resolution_height, captured_at,
                 status AS "status!: CaptureStatus",
                 error_message, thumbhash, file_size_bytes, content_type,
-                world_version_id AS "world_version_id: WorldVersionId",
+                preset_id AS "preset_id: ScenePresetId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
                 created_at, updated_at
             FROM captures WHERE scene_id = $1 ORDER BY created_at DESC"#,
@@ -250,6 +250,7 @@ impl CaptureRepo {
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
+                            preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                             freshness AS "freshness!: CaptureFreshness"
                         FROM capture_contexts
                         WHERE ($1::text IS NULL OR shader_id = $1)
@@ -289,6 +290,7 @@ impl CaptureRepo {
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
+                            preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                             freshness AS "freshness!: CaptureFreshness"
                         FROM capture_contexts
                         WHERE ($1::text IS NULL OR shader_id = $1)
@@ -328,6 +330,7 @@ impl CaptureRepo {
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
+                            preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                             freshness AS "freshness!: CaptureFreshness"
                         FROM (
                             SELECT DISTINCT ON (shader_id) *
@@ -371,6 +374,7 @@ impl CaptureRepo {
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
+                            preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                             freshness AS "freshness!: CaptureFreshness"
                         FROM capture_contexts
                         WHERE ($1::text IS NULL OR shader_id = $1)
@@ -410,6 +414,7 @@ impl CaptureRepo {
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
+                            preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                             freshness AS "freshness!: CaptureFreshness"
                         FROM (
                             SELECT DISTINCT ON (scene_id) *
@@ -453,6 +458,7 @@ impl CaptureRepo {
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
+                            preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                             freshness AS "freshness!: CaptureFreshness"
                         FROM capture_contexts
                         WHERE ($1::text IS NULL OR shader_id = $1)
@@ -582,7 +588,7 @@ impl CaptureRepo {
         resolution_width: Option<i32>,
         resolution_height: Option<i32>,
         captured_at: Option<DateTime<Utc>>,
-        world_version_id: Option<&str>,
+        preset_id: Option<&str>,
         scene_version_id: Option<&str>,
         status: CaptureStatus,
     ) -> AppResult<()> {
@@ -590,7 +596,7 @@ impl CaptureRepo {
             r#"
             INSERT INTO captures (
                 id, shader_version_id, scene_id, profile_id, image_path, image_url,
-                resolution_width, resolution_height, world_version_id, scene_version_id,
+                resolution_width, resolution_height, preset_id, scene_version_id,
                 status, created_at, updated_at, captured_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12, $12)
             "#,
@@ -602,7 +608,7 @@ impl CaptureRepo {
             image_url,
             resolution_width,
             resolution_height,
-            world_version_id,
+            preset_id,
             scene_version_id,
             status as CaptureStatus,
             captured_at
@@ -661,6 +667,7 @@ impl CaptureRepo {
                 resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
+                preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                 freshness AS "freshness!: CaptureFreshness"
             FROM capture_contexts
             WHERE id = $1
@@ -701,6 +708,9 @@ impl CaptureRepo {
             shader_author: Option<String>,
             scene_name: Option<String>,
             scene_slug: Option<String>,
+            preset_id: Option<ScenePresetId>,
+            preset_name: Option<String>,
+            preset_slug: Option<String>,
             freshness: CaptureFreshness,
             // Technical metadata
             status: CaptureStatus,
@@ -715,7 +725,6 @@ impl CaptureRepo {
             iris_version: Option<String>,
             gpu_model: Option<String>,
             content_type: Option<String>,
-            world_version_id: Option<WorldVersionId>,
             scene_version_id: Option<SceneVersionId>,
             created_at: DateTime<Utc>,
             updated_at: DateTime<Utc>,
@@ -734,11 +743,11 @@ impl CaptureRepo {
                 run_id AS "run_id: CaptureRunId",
                 run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
+                preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                 freshness AS "freshness!: CaptureFreshness",
                 status AS "status!: CaptureStatus", error_message, video_url,
                 avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
                 minecraft_version, iris_version, gpu_model, content_type,
-                world_version_id AS "world_version_id: WorldVersionId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
                 created_at AS "created_at!", updated_at AS "updated_at!"
             FROM capture_details
@@ -769,6 +778,7 @@ impl CaptureRepo {
                 resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
+                preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                 freshness AS "freshness!: CaptureFreshness"
             FROM capture_contexts
             WHERE scene_id = $1
@@ -796,6 +806,7 @@ impl CaptureRepo {
                 resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
+                preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                 freshness AS "freshness!: CaptureFreshness"
             FROM capture_contexts
             WHERE scene_id = $1
@@ -823,6 +834,7 @@ impl CaptureRepo {
                     resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
+                preset_id AS "preset_id: ScenePresetId", preset_name, preset_slug,
                 freshness AS "freshness!: CaptureFreshness"
             FROM capture_contexts
             WHERE run_id = $1
@@ -866,6 +878,9 @@ impl CaptureRepo {
             shader_author: row.shader_author,
             scene_name: row.scene_name,
             scene_slug: row.scene_slug,
+            preset_id: row.preset_id,
+            preset_name: row.preset_name,
+            preset_slug: row.preset_slug,
             freshness: row.freshness,
         };
 
@@ -884,7 +899,6 @@ impl CaptureRepo {
             iris_version: row.iris_version,
             gpu_model: row.gpu_model,
             content_type: row.content_type,
-            world_version_id: row.world_version_id,
             scene_version_id: row.scene_version_id,
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -1324,7 +1338,7 @@ impl CaptureRepo {
                 resolution_height, captured_at,
                 status AS "status!: CaptureStatus",
                 error_message, thumbhash, file_size_bytes, content_type,
-                world_version_id AS "world_version_id: WorldVersionId",
+                preset_id AS "preset_id: ScenePresetId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
                 created_at, updated_at
             FROM captures
@@ -1365,7 +1379,7 @@ impl CaptureRepo {
                 resolution_height, captured_at,
                 status AS "status!: CaptureStatus",
                 error_message, thumbhash, file_size_bytes, content_type,
-                world_version_id AS "world_version_id: WorldVersionId",
+                preset_id AS "preset_id: ScenePresetId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
                 created_at, updated_at
             FROM captures

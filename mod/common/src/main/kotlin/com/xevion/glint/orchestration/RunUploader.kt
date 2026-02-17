@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.minutes
 /** Resolved item metadata from the work→run item mapping. */
 data class RunItemInfo(
     val itemId: String,
-    val worldVersionId: String,
+    val presetId: String?,
     val sceneVersionId: String,
 )
 
@@ -85,7 +85,7 @@ class RunUploader(
 
         executor.submit {
             try {
-                executeUpload(info.itemId, info.worldVersionId, info.sceneVersionId, event)
+                executeUpload(info.itemId, info.presetId, info.sceneVersionId, event)
                 val completed = completedCount.incrementAndGet()
                 log.debug("Upload succeeded") {
                     "item_id" to info.itemId
@@ -240,7 +240,7 @@ class RunUploader(
      */
     private fun executeUpload(
         itemId: String,
-        worldVersionId: String,
+        presetId: String?,
         sceneVersionId: String,
         event: CaptureTakenEvent,
     ) {
@@ -255,7 +255,7 @@ class RunUploader(
                         resolutionWidth = event.entry.resolution.width,
                         resolutionHeight = event.entry.resolution.height,
                         capturedAt = event.entry.timestamp,
-                        worldVersionId = worldVersionId,
+                        presetId = presetId,
                         sceneVersionId = sceneVersionId,
                     ),
                 )

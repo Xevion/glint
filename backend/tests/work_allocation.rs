@@ -25,7 +25,7 @@ async fn test_work_items_only_vanilla_when_no_custom_shaders(pool: sqlx::PgPool)
     apply_views(&pool).await.expect("views");
 
     // 1 scene, only the vanilla shader from migration 001
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
         .await
@@ -40,7 +40,7 @@ async fn test_work_items_basic_matrix_expansion(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
     // 2 custom shaders × 2 scenes + vanilla × 2 scenes = 6 items
-    setup_world_with_two_scenes(&pool).await;
+    setup_two_scenes(&pool).await;
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
     seed_shader(&pool, "sh2", "shader-b", "Shader B").await;
@@ -57,20 +57,12 @@ async fn test_work_items_basic_matrix_expansion(pool: sqlx::PgPool) {
 async fn test_work_items_inactive_scenes_excluded(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    seed_world(&pool, "w1", "test-world", "Test World").await;
-    seed_world_version(&pool, "wv1", "w1").await;
-    seed_scene(&pool, "sc1", "active-scene", "Active Scene", "w1", true).await;
+    seed_scene(&pool, "sc1", "active-scene", "Active Scene", true).await;
     seed_scene_version(&pool, "sv1", "sc1").await;
-    seed_scene(
-        &pool,
-        "sc2",
-        "inactive-scene",
-        "Inactive Scene",
-        "w1",
-        false,
-    )
-    .await;
+    seed_scene(&pool, "sc2", "inactive-scene", "Inactive Scene", false).await;
     seed_scene_version(&pool, "sv2", "sc2").await;
+    seed_scene_preset(&pool, "sp1", "sc1", "Default", "default", 6000).await;
+    seed_scene_preset(&pool, "sp2", "sc2", "Default", "default-b", 6000).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -90,7 +82,7 @@ async fn test_work_items_inactive_scenes_excluded(pool: sqlx::PgPool) {
 async fn test_work_items_version_with_profiles_expands_per_profile(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -128,7 +120,7 @@ async fn test_work_items_version_with_profiles_expands_per_profile(pool: sqlx::P
 async fn test_work_items_version_without_profiles_has_null_profile_id(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -146,7 +138,7 @@ async fn test_work_items_version_without_profiles_has_null_profile_id(pool: sqlx
 async fn test_work_items_mixed_profile_and_no_profile_shaders(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     // Shader A: 2 profiles
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
@@ -202,21 +194,21 @@ async fn test_work_items_mixed_profile_and_no_profile_shaders(pool: sqlx::PgPool
 async fn test_work_items_excludes_targets_with_fresh_captures(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_world_with_two_scenes(&pool).await;
+    setup_two_scenes(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
-    // Fresh capture for scene 1: matching world_version_id and scene_version_id
+    // Fresh capture for scene 1: matching scene_version_id
     seed_capture_full(
         &pool,
         "cap1",
         "shv1",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2025, 1, 1),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;
@@ -238,31 +230,29 @@ async fn test_work_items_excludes_targets_with_fresh_captures(pool: sqlx::PgPool
 async fn test_work_items_includes_targets_with_stale_captures(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    seed_world(&pool, "w1", "test-world", "Test World").await;
-    // Old world version
-    seed_world_version(&pool, "wv-old", "w1").await;
-    seed_scene(&pool, "sc1", "scene-a", "Scene A", "w1", true).await;
-    seed_scene_version(&pool, "sv1", "sc1").await;
+    seed_scene(&pool, "sc1", "scene-a", "Scene A", true).await;
+    seed_scene_version(&pool, "sv-old", "sc1").await;
+    seed_scene_preset(&pool, "sp1", "sc1", "Default", "default", 6000).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
-    // Capture with old world version → stale
+    // Capture with old scene version → stale
     seed_capture_full(
         &pool,
         "cap1",
         "shv1",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2025, 1, 1),
-        Some("wv-old"),
-        Some("sv1"),
+        Some("sv-old"),
     )
     .await;
 
-    // Add a new world version → old capture is now stale
-    seed_world_version(&pool, "wv-new", "w1").await;
+    // Add a new scene version → old capture is now stale
+    seed_scene_version(&pool, "sv-new", "sc1").await;
 
     let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
         .await
@@ -280,7 +270,7 @@ async fn test_work_items_includes_targets_with_stale_captures(pool: sqlx::PgPool
 async fn test_work_items_force_includes_fresh_captures(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -292,9 +282,9 @@ async fn test_work_items_force_includes_fresh_captures(pool: sqlx::PgPool) {
         "shv1",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2025, 1, 1),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;
@@ -324,7 +314,7 @@ async fn test_work_items_force_includes_fresh_captures(pool: sqlx::PgPool) {
 async fn test_work_items_null_profile_fresh_capture_excludes_correctly(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -337,9 +327,9 @@ async fn test_work_items_null_profile_fresh_capture_excludes_correctly(pool: sql
         "shv1",
         "sc1",
         None, // NULL profile_id
+        Some("sp1"),
         "completed",
         ts(2025, 1, 1),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;
@@ -360,7 +350,7 @@ async fn test_work_items_null_profile_fresh_capture_excludes_correctly(pool: sql
 async fn test_work_items_excludes_versions_at_failure_cap(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version_with_failures(&pool, "shv1", "sh1", "1.0.0", 3).await;
@@ -380,7 +370,7 @@ async fn test_work_items_excludes_versions_at_failure_cap(pool: sqlx::PgPool) {
 async fn test_work_items_includes_versions_below_failure_cap(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version_with_failures(&pool, "shv1", "sh1", "1.0.0", 2).await;
@@ -400,7 +390,7 @@ async fn test_work_items_includes_versions_below_failure_cap(pool: sqlx::PgPool)
 async fn test_work_items_force_includes_failed_versions(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version_with_failures(&pool, "shv1", "sh1", "1.0.0", 5).await;
@@ -430,7 +420,7 @@ async fn test_work_items_force_includes_failed_versions(pool: sqlx::PgPool) {
 async fn test_work_items_shaders_filter_single_slug(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -450,7 +440,7 @@ async fn test_work_items_shaders_filter_single_slug(pool: sqlx::PgPool) {
 async fn test_work_items_shaders_filter_comma_separated(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "slug-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -476,7 +466,7 @@ async fn test_work_items_shaders_filter_comma_separated(pool: sqlx::PgPool) {
 async fn test_work_items_scenes_filter_single_slug(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_world_with_two_scenes(&pool).await;
+    setup_two_scenes(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -496,7 +486,7 @@ async fn test_work_items_scenes_filter_single_slug(pool: sqlx::PgPool) {
 async fn test_work_items_both_filters_combined(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_world_with_two_scenes(&pool).await;
+    setup_two_scenes(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -523,7 +513,7 @@ async fn test_work_items_both_filters_combined(pool: sqlx::PgPool) {
 async fn test_work_items_uncaptured_versions_first(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     // Shader A: no captures
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
@@ -538,14 +528,14 @@ async fn test_work_items_uncaptured_versions_first(pool: sqlx::PgPool) {
         "shv2",
         "sc1",
         None,
+        Some("sp1"),
         "completed",
         ts(2025, 1, 1),
-        Some("wv1"), // matches current but we'll make it stale by adding new version
         Some("sv1"),
     )
     .await;
-    // Add a new world version so capture becomes stale
-    seed_world_version(&pool, "wv-new", "w1").await;
+    // Add a new scene version so capture becomes stale
+    seed_scene_version(&pool, "sv2", "sc1").await;
 
     let items = WorkRepo::get_work_items(
         &pool,
@@ -567,7 +557,7 @@ async fn test_work_items_uncaptured_versions_first(pool: sqlx::PgPool) {
 async fn test_work_items_higher_downloads_first(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader_with_downloads(&pool, "sh1", "shader-a", "Shader A", 1000).await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -602,12 +592,12 @@ async fn test_work_items_higher_downloads_first(pool: sqlx::PgPool) {
 async fn test_work_items_alphabetical_tiebreaker(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    seed_world(&pool, "w1", "test-world", "Test World").await;
-    seed_world_version(&pool, "wv1", "w1").await;
-    seed_scene(&pool, "sc1", "forest", "Forest", "w1", true).await;
+    seed_scene(&pool, "sc1", "forest", "Forest", true).await;
     seed_scene_version(&pool, "sv1", "sc1").await;
-    seed_scene(&pool, "sc2", "sunset", "Sunset", "w1", true).await;
+    seed_scene(&pool, "sc2", "sunset", "Sunset", true).await;
     seed_scene_version(&pool, "sv2", "sc2").await;
+    seed_scene_preset(&pool, "sp1", "sc1", "Default", "default", 6000).await;
+    seed_scene_preset(&pool, "sp2", "sc2", "Default", "default-b", 6000).await;
 
     // Same downloads so alphabetical tiebreaker applies
     seed_shader_with_downloads(&pool, "sh1", "beta-shader", "Beta", 100).await;
@@ -641,7 +631,7 @@ async fn test_work_items_alphabetical_tiebreaker(pool: sqlx::PgPool) {
 async fn test_work_items_shader_limit_truncates(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_world_with_two_scenes(&pool).await;
+    setup_two_scenes(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -649,7 +639,7 @@ async fn test_work_items_shader_limit_truncates(pool: sqlx::PgPool) {
     seed_shader_version(&pool, "shv2", "sh2", "1.0.0").await;
     // Total: (2 custom + vanilla) × 2 scenes = 6
 
-    // shader_limit=1 selects only the top shader per world → 1 shader × 2 scenes = 2
+    // shader_limit=1 selects only the top shader → 1 shader × 2 scenes = 2
     let items = WorkRepo::get_work_items(&pool, 1, false, None, None)
         .await
         .expect("get_work_items");
@@ -675,7 +665,7 @@ async fn test_work_items_shader_limit_truncates(pool: sqlx::PgPool) {
 async fn test_work_items_limit_zero_returns_empty(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -691,7 +681,7 @@ async fn test_work_items_limit_zero_returns_empty(pool: sqlx::PgPool) {
 async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -722,7 +712,7 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
 async fn test_fresh_capture_for_one_profile_does_not_exclude_other(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");
 
-    setup_basic_world_and_scene(&pool).await;
+    setup_basic_scene(&pool).await;
 
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
@@ -736,9 +726,9 @@ async fn test_fresh_capture_for_one_profile_does_not_exclude_other(pool: sqlx::P
         "shv1",
         "sc1",
         Some("p-a"),
+        Some("sp1"),
         "completed",
         ts(2025, 1, 1),
-        Some("wv1"),
         Some("sv1"),
     )
     .await;

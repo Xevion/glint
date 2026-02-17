@@ -19,7 +19,6 @@ fn export_all_schemas() {
     let dir = schema_dir();
     fs::create_dir_all(&dir).unwrap();
 
-    write_schema::<WorldInfo>("WorldInfo");
     write_schema::<PrepareUploadRequest>("PrepareUploadRequest");
     write_schema::<PrepareUploadResponse>("PrepareUploadResponse");
     write_schema::<CaptureRecord>("CaptureRecord");
