@@ -9,7 +9,9 @@ import type {
 	Shader,
 	ShaderListItem,
 	ShaderWithCaptures,
+	StorageAuditResult,
 	StorageBucket,
+	StorageCleanupResult,
 	StorageStats,
 	UpdateSceneMetadataRequest,
 	UpdateShaderRequest,
@@ -169,5 +171,13 @@ export class AdminEndpoints extends ApiClient {
 		searchParams.set('days', String(days));
 		searchParams.set('interval_hours', String(intervalHours));
 		return this.get<StorageBucket[]>(`/api/admin/storage/growth?${searchParams.toString()}`);
+	}
+
+	storageAudit(): Promise<Result<StorageAuditResult, ApiError>> {
+		return this.post<StorageAuditResult>('/api/admin/storage/audit', {});
+	}
+
+	storageCleanup(keys: string[]): Promise<Result<StorageCleanupResult, ApiError>> {
+		return this.post<StorageCleanupResult>('/api/admin/storage/cleanup', { keys });
 	}
 }

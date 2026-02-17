@@ -8,6 +8,7 @@ import {
 	Camera,
 	Cloud,
 	Globe,
+	HardDrive,
 	Layers,
 	LayoutDashboard,
 	LogIn,
@@ -73,6 +74,7 @@ const adminItems = [
 	{ href: '/admin/scenes', label: 'Scenes', icon: Mountain },
 	{ href: '/admin/captures', label: 'Captures', icon: Camera },
 	{ href: '/admin/runs', label: 'Runs', icon: Activity },
+	{ href: '/admin/storage', label: 'Storage', icon: HardDrive },
 	{ href: '/admin/users', label: 'Users', icon: Users },
 	{ href: '/admin/settings', label: 'Settings', icon: Settings }
 ];

@@ -46,7 +46,10 @@ pub use shader::{
     ShaderSearchSort, ShaderVersion, ShaderVersionDetail, ShaderWithCaptures, ShaderWithVersions,
     TrendingShader, UpdateShaderRequest,
 };
-pub use storage::{StorageBucket, StorageStats};
+pub use storage::{
+    AuditObject, AuditReference, AuditSummary, CleanupKeyResult, CleanupKeyStatus,
+    StorageAuditResult, StorageBucket, StorageCleanupRequest, StorageCleanupResult, StorageStats,
+};
 pub use taxonomy::{Category, Feature, Tag};
 pub use user::{Role, Session, SessionInfo, UpdateUserRoleRequest, User, UserWithSessions};
 pub use work::WorkItem;

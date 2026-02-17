@@ -81,6 +81,10 @@ pub struct R2Config {
     /// R2 account ID (used to construct endpoint)
     pub account_id: Option<String>,
 
+    /// Override endpoint URL (e.g., http://localhost:9000 for MinIO).
+    /// When set, takes precedence over account_id-based endpoint construction.
+    pub endpoint: Option<String>,
+
     /// R2 bucket name
     pub bucket: Option<String>,
 
@@ -97,14 +101,17 @@ pub struct R2Config {
 impl R2Config {
     /// Returns true if R2 is fully configured
     pub fn is_configured(&self) -> bool {
-        self.account_id.is_some()
+        (self.account_id.is_some() || self.endpoint.is_some())
             && self.bucket.is_some()
             && self.access_key_id.is_some()
             && self.secret_access_key.is_some()
     }
 
-    /// R2 endpoint URL
+    /// R2 endpoint URL. Explicit endpoint takes precedence over account_id.
     pub fn endpoint(&self) -> Option<String> {
+        if let Some(ref ep) = self.endpoint {
+            return Some(ep.clone());
+        }
         self.account_id
             .as_ref()
             .map(|id| format!("https://{}.r2.cloudflarestorage.com", id))
