@@ -31,6 +31,22 @@ const nextCapture = $derived(
 	currentIndex < captures.length - 1 ? captures[currentIndex + 1] : null
 );
 
+// Gesture state machine — exactly one gesture active at a time
+type GestureState =
+	| { type: 'idle' }
+	| { type: 'pending'; startX: number; startY: number }
+	| { type: 'swiping'; startX: number }
+	| {
+			type: 'panning';
+			dragStart: { x: number; y: number };
+			panStart: { x: number; y: number };
+	  }
+	| { type: 'pinching'; lastDistance: number; startZoom: number };
+
+let gesture = $state<GestureState>({ type: 'idle' });
+let hasMoved = false;
+let suppressClick = false;
+
 // Swipe spring: drives translateX for all three panels
 const swipeSpring = new Spring(0, { stiffness: 0.3, damping: 0.8 });
 let containerWidth = $state(0);
@@ -60,21 +76,10 @@ let imageLoaded = $state(false);
 let imageErrored = $state(false);
 let imgEl = $state<HTMLImageElement | null>(null);
 
-// Gesture state machine — exactly one gesture active at a time
-type GestureState =
-	| { type: 'idle' }
-	| { type: 'pending'; startX: number; startY: number }
-	| { type: 'swiping'; startX: number }
-	| {
-			type: 'panning';
-			dragStart: { x: number; y: number };
-			panStart: { x: number; y: number };
-	  }
-	| { type: 'pinching'; lastDistance: number; startZoom: number };
-
-let gesture = $state<GestureState>({ type: 'idle' });
-let hasMoved = false;
-let suppressClick = false;
+// Progressive raw image: loaded on zoom for full fidelity
+let rawImageLoaded = $state(false);
+let rawImageRequested = $state(false);
+const rawImageUrl = $derived(currentCapture?.image_url ?? null);
 
 // Reset zoom and loaded state when navigating to a different image
 $effect(() => {
@@ -83,6 +88,15 @@ $effect(() => {
 	panOffset = { x: 0, y: 0 };
 	imageLoaded = false;
 	imageErrored = false;
+	rawImageLoaded = false;
+	rawImageRequested = false;
+});
+
+// Load raw (untransformed) image when user zooms in for full fidelity
+$effect(() => {
+	if (zoomLevel > 1 && !rawImageRequested && rawImageUrl) {
+		rawImageRequested = true;
+	}
 });
 
 // Handle images already cached by the browser
@@ -494,19 +508,31 @@ function handleTouchEnd(e: TouchEvent) {
 							aria-hidden="true"
 						/>
 					{/if}
+				<img
+					bind:this={imgEl}
+					src={fullImageUrl}
+					alt="Capture fullscreen view"
+					class="col-start-1 row-start-1 max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-300"
+					class:opacity-0={!imageLoaded || imageErrored}
+					loading="eager"
+					decoding="async"
+					draggable="false"
+					onload={() => (imageLoaded = true)}
+					onerror={() => (imageErrored = true)}
+				/>
+				{#if rawImageRequested && rawImageUrl}
 					<img
-						bind:this={imgEl}
-						src={fullImageUrl}
-						alt="Capture fullscreen view"
-						class="col-start-1 row-start-1 max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-300"
-						class:opacity-0={!imageLoaded || imageErrored}
+						src={rawImageUrl}
+						alt="Capture fullscreen view (full resolution)"
+						class="col-start-1 row-start-1 max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-200"
+						class:opacity-0={!rawImageLoaded}
 						loading="eager"
 						decoding="async"
 						draggable="false"
-						onload={() => (imageLoaded = true)}
-						onerror={() => (imageErrored = true)}
+						onload={() => (rawImageLoaded = true)}
 					/>
-					{#if imageErrored}
+				{/if}
+				{#if imageErrored}
 						<div
 							class="col-start-1 row-start-1 flex flex-col items-center justify-center text-white/70"
 						>

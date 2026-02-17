@@ -27,7 +27,7 @@ export const IMAGE_PRESETS = {
 		fit: 'cover',
 		format: 'auto'
 	},
-	full: { sizes: '100vw', quality: 100, format: 'auto' }
+	full: { sizes: '100vw', quality: 90, format: 'auto' }
 } as const satisfies Record<string, ImagePresetConfig>;
 
 export interface ImagePresetConfig {
@@ -89,7 +89,15 @@ function presetToTransformOptions(preset: ImagePreset): ImageTransformOptions {
 	const config: ImagePresetConfig = IMAGE_PRESETS[preset];
 	return {
 		width:
-			preset === 'thumbnail' ? 160 : preset === 'card' ? 640 : preset === 'hero' ? 1280 : undefined,
+			preset === 'thumbnail'
+				? 160
+				: preset === 'card'
+					? 640
+					: preset === 'hero'
+						? 1280
+						: preset === 'full'
+							? 1920
+							: undefined,
 		quality: config.quality,
 		fit: config.fit,
 		format: config.format
