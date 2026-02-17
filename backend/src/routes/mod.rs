@@ -71,7 +71,9 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         .nest("/auth", auth::router().layer(make_layer(&rl.auth, "auth")))
         .nest(
             "/device",
-            device::router().layer(make_layer(&rl.device, "device")),
+            device::router()
+                .layer(make_layer(&rl.device, "device"))
+                .merge(device::unmetered_router()),
         )
         .nest(
             "/runs",

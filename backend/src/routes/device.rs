@@ -18,6 +18,7 @@ use crate::{
     state::AppState,
 };
 
+/// Routes subject to device-tier rate limiting.
 pub fn router() -> Router<AppState> {
     Router::new()
         // Start device auth flow (no auth required - mod calls this)
@@ -28,6 +29,12 @@ pub fn router() -> Router<AppState> {
         .route("/confirm", post(confirm))
         // Get device code status for frontend (auth required)
         .route("/code/{user_code}", get(get_code_status))
+}
+
+/// Lightweight endpoints exempt from device-tier rate limiting.
+/// These still pass through the global rate limiter.
+pub fn unmetered_router() -> Router<AppState> {
+    Router::new()
         // Health check endpoint for mod (no auth required)
         .route("/status", get(status))
 }

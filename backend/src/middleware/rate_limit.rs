@@ -88,8 +88,8 @@ impl TierConfig {
 
     pub fn default_device() -> Self {
         Self {
-            requests_per_minute: NonZeroU32::new(15).unwrap(),
-            burst: NonZeroU32::new(5).unwrap(),
+            requests_per_minute: NonZeroU32::new(30).unwrap(),
+            burst: NonZeroU32::new(10).unwrap(),
         }
     }
 
