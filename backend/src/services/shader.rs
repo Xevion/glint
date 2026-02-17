@@ -18,8 +18,9 @@ impl ShaderService {
     /// Fetch shaders enriched with authors, categories, features, latest
     /// version, and a deterministic thumbnail with pagination support.
     ///
-    /// Only shaders that have at least one completed capture (thumbnail) are
-    /// included — the rest are hidden from the public listing.
+    /// When `include_all` is `false` (public listing), only shaders with at
+    /// least one completed capture (thumbnail) are included. When `true`
+    /// (admin listing), all shaders are returned.
     ///
     /// Pagination and thumbnail filtering are pushed to SQL so we only fetch
     /// the requested page of shaders, then enrich those in parallel.
@@ -31,8 +32,10 @@ impl ShaderService {
         page: &Page,
         search: Option<&str>,
         sort: Option<&str>,
+        include_all: bool,
     ) -> AppResult<(Vec<ShaderListItem>, i64)> {
-        let (shaders, total) = ShaderRepo::list_with_captures(db, page, search, sort).await?;
+        let (shaders, total) =
+            ShaderRepo::list_paginated(db, page, search, sort, !include_all).await?;
 
         if shaders.is_empty() {
             return Ok((vec![], total));

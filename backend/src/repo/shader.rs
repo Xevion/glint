@@ -22,18 +22,23 @@ impl ShaderRepo {
         Ok(shaders)
     }
 
-    /// Paginated list of shaders that have at least one completed capture
-    /// from an active scene (i.e. shaders with thumbnails).
+    /// Paginated list of shaders with optional filtering to only those that
+    /// have at least one completed capture from an active scene.
+    ///
+    /// When `require_captures` is `true`, only shaders with thumbnails are
+    /// returned (public listing). When `false`, all shaders are returned
+    /// (admin listing).
     ///
     /// Uses `COUNT(*) OVER()` to compute the total in a single query.
     /// Supports optional name search (ILIKE) and sort order.
     /// Returns `(shaders, total)`.
     #[instrument(skip(db, page), level = "debug")]
-    pub async fn list_with_captures(
+    pub async fn list_paginated(
         db: &DbPool,
         page: &Page,
         search: Option<&str>,
         sort: Option<&str>,
+        require_captures: bool,
     ) -> AppResult<(Vec<Shader>, i64)> {
         use sqlx::QueryBuilder;
 
@@ -46,9 +51,12 @@ impl ShaderRepo {
             )
         });
 
-        let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
-            "SELECT s.*, COUNT(*) OVER() AS total FROM shaders s
-             WHERE EXISTS (
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> =
+            QueryBuilder::new("SELECT s.*, COUNT(*) OVER() AS total FROM shaders s WHERE TRUE");
+
+        if require_captures {
+            qb.push(
+                " AND EXISTS (
                  SELECT 1 FROM captures c
                  JOIN shader_versions sv ON c.shader_version_id = sv.id
                  JOIN scenes sc ON c.scene_id = sc.id
@@ -57,7 +65,8 @@ impl ShaderRepo {
                    AND c.image_url IS NOT NULL
                    AND sc.active = TRUE
              )",
-        );
+            );
+        }
 
         if let Some(ref pattern) = search_pattern {
             qb.push(" AND s.name ILIKE ");

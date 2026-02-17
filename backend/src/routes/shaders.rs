@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use crate::{
-    auth::AdminUser,
+    auth::{AdminUser, MaybeAuthUser},
     error::{AppError, AppResult, OptionNotFoundExt},
     id::{self, ShaderVersionId, ShaderVersionProfileId},
     middleware::client_ip::ClientIp,
@@ -128,18 +128,40 @@ struct ShaderListQuery {
     /// Sort order: "popular" (default), "name", "updated"
     #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     sort: Option<String>,
+    /// When `true`, return all shaders regardless of capture status (admin only)
+    #[serde(default)]
+    #[debug(skip_if = std::ops::Not::not)]
+    all: bool,
 }
 
 /// GET /api/shaders - Paginated list of shaders with enrichment (public)
-#[instrument(skip(state))]
+///
+/// Pass `?all=true` (requires admin auth) to include shaders without captures.
+#[instrument(skip(state, auth))]
 async fn list_shaders(
     State(state): State<AppState>,
+    MaybeAuthUser(auth): MaybeAuthUser,
     Query(params): Query<ShaderListQuery>,
 ) -> AppResult<Json<Paginated<ShaderListItem>>> {
+    let include_all = params.all;
+    if include_all {
+        let is_admin = auth.as_ref().is_some_and(|u| u.user.role.is_admin());
+        if !is_admin {
+            return Err(AppError::Forbidden(
+                "The `all` parameter requires admin authentication".to_string(),
+            ));
+        }
+    }
+
     let p = params.page.normalize();
-    let (items, total) =
-        ShaderService::list_enriched(state.db(), &p, params.q.as_deref(), params.sort.as_deref())
-            .await?;
+    let (items, total) = ShaderService::list_enriched(
+        state.db(),
+        &p,
+        params.q.as_deref(),
+        params.sort.as_deref(),
+        include_all,
+    )
+    .await?;
     Ok(Json(Paginated::new(items, total, &p)))
 }
 

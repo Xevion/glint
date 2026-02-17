@@ -51,6 +51,7 @@ export class AdminEndpoints extends ApiClient {
 		pageSize?: number;
 	}): Promise<Result<Paginated<ShaderListItem>, ApiError>> {
 		const searchParams = new URLSearchParams();
+		searchParams.set('all', 'true');
 		if (params?.page != null) searchParams.set('page', String(params.page));
 		if (params?.pageSize != null) searchParams.set('page_size', String(params.pageSize));
 		const qs = searchParams.toString();
