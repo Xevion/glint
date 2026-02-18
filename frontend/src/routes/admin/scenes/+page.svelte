@@ -59,9 +59,9 @@ const filteredScenes = $derived(showInactive ? scenes : scenes.filter((s) => s.a
 				>
 					<!-- Preview thumbnail -->
 					<div class="hidden shrink-0 sm:block">
-						{#if scene.image_url ?? scene.thumbhash}
-							<CaptureImage
-								src={scene.image_url}
+					{#if scene.image_path ?? scene.thumbhash}
+						<CaptureImage
+							src={scene.image_path}
 								thumbhash={scene.thumbhash}
 								alt="{scene.name} preview"
 								preset="thumbnail"

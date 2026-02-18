@@ -59,9 +59,9 @@ let {
 				onclick={() => onclick?.(capture)}
 				class="group relative overflow-hidden rounded-xl transition-transform hover:scale-[1.02]"
 			>
-				<CaptureImage
-					src={capture.image_url}
-					thumbhash={capture.thumbhash}
+			<CaptureImage
+				src={capture.image_path}
+				thumbhash={capture.thumbhash}
 					preset="card"
 					alt={alt ? alt(capture) : 'Capture'}
 					class="h-full w-full object-cover"

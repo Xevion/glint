@@ -101,7 +101,7 @@ const timeLabel = $derived.by(() => {
 });
 
 // OG metadata
-const ogImage = $derived(sceneCaptures[0]?.image_url ?? null);
+const ogImage = $derived(sceneCaptures[0]?.image_path ?? null);
 const ogDescription = $derived.by(() => {
 	const parts = [`${scene.name} scene for Minecraft shader comparison`];
 	if (sceneCaptures.length > 0)
@@ -140,12 +140,12 @@ const ogDescription = $derived.by(() => {
 					<!-- Main Image -->
 					<div class="shadow-theme-lg relative aspect-video w-full overflow-hidden rounded-xl">
 						{#if selectedCapture}
-							<CaptureImage
-								src={selectedCapture.image_url}
-								thumbhash={selectedCapture.thumbhash}
-								preset="hero"
-								priority
-								alt="{scene.name} with {selectedCapture.shader_name}"
+						<CaptureImage
+							src={selectedCapture.image_path}
+							thumbhash={selectedCapture.thumbhash}
+							preset="hero"
+							priority
+							alt="{scene.name} with {selectedCapture.shader_name}"
 								class="h-full w-full object-cover"
 								containerClass="h-full w-full"
 							/>
@@ -200,11 +200,11 @@ const ogDescription = $derived.by(() => {
 										? 'border-primary'
 										: 'border-transparent'}"
 								>
-									<CaptureImage
-										src={capture.image_url}
-										thumbhash={capture.thumbhash}
-										preset="thumbnail"
-										alt="{capture.shader_name} thumbnail"
+								<CaptureImage
+									src={capture.image_path}
+									thumbhash={capture.thumbhash}
+									preset="thumbnail"
+									alt="{capture.shader_name} thumbnail"
 										class="h-full w-full object-cover"
 										containerClass="aspect-video"
 									/>

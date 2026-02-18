@@ -26,7 +26,7 @@ const hasFeaturedPairs = $derived(featuredPairs.length > 0);
 let overlayVisible = $state(true);
 
 // OG image: use first featured pair's right image (the shader-enhanced one)
-const ogImage = $derived(featuredPairs[0]?.right_image_url ?? null);
+const ogImage = $derived(featuredPairs[0]?.right_image_path ?? null);
 </script>
 
 {#snippet statsBar()}

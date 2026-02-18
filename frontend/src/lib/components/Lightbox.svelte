@@ -1,6 +1,6 @@
 <script lang="ts">
 import { Button } from '$lib/components/ui/button';
-import { cfImageUrl } from '$lib/utils/image';
+import { imageUrl, rawImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { ChevronLeft, ChevronRight, ImageOff, X } from '@lucide/svelte';
 import { fade } from 'svelte/transition';
@@ -8,7 +8,7 @@ import { Spring } from 'svelte/motion';
 
 interface CaptureItem {
 	id: string;
-	image_url?: string | null;
+	image_path?: string | null;
 	thumbhash?: string | null;
 	profile_name?: string | null;
 	shader_version?: string | null;
@@ -66,7 +66,7 @@ const currentCapture = $derived(captures[currentIndex]);
 const hasPrev = $derived(currentIndex > 0);
 const hasNext = $derived(currentIndex < captures.length - 1);
 
-const fullImageUrl = $derived(cfImageUrl(currentCapture?.image_url, 'full'));
+const fullImageUrl = $derived(imageUrl(currentCapture?.image_path, 'full'));
 const placeholderUrl = $derived(decodeThumbhash(currentCapture?.thumbhash));
 
 // Zoom and pan state
@@ -79,7 +79,7 @@ let imgEl = $state<HTMLImageElement | null>(null);
 // Progressive raw image: loaded on zoom for full fidelity
 let rawImageLoaded = $state(false);
 let rawImageRequested = $state(false);
-const rawImageUrl = $derived(currentCapture?.image_url ?? null);
+const rawUrl = $derived(rawImageUrl(currentCapture?.image_path) ?? null);
 
 // Reset zoom and loaded state when navigating to a different image
 $effect(() => {
@@ -94,7 +94,7 @@ $effect(() => {
 
 // Load raw (untransformed) image when user zooms in for full fidelity
 $effect(() => {
-	if (zoomLevel > 1 && !rawImageRequested && rawImageUrl) {
+	if (zoomLevel > 1 && !rawImageRequested && rawUrl) {
 		rawImageRequested = true;
 	}
 });
@@ -113,10 +113,10 @@ $effect(() => {
 		(i) => i >= 0 && i < captures.length
 	);
 	for (const i of preloadIndices) {
-		const url = captures[i]?.image_url;
-		if (url) {
+		const path = captures[i]?.image_path;
+		if (path) {
 			const img = new Image();
-			img.src = cfImageUrl(url, 'full') ?? '';
+			img.src = imageUrl(path, 'full') ?? '';
 		}
 	}
 });
@@ -425,7 +425,7 @@ function handleTouchEnd(e: TouchEvent) {
 	{/if}
 
 	<!-- Main image viewport -->
-	{#if currentCapture?.image_url}
+	{#if currentCapture?.image_path}
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<div
 			class="relative h-[90vh] w-[90vw] select-none overflow-hidden"
@@ -458,8 +458,8 @@ function handleTouchEnd(e: TouchEvent) {
 			bind:clientWidth={containerWidth}
 		>
 			<!-- Previous image panel -->
-			{#if prevCapture?.image_url && containerWidth > 0}
-				{@const prevUrl = cfImageUrl(prevCapture.image_url, 'full')}
+		{#if prevCapture?.image_path && containerWidth > 0}
+			{@const prevUrl = imageUrl(prevCapture.image_path, 'full')}
 				{@const prevThumb = decodeThumbhash(prevCapture.thumbhash)}
 				<div
 					class="absolute inset-0 flex items-center justify-center"
@@ -520,9 +520,9 @@ function handleTouchEnd(e: TouchEvent) {
 					onload={() => (imageLoaded = true)}
 					onerror={() => (imageErrored = true)}
 				/>
-				{#if rawImageRequested && rawImageUrl}
-					<img
-						src={rawImageUrl}
+			{#if rawImageRequested && rawUrl}
+				<img
+					src={rawUrl}
 						alt="Capture fullscreen view (full resolution)"
 						class="col-start-1 row-start-1 max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-200"
 						class:opacity-0={!rawImageLoaded}
@@ -544,8 +544,8 @@ function handleTouchEnd(e: TouchEvent) {
 			</div>
 
 			<!-- Next image panel -->
-			{#if nextCapture?.image_url && containerWidth > 0}
-				{@const nextUrl = cfImageUrl(nextCapture.image_url, 'full')}
+		{#if nextCapture?.image_path && containerWidth > 0}
+			{@const nextUrl = imageUrl(nextCapture.image_path, 'full')}
 				{@const nextThumb = decodeThumbhash(nextCapture.thumbhash)}
 				<div
 					class="absolute inset-0 flex items-center justify-center"

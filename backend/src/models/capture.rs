@@ -398,6 +398,7 @@ pub struct CaptureListItem {
     pub status: CaptureStatus,
     pub profile_id: Option<ShaderVersionProfileId>,
     pub image_url: Option<String>,
+    pub image_path: Option<String>,
     pub thumbhash: Option<String>,
     #[ts(as = "Option<String>")]
     pub captured_at: Option<DateTime<Utc>>,

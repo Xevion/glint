@@ -1,13 +1,13 @@
 <script lang="ts">
 import type { Background } from '$lib/bindings';
-import { cfImageUrl } from '$lib/utils/image';
+import { imageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { onMount } from 'svelte';
 import type { Snippet } from 'svelte';
 
 type BackgroundItem = Pick<
 	Background,
-	'id' | 'image_url' | 'thumbhash' | 'theme_mode' | 'width' | 'height'
+	'id' | 'image_url' | 'image_path' | 'thumbhash' | 'theme_mode' | 'width' | 'height'
 >;
 
 interface Props {
@@ -74,7 +74,7 @@ const sectionsNeeded = $derived.by(() => {
 
 function getImageUrl(bg: BackgroundItem): string {
 	// Use Cloudflare Image Transforms to serve optimized version (480px wide, webp)
-	return cfImageUrl(bg.image_url, { width: 480, quality: 50, format: 'webp' }) ?? bg.image_url;
+	return imageUrl(bg.image_path, { width: 480, quality: 50, format: 'webp' }) ?? bg.image_url;
 }
 
 function getThumbhashBackground(bg: BackgroundItem): string | null {

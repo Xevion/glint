@@ -2,4 +2,4 @@
 import type { SceneId } from "./SceneId";
 import type { SceneVersion } from "./SceneVersion";
 
-export type SceneListAdmin = { version: SceneVersion, image_url?: string, thumbhash?: string, capture_count: number, id: SceneId, name: string, slug: string, description?: string, dimension: string, active: boolean, created_at: string, };
+export type SceneListAdmin = { version: SceneVersion, image_url?: string, image_path?: string, thumbhash?: string, capture_count: number, id: SceneId, name: string, slug: string, description?: string, dimension: string, active: boolean, created_at: string, };

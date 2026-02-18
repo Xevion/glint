@@ -2,7 +2,7 @@
 import { browser } from '$app/environment';
 import { resolve } from '$app/paths';
 import { formatVersion } from '$lib/utils/display';
-import { cfImageSrcset, cfImageUrl } from '$lib/utils/image';
+import { imageSrcset, imageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { ImageOff } from '@lucide/svelte';
 import { cubicInOut } from 'svelte/easing';
@@ -23,8 +23,8 @@ let loaded = $state(false);
 let errored = $state(false);
 
 const placeholder = $derived(browser ? decodeThumbhash(side.thumbhash) : null);
-const src = $derived(cfImageUrl(side.image, 'hero'));
-const srcset = $derived(cfImageSrcset(side.image, 'hero'));
+const src = $derived(imageUrl(side.image, 'hero'));
+const srcset = $derived(imageSrcset(side.image, 'hero'));
 
 // Reset loaded/errored state when the image URL changes
 $effect(() => {

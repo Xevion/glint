@@ -162,20 +162,20 @@ function formatMs(value?: number): string {
 				type="button"
 				class="group relative w-full cursor-pointer overflow-hidden rounded-lg border"
 				onclick={() => (lightboxOpen = true)}
-				onmouseenter={() => preloadImage(capture.image_url, 'full')}
+				onmouseenter={() => preloadImage(capture.image_path, 'full')}
 				disabled={!capture.image_url}
 			>
-				<CaptureImage
-					src={capture.image_url}
-					thumbhash={capture.thumbhash}
-					aspectRatio={capture.resolution_width && capture.resolution_height
-						? capture.resolution_width / capture.resolution_height
-						: 16 / 9}
-					preset="hero"
-					alt="Capture"
-					class="w-full transition-transform duration-300 group-hover:scale-[1.02]"
-					containerClass="w-full"
-				/>
+			<CaptureImage
+				src={capture.image_path}
+				thumbhash={capture.thumbhash}
+				aspectRatio={capture.resolution_width && capture.resolution_height
+					? capture.resolution_width / capture.resolution_height
+					: 16 / 9}
+				preset="hero"
+				alt="Capture"
+				class="w-full transition-transform duration-300 group-hover:scale-[1.02]"
+				containerClass="w-full"
+			/>
 			</button>
 		{:else}
 			<div

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { page } from '$app/state';
-import { cfImageUrl } from '$lib/utils/image';
+import { imageUrl } from '$lib/utils/image';
 
 interface Props {
 	/** Page title. Rendered as "{title} - Glint" unless `bare` is true. */
@@ -9,7 +9,7 @@ interface Props {
 	bare?: boolean;
 	/** Meta description for SEO and og:description. */
 	description?: string;
-	/** Raw image URL (from R2/CDN). Will be transformed to 1200x630 for OG. */
+	/** Image path (S3 key). Will be transformed to 1200x630 for OG. */
 	image?: string | null;
 	/**
 	 * Path to a composite OG image endpoint (e.g. "/og/shader/bsl/og.png").
@@ -36,9 +36,9 @@ const currentUrl = $derived(page.url.href);
 const ogImageUrl = $derived.by(() => {
 	// Composite OG image path takes precedence
 	if (ogImagePath) return `${page.url.origin}${ogImagePath}`;
-	// Fall back to Cloudflare-transformed raw image (only for absolute URLs)
-	if (image && URL.canParse(image)) {
-		return cfImageUrl(image, { width: 1200, height: 630, fit: 'cover', quality: 85, format: 'jpeg' });
+	// Fall back to transformed image from path
+	if (image) {
+		return imageUrl(image, { width: 1200, height: 630, fit: 'cover', quality: 85, format: 'jpeg' });
 	}
 	return null;
 });

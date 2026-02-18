@@ -1,7 +1,7 @@
 <script lang="ts">
 import { browser } from '$app/environment';
 import { cn } from '$lib/utils';
-import { IMAGE_PRESETS, type ImagePreset, cfImageSrcset, cfImageUrl } from '$lib/utils/image';
+import { IMAGE_PRESETS, type ImagePreset, imageSrcset, imageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { ImageOff } from '@lucide/svelte';
 
@@ -34,8 +34,8 @@ let {
 	...rest
 }: Props = $props();
 
-const srcset = $derived(cfImageSrcset(src, preset));
-const fallbackSrc = $derived(cfImageUrl(src, { width: 640, format: 'auto' }));
+const srcset = $derived(imageSrcset(src, preset));
+const fallbackSrc = $derived(imageUrl(src, { width: 640, format: 'auto' }));
 const resolvedSizes = $derived(sizes ?? IMAGE_PRESETS[preset].sizes);
 const placeholderUrl = $derived(browser ? decodeThumbhash(thumbhash) : null);
 const resolvedLoading = $derived(loading ?? (priority ? 'eager' : 'lazy'));

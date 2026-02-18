@@ -82,8 +82,8 @@ function handleCheckboxClick(e: MouseEvent) {
 	<!-- Thumbnail Image -->
 	<div class="relative">
 		<CaptureImage
-			src={shader.image_url}
-			thumbhash={shader.thumbhash}
+		src={shader.image_path}
+		thumbhash={shader.thumbhash}
 			preset="card"
 			alt="{shader.name} preview"
 			class="h-full w-full object-cover"

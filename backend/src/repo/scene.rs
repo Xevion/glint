@@ -42,6 +42,7 @@ struct SceneListAdminRow {
     version_created_at: Option<DateTime<Utc>>,
     // Enrichment
     image_url: Option<String>,
+    image_path: Option<String>,
     thumbhash: Option<String>,
     capture_count: Option<i64>,
 }
@@ -91,6 +92,7 @@ impl TryFrom<SceneListAdminRow> for SceneListAdmin {
             },
             version,
             image_url: row.image_url,
+            image_path: row.image_path,
             thumbhash: row.thumbhash,
             capture_count: row.capture_count.unwrap_or(0),
         })
@@ -291,6 +293,7 @@ impl SceneRepo {
                 SELECT
                     c.scene_id,
                     c.image_url,
+                    c.image_path,
                     c.thumbhash,
                     ROW_NUMBER() OVER (
                         PARTITION BY c.scene_id
@@ -332,6 +335,7 @@ impl SceneRepo {
                 lsv.render_distance AS version_render_distance,
                 lsv.created_at AS version_created_at,
                 cr.image_url,
+                cr.image_path,
                 cr.thumbhash,
                 cnt.capture_count
             FROM scenes sc

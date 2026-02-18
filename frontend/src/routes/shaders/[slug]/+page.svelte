@@ -13,7 +13,7 @@ import BrandIcon from '$lib/components/icons/BrandIcon.svelte';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import * as Select from '$lib/components/ui/select';
 import { formatNumber, formatVersion, getCurseforgeUrl, getModrinthUrl } from '$lib/utils/display';
-import { cfImageUrl } from '$lib/utils/image';
+import { imageUrl } from '$lib/utils/image';
 import { withRetry } from '$lib/utils/retry';
 import { themeStore } from '$lib/stores/theme.svelte';
 import {
@@ -248,7 +248,7 @@ function observeSentinel(node: HTMLElement) {
 
 // OG metadata
 const firstCapture = $derived(captures[0] ?? null);
-const ogImage = $derived(firstCapture?.image_url ?? null);
+const ogImage = $derived(firstCapture?.image_path ?? null);
 const ogDescription = $derived.by(() => {
 	const parts = [`${shader.name} shader for Minecraft`];
 	if (selectedVersion) parts.push(`v${selectedVersion.version}`);
@@ -500,19 +500,19 @@ const ogDescription = $derived.by(() => {
 								_selectedCaptureId = capture.id;
 								openLightbox(i);
 							}}
-						onmouseenter={() => {
-							const url = cfImageUrl(capture.image_url, 'full');
-							if (url) {
+					onmouseenter={() => {
+						const url = imageUrl(capture.image_path, 'full');
+						if (url) {
 								const img = new Image();
 								img.src = url;
 							}
 						}}
 						>
-							<CaptureImage
-								src={capture.image_url}
-								thumbhash={capture.thumbhash}
-								preset="card"
-								alt="{shader.name} — {capture.scene_name ?? 'capture'}"
+						<CaptureImage
+							src={capture.image_path}
+							thumbhash={capture.thumbhash}
+							preset="card"
+							alt="{shader.name} — {capture.scene_name ?? 'capture'}"
 								class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
 								containerClass="aspect-video"
 							/>
@@ -629,11 +629,11 @@ const ogDescription = $derived.by(() => {
 				<ItemGrid items={data.similarShaders.slice(0, 6)} key={(s: ShaderListItem) => s.id} mode="row" class="md:hidden">
 					{#snippet row(shader: ShaderListItem)}
 							<CompactRow
-								name={shader.name}
-								subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
-								image={shader.image_url}
-								thumbhash={shader.thumbhash}
-								href={resolve('/shaders/[slug]', { slug: shader.slug })}
+							name={shader.name}
+							subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
+							image={shader.image_path}
+							thumbhash={shader.thumbhash}
+							href={resolve('/shaders/[slug]', { slug: shader.slug })}
 							>
 								{#snippet metadata()}
 									{#if shader.categories && shader.categories.length > 0}
@@ -668,12 +668,12 @@ const ogDescription = $derived.by(() => {
 						<div class="flex gap-4 pb-3">
 							{#each data.similarShaders as shader (shader.id)}
 								<div class="w-44 shrink-0">
-								<MiniCard
-									name={shader.name}
-									subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
-									image={shader.image_url}
-									thumbhash={shader.thumbhash}
-									href={resolve('/shaders/[slug]', { slug: shader.slug })}
+							<MiniCard
+								name={shader.name}
+								subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
+								image={shader.image_path}
+								thumbhash={shader.thumbhash}
+								href={resolve('/shaders/[slug]', { slug: shader.slug })}
 								/>
 								</div>
 							{/each}

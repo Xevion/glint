@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT ON (sh.id, sc.id)\n                c.image_url AS \"image_url!\",\n                c.image_path AS \"image_path!\",\n                c.thumbhash,\n                sh.name AS \"shader_name!\",\n                sh.slug AS \"shader_slug!\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = sh.id LIMIT 1) AS shader_author,\n                sv.version AS \"shader_version!\",\n                sc.name AS \"scene_name!\",\n                sc.id AS \"scene_id!\"\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders sh ON sv.shader_id = sh.id\n            JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.status = 'completed'\n              AND c.image_url IS NOT NULL\n              AND sc.active = true\n            ORDER BY sh.id, sc.id, COALESCE(sh.upstream_downloads, 0) DESC, c.created_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "image_url!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "image_path!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "thumbhash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "shader_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "shader_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "shader_author",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "shader_version!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "scene_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "scene_id!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "dbe53fc5b5a77334c831bc8a2e1f1c86d280f68ab29da642a5caaeb3a8d953fe"
+}

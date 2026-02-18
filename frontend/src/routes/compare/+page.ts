@@ -7,7 +7,7 @@ type CompareScene = Pick<SceneListItem, 'slug' | 'name' | 'capture_count'>;
 type CompareCapture = Pick<
 	CaptureWithContext,
 	'thumbhash' | 'shader_name' | 'shader_version' | 'shader_author' | 'profile_name' | 'preset_name'
-> & { image_url: string };
+> & { image_path: string };
 
 interface ComparePageData {
 	scenes: CompareScene[];
@@ -44,7 +44,7 @@ export const load: PageLoad = async ({ fetch, url }): Promise<ComparePageData> =
 	return sceneResult.match({
 		Ok: (data) => {
 			const captures: CompareCapture[] = (data[0]?.captures ?? [])
-				.filter((c): c is typeof c & { image_url: string } => !!c.image_url)
+				.filter((c): c is typeof c & { image_path: string } => !!c.image_path)
 				.map((c) => ({
 					...pick(c, [
 						'thumbhash',
@@ -54,7 +54,7 @@ export const load: PageLoad = async ({ fetch, url }): Promise<ComparePageData> =
 						'profile_name',
 						'preset_name'
 					]),
-					image_url: c.image_url
+					image_path: c.image_path
 				}));
 			return {
 				scenes,

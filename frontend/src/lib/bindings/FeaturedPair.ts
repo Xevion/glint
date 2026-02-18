@@ -4,4 +4,4 @@
  * A before/after pair for the homepage hero slider.
  * Dynamically selected from popular shaders.
  */
-export type FeaturedPair = { left_image_url: string, left_thumbhash?: string, left_shader_name: string, left_shader_slug: string, left_shader_author?: string, left_shader_version: string, left_scene_name: string, right_image_url: string, right_thumbhash?: string, right_shader_name: string, right_shader_slug: string, right_shader_author?: string, right_shader_version: string, right_scene_name: string, };
+export type FeaturedPair = { left_image_url: string, left_image_path: string, left_thumbhash?: string, left_shader_name: string, left_shader_slug: string, left_shader_author?: string, left_shader_version: string, left_scene_name: string, right_image_url: string, right_image_path: string, right_thumbhash?: string, right_shader_name: string, right_shader_slug: string, right_shader_author?: string, right_shader_version: string, right_scene_name: string, };

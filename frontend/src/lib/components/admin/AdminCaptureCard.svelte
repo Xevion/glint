@@ -19,9 +19,9 @@ let { capture, alt = capture.shader_name, children }: Props = $props();
 	class="block rounded-lg border bg-card transition-colors hover:bg-muted/50"
 >
 	<div class="overflow-hidden rounded-t-lg">
-		{#if capture.image_url}
-			<CaptureImage
-				src={capture.image_url}
+	{#if capture.image_path}
+		<CaptureImage
+			src={capture.image_path}
 				thumbhash={capture.thumbhash}
 				preset="card"
 				{alt}

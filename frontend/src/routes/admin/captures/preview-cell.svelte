@@ -9,9 +9,9 @@ interface Props {
 let { capture }: Props = $props();
 </script>
 
-{#if capture.image_url ?? capture.thumbhash}
+{#if capture.image_path ?? capture.thumbhash}
 	<CaptureImage
-		src={capture.image_url}
+		src={capture.image_path}
 		thumbhash={capture.thumbhash}
 		preset="thumbnail"
 		alt="Capture preview"

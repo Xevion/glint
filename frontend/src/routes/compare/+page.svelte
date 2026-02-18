@@ -11,6 +11,7 @@ import {
 	type ShaderDisplayInfo
 } from '$lib/components/compare';
 import { Button } from '$lib/components/ui/button';
+import { imageUrl } from '$lib/utils/image';
 import { ArrowLeftRight, Columns3, SplitSquareHorizontal, ToggleLeft } from '@lucide/svelte';
 import { fade, fly } from 'svelte/transition';
 import type { PageData } from './$types';
@@ -26,7 +27,7 @@ const images: CompareImageOption[] = $derived(
 	data.captures.map((c) => {
 		const suffix = [c.shader_version, c.profile_name, c.preset_name].filter(Boolean).join(' · ');
 		return {
-			url: c.image_url,
+			url: c.image_path,
 			label: suffix ? `${c.shader_name} (${suffix})` : c.shader_name,
 			thumbhash: c.thumbhash,
 			shader: {
@@ -86,7 +87,7 @@ const ogTitle = $derived.by(() => {
 	}
 	return 'Compare Shaders';
 });
-const ogImage = $derived(data.captures[0]?.image_url ?? null);
+const ogImage = $derived(data.captures[0]?.image_path ?? null);
 const ogImagePath = $derived(
 	data.selectedSceneSlug ? `/og/compare/${data.selectedSceneSlug}/og.png` : null
 );
@@ -149,7 +150,7 @@ const ogDescription = $derived.by(() => {
 			<!-- Shader comparison -->
 			<div in:fade={{ duration: 300, delay: 100 }} class="mb-6 overflow-hidden rounded-xl border border-border bg-card">
 				<SectionBoundary title="Comparison failed">
-					<ShaderCompare {leftImage} {rightImage} {mode} {leftShader} {rightShader} />
+					<ShaderCompare leftImage={imageUrl(leftImage, 'full') ?? leftImage} rightImage={imageUrl(rightImage, 'full') ?? rightImage} {mode} {leftShader} {rightShader} />
 				</SectionBoundary>
 			</div>
 

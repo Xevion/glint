@@ -9,7 +9,7 @@ import { Alert } from '$lib/components/ui/alert';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
 import { formatBytes } from '$lib/utils/format';
-import { cfImageUrl } from '$lib/utils/image';
+import { imageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { Eye, EyeOff, ImagePlus, Trash2, Upload } from '@lucide/svelte';
 import { rgbaToThumbHash } from 'thumbhash';
@@ -199,7 +199,7 @@ async function confirmDelete() {
 // -- Helpers --
 
 function getThumbnailUrl(bg: Background): string | null {
-	return cfImageUrl(bg.image_url, { width: 320, quality: 70, format: 'webp' });
+	return imageUrl(bg.image_path, { width: 320, quality: 70, format: 'webp' });
 }
 
 function getThumbhashUrl(bg: Background): string | null {

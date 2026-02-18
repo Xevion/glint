@@ -87,6 +87,7 @@ pub struct ShaderListItem {
     pub features: Vec<Feature>,
     pub latest_version: Option<String>,
     pub image_url: Option<String>,
+    pub image_path: Option<String>,
     pub thumbhash: Option<String>,
     pub version_count: i64,
     pub extraction_summary: Option<ExtractionSummary>,
@@ -134,6 +135,7 @@ pub struct TrendingShader {
     pub shader: Shader,
     pub trending_views: i64,
     pub image_url: Option<String>,
+    pub image_path: Option<String>,
     pub thumbhash: Option<String>,
 }
 

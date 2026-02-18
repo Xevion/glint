@@ -1,6 +1,18 @@
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import adapter from '@xevion/svelte-adapter-bun';
 
+/** @typedef {import('@sveltejs/kit').KitConfig} KitConfig */
+/** @typedef {NonNullable<KitConfig['csp']>['directives']} CspDirectives */
+/** @typedef {NonNullable<CspDirectives>['img-src']} ImgSrc */
+
+// Local dev: extra CSP origins from env (imgproxy / MinIO)
+const extraImgSrc = /** @type {NonNullable<ImgSrc>} */ (
+	[process.env.PUBLIC_CDN_URL, process.env.PUBLIC_IMGPROXY_URL].filter(Boolean)
+);
+const extraConnectSrc = /** @type {NonNullable<ImgSrc>} */ (
+	[process.env.PUBLIC_CDN_URL].filter(Boolean)
+);
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	preprocess: vitePreprocess(),
@@ -34,7 +46,9 @@ const config = {
 					'https://cdn.discordapp.com',
 					// Shader pack icons from platform APIs
 					'https://cdn.modrinth.com',
-					'https://media.forgecdn.net'
+					'https://media.forgecdn.net',
+					// Local dev: MinIO CDN + imgproxy origins (from env)
+					...extraImgSrc
 				],
 				'connect-src': [
 					'self',
@@ -43,7 +57,9 @@ const config = {
 					// PostHog event ingestion and self-hosted instance
 					'https://us.posthog.com',
 					'https://us-assets.i.posthog.com',
-					'https://observe.xevion.dev'
+					'https://observe.xevion.dev',
+					// Local dev: MinIO for direct uploads (from env)
+					...extraConnectSrc
 				],
 				'font-src': ['self'],
 				'frame-ancestors': ['none'],

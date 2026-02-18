@@ -27,7 +27,7 @@ export const EMPTY_SIDE: SliderSide = {
 export function pairToSides(pair: FeaturedPair): { left: SliderSide; right: SliderSide } {
 	return {
 		left: {
-			image: pair.left_image_url,
+			image: pair.left_image_path,
 			thumbhash: pair.left_thumbhash ?? null,
 			label: pair.left_shader_name,
 			slug: pair.left_shader_slug,
@@ -35,7 +35,7 @@ export function pairToSides(pair: FeaturedPair): { left: SliderSide; right: Slid
 			version: pair.left_shader_version
 		},
 		right: {
-			image: pair.right_image_url,
+			image: pair.right_image_path,
 			thumbhash: pair.right_thumbhash ?? null,
 			label: pair.right_shader_name,
 			slug: pair.right_shader_slug,

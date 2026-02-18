@@ -34,7 +34,7 @@ const filteredScenes = $derived.by(() => {
 const hasFilters = $derived(searchQuery !== '');
 
 // OG image: first scene's representative capture
-const ogImage = $derived(scenes[0]?.image_url ?? null);
+const ogImage: string | null = $derived(scenes[0]?.image_path ?? null);
 </script>
 
 <Meta
@@ -126,11 +126,11 @@ const ogImage = $derived(scenes[0]?.image_url ?? null);
 			{/snippet}
 			{#snippet row(scene: PageData['scenes'][number])}
 				<CompactRow
-					name={scene.name}
-					subtitle={scene.dimension}
-					image={scene.image_url}
-					thumbhash={scene.thumbhash}
-					href={`/scenes/${scene.slug}`}
+				name={scene.name}
+				subtitle={scene.dimension}
+				image={scene.image_path}
+				thumbhash={scene.thumbhash}
+				href={`/scenes/${scene.slug}`}
 				>
 					{#snippet metadata()}
 						<div class="flex items-center gap-2">

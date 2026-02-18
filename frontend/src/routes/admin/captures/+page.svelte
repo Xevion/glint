@@ -119,9 +119,9 @@ function setFilter(key: string, value: string) {
 		>
 			{#snippet card(capture: CaptureWithContext)}
 				<div class="flex gap-3">
-					{#if capture.image_url ?? capture.thumbhash}
-						<CaptureImage
-							src={capture.image_url}
+				{#if capture.image_path ?? capture.thumbhash}
+					<CaptureImage
+						src={capture.image_path}
 							thumbhash={capture.thumbhash}
 							preset="thumbnail"
 							alt="Capture preview"

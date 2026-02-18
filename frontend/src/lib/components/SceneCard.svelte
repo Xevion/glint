@@ -16,7 +16,14 @@ import { ArrowRight, Sun } from '@lucide/svelte';
 
 type SceneCardItem = Pick<
 	SceneListItem,
-	'slug' | 'name' | 'description' | 'dimension' | 'image_url' | 'thumbhash' | 'capture_count'
+	| 'slug'
+	| 'name'
+	| 'description'
+	| 'dimension'
+	| 'image_url'
+	| 'image_path'
+	| 'thumbhash'
+	| 'capture_count'
 > & {
 	version: Pick<SceneVersion, 'time_of_day_ticks' | 'weather' | 'biome'>;
 };
@@ -58,8 +65,8 @@ function handleKeyDown(e: KeyboardEvent) {
 	<!-- Thumbnail Image -->
 	<div class="relative">
 		<CaptureImage
-			src={scene.image_url}
-			thumbhash={scene.thumbhash}
+		src={scene.image_path}
+		thumbhash={scene.thumbhash}
 			preset="card"
 			alt="{scene.name} scene preview"
 			class="h-full w-full object-cover transition-all duration-500 ease-out group-hover:scale-105"

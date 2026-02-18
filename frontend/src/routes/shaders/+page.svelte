@@ -75,7 +75,7 @@ const hasError = $derived(!!data.error);
 const hasFilters = $derived(data.q !== '');
 
 // OG image: use the most popular shader's capture image
-const ogImage = $derived(data.shaders[0]?.image_url ?? null);
+const ogImage = $derived(data.shaders[0]?.image_path ?? null);
 </script>
 
 <Meta
@@ -174,11 +174,11 @@ const ogImage = $derived(data.shaders[0]?.image_url ?? null);
 			{/snippet}
 			{#snippet row(shader: ShaderListItem)}
 				<CompactRow
-					name={shader.name}
-					subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
-					image={shader.image_url}
-					thumbhash={shader.thumbhash}
-					href={`/shaders/${shader.slug}`}
+				name={shader.name}
+				subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
+				image={shader.image_path}
+				thumbhash={shader.thumbhash}
+				href={`/shaders/${shader.slug}`}
 				>
 					{#snippet metadata()}
 						{#if shader.categories.length > 0}

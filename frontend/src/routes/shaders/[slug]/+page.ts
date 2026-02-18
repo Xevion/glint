@@ -15,7 +15,14 @@ import type { PageLoad } from './$types';
 export type ShaderDetailVersion = Pick<ShaderVersionDetail, 'id' | 'version' | 'capture_count'>;
 export type ShaderDetailCapture = Pick<
 	CaptureWithContext,
-	'id' | 'image_url' | 'thumbhash' | 'scene_name' | 'profile_name' | 'shader_version' | 'shader_name'
+	| 'id'
+	| 'image_url'
+	| 'image_path'
+	| 'thumbhash'
+	| 'scene_name'
+	| 'profile_name'
+	| 'shader_version'
+	| 'shader_name'
 >;
 export type ShaderDetailAuthor = Pick<ShaderAuthor, 'name' | 'url'>;
 export type ShaderDetail = Pick<
@@ -63,6 +70,7 @@ export function _trimCapture(c: CaptureWithContext): ShaderDetailCapture {
 	return pick(c, [
 		'id',
 		'image_url',
+		'image_path',
 		'thumbhash',
 		'scene_name',
 		'profile_name',

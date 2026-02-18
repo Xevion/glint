@@ -18,6 +18,7 @@ use crate::models::{
 
 pub struct ThumbnailInfo {
     pub image_url: String,
+    pub image_path: Option<String>,
     pub thumbhash: Option<String>,
 }
 
@@ -92,6 +93,7 @@ impl CaptureRepo {
             status: CaptureStatus,
             profile_id: Option<String>,
             image_url: Option<String>,
+            image_path: Option<String>,
             thumbhash: Option<String>,
             captured_at: Option<DateTime<Utc>>,
             resolution_width: Option<i32>,
@@ -109,6 +111,7 @@ impl CaptureRepo {
                 c.status AS "status!: CaptureStatus",
                 c.profile_id,
                 c.image_url,
+                c.image_path,
                 c.thumbhash,
                 c.captured_at,
                 c.resolution_width,
@@ -137,6 +140,7 @@ impl CaptureRepo {
                 status: r.status,
                 profile_id: r.profile_id.map(ShaderVersionProfileId),
                 image_url: r.image_url,
+                image_path: r.image_path,
                 thumbhash: r.thumbhash,
                 captured_at: r.captured_at,
                 resolution_width: r.resolution_width,
@@ -931,6 +935,7 @@ impl CaptureRepo {
         struct Row {
             shader_id: String,
             image_url: String,
+            image_path: Option<String>,
             thumbhash: Option<String>,
         }
         let rows = sqlx::query_as!(
@@ -939,6 +944,7 @@ impl CaptureRepo {
             SELECT DISTINCT ON (sv.shader_id)
                 sv.shader_id,
                 c.image_url as "image_url!",
+                c.image_path,
                 c.thumbhash
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
@@ -958,6 +964,7 @@ impl CaptureRepo {
                     r.shader_id,
                     ThumbnailInfo {
                         image_url: r.image_url,
+                        image_path: r.image_path,
                         thumbhash: r.thumbhash,
                     },
                 )
@@ -974,6 +981,7 @@ impl CaptureRepo {
         struct Row {
             shader_id: String,
             image_url: String,
+            image_path: Option<String>,
             thumbhash: Option<String>,
         }
         let rows = sqlx::query_as!(
@@ -982,7 +990,8 @@ impl CaptureRepo {
             SELECT DISTINCT ON (sv.shader_id)
                 sv.shader_id,
                 c.image_url as "image_url!",
-                c.thumbhash
+                c.thumbhash,
+                c.image_path
             FROM captures c
             JOIN shader_versions sv ON c.shader_version_id = sv.id
             JOIN scenes sc ON c.scene_id = sc.id
@@ -1003,6 +1012,7 @@ impl CaptureRepo {
                     r.shader_id,
                     ThumbnailInfo {
                         image_url: r.image_url,
+                        image_path: r.image_path,
                         thumbhash: r.thumbhash,
                     },
                 )
@@ -1018,6 +1028,7 @@ impl CaptureRepo {
         struct Row {
             scene_id: String,
             image_url: String,
+            image_path: Option<String>,
             thumbhash: Option<String>,
         }
         let rows = sqlx::query_as!(
@@ -1026,6 +1037,7 @@ impl CaptureRepo {
             SELECT DISTINCT ON (c.scene_id)
                 c.scene_id,
                 c.image_url as "image_url!",
+                c.image_path,
                 c.thumbhash
             FROM captures c
             JOIN scenes sc ON c.scene_id = sc.id
@@ -1044,6 +1056,7 @@ impl CaptureRepo {
                     r.scene_id,
                     ThumbnailInfo {
                         image_url: r.image_url,
+                        image_path: r.image_path,
                         thumbhash: r.thumbhash,
                     },
                 )
