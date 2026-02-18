@@ -93,6 +93,9 @@ class LinearOrchestrator {
     // Capture tracking for manifest
     private val captureEntries = mutableListOf<CaptureSessionData>()
 
+    // Shader filenames that failed to load — skip remaining items using the same pack
+    private val failedShaderPacks = mutableSetOf<String>()
+
     /**
      * Starts orchestration from pre-ordered [WorkItem]s with scene package paths.
      *
@@ -399,6 +402,16 @@ class LinearOrchestrator {
             return
         }
 
+        // Skip items whose shader pack already failed to load (avoids repeated
+        // reload attempts for every profile of a broken pack)
+        if (newSpec.filename != null && newSpec.filename in failedShaderPacks) {
+            log.warn("Shader pack previously failed, skipping") {
+                "shader" to newSpec.displayName
+            }
+            skipCurrentItem()
+            return
+        }
+
         if (sameVersion) {
             log.info("Switching profile") {
                 "shader" to newSpec.displayName
@@ -422,6 +435,9 @@ class LinearOrchestrator {
             if (result.isFailure) {
                 log.error("Failed to load shader, skipping item") {
                     "shader" to newSpec.displayName
+                }
+                if (newSpec.filename != null) {
+                    failedShaderPacks.add(newSpec.filename)
                 }
                 skipCurrentItem()
                 return
@@ -942,6 +958,7 @@ class LinearOrchestrator {
         sessionId = ""
         startedAt = null
         captureEntries.clear()
+        failedShaderPacks.clear()
         renderSettingsApplied = false
         originalShaderPack = null
         runId = null

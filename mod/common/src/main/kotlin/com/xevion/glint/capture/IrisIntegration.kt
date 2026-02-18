@@ -106,6 +106,12 @@ object IrisIntegration {
                 Iris.getShaderPackOptionQueue().clear()
                 Iris.reload()
 
+                // Iris swallows load errors internally and falls back to no shaders.
+                // Verify the pack actually loaded before applying a profile.
+                if (!Iris.getCurrentPack().isPresent) {
+                    error("Shader pack failed to load: $packName")
+                }
+
                 queueProfile(profile)
                 Iris.reload()
                 log.info("Shader pack changed with profile") {
@@ -117,6 +123,10 @@ object IrisIntegration {
                 setShaderPackConfig(packName)
                 Iris.getShaderPackOptionQueue().clear()
                 Iris.reload()
+
+                if (!Iris.getCurrentPack().isPresent) {
+                    error("Shader pack failed to load: $packName")
+                }
                 log.info("Shader pack changed") { "pack" to packName }
             }
         }.onFailure { e ->
