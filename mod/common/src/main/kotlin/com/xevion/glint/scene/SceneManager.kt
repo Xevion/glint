@@ -5,6 +5,7 @@ import com.xevion.glint.api.GlintJsonFile
 import com.xevion.glint.capture.Camera
 import com.xevion.glint.capture.Position
 import com.xevion.glint.io.AsyncFileIO
+import com.xevion.glint.withMinecraftContext
 import net.minecraft.client.Minecraft
 import java.io.File
 import java.util.concurrent.CompletableFuture
@@ -225,61 +226,47 @@ object SceneManager {
     /**
      * Saves the current player state as a scene JSON (for quick scene creation).
      */
-    fun saveCurrentStateAsScene(sceneId: String): String? {
-        val mc = Minecraft.getInstance()
+    fun saveCurrentStateAsScene(sceneId: String): String? =
+        withMinecraftContext {
+            val server = server
+            if (server == null) {
+                log.error("Scene capture is not available in multiplayer")
+                return@withMinecraftContext null
+            }
 
-        // Scene system only works in single-player
-        if (mc.singleplayerServer == null) {
-            log.error("Scene capture is not available in multiplayer")
-            return null
+            val position = Position(x = player.x, y = player.y, z = player.z)
+            val camera = Camera(yaw = player.yRot, pitch = player.xRot)
+            val dimension = level.dimension().location().toString()
+            val timeOfDay = (level.dayTime % 24000).toInt()
+
+            val worldName = server.worldData.levelName
+
+            val scene =
+                Scene(
+                    id = sceneId,
+                    name = sceneId.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                    description = "Scene captured from current state",
+                    dimension = dimension,
+                    position = position,
+                    camera = camera,
+                    timeOfDay = timeOfDay,
+                    weather =
+                        when {
+                            level.levelData.isThundering -> Weather.THUNDER
+                            level.levelData.isRaining -> Weather.RAIN
+                            else -> Weather.CLEAR
+                        },
+                    weatherIntensity = level.getRainLevel(1.0f),
+                )
+
+            val collection =
+                SceneCollection(
+                    world = worldName,
+                    scenes = listOf(scene),
+                )
+
+            GlintJsonFile.encodeToString(SceneCollection.serializer(), collection)
         }
-
-        val player = mc.player
-        if (player == null) {
-            log.error("Cannot save scene - player is null")
-            return null
-        }
-
-        val level = mc.level
-        if (level == null) {
-            log.error("Cannot save scene - level is null")
-            return null
-        }
-
-        val position = Position(x = player.x, y = player.y, z = player.z)
-        val camera = Camera(yaw = player.yRot, pitch = player.xRot)
-        val dimension = level.dimension().location().toString()
-        val timeOfDay = (level.dayTime % 24000).toInt()
-
-        // Get world name (guaranteed to be non-null since we checked singleplayerServer above)
-        val worldName = mc.singleplayerServer!!.worldData.levelName
-
-        val scene =
-            Scene(
-                id = sceneId,
-                name = sceneId.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                description = "Scene captured from current state",
-                dimension = dimension,
-                position = position,
-                camera = camera,
-                timeOfDay = timeOfDay,
-                weather =
-                    when {
-                        level.levelData.isThundering -> Weather.THUNDER
-                        level.levelData.isRaining -> Weather.RAIN
-                        else -> Weather.CLEAR
-                    },
-                weatherIntensity = level.getRainLevel(1.0f),
-            )
-
-        val collection =
-            SceneCollection(
-                world = worldName,
-                scenes = listOf(scene),
-            )
-
-        return GlintJsonFile.encodeToString(SceneCollection.serializer(), collection)
-    }
 
     /**
      * Adds a scene to a collection and persists to disk.

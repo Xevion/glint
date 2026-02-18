@@ -401,7 +401,9 @@ const promises = checks.map(async (check) => ({
 
 const interval = isStderrTTY
 	? setInterval(() => {
-			process.stderr.write(`\r\x1b[K${elapsed(start)}s [${Array.from(remaining).join(', ')}]`);
+			const cols = process.stderr.columns || 80;
+			const line = `${elapsed(start)}s [${Array.from(remaining).join(', ')}]`;
+			process.stderr.write(`\r\x1b[K${line.length > cols ? line.slice(0, cols - 1) + '…' : line}`);
 		}, 100)
 	: null;
 

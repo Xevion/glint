@@ -42,9 +42,7 @@ object SceneSyncManager {
                         reconcileIndex(apiScenes)
                     },
                     onFailure = { throwable ->
-                        val error =
-                            throwable as? ApiError
-                                ?: ApiError.UnknownError(throwable.message ?: "Unknown", throwable)
+                        val error = ApiError.from(throwable)
                         log.error("Failed to reconcile scenes") { "error" to error.message }
                         ReconcileResult.Failure(error)
                     },
@@ -176,9 +174,7 @@ object SceneSyncManager {
 
                 val initiated =
                     initiateResult.getOrElse { throwable ->
-                        val error =
-                            throwable as? ApiError
-                                ?: ApiError.UnknownError(throwable.message ?: "Unknown", throwable)
+                        val error = ApiError.from(throwable)
                         log.error("Failed to initiate upload") {
                             "slug" to slug
                             "error" to error.message
@@ -204,9 +200,7 @@ object SceneSyncManager {
                     }
 
                 uploadResult.getOrElse { throwable ->
-                    val error =
-                        throwable as? ApiError
-                            ?: ApiError.UnknownError(throwable.message ?: "Unknown", throwable)
+                    val error = ApiError.from(throwable)
                     log.error("Failed to upload package") {
                         "slug" to slug
                         "error" to error.message
@@ -246,9 +240,7 @@ object SceneSyncManager {
 
                 val completed =
                     completeResult.getOrElse { throwable ->
-                        val error =
-                            throwable as? ApiError
-                                ?: ApiError.UnknownError(throwable.message ?: "Unknown", throwable)
+                        val error = ApiError.from(throwable)
                         log.error("Failed to complete upload") {
                             "slug" to slug
                             "error" to error.message
@@ -302,9 +294,7 @@ object SceneSyncManager {
 
                 val details =
                     detailResult.getOrElse { throwable ->
-                        val error =
-                            throwable as? ApiError
-                                ?: ApiError.UnknownError(throwable.message ?: "Unknown", throwable)
+                        val error = ApiError.from(throwable)
                         log.error("Failed to fetch scene details") {
                             "slug" to slug
                             "error" to error.message
@@ -335,11 +325,9 @@ object SceneSyncManager {
                 val downloadResult = downloadFile(packageUrl, targetFile)
                 if (downloadResult.isFailure) {
                     val error =
-                        downloadResult.exceptionOrNull() as? ApiError
-                            ?: ApiError.UnknownError(
-                                downloadResult.exceptionOrNull()?.message ?: "Download failed",
-                                downloadResult.exceptionOrNull(),
-                            )
+                        ApiError.from(
+                            downloadResult.exceptionOrNull() ?: Exception("Download failed"),
+                        )
                     log.error("Failed to download package") {
                         "slug" to slug
                         "error" to error.message

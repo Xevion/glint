@@ -1,5 +1,5 @@
 # check=skip=SecretsUsedInArgOrEnv
-# ========== Stage 1: Cargo Chef Base ==========
+# Stage 1: Cargo Chef Base
 FROM rust:1.91-slim AS chef
 WORKDIR /build
 
@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && cargo install cargo-chef --locked
 
-# ========== Stage 2: Recipe Planner ==========
+# Stage 2: Recipe Planner
 FROM chef AS planner
 
 COPY backend/Cargo.toml backend/Cargo.lock ./
@@ -16,7 +16,7 @@ COPY backend/src/ ./src/
 
 RUN cargo chef prepare --recipe-path recipe.json
 
-# ========== Stage 3: Rust Builder ==========
+# Stage 3: Rust Builder
 FROM chef AS builder
 
 # Cook dependencies (cached until Cargo.toml/Cargo.lock change)
@@ -34,7 +34,7 @@ COPY backend/.sqlx/ ./.sqlx/
 ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
-# ========== Stage 4: Frontend Builder ==========
+# Stage 4: Frontend Builder
 FROM oven/bun:1 AS frontend
 WORKDIR /build
 
@@ -50,7 +50,7 @@ ARG POSTHOG_PROJECT_ID
 
 RUN bun --smol run build
 
-# ========== Stage 5: Runtime ==========
+# Stage 5: Runtime
 FROM oven/bun:1-slim
 WORKDIR /app
 

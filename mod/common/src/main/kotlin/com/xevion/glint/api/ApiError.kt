@@ -114,5 +114,10 @@ sealed class ApiError : Exception() {
                     UnknownError(e.message ?: "Unknown error", e)
                 }
             }
+
+        /** Unwrap a [Throwable] to [ApiError], wrapping unknown exceptions as [UnknownError]. */
+        fun from(throwable: Throwable): ApiError =
+            throwable as? ApiError
+                ?: UnknownError(throwable.message ?: "Unknown", throwable)
     }
 }

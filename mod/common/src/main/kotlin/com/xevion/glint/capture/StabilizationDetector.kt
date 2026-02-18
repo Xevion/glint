@@ -1,6 +1,7 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Loggers
+import com.xevion.glint.withMinecraftContext
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.chunk.EmptyLevelChunk
 import net.minecraft.world.level.chunk.status.ChunkStatus
@@ -38,20 +39,18 @@ class StabilizationDetector {
      *
      * @return true if stable (all phases complete), false if still waiting
      */
-    fun isStable(): Boolean {
-        val mc = Minecraft.getInstance()
-        if (mc.level == null || mc.player == null) return false
+    fun isStable(): Boolean =
+        withMinecraftContext {
+            totalTicks++
+            ticksInPhase++
 
-        totalTicks++
-        ticksInPhase++
-
-        return when (phase) {
-            Phase.ServerGeneration -> tickServerGeneration()
-            Phase.ChunkReceipt -> tickChunkReceipt(mc)
-            Phase.RenderIdle -> tickRenderIdle(mc)
-            Phase.Settling -> tickSettling(mc)
-        }
-    }
+            when (phase) {
+                Phase.ServerGeneration -> tickServerGeneration()
+                Phase.ChunkReceipt -> tickChunkReceipt(mc)
+                Phase.RenderIdle -> tickRenderIdle(mc)
+                Phase.Settling -> tickSettling(mc)
+            }
+        } ?: false
 
     // -- Phase handlers --
 
@@ -195,32 +194,31 @@ class StabilizationDetector {
     }
 
     /** Returns (loaded, total) chunk counts within render distance. */
-    private fun countClientChunks(mc: Minecraft): Pair<Int, Int> {
-        val player = mc.player ?: return Pair(0, 0)
-        val level = mc.level ?: return Pair(0, 0)
-        val chunkSource = level.chunkSource
+    private fun countClientChunks(mc: Minecraft): Pair<Int, Int> =
+        withMinecraftContext {
+            val chunkSource = level.chunkSource
 
-        val chunkX = player.blockPosition().x shr 4
-        val chunkZ = player.blockPosition().z shr 4
-        val renderDistance = mc.options.effectiveRenderDistance
-        val radiusSquared = renderDistance * renderDistance
+            val chunkX = player.blockPosition().x shr 4
+            val chunkZ = player.blockPosition().z shr 4
+            val renderDistance = mc.options.effectiveRenderDistance
+            val radiusSquared = renderDistance * renderDistance
 
-        var total = 0
-        var loaded = 0
+            var total = 0
+            var loaded = 0
 
-        for (dx in -renderDistance..renderDistance) {
-            for (dz in -renderDistance..renderDistance) {
-                if (dx * dx + dz * dz > radiusSquared) continue
-                total++
-                val chunk = chunkSource.getChunk(chunkX + dx, chunkZ + dz, ChunkStatus.FULL, false)
-                if (chunk != null && chunk !is EmptyLevelChunk) {
-                    loaded++
+            for (dx in -renderDistance..renderDistance) {
+                for (dz in -renderDistance..renderDistance) {
+                    if (dx * dx + dz * dz > radiusSquared) continue
+                    total++
+                    val chunk = chunkSource.getChunk(chunkX + dx, chunkZ + dz, ChunkStatus.FULL, false)
+                    if (chunk != null && chunk !is EmptyLevelChunk) {
+                        loaded++
+                    }
                 }
             }
-        }
 
-        return Pair(loaded, total)
-    }
+            Pair(loaded, total)
+        } ?: Pair(0, 0)
 
     /**
      * Is Sodium's rendering pipeline idle?

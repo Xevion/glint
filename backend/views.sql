@@ -7,9 +7,7 @@
 -- To apply manually: just migrate-run (runs migrations then views)
 -- Views are also applied on every app startup via db::apply_views().
 
--- =============================================================================
 -- Layer 1: Latest version lookups
--- =============================================================================
 
 -- Latest scene version per scene (by created_at DESC, id DESC tiebreaker).
 -- Includes package and rendering fields from the scene-packages migration.
@@ -37,9 +35,7 @@ SELECT DISTINCT ON (shader_id)
 FROM shader_versions
 ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC;
 
--- =============================================================================
 -- Layer 2: Composed views
--- =============================================================================
 
 -- Every (shader_version, scene, preset, profile) tuple that should have a capture.
 -- Cross-joins scenes × presets × shader versions. Expands shader profiles via
@@ -110,9 +106,7 @@ FROM captures c
 LEFT JOIN latest_scene_versions lsv ON lsv.scene_id = c.scene_id
 LEFT JOIN scene_presets sp ON sp.id = c.preset_id;
 
--- =============================================================================
 -- Layer 3: Full projections
--- =============================================================================
 
 -- Full capture-with-context projection.
 -- Replaces the capture_ctx_query! macro entirely.

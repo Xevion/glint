@@ -75,11 +75,21 @@ class LinearOrchestrator {
     private var loadedScene: LoadedScene? = null
     private var injectionProcess: InjectionProcess? = null
 
+    /** Tracks cross-thread state for InjectionProcess ticking dispatched via server.execute {}. */
+    private sealed interface ServerDispatchState {
+        /** No server-thread work in flight. */
+        data object Idle : ServerDispatchState
+
+        /** A server.execute{} lambda is queued/running. */
+        data object Pending : ServerDispatchState
+
+        /** Server thread signaled that injection tick returned terminal. */
+        data object Terminal : ServerDispatchState
+    }
+
     // Server-thread dispatch for injection ticking: prevents queuing multiple
     // server.execute calls while one is still pending
-    @Volatile private var injectionTickPending = false
-
-    @Volatile private var injectionTickTerminal = false
+    @Volatile private var serverDispatch: ServerDispatchState = ServerDispatchState.Idle
 
     // Capture state
     private var pendingCapture: CompletableFuture<Path>? = null
@@ -327,22 +337,26 @@ class LinearOrchestrator {
         }
 
         // Check if a previously dispatched server-thread tick has completed
-        if (injectionTickTerminal) {
-            injectionTickTerminal = false
-            injectionTickPending = false
-            injectionProcess = null
-            if (process.isComplete) {
-                log.info("Scene injection complete")
-                applySceneViewSettings(currentWorkItem()!!)
-                transitionTo(State.ApplyingPreset)
-            } else {
-                finishWithError("Scene injection failed: ${process.error}")
+        when (serverDispatch) {
+            ServerDispatchState.Terminal -> {
+                serverDispatch = ServerDispatchState.Idle
+                injectionProcess = null
+                if (process.isComplete) {
+                    log.info("Scene injection complete")
+                    applySceneViewSettings(currentWorkItem()!!)
+                    transitionTo(State.ApplyingPreset)
+                } else {
+                    finishWithError("Scene injection failed: ${process.error}")
+                }
+                return
             }
-            return
-        }
 
-        // Don't queue another tick if one is already pending on the server thread
-        if (injectionTickPending) return
+            ServerDispatchState.Pending -> {
+                return
+            }
+
+            ServerDispatchState.Idle -> { /* fall through to dispatch */ }
+        }
 
         // InjectionProcess.tick() operates on ServerLevel (addRegionTicket, chunk loading,
         // entity spawning, player teleport) — must run on the server thread to avoid
@@ -352,13 +366,10 @@ class LinearOrchestrator {
             finishWithError("No integrated server available for injection tick")
             return
         }
-        injectionTickPending = true
+        serverDispatch = ServerDispatchState.Pending
         server.execute {
             val terminal = process.tick()
-            if (terminal) {
-                injectionTickTerminal = true
-            }
-            injectionTickPending = false
+            serverDispatch = if (terminal) ServerDispatchState.Terminal else ServerDispatchState.Idle
         }
     }
 
@@ -924,8 +935,7 @@ class LinearOrchestrator {
         }
         loadedScene = null
         injectionProcess = null
-        injectionTickPending = false
-        injectionTickTerminal = false
+        serverDispatch = ServerDispatchState.Idle
 
         // End 4K session if active
         if (highResSessionActive) {
