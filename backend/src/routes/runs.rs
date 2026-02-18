@@ -278,7 +278,7 @@ async fn claim_item(
         item.shader_version_id.as_ref(),
         item.scene_id.as_ref(),
         item.profile_id.as_ref().map(AsRef::as_ref),
-        None,
+        Some(&r2_key),
         Some(&image_url),
         Some(request.resolution_width),
         Some(request.resolution_height),

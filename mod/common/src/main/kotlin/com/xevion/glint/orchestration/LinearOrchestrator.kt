@@ -386,9 +386,11 @@ class LinearOrchestrator {
             }
 
         val newSpec = item.shader.toShaderSpec()
+        val sameVersion = item.shader.versionId == currentShaderVersionId && currentShaderSpec != null
+        val sameProfile = newSpec.profileId == currentShaderSpec?.profileId
 
-        // Only reload if shader actually changed
-        if (item.shader.versionId == currentShaderVersionId && currentShaderSpec != null) {
+        // Skip reload only when both shader version AND profile are unchanged
+        if (sameVersion && sameProfile) {
             log.debug("Shader unchanged, skipping reload") {
                 "shader" to newSpec.displayName
             }
@@ -397,8 +399,16 @@ class LinearOrchestrator {
             return
         }
 
-        log.info("Loading shader") {
-            "shader" to newSpec.displayName
+        if (sameVersion) {
+            log.info("Switching profile") {
+                "shader" to newSpec.displayName
+                "from" to (currentShaderSpec?.profile ?: "default")
+                "to" to (newSpec.profile ?: "default")
+            }
+        } else {
+            log.info("Loading shader") {
+                "shader" to newSpec.displayName
+            }
         }
 
         if (IrisIntegration.isAvailable) {
