@@ -126,7 +126,7 @@ SELECT
     s.name AS shader_name,
     sv.version AS shader_version,
     c.profile_id,
-    svp.name AS profile_name,
+    svp.display_name AS profile_name,
     c.preset_id,
     sp.name AS preset_name,
     sp.slug AS preset_slug,

@@ -73,6 +73,7 @@ pub struct ShaderVersionProfile {
     pub shader_version_id: ShaderVersionId,
     pub name: String,
     pub label: Option<String>,
+    pub display_name: String,
     pub description: Option<String>,
     #[ts(type = "Record<string, string>")]
     pub options: serde_json::Value,

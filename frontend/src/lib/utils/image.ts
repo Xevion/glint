@@ -101,10 +101,6 @@ export function rawImageUrl(path: string | null | undefined): string | null {
 	return `${cdnUrl}/${path}`;
 }
 
-// ---------------------------------------------------------------------------
-// Internals
-// ---------------------------------------------------------------------------
-
 function buildCloudflareUrl(path: string, opts: ImageTransformOptions): string | null {
 	const cdnUrl = env.PUBLIC_CDN_URL;
 	if (!cdnUrl) return null;

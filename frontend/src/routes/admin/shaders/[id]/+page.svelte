@@ -614,15 +614,8 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                         >
                                                             <span
                                                                 class="font-medium text-sm"
-                                                                >{profile.label ??
-                                                                    profile.name}</span
+                                                                >{profile.display_name}</span
                                                             >
-                                                            {#if profile.label && profile.label !== profile.name}
-                                                                <span
-                                                                    class="ml-1.5 font-mono text-xs text-muted-foreground"
-                                                                    >{profile.name}</span
-                                                                >
-                                                            {/if}
                                                         </div>
                                                         <Badge
                                                             variant="outline"
@@ -648,6 +641,16 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                                     {profile.description}
                                                                 </p>
                                                             {/if}
+                                                            <dl class="mb-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+                                                                <dt class="text-muted-foreground">Name</dt>
+                                                                <dd class="font-mono">{profile.name}</dd>
+                                                                {#if profile.label}
+                                                                    <dt class="text-muted-foreground">Label</dt>
+                                                                    <dd class="font-mono">{profile.label}</dd>
+                                                                {/if}
+                                                                <dt class="text-muted-foreground">Display Name</dt>
+                                                                <dd>{profile.display_name}</dd>
+                                                            </dl>
                                                             {#if optionEntries.length > 0}
                                                                 <div
                                                                     class="rounded border"

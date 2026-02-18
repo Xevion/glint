@@ -480,12 +480,12 @@ const ogDescription = $derived.by(() => {
 									: 'text-muted-foreground hover:text-foreground'}"
 							onclick={() => void onProfileChange(profile.id)}
 						>
-							{profile.label ?? profile.name}
-						</button>
-					{/each}
-				</div>
-			{/if}
-		</div>
+						{profile.display_name}
+					</button>
+				{/each}
+			</div>
+		{/if}
+	</div>
 
 		<!-- Screenshot Grid -->
 		<SectionBoundary title="Scene captures">
@@ -579,13 +579,7 @@ const ogDescription = $derived.by(() => {
 									<h3
 										class="mb-2 text-sm font-semibold text-card-foreground"
 									>
-										{profile.label ?? profile.name}
-										{#if profile.label && profile.label !== profile.name}
-											<span
-												class="ml-1 text-xs font-normal text-muted-foreground"
-												>({profile.name})</span
-											>
-										{/if}
+									{profile.display_name}
 									</h3>
 									{#if Object.keys(profile.options).length > 0}
 										<dl class="space-y-0.5 text-xs">

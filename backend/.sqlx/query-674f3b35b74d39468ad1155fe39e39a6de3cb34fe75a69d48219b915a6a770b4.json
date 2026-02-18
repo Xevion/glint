@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO shader_version_profiles (id, shader_version_id, name, label, display_name, options, sort_order)\n                    VALUES ($1, $2, $3, $4, $5, $6, $7)\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "674f3b35b74d39468ad1155fe39e39a6de3cb34fe75a69d48219b915a6a770b4"
+}

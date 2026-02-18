@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT id, shader_version_id, name, label, description, options, sort_order, created_at\n            FROM shader_version_profiles\n            WHERE shader_version_id = $1\n            ORDER BY sort_order\n            ",
+  "query": "\n            SELECT id, shader_version_id, name, label, display_name, description, options, sort_order, created_at\n            FROM shader_version_profiles\n            WHERE shader_version_id = $1\n            ORDER BY sort_order\n            ",
   "describe": {
     "columns": [
       {
@@ -25,21 +25,26 @@
       },
       {
         "ordinal": 4,
-        "name": "description",
+        "name": "display_name",
         "type_info": "Text"
       },
       {
         "ordinal": 5,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
         "name": "options",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "sort_order",
         "type_info": "Int4"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "created_at",
         "type_info": "Timestamptz"
       }
@@ -54,11 +59,12 @@
       false,
       false,
       true,
+      false,
       true,
       false,
       false,
       false
     ]
   },
-  "hash": "cdad484aa030d16a27ea3a49eb2d53f1e776f8b7ba42d614fc9af8bb4215cea7"
+  "hash": "9e067526a1d0b2c2a6e87ce5bb3cf75917149a31e3510c64f14707b88cf71431"
 }

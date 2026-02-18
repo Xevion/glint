@@ -2,6 +2,7 @@ pub mod archive;
 pub mod error;
 pub mod lang;
 pub mod limits;
+pub mod normalize;
 pub mod properties;
 pub mod shader_props;
 

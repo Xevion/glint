@@ -123,8 +123,8 @@ pub async fn seed_shader_version_with_published_at(
 
 pub async fn seed_profile(pool: &PgPool, id: &str, version_id: &str, name: &str, sort_order: i32) {
     sqlx::query(
-        "INSERT INTO shader_version_profiles (id, shader_version_id, name, options, sort_order) \
-         VALUES ($1, $2, $3, '{}'::jsonb, $4)",
+        "INSERT INTO shader_version_profiles (id, shader_version_id, name, display_name, options, sort_order) \
+         VALUES ($1, $2, $3, $3, '{}'::jsonb, $4)",
     )
     .bind(id)
     .bind(version_id)

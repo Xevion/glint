@@ -191,6 +191,11 @@ async fn main() -> anyhow::Result<()> {
         |ctx| services::extraction::run(ctx, pool, http)
     });
 
+    services.spawn("profile-backfill", {
+        let pool = pool.clone();
+        |ctx| services::profile_backfill::run(ctx, pool)
+    });
+
     services.spawn("session-cleanup", {
         let pool = pool.clone();
         |ctx| async move {

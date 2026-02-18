@@ -5,4 +5,4 @@ import type { ShaderVersionProfileId } from "./ShaderVersionProfileId";
 /**
  * A declared profile within a specific shader version
  */
-export type ShaderVersionProfile = { id: ShaderVersionProfileId, shader_version_id: ShaderVersionId, name: string, label?: string, description?: string, options: Record<string, string>, sort_order: number, created_at: string, };
+export type ShaderVersionProfile = { id: ShaderVersionProfileId, shader_version_id: ShaderVersionId, name: string, label?: string, display_name: string, description?: string, options: Record<string, string>, sort_order: number, created_at: string, };

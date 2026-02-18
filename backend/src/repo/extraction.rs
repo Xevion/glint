@@ -5,6 +5,7 @@ use tracing::{debug, instrument};
 
 use crate::error::AppResult;
 use crate::extraction::ShaderPackData;
+use crate::extraction::normalize::normalize_display_name;
 use crate::extraction::shader_props::{
     ParsedProfile, PipelineFeatures, ProfileOption, ScreenDefinition, ScreenEntry,
     ShaderPropertiesData,
@@ -55,17 +56,19 @@ impl ExtractionRepo {
                     .lang
                     .as_ref()
                     .and_then(|l| l.profile_labels.get(&profile.name).cloned());
+                let display_name = normalize_display_name(&profile.name, label.as_deref());
                 let options = serialize_profile_options(profile);
 
                 sqlx::query!(
                     r#"
-                    INSERT INTO shader_version_profiles (id, shader_version_id, name, label, options, sort_order)
-                    VALUES ($1, $2, $3, $4, $5, $6)
+                    INSERT INTO shader_version_profiles (id, shader_version_id, name, label, display_name, options, sort_order)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
                     "#,
                     id,
                     version_id,
                     profile.name,
                     label,
+                    display_name,
                     options,
                     profile.sort_order,
                 )
@@ -169,7 +172,7 @@ impl ExtractionRepo {
         let profiles = sqlx::query_as!(
             ShaderVersionProfile,
             r#"
-            SELECT id, shader_version_id, name, label, description, options, sort_order, created_at
+            SELECT id, shader_version_id, name, label, display_name, description, options, sort_order, created_at
             FROM shader_version_profiles
             WHERE shader_version_id = $1
             ORDER BY sort_order

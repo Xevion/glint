@@ -156,7 +156,7 @@ impl CaptureHealthRepo {
                 sc.name AS "scene_name!",
                 sc.slug AS "scene_slug!",
                 tm.profile_id,
-                svp.name AS "profile_name?",
+                svp.display_name AS "profile_name?",
                 sv.capture_failure_count AS "capture_failure_count!",
                 bc.captured_at AS last_capture_at,
                 CASE
