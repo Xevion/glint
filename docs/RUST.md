@@ -9,16 +9,17 @@ General principles in [STYLE.md](STYLE.md).
 Strict layering for data integrity:
 
 ```
-routes (HTTP handlers)
+routes (REST handlers) / graphql (GraphQL resolvers)
   → services (business logic, background tasks)
     → repos (database access)
       → DB (PostgreSQL via SQLx)
 ```
 
-- **Routes** handle HTTP concerns: extract params, call services/repos, return responses.
+- **Routes** handle REST HTTP concerns: extract params, call services/repos, return responses.
+- **GraphQL** resolvers follow the same layering — call repos/services, never touch the DB directly.
 - **Services** contain business logic that spans multiple repos or has side effects.
 - **Repos** are the only code that touches the database. All SQL lives here.
-- Routes may call repos directly for simple CRUD. A service layer is required when logic spans multiple repos or has side effects beyond a single query.
+- Routes/resolvers may call repos directly for simple CRUD. A service layer is required when logic spans multiple repos or has side effects beyond a single query.
 
 ### Module Organization
 
@@ -31,8 +32,9 @@ src/
 ├── config/        # Figment-based configuration
 ├── db/            # Pool initialization, migrations
 ├── error.rs       # AppError, AppResult
-├── extraction/    # Shader pack metadata extraction (properties, lang files, zip)
+├── extraction/    # Shader metadata extraction (properties, lang, zip) + display name normalization
 ├── fmt.rs         # Debug formatting helpers
+├── graphql/       # GraphQL API (async-graphql): queries, subscriptions, types, pagination
 ├── id.rs          # Newtype ID wrappers with macro-generated traits
 ├── lib.rs         # Library root
 ├── logging.rs     # Dual-format logging setup (pretty + JSON)
@@ -103,10 +105,10 @@ Optional services return `Option<&T>` — handlers check availability before use
 - Request types: derive `Deserialize`. Response types: derive `Serialize`. Shared types: both.
 
 ```rust
-// Query param structs are snake_case too — clients send ?world_id=..., not ?worldId=...
+// Query param structs are snake_case too — clients send ?scene_id=..., not ?sceneId=...
 #[derive(Deserialize)]
 struct SceneQuery {
-    world_id: Option<String>,
+    scene_id: Option<String>,
 }
 ```
 

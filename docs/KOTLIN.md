@@ -12,16 +12,18 @@ All game logic lives in `common/`. Platform modules (`fabric/`, `neoforge/`) con
 mod/
 ├── common/src/main/
 │   ├── kotlin/com/xevion/glint/   # All business logic
-│   │   ├── api/           # HTTP clients (GlintApi, AgentApi)
-│   │   ├── capture/       # Capture lifecycle, high-res capture, framebuffer/WebP writing
-│   │   ├── download/      # Shader pack downloading
+│   │   ├── Glint.kt, MinecraftContext.kt, Loggers.kt  # Entry point, typed world access, logging
+│   │   ├── api/           # HTTP clients (HttpClient, AgentClient, AuthClient), scene sync, API config
+│   │   ├── capture/       # Capture lifecycle, Iris/Sodium integration, framebuffer/WebP writing
+│   │   ├── command/       # In-game chat commands (GlintCommands)
 │   │   ├── input/         # Keybind handling
 │   │   ├── io/            # File I/O utilities
-│   │   ├── orchestration/ # Autonomous capture state machine (AutonomousRunner, Orchestrator)
-│   │   ├── scene/         # Scene management, models, configuration
-│   │   ├── session/       # Session lifecycle
+│   │   ├── orchestration/ # Autonomous capture (AutonomousRunner, LinearOrchestrator, AssetPreparer)
+│   │   ├── scene/         # Scene packages, injection, chunk provision, local storage, export
+│   │   ├── session/       # Session registry (SessionRegistry)
 │   │   ├── ui/            # Minecraft GUI screens
-│   │   └── upload/        # World file packaging and upload to backend
+│   │   │   └── base/      # Shared screen framework (GlintPanelScreen, GlintScreen, GlintTheme)
+│   │   └── upload/        # Upload progress models and error types
 │   └── java/.../mixin/    # Mixins (must be Java)
 ├── fabric/                 # ClientModInitializer + tick registration
 └── neoforge/               # @Mod annotation + event bus registration

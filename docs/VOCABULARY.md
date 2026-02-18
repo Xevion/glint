@@ -8,11 +8,11 @@ Canonical terms for Glint's domain. Use these names consistently in types, API e
 |-------------------|------------|
 | **Shader**        | A shader pack identity. Represents one shader across all its versions, profiles, and platforms. Not "pack", "shaderpack", or "mod". |
 | **ShaderVersion** | A specific release of a Shader. Has a version string, download URL, file hash, and optionally a list of supported Iris profiles. The `(shader_id, version)` pair is unique. |
-| **World**         | A Minecraft world identity. Contains one or more Scenes. Has a Minecraft version. Artifact data (file URL, hash, size) lives on WorldVersion. |
-| **WorldVersion**  | A specific revision of a World's save file. Holds the file URL, hash, and size. Captures record which WorldVersion they were taken against, enabling computed staleness detection when worlds are rebuilt. Follows the same `DISTINCT ON ... ORDER BY created_at DESC` pattern as ShaderVersion for resolving the latest version. |
-| **Scene**         | A specific camera position and environment configuration within a World. Defines location (x/y/z), rotation (yaw/pitch), time of day, weather, dimension, biome, and render settings. Scenes are the *where* of a capture. |
-| **Capture**       | A single screenshot produced by rendering a specific ShaderVariant in a specific Scene. Contains the image URL, resolution, performance metrics, and metadata about the Minecraft/Iris versions used. Records `world_version_id` to track which WorldVersion was active at capture time. Multiple Captures can exist for the same CaptureTarget. |
-| **CaptureRun**    | An auditable session of capture work. Created when the mod begins a batch of captures, tracks progress (total/completed/failed/skipped items), and completed when the batch finishes. |
+| **Scene**         | A named camera location and environment. Has a slug, dimension, and active flag. Configuration details (position, camera, time, weather, biome, render settings, scene package) live on SceneVersion. Scenes are the *where* of a capture. |
+| **SceneVersion**  | A specific revision of a Scene's configuration: position (x/y/z), camera (yaw/pitch), time of day, weather, biome, render settings (FOV, render distance), and optional scene package (world file zip stored in R2). Captures record which SceneVersion they were taken against for freshness tracking. Follows the same `DISTINCT ON ... ORDER BY created_at DESC` pattern as ShaderVersion. |
+| **ScenePreset**   | A named time/weather/moon-phase variation within a Scene (e.g., "Sunset", "Stormy Night"). Has a `sort_order` for UI ordering. Captures can target a specific preset, enabling multiple environment variations per scene without duplicating the scene definition. |
+| **Capture**       | A single screenshot produced by rendering a specific ShaderVariant in a specific Scene (with optional ScenePreset). Contains `image_path` (public URLs derived at runtime via CDN/imgproxy), resolution, performance metrics, and Minecraft/Iris version metadata. Records `scene_version_id` and optional `preset_id` for freshness tracking. Multiple Captures can exist for the same CaptureTarget. |
+| **CaptureRun**    | An auditable session of capture work. Created when the mod begins a batch of captures, tracks progress (total/completed/failed/skipped items), and completed when the batch finishes. Status can be `running`, `completed`, `partial`, `failed`, or `timed_out`. |
 
 ## Composite Concepts
 
@@ -20,8 +20,9 @@ These are logical groupings that don't (yet) have their own database tables but 
 
 | Term               | Composition | Definition |
 |--------------------|-------------|------------|
-| **ShaderVariant**  | Shader + ShaderVersion + Profile | A specific renderable configuration: a particular version of a shader pack with a particular Iris profile (or the default/none). This is the *what* being rendered. A null profile means either vanilla rendering or a shader without Iris profiles. |
-| **CaptureTarget**  | ShaderVariant + Scene | The unique combination identifying *what should be captured where*. The work queue, deduplication, and capture history all revolve around this concept. Concretely: `(shader_version_id, scene_id, profile)`. Staleness is computed by comparing a Capture's `world_version_id` against the latest WorldVersion for the Scene's World. |
+| **ShaderVariant**  | Shader + ShaderVersion + ShaderVersionProfile | A specific renderable configuration: a particular version of a shader pack with a particular Iris profile (or the default/none). This is the *what* being rendered. A null profile means either vanilla rendering or a shader without Iris profiles. |
+| **CaptureTarget**  | ShaderVariant + Scene + ScenePreset | The unique combination identifying *what should be captured where*. The work queue, deduplication, and capture history all revolve around this concept. Concretely: `(shader_version_id, scene_id, profile_id, preset_id)`. Freshness is computed by comparing a Capture's `scene_version_id` against the latest SceneVersion (see CaptureFreshness). |
+| **CaptureFreshness** | Enum: `fresh` / `stale` / `superseded` | Computed at query time. `fresh` = latest capture for a target using the current SceneVersion. `stale` = latest capture but against an outdated SceneVersion or preset. `superseded` = a newer capture exists for this target. Replaces the old WorldVersion-based staleness concept. |
 | **Latest Capture** | CaptureTarget → Capture | The most recent Capture for a given CaptureTarget, derived by `captured_at DESC`. This is what users see in the gallery and comparison views. Historical captures for the same target are retained but not displayed by default. Determined at query time, not a stored flag. |
 
 ## Taxonomy & Metadata
@@ -62,20 +63,18 @@ The mod has a layered capture architecture. From outermost to innermost:
 
 | Term                      | Layer | Definition |
 |---------------------------|-------|------------|
-| **AutonomousRunner**      | 1     | The top-level agent loop. Fetches work from the backend, creates a CaptureRun, delegates to the Orchestrator, uploads results, and repeats until no work remains. |
-| **Orchestrator**          | 2     | Manages multi-world, multi-scene capture within a single CaptureRun. Loads worlds, iterates scenes, and delegates each scene to a CaptureSession. Produces an OrchestrationManifest on completion. |
-| **CaptureSession**        | 3     | Handles capturing all shaders for a single Scene. Manages the state machine: apply scene environment, then for each shader: load → stabilize → screenshot. Restores original state on completion. |
+| **AutonomousRunner**      | 1     | The top-level agent loop. Fetches work from the backend, creates a CaptureRun, delegates to the LinearOrchestrator, uploads results, and repeats until no work remains. |
+| **LinearOrchestrator**    | 2     | Manages capture within a single CaptureRun. Processes work items linearly: loads scene packages, applies environment (with presets), then for each shader: load → stabilize → capture. Detects scene/preset/shader transitions to minimize expensive operations. Produces an OrchestrationManifest on completion. |
 | **Stabilization**         | —     | The process of waiting for the game to reach a visually stable state before capturing. Includes chunk loading, FPS settling, and render pipeline convergence. Affects capture quality and timing. |
-| **OrchestrationManifest** | —     | A JSON file written to the output directory after an Orchestrator run. Contains metadata: timing, scenes captured, screenshots produced, shader/Minecraft/Iris versions. |
+| **OrchestrationManifest** | —     | A JSON file written to the output directory after an orchestration run. Contains metadata: timing, scenes captured, screenshots produced, shader/Minecraft/Iris versions. |
 
 ### Work & Run Concepts
 
 | Term                | Definition |
 |---------------------|------------|
-| **WorkItem**        | A denormalized packet returned by `GET /api/work` containing everything the mod needs to capture a single CaptureTarget: shader download URL, scene definition JSON, world file URL, profile, etc. Eliminates additional API lookups. |
-| **CaptureRunItem**  | A single unit of work within a CaptureRun: one CaptureTarget to process. Tracks status, timing, error details, and links to the resulting Capture on success. |
-| **CaptureSpec**     | The input to the Orchestrator: which scenes to capture, which shaders, output directory, and whether to shut down on completion. Used for both interactive and autonomous captures. Mod-only concept. |
-| **ShaderSpec**      | A shader filename + optional Iris profile, used within CaptureSpec to specify what to render. Maps to the mod's local shader pack files. Mod-only concept. |
+| **WorkItem**        | A composed packet returned by `GET /api/work` containing everything the mod needs to capture a single CaptureTarget. Contains four sub-types: `WorkShader` (version, download URL, hash, profile info), `WorkScene` (position, camera, environment, render settings), optional `WorkPreset` (environment overrides), and optional `WorkPackage` (scene package URL/hash/size). Eliminates additional API lookups. |
+| **CaptureRunItem**  | A single unit of work within a CaptureRun: one CaptureTarget to process. Tracks status (`pending` → `running` → `completed`/`failed`/`skipped`), timing, error details, and links to the resulting Capture on success. |
+| **ShaderSpec**      | A shader filename + Iris profile ID, used within the LinearOrchestrator to specify what to render. Built from `WorkShader.toShaderSpec()`. Maps to the mod's local shader pack files. Mod-only concept. |
 
 ## Authentication
 
@@ -89,7 +88,7 @@ The mod has a layered capture architecture. From outermost to innermost:
 
 | Term                | Definition |
 |---------------------|------------|
-| **SceneCollection** | A JSON file defining all scenes for a single World, stored at `.minecraft/glint/scenes/<world_name>.json`. Contains world metadata, a default SceneConfig, and a list of Scenes. |
+| **SceneCollection** | A mod-local JSON file defining scenes, stored at `.minecraft/glint/scenes/<name>.json`. Contains a default SceneConfig and a list of Scenes. This is a mod-side concept — the backend uses Scene + SceneVersion + ScenePreset instead. |
 | **SceneConfig**     | Render and capture settings: render distance, graphics mode, FOV, resolution, particles, clouds, etc. Supports inheritance — a scene's config merges with the collection's `defaultConfig` as fallback. |
 | **SceneVariant**    | An override layer on a Scene that modifies specific properties (time of day, weather, etc.) to create alternative versions of the same location. Used for day/night, seasonal, or weather variations. |
 | **SceneEntity**     | An entity definition within a SceneCollection for reproducible scene setup (placing specific mobs or items). |
@@ -98,30 +97,32 @@ The mod has a layered capture architecture. From outermost to innermost:
 
 | Context        | States | Notes |
 |----------------|--------|-------|
-| Capture        | `pending` → `uploading` → `completed`, or `pending` → `failed` | `uploading` is transient during file upload |
-| CaptureRun     | `running` → `completed`, or `running` → `failed` | Set when all items are processed |
-| CaptureRunItem | `pending` → `completed`, `pending` → `failed`, or `pending` → `skipped` | `skipped` = valid capture already existed |
+| Capture        | `uploading` → `completed`, or `uploading` → `failed` | `uploading` is transient during file upload |
+| CaptureRun     | `running` → `completed` / `partial` / `failed` / `timed_out` | `partial` = some items completed, some failed; `timed_out` = run exceeded time limit |
+| CaptureRunItem | `pending` → `running` → `completed` / `failed` / `skipped` | `skipped` = valid capture already existed |
 | DeviceCode     | `pending` → `authorized` → `used` | RFC 8628 lifecycle |
 
 ## Relationships
 
 ```
-World
-├── WorldVersion (one-to-many, ordered by created_at)
-└── Scene (one-to-many)
-    └── Tag (many-to-many)
+Scene
+├── SceneVersion (one-to-many, ordered by created_at)
+│   └── Scene Package (optional, stored in R2)
+├── ScenePreset (one-to-many, ordered by sort_order)
+└── Tag (many-to-many)
 
 Shader
 ├── ShaderVersion (one-to-many)
-│   └── Profile (discovered, stored as JSON array)
+│   └── ShaderVersionProfile (one-to-many, discovered during extraction)
 ├── ShaderAuthor (one-to-many)
 ├── Category (many-to-many)
 └── Feature (many-to-many)
 
-CaptureTarget = (ShaderVersion + Scene + Profile)
+CaptureTarget = (ShaderVersion + ShaderVersionProfile + Scene + ScenePreset)
 └── Capture (one-to-many, ordered by captured_at)
     ├── Latest Capture (derived: most recent per target)
-    └── WorldVersion (many-to-one, records which version was active)
+    ├── SceneVersion (many-to-one, records which version was active)
+    └── CaptureFreshness (derived: fresh / stale / superseded)
 
 CaptureRun
 └── CaptureRunItem (one-to-many)
@@ -138,4 +139,5 @@ Avoid these terms — they've been sources of confusion or have been superseded:
 | "screenshot", "image" | Capture | Domain-specific, includes metadata beyond the image |
 | "Job" | CaptureRun | `Job` was the legacy name, replaced in the capture redesign |
 | "config" (for shader settings) | Profile | "Config" is ambiguous — could mean SceneConfig, game settings, etc. |
-| "outdated capture" | stale capture | A capture whose `world_version_id` doesn't match the latest WorldVersion. Staleness is always computed at query time, never stored as a flag. |
+| "outdated capture" | stale capture | A capture whose `scene_version_id` doesn't match the latest SceneVersion, or whose preset is outdated. Freshness is computed at query time via the `CaptureFreshness` enum, never stored as a flag. |
+| "world", "world file" | scene package | Worlds were replaced by scene packages attached to SceneVersion. The mod injects scene packages into a staging world rather than loading separate world saves. |

@@ -201,7 +201,7 @@ Components with opaque backgrounds where `text-muted-foreground` is safe:
 - Generated bindings are the source of truth for API shapes — never duplicate them manually
 - Use `$types` imports for SvelteKit page data: `import type { PageData } from './$types'`
 
-## API Client
+## API Client (REST)
 
 Endpoint classes per resource, aggregated by the client factory:
 
@@ -214,6 +214,65 @@ const shader = await api.shaders.get(id);   // Result<Shader, ApiError>
 - All methods return `Result<T, ApiError>` — never throw
 - JSON requests/responses by default
 - SSR-compatible via `fetch` parameter injection
+- Used for admin CRUD, mutations, and mod-facing endpoints
+
+## GraphQL Client
+
+Public data fetching uses GraphQL via urql + gql-tada (`$lib/graphql/`):
+
+```typescript
+import { graphql } from '$lib/graphql/tada';
+import { createGraphQLClient } from '$lib/graphql/client';
+
+const ShadersQuery = graphql(`query Shaders { shaders { id name slug } }`);
+const client = createGraphQLClient(fetch);
+const result = await client.query(ShadersQuery, {});
+```
+
+- **gql-tada** provides compile-time type safety — query results are fully typed from the schema
+- **Schema auto-generated** from backend async-graphql types (`just bindings` or `just check`)
+- **Subscriptions** via graphql-ws for real-time updates (e.g., capture progress)
+- **Result pattern** — queries are wrapped in `Result<T, ApiError>` matching the REST client
+- **When to use**: Prefer GraphQL for public read-heavy pages (shader listings, scene browsing, comparisons). Use REST for admin CRUD, mutations, and mod API endpoints
+
+## Admin Data Tables
+
+Admin list pages use TanStack Table via `$lib/components/data-table/`:
+
+```typescript
+// columns.ts — define columns per resource
+import { textColumn, timeColumn, imageColumn } from '$lib/components/data-table/columns';
+
+export const columns = [
+    imageColumn<Shader>({ accessorKey: 'image_path', header: '' }),
+    textColumn<Shader>({ accessorKey: 'name', header: 'Name' }),
+    timeColumn<Shader>({ accessorKey: 'updated_at', header: 'Updated' }),
+];
+```
+
+- Column definitions in co-located `columns.ts` files alongside the page
+- Custom cell renderers as separate `.svelte` components (e.g., `shader-name-cell.svelte`)
+- `createTable()` composable in `.svelte.ts` for table state management
+- Pagination, sorting, and column visibility built in
+
+## Admin Form Composable
+
+Detail pages use `createAdminForm()` from `$lib/components/admin/admin-form.svelte.ts`:
+
+- Reactive field extraction from source entity via `FieldExtractor<T>` functions
+- Dirty tracking — only changed fields are sent on save
+- Automatic field reset when the source entity changes
+- Wraps save actions in `Result<T, ApiError>` with automatic `invalidateAll()` on success
+
+## Admin Navigation
+
+Admin pages use `AdminBreadcrumb` (not the deleted `AdminPageHeader`/`AdminDetailHeader`):
+
+```svelte
+<AdminBreadcrumb segments={[
+    { label: 'Shaders', href: '/admin/shaders' },
+    { label: shader.name },
+]} />
 
 ## Logging
 
