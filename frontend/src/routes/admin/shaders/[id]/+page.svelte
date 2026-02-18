@@ -9,6 +9,7 @@ import type {
 	ShaderWithCaptures,
 	UpdateShaderRequest
 } from '$lib/bindings';
+import { createDataTable, DataTable } from '$lib/components/data-table';
 import { ItemGrid } from '$lib/components/item-grid';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import {
@@ -27,18 +28,13 @@ import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
-import * as Table from '$lib/components/ui/table';
 import { Textarea } from '$lib/components/ui/textarea';
-import { formatGameVersions } from '$lib/utils/display';
-import { formatBytes } from '$lib/utils/format';
 import { freshnessColors } from '$lib/utils/status';
 import {
 	AlertTriangle,
-	Check,
 	ChevronDown,
 	CircleAlert,
 	Clock,
-	Download,
 	FlaskConical,
 	Link,
 	LoaderCircle,
@@ -49,6 +45,7 @@ import {
 	Trash2
 } from '@lucide/svelte';
 import type { PageData } from './$types';
+import { createVersionColumns } from './version-columns.js';
 
 const PLATFORM_URL_PATTERN =
 	/^https?:\/\/(www\.)?(modrinth\.com\/shader\/|curseforge\.com\/minecraft\/shaders\/)/i;
@@ -65,6 +62,18 @@ let metadata: ShaderVersionMetadata | undefined = $derived(data.shader.metadata)
 
 /** The effective (latest) version — matches what the backend returns profiles/metadata for */
 let effectiveVersion = $derived(versions.length > 0 ? versions[0] : null);
+
+let versionColumns = $derived(createVersionColumns(effectiveVersion?.id));
+const versionTable = createDataTable<ShaderVersionDetail>({
+	get data() {
+		return versions;
+	},
+	get columns() {
+		return versionColumns;
+	},
+	pageSize: false,
+	selection: false
+});
 
 /** Humanize a camelCase or snake_case key into words */
 function humanize(key: string): string {
@@ -547,168 +556,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                             No versions yet.
                         </p>
                     {:else}
-                        <Table.Root class="border">
-                            <Table.Header>
-                                <Table.Row class="bg-muted/50">
-                                    <Table.Head class="px-4 py-2"
-                                        >Version</Table.Head
-                                    >
-                                    <Table.Head class="px-4 py-2"
-                                        >Game Versions</Table.Head
-                                    >
-                                    <Table.Head class="px-4 py-2"
-                                        >Channel</Table.Head
-                                    >
-                                    <Table.Head class="px-4 py-2"
-                                        >Extraction</Table.Head
-                                    >
-                                    <Table.Head class="px-4 py-2"
-                                        >File</Table.Head
-                                    >
-                                    <Table.Head class="px-4 py-2"
-                                        >Created</Table.Head
-                                    >
-                                </Table.Row>
-                            </Table.Header>
-                            <Table.Body>
-                                {#each versions as version (version.id)}
-                                    {@const isEffective =
-                                        effectiveVersion?.id === version.id}
-                                    {@const isFailed =
-                                        version.extraction_status === "failed"}
-                                    <Table.Row
-                                        class="last:border-0 {isFailed
-                                            ? 'bg-destructive/5'
-                                            : ''} {isEffective
-                                            ? 'bg-primary/5'
-                                            : ''}"
-                                    >
-                                        <Table.Cell
-                                            class="px-4 py-2 font-medium"
-                                        >
-                                            {version.version}
-                                            {#if isEffective}
-                                                <Badge
-                                                    variant="outline"
-                                                    class="ml-1.5 text-[10px] px-1 py-0"
-                                                    >latest</Badge
-                                                >
-                                            {/if}
-                                        </Table.Cell>
-                                        <Table.Cell
-                                            class="px-4 py-2 text-xs text-muted-foreground"
-                                        >
-                                            {formatGameVersions(
-                                                version.game_versions,
-                                            )}
-                                        </Table.Cell>
-                                        <Table.Cell
-                                            class="px-4 py-2 text-xs capitalize"
-                                        >
-                                            {version.release_channel ?? "-"}
-                                        </Table.Cell>
-                                        <Table.Cell class="px-4 py-2">
-                                            <div class="flex flex-col gap-0.5">
-                                                {#if version.extraction_status === "completed"}
-                                                    <Badge
-                                                        variant="default"
-                                                        class="w-fit gap-1 bg-success hover:bg-success text-[11px] px-1.5 py-0"
-                                                    >
-                                                        <Check
-                                                            class="h-3 w-3"
-                                                        />Extracted
-                                                    </Badge>
-                                                {:else if version.extraction_status === "failed"}
-                                                    <Badge
-                                                        variant="destructive"
-                                                        class="w-fit gap-1 text-[11px] px-1.5 py-0"
-                                                    >
-                                                        <AlertTriangle
-                                                            class="h-3 w-3"
-                                                        />Failed
-                                                    </Badge>
-                                                {:else if version.extraction_status === "pending"}
-                                                    <Badge
-                                                        variant="secondary"
-                                                        class="w-fit gap-1 text-[11px] px-1.5 py-0"
-                                                    >
-                                                        <Clock
-                                                            class="h-3 w-3"
-                                                        />Pending
-                                                    </Badge>
-                                                {:else}
-                                                    <Badge
-                                                        variant="outline"
-                                                        class="w-fit gap-1 text-[11px] px-1.5 py-0"
-                                                    >
-                                                        <SkipForward
-                                                            class="h-3 w-3"
-                                                        />Skipped
-                                                    </Badge>
-                                                {/if}
-                                                {#if version.extracted_at}
-                                                    <span
-                                                        class="text-[10px] text-muted-foreground"
-                                                        ><TimeAgo
-                                                            timestamp={version.extracted_at}
-                                                        /></span
-                                                    >
-                                                {/if}
-                                                {#if version.extraction_error}
-                                                    <span
-                                                        class="max-w-[200px] truncate text-[10px] font-mono text-destructive"
-                                                        title={version.extraction_error}
-                                                        >{version.extraction_error}</span
-                                                    >
-                                                {/if}
-                                            </div>
-                                        </Table.Cell>
-                                        <Table.Cell class="px-4 py-2">
-                                            <div
-                                                class="flex flex-col gap-0.5 text-xs text-muted-foreground"
-                                            >
-                                                {#if version.file_size}
-                                                    <span
-                                                        >{formatBytes(
-                                                            version.file_size,
-                                                        )}</span
-                                                    >
-                                                {/if}
-                                                {#if version.file_hash}
-                                                    <span
-                                                        class="font-mono text-[10px]"
-                                                        title={version.file_hash}
-                                                        >{version.file_hash.slice(
-                                                            0,
-                                                            8,
-                                                        )}</span
-                                                    >
-                                                {/if}
-                                                {#if version.download_url}
-                                                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-                                                    <a
-                                                        href={version.download_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        class="inline-flex items-center gap-0.5 hover:text-foreground"
-                                                        title="Download"
-                                                    >
-                                                        <Download
-                                                            class="h-3 w-3"
-                                                        />
-                                                    </a>
-                                                {/if}
-                                            </div>
-                                        </Table.Cell>
-                                        <Table.Cell class="px-4 py-2">
-                                            <TimeAgo
-                                                timestamp={version.created_at}
-                                            />
-                                        </Table.Cell>
-                                    </Table.Row>
-                                {/each}
-                            </Table.Body>
-                        </Table.Root>
+                        <DataTable table={versionTable} />
                     {/if}
                 </div>
 
