@@ -70,7 +70,7 @@ function handleCheckboxClick(e: MouseEvent) {
 	onmouseenter={() => (isHovered = true)}
 	onmouseleave={() => (isHovered = false)}
 	class={cn(
-		'group relative flex flex-col overflow-hidden rounded-xl bg-card transition-all duration-300',
+		'group relative flex h-full flex-col overflow-hidden rounded-xl bg-card transition-all duration-300',
 		'border border-border shadow-theme-sm',
 		'focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
 		hasAnySelection
