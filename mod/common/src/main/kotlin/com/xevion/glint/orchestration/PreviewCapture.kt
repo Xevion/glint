@@ -2,6 +2,10 @@ package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.WorkItem
+import com.xevion.glint.api.WorkPackage
+import com.xevion.glint.api.WorkPreset
+import com.xevion.glint.api.WorkScene
+import com.xevion.glint.api.WorkShader
 import com.xevion.glint.scene.LocalSceneMetadata
 import com.xevion.glint.scene.LocalSceneStore
 import com.xevion.glint.session.SessionRegistry
@@ -53,41 +57,54 @@ object PreviewCapture {
 
         val item =
             WorkItem(
-                // Shader: vanilla
-                shaderVersionId = "vanilla",
-                shaderId = "vanilla",
-                shaderSlug = "vanilla",
-                shaderName = "Vanilla",
-                version = "0",
-                // Scene: from metadata
-                sceneId = slug,
-                sceneSlug = slug,
-                sceneName = metadata.name,
-                sceneDimension = metadata.dimension,
-                sceneX = metadata.camera.x,
-                sceneY = metadata.camera.y,
-                sceneZ = metadata.camera.z,
-                sceneYaw = metadata.camera.yaw.toDouble(),
-                scenePitch = metadata.camera.pitch.toDouble(),
-                sceneTimeOfDayTicks = preset?.timeOfDayTicks ?: metadata.environment.time,
-                sceneWeather = preset?.weather ?: metadata.environment.weather,
-                sceneWeatherIntensity = preset?.weatherIntensity ?: metadata.environment.weatherIntensity.toDouble(),
-                sceneMoonPhase = preset?.moonPhase ?: metadata.environment.moonPhase,
-                sceneFov = metadata.fov,
-                sceneRenderDistance = metadata.renderDistance,
-                sceneMinecraftVersion = metadata.minecraftVersion,
-                // Package
-                packageHash = metadata.packageHash,
-                // Preset (if specified)
-                presetId = preset?.backendPresetId,
-                presetName = preset?.name,
-                presetSlug = preset?.slug,
-                presetTimeOfDayTicks = preset?.timeOfDayTicks,
-                presetWeather = preset?.weather,
-                presetWeatherIntensity = preset?.weatherIntensity,
-                presetMoonPhase = preset?.moonPhase,
-                // Scene version
-                sceneVersionId = metadata.versions.firstOrNull()?.backendVersionId,
+                shader =
+                    WorkShader(
+                        versionId = "vanilla",
+                        id = "vanilla",
+                        slug = "vanilla",
+                        name = "Vanilla",
+                        version = "0",
+                    ),
+                scene =
+                    WorkScene(
+                        id = slug,
+                        slug = slug,
+                        name = metadata.name,
+                        dimension = metadata.dimension,
+                        x = metadata.camera.x,
+                        y = metadata.camera.y,
+                        z = metadata.camera.z,
+                        yaw = metadata.camera.yaw.toDouble(),
+                        pitch = metadata.camera.pitch.toDouble(),
+                        timeOfDayTicks = metadata.environment.time,
+                        weather = metadata.environment.weather,
+                        weatherIntensity = metadata.environment.weatherIntensity.toDouble(),
+                        moonPhase = metadata.environment.moonPhase,
+                        fov = metadata.fov,
+                        renderDistance = metadata.renderDistance,
+                        minecraftVersion = metadata.minecraftVersion,
+                        versionId = metadata.versions.firstOrNull()?.backendVersionId,
+                    ),
+                preset =
+                    preset?.let {
+                        WorkPreset(
+                            // Unsynced local presets use "local" as a sentinel ID.
+                            // Preview captures don't flow through RunUploader, so
+                            // this never reaches the backend API.
+                            id = it.backendPresetId ?: "local",
+                            name = it.name,
+                            slug = it.slug,
+                            timeOfDayTicks = it.timeOfDayTicks,
+                            weather = it.weather,
+                            weatherIntensity = it.weatherIntensity,
+                            moonPhase = it.moonPhase,
+                        )
+                    },
+                scenePackage =
+                    WorkPackage(
+                        url = "",
+                        hash = metadata.packageHash,
+                    ),
             )
 
         val scenePackages = mapOf(metadata.packageHash to packageFile)

@@ -9,6 +9,7 @@ import com.xevion.glint.api.FailItemRequest
 import com.xevion.glint.api.HttpClient
 import com.xevion.glint.api.ReportFailureRequest
 import com.xevion.glint.api.WorkItem
+import com.xevion.glint.api.captureKey
 import com.xevion.glint.api.retryOnRateLimit
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
@@ -142,7 +143,7 @@ class RunUploader(
     fun failAllItems(items: List<WorkItem>) {
         val unsubmittedEntries =
             items.mapNotNull { item ->
-                val key = CaptureItemKey(item.shaderVersionId, item.sceneId, item.profileId, item.presetId)
+                val key = item.captureKey()
                 val info = itemLookup[key] ?: return@mapNotNull null
                 if (info.itemId in submittedItemIds) return@mapNotNull null
                 item to info.itemId
@@ -161,7 +162,7 @@ class RunUploader(
                     }.onSuccess {
                         log.debug("Failed unsubmitted item") {
                             "item_id" to itemId
-                            "scene_id" to item.sceneId
+                            "scene_id" to item.scene.id
                         }
                     }.onFailure { e ->
                         log.error("Failed to report unsubmitted item failure") {

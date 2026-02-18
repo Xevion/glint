@@ -35,6 +35,7 @@ macro_rules! define_id {
         #[derive(
             Debug,
             Clone,
+            Default,
             PartialEq,
             Eq,
             Hash,

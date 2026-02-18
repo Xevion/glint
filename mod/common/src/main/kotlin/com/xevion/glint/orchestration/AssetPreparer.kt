@@ -53,13 +53,13 @@ class AssetPreparer(
         val readyItems =
             items.filter { item ->
                 val shaderReady =
-                    if (item.shaderSlug == "vanilla") {
+                    if (item.shader.slug == "vanilla") {
                         true
                     } else {
-                        shaderResults[item.shaderVersionId] != null
+                        shaderResults[item.shader.versionId] != null
                     }
                 val packageReady =
-                    item.packageHash == null || packageResults.containsKey(item.packageHash)
+                    item.scenePackage == null || packageResults.containsKey(item.scenePackage.hash)
                 shaderReady && packageReady
             }
 
@@ -86,17 +86,17 @@ class AssetPreparer(
 
         val uniqueShaders =
             items
-                .filter { it.shaderSlug != "vanilla" }
-                .distinctBy { it.shaderVersionId }
+                .filter { it.shader.slug != "vanilla" }
+                .distinctBy { it.shader.versionId }
 
         for (item in uniqueShaders) {
             val filename = downloadShader(item)
             if (filename != null) {
-                results[item.shaderVersionId] = filename
+                results[item.shader.versionId] = filename
             } else {
                 log.error("Failed to download shader") {
-                    "shader" to item.shaderName
-                    "version" to item.version
+                    "shader" to item.shader.name
+                    "version" to item.shader.version
                 }
             }
         }
@@ -109,26 +109,26 @@ class AssetPreparer(
         val shaderpacksDir = File(gameDirectory, "shaderpacks")
         shaderpacksDir.mkdirs()
 
-        val hash8 = item.fileHash?.take(8)
+        val hash8 = item.shader.fileHash?.take(8)
         val filename =
             if (hash8 != null) {
-                "${item.shaderSlug}-${item.version}-$hash8.zip"
+                "${item.shader.slug}-${item.shader.version}-$hash8.zip"
             } else {
-                "${item.shaderSlug}-${item.version}.zip"
+                "${item.shader.slug}-${item.shader.version}.zip"
             }
         val targetFile = File(shaderpacksDir, filename)
 
         // Check if file already exists
         if (targetFile.exists()) {
-            if (item.fileHash != null) {
+            if (item.shader.fileHash != null) {
                 val existingHash = sha1Hex(targetFile)
-                if (existingHash == item.fileHash) {
+                if (existingHash == item.shader.fileHash) {
                     log.debug("Shader already present and verified") { "file" to filename }
                     return filename
                 }
                 log.warn("Shader file exists but hash mismatch, re-downloading") {
                     "file" to filename
-                    "expected" to item.fileHash
+                    "expected" to item.shader.fileHash
                     "actual" to existingHash
                 }
                 targetFile.delete()
@@ -138,17 +138,17 @@ class AssetPreparer(
             }
         }
 
-        val downloadUrl = item.downloadUrl
+        val downloadUrl = item.shader.downloadUrl
         if (downloadUrl == null) {
-            log.error("No download URL for shader") { "name" to item.shaderName }
+            log.error("No download URL for shader") { "name" to item.shader.name }
             return null
         }
 
         log.info("Downloading shader") {
-            "name" to item.shaderName
+            "name" to item.shader.name
             "file" to filename
         }
-        return downloadFile(downloadUrl, targetFile, item.fileHash, "shader")?.let { filename }
+        return downloadFile(downloadUrl, targetFile, item.shader.fileHash, "shader")?.let { filename }
     }
 
     /**
@@ -163,19 +163,20 @@ class AssetPreparer(
 
         val uniquePackages =
             items
-                .filter { it.packageUrl != null && it.packageHash != null }
-                .distinctBy { it.packageHash }
+                .filter { it.scenePackage != null }
+                .distinctBy { it.scenePackage!!.hash }
 
         for (item in uniquePackages) {
-            val hash = item.packageHash!!
-            val url = item.packageUrl!!
+            val pkg = item.scenePackage!!
+            val hash = pkg.hash
+            val url = pkg.url
             val targetFile = File(packagesDir, "$hash.zip")
 
             // Cache hit: file exists with matching name (hash-based naming ensures correctness)
             if (targetFile.exists()) {
                 log.debug("Scene package cached") {
                     "hash" to hash
-                    "scene" to item.sceneName
+                    "scene" to item.scene.name
                     "bytes" to targetFile.length()
                 }
                 results[hash] = targetFile
@@ -183,9 +184,9 @@ class AssetPreparer(
             }
 
             log.info("Downloading scene package") {
-                "scene" to item.sceneName
+                "scene" to item.scene.name
                 "hash" to hash
-                "size" to (item.packageSizeBytes ?: -1)
+                "size" to (pkg.sizeBytes ?: -1)
             }
 
             val downloaded = downloadFile(url, targetFile, expectedHash = null, label = "scene package")
@@ -197,7 +198,7 @@ class AssetPreparer(
                 }
             } else {
                 log.error("Failed to download scene package") {
-                    "scene" to item.sceneName
+                    "scene" to item.scene.name
                     "hash" to hash
                 }
             }

@@ -3,6 +3,11 @@ package com.xevion.glint.orchestration
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.GlintJsonFile
 import com.xevion.glint.api.WorkItem
+import com.xevion.glint.api.effectiveMoonPhase
+import com.xevion.glint.api.effectiveTimeOfDayTicks
+import com.xevion.glint.api.effectiveWeather
+import com.xevion.glint.api.effectiveWeatherIntensity
+import com.xevion.glint.api.toShaderSpec
 import com.xevion.glint.capture.CaptureEntry
 import com.xevion.glint.capture.CaptureSessionData
 import com.xevion.glint.capture.CaptureStateManager
@@ -200,8 +205,8 @@ class LinearOrchestrator {
         // Validate all required scene packages are available
         val missingPackages =
             workItems
-                .filter { it.packageHash != null }
-                .map { it.packageHash!! }
+                .filter { it.scenePackage != null }
+                .map { it.scenePackage!!.hash }
                 .distinct()
                 .filter { it !in scenePackages }
         if (missingPackages.isNotEmpty()) {
@@ -209,9 +214,9 @@ class LinearOrchestrator {
             return
         }
 
-        val totalScenes = workItems.map { it.packageHash }.distinct().size
-        val totalPresets = workItems.map { it.packageHash to it.presetId }.distinct().size
-        val totalShaders = workItems.map { it.shaderVersionId }.distinct().size
+        val totalScenes = workItems.map { it.scenePackage?.hash }.distinct().size
+        val totalPresets = workItems.map { it.scenePackage?.hash to it.preset?.id }.distinct().size
+        val totalShaders = workItems.map { it.shader.versionId }.distinct().size
         log.info("Linear capture plan ready") {
             "items" to workItems.size
             "scenes" to totalScenes
@@ -263,9 +268,9 @@ class LinearOrchestrator {
                     return
                 }
 
-            val packageHash = item.packageHash
+            val packageHash = item.scenePackage?.hash
             if (packageHash == null) {
-                finishWithError("Work item missing package hash: ${item.sceneId}")
+                finishWithError("Work item missing package hash: ${item.scene.id}")
                 return
             }
 
@@ -288,7 +293,7 @@ class LinearOrchestrator {
             }
 
             log.info("Loading scene package") {
-                "scene" to item.sceneName
+                "scene" to item.scene.name
                 "hash" to packageHash
             }
 
@@ -305,11 +310,11 @@ class LinearOrchestrator {
             // Camera position from work item (backend-authoritative, may differ from package meta)
             val camera =
                 CameraPosition(
-                    x = item.sceneX,
-                    y = item.sceneY,
-                    z = item.sceneZ,
-                    yaw = item.sceneYaw.toFloat(),
-                    pitch = item.scenePitch.toFloat(),
+                    x = item.scene.x,
+                    y = item.scene.y,
+                    z = item.scene.z,
+                    yaw = item.scene.yaw.toFloat(),
+                    pitch = item.scene.pitch.toFloat(),
                 )
 
             // Inject with zero offset (staging world, no need to offset)
@@ -362,12 +367,12 @@ class LinearOrchestrator {
             }
 
         applyPresetEnvironment(item)
-        currentPresetId = item.presetId
+        currentPresetId = item.preset?.id
 
         log.info("Preset applied") {
-            "preset" to (item.presetName ?: item.presetId ?: "default")
-            "time" to effectiveTime(item)
-            "weather" to effectiveWeather(item)
+            "preset" to (item.preset?.name ?: item.preset?.id ?: "default")
+            "time" to item.effectiveTimeOfDayTicks
+            "weather" to item.effectiveWeather
         }
 
         transitionTo(State.LoadingShader)
@@ -380,10 +385,10 @@ class LinearOrchestrator {
                 return
             }
 
-        val newSpec = buildShaderSpecFromItem(item)
+        val newSpec = item.shader.toShaderSpec()
 
         // Only reload if shader actually changed
-        if (item.shaderVersionId == currentShaderVersionId && currentShaderSpec != null) {
+        if (item.shader.versionId == currentShaderVersionId && currentShaderSpec != null) {
             log.debug("Shader unchanged, skipping reload") {
                 "shader" to newSpec.displayName
             }
@@ -413,7 +418,7 @@ class LinearOrchestrator {
             }
         }
 
-        currentShaderVersionId = item.shaderVersionId
+        currentShaderVersionId = item.shader.versionId
         currentShaderSpec = newSpec
 
         ChunkForceLoader.forceLoadRenderDistance()
@@ -460,8 +465,8 @@ class LinearOrchestrator {
 
         log.info("Taking capture") {
             "shader" to shader.displayName
-            "scene" to item.sceneName
-            "preset" to (item.presetName ?: "default")
+            "scene" to item.scene.name
+            "preset" to (item.preset?.name ?: "default")
             "file" to captureFilename
         }
 
@@ -491,8 +496,8 @@ class LinearOrchestrator {
         val outputPath = screenshotsDir.toPath().resolve(captureFilename)
         val captureFile = File(screenshotsDir, captureFilename)
         val callback = onCaptureTaken
-        val sceneId = item.sceneId
-        val presetId = item.presetId
+        val sceneId = item.scene.id
+        val presetId = item.preset?.id
 
         val future =
             HighResCapture.startCapture(outputPath) ?: run {
@@ -589,13 +594,13 @@ class LinearOrchestrator {
         val item = workItems[currentItemIndex]
 
         // Scene changed → need full injection
-        if (item.packageHash != currentPackageHash) {
+        if (item.scenePackage?.hash != currentPackageHash) {
             transitionTo(State.InjectingScene)
             return
         }
 
         // Preset changed → apply environment only
-        if (item.presetId != currentPresetId) {
+        if (item.preset?.id != currentPresetId) {
             transitionTo(State.ApplyingPreset)
             return
         }
@@ -612,8 +617,8 @@ class LinearOrchestrator {
     private fun skipCurrentItem() {
         log.warn("Skipping item") {
             "index" to currentItemIndex
-            "scene" to currentWorkItem()?.sceneName
-            "shader" to currentWorkItem()?.shaderName
+            "scene" to currentWorkItem()?.scene?.name
+            "shader" to currentWorkItem()?.shader?.name
         }
         advanceToNextItem()
     }
@@ -630,12 +635,12 @@ class LinearOrchestrator {
         val overworld = server.overworld()
 
         // Time of day
-        val time = effectiveTime(item)
+        val time = item.effectiveTimeOfDayTicks
         overworld.dayTime = time.toLong()
 
         // Weather
-        val weather = effectiveWeather(item)
-        val intensity = effectiveWeatherIntensity(item)
+        val weather = item.effectiveWeather
+        val intensity = item.effectiveWeatherIntensity
         when (weather) {
             "clear" -> overworld.setWeatherParameters(6000, 0, false, false)
             "rain" -> overworld.setWeatherParameters(0, 6000, true, false)
@@ -646,7 +651,7 @@ class LinearOrchestrator {
         applyWeatherSnap(item)
 
         // Moon phase (if applicable — requires setting world time to the right day)
-        val moonPhase = item.presetMoonPhase ?: item.sceneMoonPhase
+        val moonPhase = item.effectiveMoonPhase
         if (moonPhase != null) {
             // Moon phase is derived from dayTime / 24000. To set a specific phase,
             // adjust the day count while keeping the time-of-day component.
@@ -661,8 +666,8 @@ class LinearOrchestrator {
         val server = mc.singleplayerServer ?: return
         val overworld = server.overworld()
 
-        val weather = effectiveWeather(item)
-        val intensity = effectiveWeatherIntensity(item).toFloat()
+        val weather = item.effectiveWeather
+        val intensity = item.effectiveWeatherIntensity.toFloat()
 
         val (targetRain, targetThunder) =
             when (weather) {
@@ -691,13 +696,6 @@ class LinearOrchestrator {
             clientLevel.setThunderLevel(targetThunder)
         }
     }
-
-    // Effective values: preset overrides scene defaults
-    private fun effectiveTime(item: WorkItem): Int = item.presetTimeOfDayTicks ?: item.sceneTimeOfDayTicks
-
-    private fun effectiveWeather(item: WorkItem): String = item.presetWeather ?: item.sceneWeather
-
-    private fun effectiveWeatherIntensity(item: WorkItem): Double = item.presetWeatherIntensity ?: item.sceneWeatherIntensity
 
     // -- Render settings --
 
@@ -736,13 +734,13 @@ class LinearOrchestrator {
     /** Applies per-scene FOV and render distance from the work item. */
     private fun applySceneViewSettings(item: WorkItem) {
         val mc = Minecraft.getInstance()
-        mc.options.fov().set(item.sceneFov)
-        mc.options.renderDistance().set(item.sceneRenderDistance)
-        mc.options.simulationDistance().set(item.sceneRenderDistance)
+        mc.options.fov().set(item.scene.fov)
+        mc.options.renderDistance().set(item.scene.renderDistance)
+        mc.options.simulationDistance().set(item.scene.renderDistance)
 
         log.debug("Scene view settings applied") {
-            "fov" to item.sceneFov
-            "render_distance" to item.sceneRenderDistance
+            "fov" to item.scene.fov
+            "render_distance" to item.scene.renderDistance
         }
     }
 
@@ -765,24 +763,6 @@ class LinearOrchestrator {
     }
 
     // -- Shader helpers --
-
-    private fun buildShaderSpecFromItem(item: WorkItem): ShaderSpec =
-        if (item.shaderSlug == "vanilla") {
-            ShaderSpec(filename = null)
-        } else {
-            val hash8 = item.fileHash?.take(8)
-            val filename =
-                if (hash8 != null) {
-                    "${item.shaderSlug}-${item.version}-$hash8.zip"
-                } else {
-                    "${item.shaderSlug}-${item.version}.zip"
-                }
-            ShaderSpec(
-                filename = filename,
-                profile = item.profileName,
-                profileId = item.profileId,
-            )
-        }
 
     private fun buildShaderMetadata(shader: ShaderSpec): com.xevion.glint.capture.ShaderMetadata? {
         if (shader.filename == null) return null
@@ -826,8 +806,8 @@ class LinearOrchestrator {
         item: WorkItem,
         shader: ShaderSpec,
     ): String {
-        val scenePrefix = sanitize(item.sceneSlug)
-        val presetSuffix = item.presetSlug?.let { "_${sanitize(it)}" } ?: ""
+        val scenePrefix = sanitize(item.scene.slug)
+        val presetSuffix = item.preset?.slug?.let { "_${sanitize(it)}" } ?: ""
 
         if (shader.filename == null) {
             return "${scenePrefix}${presetSuffix}_vanilla.webp"

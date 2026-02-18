@@ -8,6 +8,7 @@ import com.xevion.glint.api.CreateRunItemRequest
 import com.xevion.glint.api.CreateRunRequest
 import com.xevion.glint.api.HttpClient
 import com.xevion.glint.api.WorkItem
+import com.xevion.glint.api.captureKey
 import com.xevion.glint.api.retryOnRateLimit
 import com.xevion.glint.session.SessionRegistry
 import net.minecraft.client.Minecraft
@@ -162,10 +163,10 @@ class AutonomousRunner(
                             items =
                                 workItems.map { item ->
                                     CreateRunItemRequest(
-                                        shaderVersionId = item.shaderVersionId,
-                                        sceneId = item.sceneId,
-                                        profileId = item.profileId,
-                                        presetId = item.presetId,
+                                        shaderVersionId = item.shader.versionId,
+                                        sceneId = item.scene.id,
+                                        profileId = item.shader.profileId,
+                                        presetId = item.preset?.id,
                                     )
                                 },
                         )
@@ -215,16 +216,14 @@ class AutonomousRunner(
 
         // Build lookup: (shaderVersionId, sceneId, profileId, presetId) → RunItemInfo
         val workItemsByKey =
-            workItems.associateBy {
-                CaptureItemKey(it.shaderVersionId, it.sceneId, it.profileId, it.presetId)
-            }
+            workItems.associateBy { it.captureKey() }
         val itemLookup =
             runItems.associate { item ->
                 val key = CaptureItemKey(item.shaderVersionId, item.sceneId, item.profileId, item.presetId)
                 val workItem = workItemsByKey[key]
-                val presetId = workItem?.presetId
+                val presetId = workItem?.preset?.id
                 val sceneVersionId =
-                    workItem?.sceneVersionId
+                    workItem?.scene?.versionId
                         ?: error("Work item missing scene_version_id for ${item.shaderVersionId}/${item.sceneId}")
                 key to RunItemInfo(item.id, presetId, sceneVersionId)
             }
@@ -269,12 +268,12 @@ class AutonomousRunner(
                             val presetId = event.presetId
                             val matchingItem =
                                 result.items.find { item ->
-                                    item.sceneId == event.sceneId &&
-                                        item.profileId == profileId &&
-                                        item.presetId == presetId
+                                    item.scene.id == event.sceneId &&
+                                        item.shader.profileId == profileId &&
+                                        item.preset?.id == presetId
                                 }
                             if (matchingItem != null) {
-                                uploader.handleCapture(matchingItem.shaderVersionId, presetId, event)
+                                uploader.handleCapture(matchingItem.shader.versionId, presetId, event)
                             } else {
                                 log.warn("No matching work item for capture event") {
                                     "scene_id" to event.sceneId

@@ -7,7 +7,7 @@ use crate::error::AppResult;
 use crate::id::{
     SceneId, ScenePresetId, SceneVersionId, ShaderId, ShaderVersionId, ShaderVersionProfileId,
 };
-use crate::models::WorkItem;
+use crate::models::{WorkItem, WorkItemRow};
 use crate::repo::work_ordering;
 
 /// Safety cap on total items returned to prevent absurdly large responses,
@@ -47,7 +47,7 @@ impl WorkRepo {
             .context("failed to disable JIT")?;
 
         let items = sqlx::query_as!(
-            WorkItem,
+            WorkItemRow,
             r#"
             WITH has_captures AS (
                 SELECT DISTINCT shader_version_id
@@ -165,6 +165,8 @@ impl WorkRepo {
         .context("failed to fetch work items")?;
 
         tx.commit().await.context("failed to commit transaction")?;
+
+        let items: Vec<WorkItem> = items.into_iter().map(WorkItem::from).collect();
 
         // Post-process: spatial clustering + nearest-neighbor scene ordering
         let ordered = work_ordering::optimize_execution_order(items);

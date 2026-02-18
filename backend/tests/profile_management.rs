@@ -541,10 +541,10 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
         .expect("get work items before");
     let custom_before: Vec<_> = items_before
         .iter()
-        .filter(|i| i.shader_version_id.0 == "shv1")
+        .filter(|i| i.shader.version_id.0 == "shv1")
         .collect();
     check!(custom_before.len() == 1);
-    check!(custom_before[0].profile_id.is_none());
+    check!(custom_before[0].shader.profile_id.is_none());
 
     // Add 2 profiles via extraction
     let data = make_shader_pack_data(vec![make_profile("Low", 0), make_profile("High", 1)], None);
@@ -558,11 +558,11 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
         .expect("get work items after");
     let custom_after: Vec<_> = items_after
         .iter()
-        .filter(|i| i.shader_version_id.0 == "shv1")
+        .filter(|i| i.shader.version_id.0 == "shv1")
         .collect();
     check!(custom_after.len() == 2);
     // Both should have profile IDs
-    assert!(custom_after.iter().all(|i| i.profile_id.is_some()));
+    assert!(custom_after.iter().all(|i| i.shader.profile_id.is_some()));
 }
 
 #[sqlx::test]

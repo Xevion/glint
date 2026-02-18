@@ -81,10 +81,10 @@ fn group_into_hierarchy(items: Vec<WorkItem>) -> Vec<ShaderGroup> {
     for item in items {
         // Find or create ShaderGroup
         let shader = match shaders.last_mut() {
-            Some(s) if s.shader_version_id == item.shader_version_id => s,
+            Some(s) if s.shader_version_id == item.shader.version_id => s,
             _ => {
                 shaders.push(ShaderGroup {
-                    shader_version_id: item.shader_version_id.clone(),
+                    shader_version_id: item.shader.version_id.clone(),
                     profiles: Vec::new(),
                 });
                 shaders.last_mut().unwrap()
@@ -93,10 +93,10 @@ fn group_into_hierarchy(items: Vec<WorkItem>) -> Vec<ShaderGroup> {
 
         // Find or create ProfileGroup within shader
         let profile = match shader.profiles.last_mut() {
-            Some(p) if p.profile_id == item.profile_id => p,
+            Some(p) if p.profile_id == item.shader.profile_id => p,
             _ => {
                 shader.profiles.push(ProfileGroup {
-                    profile_id: item.profile_id.clone(),
+                    profile_id: item.shader.profile_id.clone(),
                     items: Vec::new(),
                 });
                 shader.profiles.last_mut().unwrap()
@@ -133,14 +133,14 @@ fn cluster_scenes(items: Vec<WorkItem>) -> Vec<SceneCluster> {
     for item in items {
         match scene_groups
             .iter()
-            .position(|sp| sp.scene_id == item.scene_id)
+            .position(|sp| sp.scene_id == item.scene.id)
         {
             Some(idx) => scene_groups[idx].items.push(item),
             None => {
                 let sp = ScenePosition {
-                    scene_id: item.scene_id.clone(),
-                    x: item.scene_x,
-                    z: item.scene_z,
+                    scene_id: item.scene.id.clone(),
+                    x: item.scene.x,
+                    z: item.scene.z,
                     items: vec![item],
                 };
                 scene_groups.push(sp);
@@ -181,7 +181,7 @@ fn cluster_scenes(items: Vec<WorkItem>) -> Vec<SceneCluster> {
         // transitioning between them is just a time/weather change (~0.1s).
         let mut derived_items: Vec<WorkItem> =
             derived_group.into_iter().flat_map(|sp| sp.items).collect();
-        derived_items.sort_by_key(|i| i.scene_time_of_day_ticks);
+        derived_items.sort_by_key(|i| i.scene.time_of_day_ticks);
 
         match placed {
             Some(idx) => {
@@ -220,8 +220,8 @@ fn recompute_centroid(cluster: &mut SceneCluster) {
     let mut count = 0usize;
     for subcluster in &cluster.derived_subclusters {
         for item in subcluster {
-            sum_x += item.scene_x;
-            sum_z += item.scene_z;
+            sum_x += item.scene.x;
+            sum_z += item.scene.z;
             count += 1;
         }
     }
@@ -307,6 +307,7 @@ fn flatten_to_execution_order(shaders: Vec<ShaderGroup>) -> Vec<WorkItem> {
 mod tests {
     use super::*;
     use crate::id::{SceneId, ShaderId, ShaderVersionId, ShaderVersionProfileId};
+    use crate::models::{WorkScene, WorkShader};
 
     /// Create a minimal WorkItem for testing. Only fields relevant to ordering
     /// are set meaningfully; the rest use placeholder values.
@@ -319,49 +320,41 @@ mod tests {
         time_of_day: i32,
     ) -> WorkItem {
         WorkItem {
-            shader_version_id: ShaderVersionId(shader_version_id.to_string()),
-            shader_id: ShaderId("sh1".to_string()),
-            shader_slug: "test-shader".to_string(),
-            shader_name: "Test Shader".to_string(),
-            version: "1.0".to_string(),
-            download_url: None,
-            file_hash: None,
-            scene_id: SceneId(scene_id.to_string()),
-            scene_slug: scene_id.to_string(),
-            scene_name: scene_id.to_string(),
-            scene_dimension: "overworld".to_string(),
-            scene_x: x,
-            scene_y: 64.0,
-            scene_z: z,
-            scene_yaw: 0.0,
-            scene_pitch: 0.0,
-            scene_time_of_day_ticks: time_of_day,
-            scene_weather: "clear".to_string(),
-            scene_weather_intensity: 0.0,
-            scene_moon_phase: None,
-            scene_biome: None,
-            preset_id: None,
-            preset_name: None,
-            preset_slug: None,
-            preset_time_of_day_ticks: None,
-            preset_weather: None,
-            preset_weather_intensity: None,
-            preset_moon_phase: None,
-            package_url: None,
-            package_hash: None,
-            package_size_bytes: None,
-            scene_minecraft_version: None,
-            scene_fov: 70,
-            scene_render_distance: 16,
-            scene_version_id: None,
-            profile_id: profile_id.map(|p| ShaderVersionProfileId(p.to_string())),
-            profile_name: profile_id.map(|p| p.to_string()),
+            shader: WorkShader {
+                version_id: ShaderVersionId(shader_version_id.to_string()),
+                id: ShaderId("sh1".to_string()),
+                slug: "test-shader".to_string(),
+                name: "Test Shader".to_string(),
+                version: "1.0".to_string(),
+                profile_id: profile_id.map(|p| ShaderVersionProfileId(p.to_string())),
+                profile_name: profile_id.map(|p| p.to_string()),
+                ..Default::default()
+            },
+            scene: WorkScene {
+                id: SceneId(scene_id.to_string()),
+                slug: scene_id.to_string(),
+                name: scene_id.to_string(),
+                dimension: "overworld".to_string(),
+                x,
+                y: 64.0,
+                z,
+                yaw: 0.0,
+                pitch: 0.0,
+                time_of_day_ticks: time_of_day,
+                weather: "clear".to_string(),
+                weather_intensity: 0.0,
+                fov: 70,
+                render_distance: 16,
+                ..Default::default()
+            },
+            preset: None,
+            scene_package: None,
         }
     }
 
     /// Extract scene_id strings from items for easy assertion.
     fn scene_ids(items: &[WorkItem]) -> Vec<&str> {
-        items.iter().map(|i| i.scene_id.0.as_str()).collect()
+        items.iter().map(|i| i.scene.id.0.as_str()).collect()
     }
 
     /// Extract (shader, profile, scene) tuples for full ordering assertions.
@@ -370,9 +363,9 @@ mod tests {
             .iter()
             .map(|i| {
                 (
-                    i.shader_version_id.0.as_str(),
-                    i.profile_id.as_ref().map(|p| p.0.as_str()),
-                    i.scene_id.0.as_str(),
+                    i.shader.version_id.0.as_str(),
+                    i.shader.profile_id.as_ref().map(|p| p.0.as_str()),
+                    i.scene.id.0.as_str(),
                 )
             })
             .collect()
@@ -389,7 +382,7 @@ mod tests {
         let items = vec![make_item("sv1", None, "s1", 0.0, 0.0, 6000)];
         let result = optimize_execution_order(items);
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].scene_id.0, "s1");
+        assert_eq!(result[0].scene.id.0, "s1");
     }
 
     #[test]
@@ -488,8 +481,8 @@ mod tests {
         let result = optimize_execution_order(items);
 
         // First 3 should be low profile, next 3 high profile
-        let low_scenes: Vec<&str> = result[..3].iter().map(|i| i.scene_id.0.as_str()).collect();
-        let high_scenes: Vec<&str> = result[3..].iter().map(|i| i.scene_id.0.as_str()).collect();
+        let low_scenes: Vec<&str> = result[..3].iter().map(|i| i.scene.id.0.as_str()).collect();
+        let high_scenes: Vec<&str> = result[3..].iter().map(|i| i.scene.id.0.as_str()).collect();
 
         assert_eq!(low_scenes, vec!["hills", "hills_night", "hills_sunset"]);
         assert_eq!(high_scenes, vec!["hills", "hills_night", "hills_sunset"]);
@@ -520,11 +513,15 @@ mod tests {
         );
         assert_eq!(clusters[0].derived_subclusters[0].len(), 2);
         assert_eq!(
-            clusters[0].derived_subclusters[0][0].scene_time_of_day_ticks,
+            clusters[0].derived_subclusters[0][0]
+                .scene
+                .time_of_day_ticks,
             6000
         );
         assert_eq!(
-            clusters[0].derived_subclusters[0][1].scene_time_of_day_ticks,
+            clusters[0].derived_subclusters[0][1]
+                .scene
+                .time_of_day_ticks,
             12000
         );
     }

@@ -4,205 +4,253 @@
   "description": "A single work item: one (shader_version, scene, preset, profile) tuple to capture",
   "type": "object",
   "properties": {
-    "download_url": {
-      "type": [
-        "string",
-        "null"
+    "preset": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkPreset"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
-    "file_hash": {
-      "type": [
-        "string",
-        "null"
+    "scene": {
+      "$ref": "#/$defs/WorkScene"
+    },
+    "scene_package": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkPackage"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
-    "package_hash": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "package_size_bytes": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "int64"
-    },
-    "package_url": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "preset_id": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "preset_moon_phase": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "int32"
-    },
-    "preset_name": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "preset_slug": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "preset_time_of_day_ticks": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "int32"
-    },
-    "preset_weather": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "preset_weather_intensity": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "format": "double"
-    },
-    "profile_id": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "profile_name": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "scene_biome": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "scene_dimension": {
-      "type": "string"
-    },
-    "scene_fov": {
-      "type": "integer",
-      "format": "int32"
-    },
-    "scene_id": {
-      "type": "string"
-    },
-    "scene_minecraft_version": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "scene_moon_phase": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "int32"
-    },
-    "scene_name": {
-      "type": "string"
-    },
-    "scene_pitch": {
-      "type": "number",
-      "format": "double"
-    },
-    "scene_render_distance": {
-      "type": "integer",
-      "format": "int32"
-    },
-    "scene_slug": {
-      "type": "string"
-    },
-    "scene_time_of_day_ticks": {
-      "type": "integer",
-      "format": "int32"
-    },
-    "scene_version_id": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "scene_weather": {
-      "type": "string"
-    },
-    "scene_weather_intensity": {
-      "type": "number",
-      "format": "double"
-    },
-    "scene_x": {
-      "type": "number",
-      "format": "double"
-    },
-    "scene_y": {
-      "type": "number",
-      "format": "double"
-    },
-    "scene_yaw": {
-      "type": "number",
-      "format": "double"
-    },
-    "scene_z": {
-      "type": "number",
-      "format": "double"
-    },
-    "shader_id": {
-      "type": "string"
-    },
-    "shader_name": {
-      "type": "string"
-    },
-    "shader_slug": {
-      "type": "string"
-    },
-    "shader_version_id": {
-      "type": "string"
-    },
-    "version": {
-      "type": "string"
+    "shader": {
+      "$ref": "#/$defs/WorkShader"
     }
   },
   "required": [
-    "shader_version_id",
-    "shader_id",
-    "shader_slug",
-    "shader_name",
-    "version",
-    "scene_id",
-    "scene_slug",
-    "scene_name",
-    "scene_dimension",
-    "scene_x",
-    "scene_y",
-    "scene_z",
-    "scene_yaw",
-    "scene_pitch",
-    "scene_time_of_day_ticks",
-    "scene_weather",
-    "scene_weather_intensity",
-    "scene_fov",
-    "scene_render_distance"
-  ]
+    "shader",
+    "scene"
+  ],
+  "$defs": {
+    "WorkPackage": {
+      "type": "object",
+      "properties": {
+        "hash": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "hash"
+      ]
+    },
+    "WorkPreset": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "moon_phase": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "time_of_day_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "weather": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weather_intensity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "slug"
+      ]
+    },
+    "WorkScene": {
+      "type": "object",
+      "properties": {
+        "biome": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dimension": {
+          "type": "string"
+        },
+        "fov": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "id": {
+          "type": "string"
+        },
+        "minecraft_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "moon_phase": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "name": {
+          "type": "string"
+        },
+        "pitch": {
+          "type": "number",
+          "format": "double"
+        },
+        "render_distance": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "time_of_day_ticks": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "version_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weather": {
+          "type": "string"
+        },
+        "weather_intensity": {
+          "type": "number",
+          "format": "double"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "yaw": {
+          "type": "number",
+          "format": "double"
+        },
+        "z": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "dimension",
+        "x",
+        "y",
+        "z",
+        "yaw",
+        "pitch",
+        "time_of_day_ticks",
+        "weather",
+        "weather_intensity",
+        "fov",
+        "render_distance"
+      ]
+    },
+    "WorkShader": {
+      "type": "object",
+      "properties": {
+        "download_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "profile_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "profile_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "slug": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "version_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version_id",
+        "id",
+        "slug",
+        "name",
+        "version"
+      ]
+    }
+  }
 }

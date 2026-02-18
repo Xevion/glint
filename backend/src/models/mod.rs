@@ -54,4 +54,4 @@ pub use storage::{
 };
 pub use taxonomy::{Category, Feature, Tag};
 pub use user::{Role, Session, SessionInfo, UpdateUserRoleRequest, User, UserWithSessions};
-pub use work::WorkItem;
+pub use work::{WorkItem, WorkItemRow, WorkPackage, WorkPreset, WorkScene, WorkShader};

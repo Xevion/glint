@@ -1,49 +1,110 @@
 package com.xevion.glint.api
 
+import com.xevion.glint.orchestration.CaptureItemKey
+import com.xevion.glint.orchestration.ShaderSpec
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
-/** A single work item: one (shader_version, scene, profile) triple to capture. */
+/** Shader metadata within a work item. */
 @Serializable
-data class WorkItem(
-    val shaderVersionId: String,
-    val shaderId: String,
-    val shaderSlug: String,
-    val shaderName: String,
+data class WorkShader(
+    val versionId: String,
+    val id: String,
+    val slug: String,
+    val name: String,
     val version: String,
     val downloadUrl: String? = null,
     val fileHash: String? = null,
-    val sceneId: String,
-    val sceneSlug: String,
-    val sceneName: String,
-    val sceneDimension: String,
-    val sceneX: Double,
-    val sceneY: Double,
-    val sceneZ: Double,
-    val sceneYaw: Double,
-    val scenePitch: Double,
-    val sceneTimeOfDayTicks: Int,
-    val sceneWeather: String,
-    val sceneWeatherIntensity: Double,
-    val sceneMoonPhase: Int? = null,
-    val sceneBiome: String? = null,
-    val presetId: String? = null,
-    val presetName: String? = null,
-    val presetSlug: String? = null,
-    val presetTimeOfDayTicks: Int? = null,
-    val presetWeather: String? = null,
-    val presetWeatherIntensity: Double? = null,
-    val presetMoonPhase: Int? = null,
-    val packageUrl: String? = null,
-    val packageHash: String? = null,
-    val packageSizeBytes: Long? = null,
-    val sceneMinecraftVersion: String? = null,
-    val sceneFov: Int = 70,
-    val sceneRenderDistance: Int = 16,
-    val sceneVersionId: String? = null,
     val profileId: String? = null,
     val profileName: String? = null,
 )
+
+/** Scene positioning and environment within a work item. */
+@Serializable
+data class WorkScene(
+    val id: String,
+    val slug: String,
+    val name: String,
+    val dimension: String,
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val yaw: Double,
+    val pitch: Double,
+    val timeOfDayTicks: Int,
+    val weather: String,
+    val weatherIntensity: Double,
+    val moonPhase: Int? = null,
+    val biome: String? = null,
+    val fov: Int = 70,
+    val renderDistance: Int = 16,
+    val minecraftVersion: String? = null,
+    val versionId: String? = null,
+)
+
+/** Preset overrides within a work item. */
+@Serializable
+data class WorkPreset(
+    val id: String,
+    val name: String,
+    val slug: String,
+    val timeOfDayTicks: Int? = null,
+    val weather: String? = null,
+    val weatherIntensity: Double? = null,
+    val moonPhase: Int? = null,
+)
+
+/** Scene package download info within a work item. */
+@Serializable
+data class WorkPackage(
+    val url: String,
+    val hash: String,
+    val sizeBytes: Long? = null,
+)
+
+/** A single work item: one (shader_version, scene, preset, profile) tuple to capture. */
+@Serializable
+data class WorkItem(
+    val shader: WorkShader,
+    val scene: WorkScene,
+    val preset: WorkPreset? = null,
+    val scenePackage: WorkPackage? = null,
+)
+
+// -- WorkItem extensions: preset-over-scene environment overrides --
+
+/** Effective time of day: preset overrides scene. */
+val WorkItem.effectiveTimeOfDayTicks: Int
+    get() = preset?.timeOfDayTicks ?: scene.timeOfDayTicks
+
+/** Effective weather: preset overrides scene. */
+val WorkItem.effectiveWeather: String
+    get() = preset?.weather ?: scene.weather
+
+/** Effective weather intensity: preset overrides scene. */
+val WorkItem.effectiveWeatherIntensity: Double
+    get() = preset?.weatherIntensity ?: scene.weatherIntensity
+
+/** Effective moon phase: preset overrides scene. */
+val WorkItem.effectiveMoonPhase: Int?
+    get() = preset?.moonPhase ?: scene.moonPhase
+
+/** Composite key for capture tracking. */
+fun WorkItem.captureKey() =
+    CaptureItemKey(
+        shaderVersionId = shader.versionId,
+        sceneId = scene.id,
+        profileId = shader.profileId,
+        presetId = preset?.id,
+    )
+
+/** Build a ShaderSpec from the shader metadata. */
+fun WorkShader.toShaderSpec(): ShaderSpec {
+    if (slug == "vanilla") return ShaderSpec(filename = null)
+    val hash8 = fileHash?.take(8)
+    val filename = if (hash8 != null) "$slug-$version-$hash8.zip" else "$slug-$version.zip"
+    return ShaderSpec(filename = filename, profile = profileName, profileId = profileId)
+}
 
 /** Request to create a capture run. */
 @Serializable

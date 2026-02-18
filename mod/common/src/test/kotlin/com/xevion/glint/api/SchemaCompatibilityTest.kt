@@ -8,7 +8,6 @@ import kotlinx.serialization.json.JsonNamingStrategy
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import java.io.File
 import kotlin.test.Test
@@ -30,22 +29,23 @@ class SchemaCompatibilityTest {
     private val schemasDir = findSchemasDir()
 
     /** Builds a minimal JSON object from a JSON Schema definition, using stub values. */
-    private fun buildStubFromSchema(schema: JsonObject): JsonObject {
+    private fun buildStubFromSchema(
+        schema: JsonObject,
+        rootSchema: JsonObject = schema,
+    ): JsonObject {
         val properties = schema["properties"]?.jsonObject ?: return JsonObject(emptyMap())
-        val required = schema["required"]?.jsonArray?.map { it.toString().trim('"') }?.toSet() ?: emptySet()
+        val defs = rootSchema["\$defs"]?.jsonObject ?: JsonObject(emptyMap())
 
         val fields = mutableMapOf<String, JsonElement>()
         for ((key, prop) in properties) {
-            val propObj = prop.jsonObject
-            val typeField = propObj["type"]
-            val isRequired = key in required
+            val resolvedProp = resolveSchema(prop.jsonObject, defs)
+            val typeField = resolvedProp["type"]
 
-            // Determine the primary type (handles both "type": "string" and "type": ["string", "null"])
             val primaryType =
                 when (typeField) {
                     is JsonPrimitive -> typeField.content
                     is JsonArray -> typeField.map { it.toString().trim('"') }.firstOrNull { it != "null" } ?: "null"
-                    else -> "string"
+                    else -> if (resolvedProp.containsKey("properties")) "object" else "string"
                 }
 
             val value: JsonElement =
@@ -55,18 +55,40 @@ class SchemaCompatibilityTest {
                     "number" -> JsonPrimitive(0.0)
                     "boolean" -> JsonPrimitive(false)
                     "array" -> JsonArray(emptyList())
-                    "object" -> JsonObject(emptyMap())
+                    "object" -> buildStubFromSchema(resolvedProp, rootSchema)
                     "null" -> JsonNull
                     else -> JsonPrimitive("stub")
                 }
 
-            // Include required fields always; include optional fields too (with a value)
-            // so we validate the field name mapping
-            if (isRequired || !isRequired) {
-                fields[key] = value
-            }
+            fields[key] = value
         }
         return JsonObject(fields)
+    }
+
+    /** Resolves a schema node, following $ref and anyOf patterns. */
+    private fun resolveSchema(
+        schema: JsonObject,
+        defs: JsonObject,
+    ): JsonObject {
+        // Direct $ref
+        val ref = schema["\$ref"]
+        if (ref is JsonPrimitive) {
+            val refName = ref.content.removePrefix("#/\$defs/")
+            return defs[refName]?.jsonObject ?: schema
+        }
+
+        // anyOf: [{ $ref: "..." }, { type: "null" }] — pick the non-null variant
+        val anyOf = schema["anyOf"]
+        if (anyOf is JsonArray) {
+            for (variant in anyOf) {
+                val variantObj = variant.jsonObject
+                val variantType = variantObj["type"]
+                if (variantType is JsonPrimitive && variantType.content == "null") continue
+                return resolveSchema(variantObj, defs)
+            }
+        }
+
+        return schema
     }
 
     /**
@@ -84,7 +106,7 @@ class SchemaCompatibilityTest {
         }
 
         val schema = json.parseToJsonElement(schemaFile.readText()).jsonObject
-        val stub = buildStubFromSchema(schema)
+        val stub = buildStubFromSchema(schema, schema)
         val stubJson = stub.toString()
 
         try {

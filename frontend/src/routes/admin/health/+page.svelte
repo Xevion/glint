@@ -336,13 +336,13 @@ function formatTime(iso: string | null | undefined): string {
 						<Table.Row class="last:border-b-0">
 							<Table.Cell class="p-3 text-muted-foreground">{i + 1}</Table.Cell>
 							<Table.Cell class="p-3 font-medium">
-								<a href="/admin/shaders/{item.shader_slug}" class="hover:underline">{item.shader_name}</a>
+								<a href="/admin/shaders/{item.shader.slug}" class="hover:underline">{item.shader.name}</a>
 							</Table.Cell>
-							<Table.Cell class="p-3 text-muted-foreground">{item.version}</Table.Cell>
+							<Table.Cell class="p-3 text-muted-foreground">{item.shader.version}</Table.Cell>
 							<Table.Cell class="p-3">
-							<a href="/admin/scenes/{item.scene_id}" class="hover:underline">{item.scene_name}</a>
+							<a href="/admin/scenes/{item.scene.id}" class="hover:underline">{item.scene.name}</a>
 							</Table.Cell>
-							<Table.Cell class="p-3 text-muted-foreground">{item.profile_name ?? '—'}</Table.Cell>
+							<Table.Cell class="p-3 text-muted-foreground">{item.shader.profile_name ?? '—'}</Table.Cell>
 						</Table.Row>
 					{/each}
 				</Table.Body>

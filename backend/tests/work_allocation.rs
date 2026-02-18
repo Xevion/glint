@@ -32,7 +32,7 @@ async fn test_work_items_only_vanilla_when_no_custom_shaders(pool: sqlx::PgPool)
         .expect("get_work_items");
 
     assert!(items.len() == 1);
-    check!(items[0].shader_name == "Vanilla");
+    check!(items[0].shader.name == "Vanilla");
 }
 
 #[sqlx::test]
@@ -74,7 +74,7 @@ async fn test_work_items_inactive_scenes_excluded(pool: sqlx::PgPool) {
     // Only the active scene: shader-a × active + vanilla × active = 2
     assert!(items.len() == 2);
     for item in &items {
-        check!(item.scene_slug == "active-scene");
+        check!(item.scene.slug == "active-scene");
     }
 }
 
@@ -99,21 +99,21 @@ async fn test_work_items_version_with_profiles_expands_per_profile(pool: sqlx::P
 
     let custom_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(custom_items.len() == 3);
     for item in &custom_items {
-        check!(item.profile_id.is_some());
-        check!(item.profile_name.is_some());
+        check!(item.shader.profile_id.is_some());
+        check!(item.shader.profile_name.is_some());
     }
 
     let vanilla_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "vanilla")
+        .filter(|i| i.shader.slug == "vanilla")
         .collect();
     assert!(vanilla_items.len() == 1);
-    check!(vanilla_items[0].profile_id.is_none());
-    check!(vanilla_items[0].profile_name.is_none());
+    check!(vanilla_items[0].shader.profile_id.is_none());
+    check!(vanilla_items[0].shader.profile_name.is_none());
 }
 
 #[sqlx::test]
@@ -129,9 +129,9 @@ async fn test_work_items_version_without_profiles_has_null_profile_id(pool: sqlx
         .await
         .expect("get_work_items");
 
-    let custom = items.iter().find(|i| i.shader_slug == "shader-a").unwrap();
-    check!(custom.profile_id.is_none());
-    check!(custom.profile_name.is_none());
+    let custom = items.iter().find(|i| i.shader.slug == "shader-a").unwrap();
+    check!(custom.shader.profile_id.is_none());
+    check!(custom.shader.profile_name.is_none());
 }
 
 #[sqlx::test]
@@ -159,35 +159,35 @@ async fn test_work_items_mixed_profile_and_no_profile_shaders(pool: sqlx::PgPool
 
     let a_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(a_items.len() == 2);
     for item in &a_items {
-        check!(item.profile_id.is_some());
-        check!(item.profile_name.is_some());
+        check!(item.shader.profile_id.is_some());
+        check!(item.shader.profile_name.is_some());
     }
     let a_names: Vec<_> = a_items
         .iter()
-        .filter_map(|i| i.profile_name.as_deref())
+        .filter_map(|i| i.shader.profile_name.as_deref())
         .collect();
     check!(a_names.contains(&"Low"));
     check!(a_names.contains(&"High"));
 
     let b_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "shader-b")
+        .filter(|i| i.shader.slug == "shader-b")
         .collect();
     assert!(b_items.len() == 1);
-    check!(b_items[0].profile_id.is_none());
-    check!(b_items[0].profile_name.is_none());
+    check!(b_items[0].shader.profile_id.is_none());
+    check!(b_items[0].shader.profile_name.is_none());
 
     let vanilla_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "vanilla")
+        .filter(|i| i.shader.slug == "vanilla")
         .collect();
     assert!(vanilla_items.len() == 1);
-    check!(vanilla_items[0].profile_id.is_none());
-    check!(vanilla_items[0].profile_name.is_none());
+    check!(vanilla_items[0].shader.profile_id.is_none());
+    check!(vanilla_items[0].shader.profile_name.is_none());
 }
 
 #[sqlx::test]
@@ -220,10 +220,10 @@ async fn test_work_items_excludes_targets_with_fresh_captures(pool: sqlx::PgPool
     // Custom shader should only appear for scene 2 (scene 1 has fresh capture)
     let custom_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(custom_items.len() == 1);
-    check!(custom_items[0].scene_slug == "scene-b");
+    check!(custom_items[0].scene.slug == "scene-b");
 }
 
 #[sqlx::test]
@@ -260,10 +260,10 @@ async fn test_work_items_includes_targets_with_stale_captures(pool: sqlx::PgPool
 
     let custom_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(custom_items.len() == 1);
-    check!(custom_items[0].scene_slug == "scene-a");
+    check!(custom_items[0].scene.slug == "scene-a");
 }
 
 #[sqlx::test]
@@ -295,7 +295,7 @@ async fn test_work_items_force_includes_fresh_captures(pool: sqlx::PgPool) {
         .expect("get_work_items");
     let custom_no_force: Vec<_> = items_no_force
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(custom_no_force.is_empty());
 
@@ -305,7 +305,7 @@ async fn test_work_items_force_includes_fresh_captures(pool: sqlx::PgPool) {
         .expect("get_work_items");
     let custom_force: Vec<_> = items_force
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(custom_force.len() == 1);
 }
@@ -341,7 +341,7 @@ async fn test_work_items_null_profile_fresh_capture_excludes_correctly(pool: sql
     // Should be excluded via IS NOT DISTINCT FROM NULL matching
     let custom_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(custom_items.is_empty());
 }
@@ -361,7 +361,7 @@ async fn test_work_items_excludes_versions_at_failure_cap(pool: sqlx::PgPool) {
 
     let custom_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(custom_items.is_empty());
 }
@@ -381,7 +381,7 @@ async fn test_work_items_includes_versions_below_failure_cap(pool: sqlx::PgPool)
 
     let custom_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(custom_items.len() == 1);
 }
@@ -401,7 +401,7 @@ async fn test_work_items_force_includes_failed_versions(pool: sqlx::PgPool) {
         .expect("get_work_items");
     let custom_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(custom_items.is_empty());
 
@@ -411,7 +411,7 @@ async fn test_work_items_force_includes_failed_versions(pool: sqlx::PgPool) {
         .expect("get_work_items");
     let custom_items: Vec<_> = items
         .iter()
-        .filter(|i| i.shader_slug == "shader-a")
+        .filter(|i| i.shader.slug == "shader-a")
         .collect();
     assert!(custom_items.len() == 1);
 }
@@ -433,7 +433,7 @@ async fn test_work_items_shaders_filter_single_slug(pool: sqlx::PgPool) {
 
     // Only shader-a, vanilla excluded by filter
     assert!(items.len() == 1);
-    check!(items[0].shader_slug == "shader-a");
+    check!(items[0].shader.slug == "shader-a");
 }
 
 #[sqlx::test]
@@ -456,7 +456,7 @@ async fn test_work_items_shaders_filter_comma_separated(pool: sqlx::PgPool) {
 
     // Only slug-a and slug-b
     assert!(items.len() == 2);
-    let slugs: Vec<&str> = items.iter().map(|i| i.shader_slug.as_str()).collect();
+    let slugs: Vec<&str> = items.iter().map(|i| i.shader.slug.as_str()).collect();
     check!(slugs.contains(&"slug-a"));
     check!(slugs.contains(&"slug-b"));
     check!(!slugs.contains(&"slug-c"));
@@ -478,7 +478,7 @@ async fn test_work_items_scenes_filter_single_slug(pool: sqlx::PgPool) {
     // shader-a × scene-a + vanilla × scene-a = 2
     assert!(items.len() == 2);
     for item in &items {
-        check!(item.scene_slug == "scene-a");
+        check!(item.scene.slug == "scene-a");
     }
 }
 
@@ -505,8 +505,8 @@ async fn test_work_items_both_filters_combined(pool: sqlx::PgPool) {
 
     // Only shader-a × scene-b = 1
     assert!(items.len() == 1);
-    check!(items[0].shader_slug == "shader-a");
-    check!(items[0].scene_slug == "scene-b");
+    check!(items[0].shader.slug == "shader-a");
+    check!(items[0].scene.slug == "scene-b");
 }
 
 #[sqlx::test]
@@ -549,8 +549,8 @@ async fn test_work_items_uncaptured_versions_first(pool: sqlx::PgPool) {
 
     assert!(items.len() == 2);
     // Shader A (uncaptured) before Shader B (has captures)
-    check!(items[0].shader_slug == "shader-a");
-    check!(items[1].shader_slug == "shader-b");
+    check!(items[0].shader.slug == "shader-a");
+    check!(items[1].shader.slug == "shader-b");
 }
 
 #[sqlx::test]
@@ -573,8 +573,8 @@ async fn test_work_items_higher_downloads_first(pool: sqlx::PgPool) {
     // Filter to only custom shaders for order check
     let custom: Vec<&str> = items
         .iter()
-        .filter(|i| i.shader_slug != "vanilla")
-        .map(|i| i.shader_slug.as_str())
+        .filter(|i| i.shader.slug != "vanilla")
+        .map(|i| i.shader.slug.as_str())
         .collect();
 
     // C(2000) → A(1000) → B(500)
@@ -585,7 +585,7 @@ async fn test_work_items_higher_downloads_first(pool: sqlx::PgPool) {
 
     // Vanilla (0 downloads) should be last overall
     let_assert!(Some(last) = items.last());
-    check!(last.shader_slug == "vanilla");
+    check!(last.shader.slug == "vanilla");
 }
 
 #[sqlx::test]
@@ -617,14 +617,14 @@ async fn test_work_items_alphabetical_tiebreaker(pool: sqlx::PgPool) {
 
     // Alpha/Forest, Alpha/Sunset, Beta/Forest, Beta/Sunset
     assert!(items.len() == 4);
-    check!(items[0].shader_name == "Alpha");
-    check!(items[0].scene_name == "Forest");
-    check!(items[1].shader_name == "Alpha");
-    check!(items[1].scene_name == "Sunset");
-    check!(items[2].shader_name == "Beta");
-    check!(items[2].scene_name == "Forest");
-    check!(items[3].shader_name == "Beta");
-    check!(items[3].scene_name == "Sunset");
+    check!(items[0].shader.name == "Alpha");
+    check!(items[0].scene.name == "Forest");
+    check!(items[1].shader.name == "Alpha");
+    check!(items[1].scene.name == "Sunset");
+    check!(items[2].shader.name == "Beta");
+    check!(items[2].scene.name == "Forest");
+    check!(items[3].shader.name == "Beta");
+    check!(items[3].scene.name == "Sunset");
 }
 
 #[sqlx::test]
@@ -691,8 +691,8 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
         .await
         .expect("get_work_items");
     assert!(items.len() == 1);
-    check!(items[0].profile_id.is_none());
-    check!(items[0].profile_name.is_none());
+    check!(items[0].shader.profile_id.is_none());
+    check!(items[0].shader.profile_name.is_none());
 
     // Add 2 profiles
     seed_profile(&pool, "p1", "shv1", "Low", 0).await;
@@ -703,8 +703,8 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
         .expect("get_work_items");
     assert!(items.len() == 2);
     for item in &items {
-        check!(item.profile_id.is_some());
-        check!(item.profile_name.is_some());
+        check!(item.shader.profile_id.is_some());
+        check!(item.shader.profile_name.is_some());
     }
 }
 
@@ -739,7 +739,7 @@ async fn test_fresh_capture_for_one_profile_does_not_exclude_other(pool: sqlx::P
 
     // Profile A excluded (fresh capture), Profile B still needed
     assert!(items.len() == 1);
-    let_assert!(Some(profile_id) = &items[0].profile_id);
+    let_assert!(Some(profile_id) = &items[0].shader.profile_id);
     check!(profile_id.as_ref() == "p-b");
-    check!(items[0].profile_name.as_deref() == Some("Profile B"));
+    check!(items[0].shader.profile_name.as_deref() == Some("Profile B"));
 }

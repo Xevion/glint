@@ -87,3 +87,7 @@ export type { UploadInitiatedResponse } from "./UploadInitiatedResponse";
 export type { User } from "./User";
 export type { UserWithSessions } from "./UserWithSessions";
 export type { WorkItem } from "./WorkItem";
+export type { WorkPackage } from "./WorkPackage";
+export type { WorkPreset } from "./WorkPreset";
+export type { WorkScene } from "./WorkScene";
+export type { WorkShader } from "./WorkShader";

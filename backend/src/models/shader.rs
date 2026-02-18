@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use sqlx::types::Json;
 use sqlx::FromRow;
+use sqlx::types::Json;
 use ts_rs::TS;
 
 use super::capture::CaptureWithContext;
