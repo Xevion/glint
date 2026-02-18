@@ -32,21 +32,6 @@ class SaveSceneDialog(
 ) : GlintDialogScreen(
         McComponent.literal(if (existingScene != null) "Edit Scene" else "Save Current Scene"),
     ) {
-    /**
-     * Legacy constructor for SceneManagerScreen compatibility.
-     */
-    constructor(parent: SceneManagerScreen) : this(
-        parentScreen = parent,
-        worldName =
-            Minecraft
-                .getInstance()
-                .singleplayerServer
-                ?.worldData
-                ?.levelName ?: "Unknown",
-        existingScene = null,
-        onSave = { parent.refreshSceneList() },
-    )
-
     companion object {
         private val TIME_PRESETS =
             listOf(

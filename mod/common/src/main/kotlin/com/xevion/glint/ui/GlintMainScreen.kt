@@ -2,6 +2,7 @@ package com.xevion.glint.ui
 
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.UrlValidation
+import com.xevion.glint.orchestration.PreviewCapture
 import com.xevion.glint.scene.LocalPreset
 import com.xevion.glint.scene.LocalSceneMetadata
 import com.xevion.glint.scene.LocalSceneStore
@@ -415,6 +416,21 @@ class GlintMainScreen(
                 } as Component,
             )
         }
+
+        buttonRow.child(
+            GlintComponents.smallButton(
+                McComponent.literal("Preview"),
+                width = 55,
+                tooltip = McComponent.literal("Take a vanilla capture of this scene"),
+            ) {
+                if (PreviewCapture.start(metadata.slug)) {
+                    onClose()
+                } else {
+                    StatusLog.error("Failed to start preview capture")
+                    rebuildStatusBar()
+                }
+            } as Component,
+        )
 
         buttonRow.child(
             GlintComponents.smallButton(

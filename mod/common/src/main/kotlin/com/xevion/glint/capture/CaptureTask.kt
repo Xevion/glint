@@ -14,7 +14,7 @@ import java.util.concurrent.CompletableFuture
  * - Frame 0: Optionally hide HUD (framebuffer is already at capture resolution from session start)
  * - Frame 1: Read back framebuffer pixels and write image asynchronously
  *
- * No settle frames are needed because the StabilizationDetector in CaptureSession
+ * No settle frames are needed because the StabilizationDetector in LinearOrchestrator
  * already ensures chunks, lighting, and rendering are fully stable before capture begins,
  * and the framebuffer has been at 4K since session start (no per-capture resize).
  */

@@ -13,7 +13,7 @@ import com.xevion.glint.Loggers
  * IMPORTANT: When `LevelRenderer.allChanged()` is called, Sodium destroys and recreates its
  * RenderSectionManager. The `needsUpdate` flag is set to true initially but gets cleared
  * during the same tick's render pass when `update()` is called. Callers must provide their own
- * timing buffer (e.g. the [CaptureSession] `WaitingForRebuild` state) to avoid checking on
+ * timing buffer (e.g. a stabilization wait state) to avoid checking on
  * the same tick as `allChanged()`.
  */
 object SodiumIntegration {
@@ -143,8 +143,8 @@ object SodiumIntegration {
      * Returns true when the render graph is up-to-date and the build queue is empty.
      * Returns null if Sodium is not available or reflection fails.
      *
-     * Callers must provide their own timing buffer (e.g. the [CaptureSession.State.WaitingForRebuild]
-     * state) to avoid checking on the same tick as `allChanged()`.
+     * Callers must provide their own timing buffer (e.g. a stabilization wait state)
+     * to avoid checking on the same tick as `allChanged()`.
      */
     fun isRenderingComplete(): Boolean? {
         if (!isAvailable()) return null
