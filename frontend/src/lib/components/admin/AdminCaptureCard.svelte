@@ -16,24 +16,26 @@ let { capture, alt = capture.shader_name, children }: Props = $props();
 
 <a
 	href="/admin/captures/{capture.id}"
-	class="overflow-hidden rounded-lg border transition-colors hover:bg-muted/50"
+	class="block rounded-lg border bg-card transition-colors hover:bg-muted/50"
 >
-	{#if capture.image_url}
-		<CaptureImage
-			src={capture.image_url}
-			thumbhash={capture.thumbhash}
-			preset="card"
-			{alt}
-			class="w-full"
-			containerClass="aspect-video w-full"
-		/>
-	{:else}
-		<div
-			class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground"
-		>
-			No image
-		</div>
-	{/if}
+	<div class="overflow-hidden rounded-t-lg">
+		{#if capture.image_url}
+			<CaptureImage
+				src={capture.image_url}
+				thumbhash={capture.thumbhash}
+				preset="card"
+				{alt}
+				class="w-full"
+				containerClass="aspect-video w-full"
+			/>
+		{:else}
+			<div
+				class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground"
+			>
+				No image
+			</div>
+		{/if}
+	</div>
 	{#if children}
 		{@render children()}
 	{/if}
