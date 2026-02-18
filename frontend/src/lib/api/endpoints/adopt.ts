@@ -11,14 +11,14 @@ import type { ApiError } from '../errors';
 export class AdoptEndpoints extends ApiClient {
 	search(
 		query?: string,
-		limit?: number,
-		offset?: number,
+		page?: number,
+		pageSize?: number,
 		sort?: ShaderSearchSort
 	): Promise<Result<ShaderSearchResponse, ApiError>> {
 		return this.post<ShaderSearchResponse>('/api/shaders/search', {
 			query: query ?? undefined,
-			limit,
-			offset,
+			page,
+			page_size: pageSize,
 			sort
 		});
 	}

@@ -59,11 +59,6 @@ function handleTabChange(tab: string) {
 		url.searchParams.set('tab', tab);
 	}
 	void goto(url.toString(), { replaceState: true, noScroll: true, keepFocus: true });
-
-	// Lazy-load discover data on first visit
-	if (tab === 'discover' && !discoverLoaded) {
-		void loadBrowse(browseSort);
-	}
 }
 
 // Discover state
@@ -71,6 +66,7 @@ const PAGE_SIZE = 20;
 
 let discoverLoaded = $state(false);
 let discoverResults = $state<ShaderSearchResult[]>([]);
+let discoverPage = $state(1);
 let totalModrinth = $state(0);
 let totalCurseforge = $state<number | undefined>(undefined);
 let discoverLoading = $state(false);
@@ -117,9 +113,10 @@ async function loadBrowse(sort: ShaderSearchSort) {
 	if (isInitial) discoverLoading = true;
 	discoverError = null;
 
-	const result = await withRetry(() => api.adopt.search(undefined, PAGE_SIZE, 0, sort));
+	const result = await withRetry(() => api.adopt.search(undefined, 1, PAGE_SIZE, sort));
 	if (result.isOk) {
 		discoverResults = result.value.results;
+		discoverPage = 2;
 		totalModrinth = result.value.total_modrinth;
 		totalCurseforge = result.value.total_curseforge;
 	} else {
@@ -145,9 +142,10 @@ async function handleSearch() {
 	searchActive = true;
 	searchQuery = q;
 
-	const result = await withRetry(() => api.adopt.search(q, PAGE_SIZE, 0));
+	const result = await withRetry(() => api.adopt.search(q, 1, PAGE_SIZE));
 	if (result.isOk) {
 		discoverResults = result.value.results;
+		discoverPage = 2;
 		totalModrinth = result.value.total_modrinth;
 		totalCurseforge = result.value.total_curseforge;
 	} else {
@@ -161,13 +159,17 @@ async function loadMore() {
 	discoverLoadingMore = true;
 	discoverError = null;
 
-	const offset = discoverResults.length;
 	const sort: ShaderSearchSort | undefined = searchActive ? undefined : browseSort;
 	const q = searchActive ? searchQuery : undefined;
 
-	const result = await withRetry(() => api.adopt.search(q, PAGE_SIZE, offset, sort));
+	const result = await withRetry(() => api.adopt.search(q, discoverPage, PAGE_SIZE, sort));
 	if (result.isOk) {
-		discoverResults = [...discoverResults, ...result.value.results];
+		// Deduplicate: platform pagination can return the same project at different pages
+		// when sort order is unstable (e.g. download count ties shifting between pages)
+		const existing = new Set(discoverResults.map((r) => r.platform + ':' + r.platform_id));
+		const fresh = result.value.results.filter((r) => !existing.has(r.platform + ':' + r.platform_id));
+		discoverResults = [...discoverResults, ...fresh];
+		discoverPage += 1;
 		totalModrinth = result.value.total_modrinth;
 		totalCurseforge = result.value.total_curseforge;
 	} else {

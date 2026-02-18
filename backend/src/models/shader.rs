@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use sqlx::FromRow;
 use sqlx::types::Json;
+use sqlx::FromRow;
 use ts_rs::TS;
 
 use super::capture::CaptureWithContext;
@@ -201,7 +201,7 @@ pub enum ShaderSearchSort {
 pub struct ShaderSearchRequest {
     pub query: Option<String>,
     #[serde(flatten)]
-    pub page: crate::models::pagination::PageQuery,
+    pub page: crate::models::pagination::PageBody,
     /// Sort order for browse mode (ignored when query is provided)
     pub sort: Option<ShaderSearchSort>,
 }
