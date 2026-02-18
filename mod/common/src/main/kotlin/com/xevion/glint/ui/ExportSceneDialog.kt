@@ -282,26 +282,7 @@ class ExportSceneDialog(
             },
         )
 
-        val weatherRow = Containers.horizontalFlow(Sizing.content(), Sizing.content())
-        weatherRow.gap(GlintTheme.GAP_SM)
-        weatherRow.verticalAlignment(VerticalAlignment.CENTER)
-        weatherRow.child(
-            Components
-                .label(McComponent.literal("Weather:"))
-                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
-        )
-        val weatherButton =
-            GlintComponents.smallButton(
-                McComponent.literal(currentWeather.displayName),
-                width = 60,
-                tooltip = McComponent.literal("Click to cycle weather"),
-            ) { btn ->
-                currentWeather = currentWeather.next()
-                btn.setMessage(McComponent.literal(currentWeather.displayName))
-                applyWeather()
-            }
-        weatherRow.child(weatherButton as Component)
-        panel.child(weatherRow as Component)
+        panel.child(buildWeatherRow() as Component)
 
         moonLabel = Components.label(moonText())
         addSlider(
@@ -317,30 +298,7 @@ class ExportSceneDialog(
             },
         )
 
-        val freezeRow = Containers.horizontalFlow(Sizing.content(), Sizing.content())
-        freezeRow.gap(GlintTheme.GAP_SM)
-        freezeRow.verticalAlignment(VerticalAlignment.CENTER)
-        freezeRow.child(
-            Components
-                .label(McComponent.literal("Freeze Entities:"))
-                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
-        )
-        val freezeButton =
-            GlintComponents.smallButton(
-                McComponent.literal(if (entityTicksFrozen) "On" else "Off"),
-                width = 40,
-                tooltip = McComponent.literal("Freeze entity movement and animations"),
-            ) { btn ->
-                entityTicksFrozen = !entityTicksFrozen
-                if (entityTicksFrozen) {
-                    SceneInjection.freezeEntityTick()
-                } else {
-                    SceneInjection.unfreezeEntityTick()
-                }
-                btn.setMessage(McComponent.literal(if (entityTicksFrozen) "On" else "Off"))
-            }
-        freezeRow.child(freezeButton as Component)
-        panel.child(freezeRow as Component)
+        panel.child(buildFreezeRow() as Component)
 
         errorLabel = Components.label(McComponent.literal(""))
         errorLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
@@ -358,6 +316,56 @@ class ExportSceneDialog(
 
         validateInput()
         uiAdapter.rootComponent.focusHandler()?.focus(nameInput as Component, null)
+    }
+
+    private fun buildWeatherRow(): FlowLayout {
+        val row = Containers.horizontalFlow(Sizing.content(), Sizing.content())
+        row.gap(GlintTheme.GAP_SM)
+        row.verticalAlignment(VerticalAlignment.CENTER)
+        row.child(
+            Components
+                .label(McComponent.literal("Weather:"))
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+        )
+        val button =
+            GlintComponents.smallButton(
+                McComponent.literal(currentWeather.displayName),
+                width = 60,
+                tooltip = McComponent.literal("Click to cycle weather"),
+            ) { btn ->
+                currentWeather = currentWeather.next()
+                btn.setMessage(McComponent.literal(currentWeather.displayName))
+                applyWeather()
+            }
+        row.child(button as Component)
+        return row
+    }
+
+    private fun buildFreezeRow(): FlowLayout {
+        val row = Containers.horizontalFlow(Sizing.content(), Sizing.content())
+        row.gap(GlintTheme.GAP_SM)
+        row.verticalAlignment(VerticalAlignment.CENTER)
+        row.child(
+            Components
+                .label(McComponent.literal("Freeze Entities:"))
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+        )
+        val button =
+            GlintComponents.smallButton(
+                McComponent.literal(if (entityTicksFrozen) "On" else "Off"),
+                width = 40,
+                tooltip = McComponent.literal("Freeze entity movement and animations"),
+            ) { btn ->
+                entityTicksFrozen = !entityTicksFrozen
+                if (entityTicksFrozen) {
+                    SceneInjection.freezeEntityTick()
+                } else {
+                    SceneInjection.unfreezeEntityTick()
+                }
+                btn.setMessage(McComponent.literal(if (entityTicksFrozen) "On" else "Off"))
+            }
+        row.child(button as Component)
+        return row
     }
 
     private fun buildProgressView(panel: FlowLayout) {

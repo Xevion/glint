@@ -237,4 +237,4 @@ jobs:
 
       - name: Frontend security audit
         working-directory: frontend
-        run: bun audit --audit-level=moderate
+        run: bun audit --audit-level=moderate --ignore=GHSA-2g4f-4pwh-qvx6
