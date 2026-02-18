@@ -20,6 +20,18 @@ use crate::{
     state::AppState,
 };
 
+/// Error codes passed as `?error=<code>` to the login page when OAuth fails.
+/// Each code maps to a specific user-facing message on the frontend.
+mod oauth_error {
+    pub const SESSION_EXPIRED: &str = "session_expired";
+    pub const STATE_INVALID: &str = "state_invalid";
+    pub const CSRF_MISMATCH: &str = "csrf_mismatch";
+    pub const EXCHANGE_FAILED: &str = "exchange_failed";
+    pub const DISCORD_ERROR: &str = "discord_error";
+    pub const DISCORD_UNAVAILABLE: &str = "discord_unavailable";
+    pub const SERVER_ERROR: &str = "server_error";
+}
+
 /// Cookie name for OAuth CSRF state token
 const OAUTH_STATE_COOKIE: &str = "glint_oauth_state";
 
@@ -104,16 +116,71 @@ struct DiscordUser {
     avatar: Option<String>,
 }
 
-/// GET /api/auth/discord/callback - Handles Discord OAuth callback
+/// Best-effort extraction of the redirect URL from the OAuth state parameter.
+/// Called before any validation so we can preserve the user's destination even
+/// when the callback fails. Returns "/" if the state is unparseable.
+fn parse_redirect_from_state(state: &str) -> &str {
+    state
+        .split_once(':')
+        .map(|(_, redirect)| validate_redirect_url(redirect))
+        .unwrap_or("/")
+}
+
+/// Build a `/login?error=<code>&redirect=<url>` URL for OAuth error redirects.
+fn build_login_error_url(error_code: &str, redirect: &str) -> String {
+    let qs = form_urlencoded::Serializer::new(String::new())
+        .append_pair("error", error_code)
+        .append_pair("redirect", redirect)
+        .finish();
+    format!("/login?{qs}")
+}
+
+/// Cookie that clears the CSRF state token.
+fn clear_csrf_cookie() -> Cookie<'static> {
+    Cookie::build((OAUTH_STATE_COOKIE, ""))
+        .path("/")
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(true)
+        .max_age(time::Duration::ZERO)
+        .build()
+}
+
+/// GET /api/auth/discord/callback - Handles Discord OAuth callback.
+///
+/// On success, sets a session cookie and redirects to the user's original
+/// destination. On failure, redirects to `/login?error=<code>` so the user
+/// sees a proper error page instead of raw JSON.
 #[instrument(skip(state, jar))]
 async fn discord_callback(
     State(state): State<AppState>,
     Query(query): Query<CallbackQuery>,
     jar: CookieJar,
-) -> AppResult<(CookieJar, Response)> {
-    let oauth_client = state
-        .oauth()
-        .ok_or_else(|| AppError::ServiceUnavailable("Discord OAuth not configured".to_string()))?;
+) -> (CookieJar, Response) {
+    let redirect = parse_redirect_from_state(&query.state).to_owned();
+
+    match discord_callback_inner(&state, query, &jar).await {
+        Ok((session_jar, response)) => (session_jar, response),
+        Err(code) => {
+            let jar = jar.add(clear_csrf_cookie());
+            let url = build_login_error_url(code, &redirect);
+            warn!(
+                error_code = code,
+                "OAuth callback failed, redirecting to login"
+            );
+            (jar, Redirect::temporary(&url).into_response())
+        }
+    }
+}
+
+/// Inner callback logic. Returns the error code string on failure so the
+/// outer handler can redirect to the login page with the appropriate message.
+async fn discord_callback_inner(
+    state: &AppState,
+    query: CallbackQuery,
+    jar: &CookieJar,
+) -> Result<(CookieJar, Response), &'static str> {
+    let oauth_client = state.oauth().ok_or(oauth_error::DISCORD_UNAVAILABLE)?;
 
     // Validate CSRF state: extract token from cookie and compare with state parameter
     let stored_csrf = jar
@@ -121,36 +188,25 @@ async fn discord_callback(
         .map(|c| c.value().to_string())
         .ok_or_else(|| {
             warn!("OAuth callback missing CSRF state cookie");
-            AppError::BadRequest("Invalid OAuth state: missing CSRF cookie".to_string())
+            oauth_error::SESSION_EXPIRED
         })?;
 
     // Parse state parameter (format: "csrf_token:redirect_url")
     let (state_csrf, redirect_url) = query
         .state
         .split_once(':')
-        .ok_or_else(|| AppError::BadRequest("Invalid OAuth state format".to_string()))?;
+        .ok_or(oauth_error::STATE_INVALID)?;
 
-    if state_csrf.as_bytes().ct_eq(stored_csrf.as_bytes()).into() {
-        // Tokens match — continue
-    } else {
+    if !bool::from(state_csrf.as_bytes().ct_eq(stored_csrf.as_bytes())) {
         warn!("OAuth CSRF token mismatch");
-        return Err(AppError::BadRequest(
-            "Invalid OAuth state: CSRF token mismatch".to_string(),
-        ));
+        return Err(oauth_error::CSRF_MISMATCH);
     }
 
     // Validate redirect URL again on callback (defense in depth)
     let redirect_url = validate_redirect_url(redirect_url);
 
-    // Clear the CSRF cookie
-    let clear_csrf = Cookie::build((OAUTH_STATE_COOKIE, ""))
-        .path("/")
-        .http_only(true)
-        .same_site(SameSite::Lax)
-        .secure(true)
-        .max_age(time::Duration::ZERO)
-        .build();
-    let jar = jar.add(clear_csrf);
+    // Clear the CSRF cookie now that it's been validated
+    let jar = jar.clone().add(clear_csrf_cookie());
 
     // Exchange authorization code for access token
     let token_result = oauth_client
@@ -159,13 +215,18 @@ async fn discord_callback(
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to exchange OAuth code");
-            AppError::BadRequest("Failed to exchange authorization code".to_string())
+            oauth_error::EXCHANGE_FAILED
         })?;
 
     let access_token = token_result.access_token().secret();
 
     // Fetch user info from Discord
-    let discord_user = fetch_discord_user(state.http(), access_token).await?;
+    let discord_user = fetch_discord_user(state.http(), access_token)
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to fetch Discord user info");
+            oauth_error::DISCORD_ERROR
+        })?;
     debug!(
         discord_id = %discord_user.id,
         username = %discord_user.username,
@@ -179,10 +240,19 @@ async fn discord_callback(
         &discord_user.username,
         discord_user.avatar.as_deref(),
     )
-    .await?;
+    .await
+    .map_err(|e| {
+        error!(error = %e, "Failed to upsert user");
+        oauth_error::SERVER_ERROR
+    })?;
 
     // Create session (web source since this is browser OAuth)
-    let session = SessionRepo::create(state.db(), user.id, "web").await?;
+    let session = SessionRepo::create(state.db(), user.id, "web")
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to create session");
+            oauth_error::SERVER_ERROR
+        })?;
 
     // Build session cookie
     let cookie = Cookie::build((SESSION_COOKIE_NAME, session.token))
