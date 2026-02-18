@@ -38,6 +38,8 @@ const config = {
 				],
 				'connect-src': [
 					'self',
+					// Cloudflare R2 pre-signed upload URLs
+					'https://*.r2.cloudflarestorage.com',
 					// PostHog event ingestion and self-hosted instance
 					'https://us.posthog.com',
 					'https://us-assets.i.posthog.com',
