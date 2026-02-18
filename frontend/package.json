@@ -86,6 +86,7 @@
 		"@fontsource/inter": "^5.2.8",
 		"@logtape/logtape": "^2.0.2",
 		"@resvg/resvg-js": "^2.6.2",
+		"@tanstack/table-core": "^8.21.3",
 		"@xevion/satori-html": "^0.4.1",
 		"class-variance-authority": "^0.7.1",
 		"d3-scale": "^4.0.2",

@@ -3,12 +3,11 @@ import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { api } from '$lib/api';
 import type { Shader, ShaderListItem, ShaderSearchResult, ShaderSearchSort } from '$lib/bindings';
-import AdminTable from '$lib/components/AdminTable.svelte';
 import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
+import { createDataTable, DataTable, DataTablePagination } from '$lib/components/data-table';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminPageHeader } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
-import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
 import * as Tabs from '$lib/components/ui/tabs';
@@ -16,9 +15,7 @@ import { cn } from '$lib/utils';
 import { formatNumber } from '$lib/utils/display';
 import { withRetry } from '$lib/utils/retry';
 import {
-	Check,
 	CircleAlert,
-	Clock,
 	Download,
 	ExternalLink,
 	EyeOff,
@@ -26,11 +23,11 @@ import {
 	Link,
 	LoaderCircle,
 	Search,
-	SkipForward,
 	Sparkles,
 	X as XIcon
 } from '@lucide/svelte';
 import type { PageData } from './$types';
+import { columns } from './columns.js';
 
 // My Shaders data (from SSR load)
 interface Props {
@@ -39,6 +36,15 @@ interface Props {
 let { data }: Props = $props();
 let shaders = $derived(data.shaders);
 let shadersError = $derived(data.error);
+
+// TanStack Table for My Shaders
+const table = createDataTable<ShaderListItem>({
+	get data() {
+		return shaders;
+	},
+	columns,
+	pageSize: 50
+});
 
 // Tab state (synced to URL)
 type PageTab = 'my-shaders' | 'discover';
@@ -58,42 +64,6 @@ function handleTabChange(tab: string) {
 	if (tab === 'discover' && !discoverLoaded) {
 		void loadBrowse(browseSort);
 	}
-}
-
-// My Shaders table config
-const columns = [
-	{ id: 'icon', key: 'icon_url', name: '', hideOnMobile: true },
-	{ id: 'name', key: 'name', name: 'Name', cardTitle: true },
-	{ id: 'description', key: 'description', name: 'Description' },
-	{ id: 'sync_status', key: 'last_synced_at', name: 'Sync' },
-	{ id: 'versions', key: 'version_count', name: 'Versions' },
-	{ id: 'extraction', key: 'extraction_summary', name: 'Extraction' },
-	{ id: 'created_at', key: 'created_at', name: 'Created' }
-];
-
-function getSyncStatus(shader: ShaderListItem): { label: string; class: string } {
-	const hasLink = !!shader.modrinth_id || !!shader.curseforge_id;
-	if (!hasLink) return { label: 'No link', class: 'text-muted-foreground' };
-	if (!shader.last_synced_at) return { label: 'Never', class: 'text-warning' };
-
-	const days = (Date.now() - new Date(shader.last_synced_at).getTime()) / (1000 * 60 * 60 * 24);
-	if (days > 7) return { label: `${Math.floor(days)}d`, class: 'text-destructive' };
-	if (days > 1) return { label: `${Math.floor(days)}d`, class: 'text-warning' };
-	if (days * 24 > 1)
-		return {
-			label: `${Math.floor(days * 24)}h`,
-			class: 'text-success'
-		};
-	return { label: 'Now', class: 'text-success' };
-}
-
-function formatTerseTime(dateStr: string): string {
-	const days = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24);
-	if (days > 365) return `${Math.floor(days / 365)}y`;
-	if (days > 30) return `${Math.floor(days / 30)}mo`;
-	if (days > 1) return `${Math.floor(days)}d`;
-	if (days * 24 > 1) return `${Math.floor(days * 24)}h`;
-	return 'Now';
 }
 
 // Discover state
@@ -271,97 +241,48 @@ function handleShaderAdopted(shader: Shader) {
 				<Alert variant="destructive">Error: {shadersError}</Alert>
 			{:else if shaders.length === 0}
 				<div class="py-12 text-center">
-				<Download class="mx-auto mb-3 h-10 w-10 text-muted-foreground opacity-50" />
-				<p class="text-muted-foreground">No shaders yet.</p>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Switch to the Discover tab to find and adopt shaders.
-				</p>
+					<Download class="mx-auto mb-3 h-10 w-10 text-muted-foreground opacity-50" />
+					<p class="text-muted-foreground">No shaders yet.</p>
+					<p class="mt-1 text-sm text-muted-foreground">
+						Switch to the Discover tab to find and adopt shaders.
+					</p>
 				</div>
 			{:else}
-				<AdminTable
-					data={shaders}
-					{columns}
+				<DataTable
+					{table}
 					onRowClick={(shader: ShaderListItem) => goto(`/admin/shaders/${shader.id}`)}
-					getRowId={(s: ShaderListItem) => s.id}
 				>
-				{#snippet cell({ columnId, value, row })}
-					{#if columnId === 'icon'}
-						{@const shader = row as ShaderListItem}
-						{#if shader.icon_url}
-							<img
-								src={shader.icon_url}
-								alt=""
-								class="h-8 w-8 shrink-0 rounded object-cover"
-							/>
-						{:else}
-							<div
-								class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted"
-							>
-								<Sparkles class="h-4 w-4 text-muted-foreground" />
-							</div>
-						{/if}
-					{:else if columnId === 'name'}
-						{@const shader = row as ShaderListItem}
-						<div>
-							<span class="font-medium">{value}</span>
-							<span class="ml-1.5 font-mono text-xs text-muted-foreground"
-								>{shader.slug}</span
-							>
-						</div>
-						{:else if columnId === 'description'}
-							{#if value}
-								<span class="line-clamp-1 max-w-xs">{value}</span>
+					{#snippet card(shader: ShaderListItem)}
+						<div class="flex gap-3">
+							{#if shader.icon_url}
+								<img
+									src={shader.icon_url}
+									alt=""
+									class="h-10 w-10 shrink-0 rounded object-cover"
+								/>
 							{:else}
-								<span class="text-muted-foreground">-</span>
+								<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-muted">
+									<Sparkles class="h-5 w-5 text-muted-foreground" />
+								</div>
 							{/if}
-						{:else if columnId === 'sync_status'}
-							{@const status = getSyncStatus(row as ShaderListItem)}
-							<span class="text-sm font-medium {status.class}"
-								>{status.label}</span
-							>
-					{:else if columnId === 'versions'}
-						<span class="text-sm tabular-nums text-muted-foreground">{(row as ShaderListItem).version_count}</span>
-					{:else if columnId === 'extraction'}
-						{@const summary = (row as ShaderListItem).extraction_summary}
-						{#if !summary || summary.total === 0}
-							<span class="text-xs text-muted-foreground">No versions</span>
-						{:else}
-							<div class="flex items-center gap-1">
-								{#if summary.completed > 0}
-									<Badge variant="default" class="gap-0.5 px-1.5 py-0 text-[10px] bg-success hover:bg-success">
-										<Check class="h-3 w-3" />{summary.completed}
-									</Badge>
-								{/if}
-								{#if summary.failed > 0}
-									<Badge variant="destructive" class="gap-0.5 px-1.5 py-0 text-[10px]">
-										<XIcon class="h-3 w-3" />{summary.failed}
-									</Badge>
-								{/if}
-								{#if summary.pending > 0}
-									<Badge variant="secondary" class="gap-0.5 px-1.5 py-0 text-[10px]">
-										<Clock class="h-3 w-3" />{summary.pending}
-									</Badge>
-								{/if}
-								{#if summary.skipped > 0}
-									<Badge variant="outline" class="gap-0.5 px-1.5 py-0 text-[10px]">
-										<SkipForward class="h-3 w-3" />{summary.skipped}
-									</Badge>
+							<div class="min-w-0 flex-1">
+								<div class="font-medium">{shader.name}</div>
+								<div class="text-xs text-muted-foreground">{shader.slug}</div>
+								{#if shader.description}
+									<div class="mt-1 line-clamp-1 text-xs text-muted-foreground">
+										{shader.description}
+									</div>
 								{/if}
 							</div>
-						{/if}
-					{:else if columnId === 'created_at'}
-						{#if value}
-							<span class="text-sm tabular-nums text-muted-foreground"
-								>{formatTerseTime(value as string)}</span
-							>
-						{:else}
-							<span class="text-muted-foreground">-</span>
-						{/if}
-					{:else}
-						{value ?? '-'}
-					{/if}
+							<div class="shrink-0 text-right text-xs text-muted-foreground">
+								<div>{shader.version_count} ver.</div>
+							</div>
+						</div>
 					{/snippet}
-				</AdminTable>
+				</DataTable>
+				<div class="mt-3">
+					<DataTablePagination {table} />
+				</div>
 			{/if}
 		</Tabs.Content>
 
@@ -372,7 +293,9 @@ function handleShaderAdopted(shader: Shader) {
 				<div class="flex items-center gap-2">
 					<!-- Search input -->
 					<div class="relative min-w-0 flex-1">
-						<Search class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+						<Search
+							class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+						/>
 						<Input
 							placeholder="Search shaders..."
 							bind:value={searchInput}
@@ -387,7 +310,10 @@ function handleShaderAdopted(shader: Shader) {
 						<Button
 							variant={browseSort === 'popular' && !searchActive ? 'default' : 'ghost'}
 							size="sm"
-							class={cn('rounded-r-none border-r text-xs', (browseSort !== 'popular' || searchActive) && 'bg-muted')}
+							class={cn(
+								'rounded-r-none border-r text-xs',
+								(browseSort !== 'popular' || searchActive) && 'bg-muted'
+							)}
 							disabled={searchActive}
 							onclick={() => handleBrowseSortChange('popular')}
 						>
@@ -397,7 +323,10 @@ function handleShaderAdopted(shader: Shader) {
 						<Button
 							variant={browseSort === 'recent' && !searchActive ? 'default' : 'ghost'}
 							size="sm"
-							class={cn('rounded-l-none text-xs', (browseSort !== 'recent' || searchActive) && 'bg-muted')}
+							class={cn(
+								'rounded-l-none text-xs',
+								(browseSort !== 'recent' || searchActive) && 'bg-muted'
+							)}
 							disabled={searchActive}
 							onclick={() => handleBrowseSortChange('recent')}
 						>
@@ -415,7 +344,9 @@ function handleShaderAdopted(shader: Shader) {
 						title={hideAdopted ? 'Show adopted shaders' : 'Hide adopted shaders'}
 					>
 						<EyeOff class="h-3.5 w-3.5" />
-						<span class="hidden sm:inline">{hideAdopted ? 'Hidden' : 'Hide adopted'}</span>
+						<span class="hidden sm:inline"
+							>{hideAdopted ? 'Hidden' : 'Hide adopted'}</span
+						>
 					</Button>
 
 					<!-- Adopt by URL -->
@@ -425,12 +356,7 @@ function handleShaderAdopted(shader: Shader) {
 						onShaderAdopted={handleShaderAdopted}
 					>
 						{#snippet trigger({ props })}
-							<Button
-								variant="outline"
-								size="icon-sm"
-								title="Adopt by URL"
-								{...props}
-							>
+							<Button variant="outline" size="icon-sm" title="Adopt by URL" {...props}>
 								<Link class="h-4 w-4" />
 							</Button>
 						{/snippet}
@@ -439,9 +365,7 @@ function handleShaderAdopted(shader: Shader) {
 
 				<!-- Search active banner -->
 				{#if searchActive}
-					<div
-						class="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm"
-					>
+					<div class="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm">
 						<Search class="h-4 w-4 shrink-0 text-muted-foreground" />
 						<span class="text-muted-foreground">
 							Results for "<span class="font-medium text-foreground"
@@ -459,8 +383,8 @@ function handleShaderAdopted(shader: Shader) {
 
 				<!-- Result count -->
 				{#if discoverLoaded && !discoverLoading && discoverResults.length > 0}
-				<p class="text-xs text-muted-foreground">
-					{totalModrinth} Modrinth{totalCurseforge != null
+					<p class="text-xs text-muted-foreground">
+						{totalModrinth} Modrinth{totalCurseforge != null
 							? ` · ${totalCurseforge} CurseForge`
 							: ''}
 						{#if hideAdopted && filteredResults.length < discoverResults.length}
@@ -487,12 +411,8 @@ function handleShaderAdopted(shader: Shader) {
 										class="h-12 w-12 shrink-0 animate-pulse rounded-lg bg-muted"
 									></div>
 									<div class="min-w-0 flex-1 space-y-2">
-										<div
-											class="h-4 w-2/3 animate-pulse rounded bg-muted"
-										></div>
-										<div
-											class="h-3 w-1/3 animate-pulse rounded bg-muted"
-										></div>
+										<div class="h-4 w-2/3 animate-pulse rounded bg-muted"></div>
+										<div class="h-3 w-1/3 animate-pulse rounded bg-muted"></div>
 										<div class="h-3 w-full animate-pulse rounded bg-muted"></div>
 									</div>
 								</div>
@@ -511,7 +431,7 @@ function handleShaderAdopted(shader: Shader) {
 					</p>
 				{/if}
 
-				<!-- Card grid (separate from empty state so Load More is always reachable) -->
+				<!-- Card grid -->
 				{#if filteredResults.length > 0}
 					<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 						{#each filteredResults as result (result.platform + ':' + result.platform_id)}
@@ -521,7 +441,6 @@ function handleShaderAdopted(shader: Shader) {
 									: ''}"
 							>
 								<div class="flex gap-3 p-4 pb-2">
-									<!-- Icon -->
 									{#if result.icon_url}
 										<img
 											src={result.icon_url}
@@ -532,22 +451,18 @@ function handleShaderAdopted(shader: Shader) {
 										<div
 											class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted"
 										>
-											<Download
-												class="h-5 w-5 text-muted-foreground"
-											/>
+											<Download class="h-5 w-5 text-muted-foreground" />
 										</div>
 									{/if}
-
-									<!-- Name + author -->
 									<div class="min-w-0 flex-1">
 										<div class="flex items-start gap-1.5">
+											<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 											<a
 												href={result.platform_url}
 												target="_blank"
 												rel="noopener noreferrer"
 												class="truncate font-medium leading-tight hover:underline"
-												onclick={(e: MouseEvent) =>
-													e.stopPropagation()}
+												onclick={(e: MouseEvent) => e.stopPropagation()}
 											>
 												{result.name}
 											</a>
@@ -555,15 +470,11 @@ function handleShaderAdopted(shader: Shader) {
 												class="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground"
 											/>
 										</div>
-										<p
-											class="mt-0.5 truncate text-xs text-muted-foreground"
-										>
+										<p class="mt-0.5 truncate text-xs text-muted-foreground">
 											{result.author}
 										</p>
 									</div>
 								</div>
-
-								<!-- Description -->
 								{#if result.description}
 									<p
 										class="line-clamp-2 px-4 text-xs leading-relaxed text-muted-foreground"
@@ -571,14 +482,10 @@ function handleShaderAdopted(shader: Shader) {
 										{result.description}
 									</p>
 								{/if}
-
-								<!-- Footer: metadata + action -->
 								<div
 									class="mt-auto flex items-center justify-between gap-2 px-4 pb-3 pt-2"
 								>
-									<div
-										class="flex items-center gap-2 text-xs text-muted-foreground"
-									>
+									<div class="flex items-center gap-2 text-xs text-muted-foreground">
 										<span class="tabular-nums">
 											<Download class="mr-0.5 inline h-3 w-3" />{formatNumber(
 												result.downloads
@@ -589,7 +496,6 @@ function handleShaderAdopted(shader: Shader) {
 											<TimeAgo timestamp={result.updated_at} />
 										{/if}
 									</div>
-
 									{#if result.adopted}
 										<Button
 											size="sm"
@@ -615,14 +521,10 @@ function handleShaderAdopted(shader: Shader) {
 					</div>
 				{/if}
 
-				<!-- Load more (always visible when there are more results, even if current page is all filtered out) -->
+				<!-- Load more -->
 				{#if hasMore && !discoverLoading}
 					<div class="flex justify-center pt-2">
-						<Button
-							variant="outline"
-							onclick={loadMore}
-							disabled={discoverLoadingMore}
-						>
+						<Button variant="outline" onclick={loadMore} disabled={discoverLoadingMore}>
 							{#if discoverLoadingMore}
 								<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 							{/if}
@@ -634,5 +536,3 @@ function handleShaderAdopted(shader: Shader) {
 		</Tabs.Content>
 	</Tabs.Root>
 </div>
-
-
