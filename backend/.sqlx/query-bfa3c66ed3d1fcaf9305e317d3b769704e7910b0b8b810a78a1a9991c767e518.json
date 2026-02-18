@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, name, label\n        FROM shader_version_profiles\n        WHERE display_name = ''\n        LIMIT $1\n        ",
+  "query": "\n        SELECT id, name, label, display_name\n        FROM shader_version_profiles\n        ORDER BY id\n        ",
   "describe": {
     "columns": [
       {
@@ -17,18 +17,22 @@
         "ordinal": 2,
         "name": "label",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "display_name",
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Left": [
-        "Int8"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "dbc994deb17944c3494aabd299a574dd43dd209ca51dcde316b151d8493d15df"
+  "hash": "bfa3c66ed3d1fcaf9305e317d3b769704e7910b0b8b810a78a1a9991c767e518"
 }

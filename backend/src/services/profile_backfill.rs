@@ -1,98 +1,123 @@
-use std::time::Duration;
-
 use sqlx::PgPool;
-use tracing::{debug, info, warn};
+use tracing::{error, info, warn};
 
 use crate::extraction::normalize::normalize_display_name;
 use crate::services::lifecycle::ServiceContext;
 
-/// Number of profiles to process per batch.
-const BATCH_SIZE: i64 = 200;
-
-/// Initial backoff when no pending rows found.
-const IDLE_BACKOFF_INITIAL: Duration = Duration::from_secs(60);
-
-/// Maximum backoff when the queue stays empty.
-const IDLE_BACKOFF_MAX: Duration = Duration::from_secs(10 * 60);
-
-/// Background worker that backfills empty `display_name` values on shader profiles.
+/// One-shot background worker that normalizes `display_name` for all shader profiles.
 ///
-/// Queries for profiles where `display_name = ''` (the sentinel value), computes
-/// the normalized display name from `name` and `label`, and writes it back.
-/// Backs off exponentially when no work is found.
+/// Queries every profile in the database, recomputes the normalized display name
+/// from `name` and `label`, and updates any rows whose stored value differs.
+/// Reports statistics and any anomalies, then exits permanently.
 pub async fn run(ctx: ServiceContext, pool: PgPool) {
-    let mut backoff = IDLE_BACKOFF_INITIAL;
-
-    loop {
-        let processed = process_batch(&pool).await;
-
-        if processed > 0 {
-            info!(count = processed, "Backfilled profile display names");
-            backoff = IDLE_BACKOFF_INITIAL;
-        } else {
-            debug!(
-                backoff_secs = backoff.as_secs(),
-                "No profiles need backfill, backing off"
-            );
-            if !ctx.sleep(backoff).await {
-                break;
-            }
-            backoff = (backoff * 2).min(IDLE_BACKOFF_MAX);
-        }
-
-        if ctx.is_shutting_down() {
-            break;
-        }
+    if ctx.is_shutting_down() {
+        return;
     }
-}
 
-/// Fetch profiles with empty display_name and compute their normalized names.
-async fn process_batch(pool: &PgPool) -> usize {
+    info!("Starting profile display name normalization (one-shot)");
+
     let rows = match sqlx::query!(
         r#"
-        SELECT id, name, label
+        SELECT id, name, label, display_name
         FROM shader_version_profiles
-        WHERE display_name = ''
-        LIMIT $1
+        ORDER BY id
         "#,
-        BATCH_SIZE,
     )
-    .fetch_all(pool)
+    .fetch_all(&pool)
     .await
     {
         Ok(rows) => rows,
         Err(e) => {
-            warn!(error = %e, "Failed to query profiles for backfill");
-            return 0;
+            error!(error = %e, "Failed to query profiles for normalization backfill — aborting");
+            return;
         }
     };
 
-    if rows.is_empty() {
-        return 0;
+    let total = rows.len();
+    if total == 0 {
+        info!("No profiles in database — nothing to normalize");
+        return;
     }
 
-    let mut count = 0;
-    for row in &rows {
-        let display_name = normalize_display_name(&row.name, row.label.as_deref());
+    let mut updated = 0u64;
+    let mut empty_results = 0u64;
+    let mut short_results = 0u64;
+    let mut errors = 0u64;
 
-        if let Err(e) = sqlx::query!(
-            "UPDATE shader_version_profiles SET display_name = $1 WHERE id = $2",
-            display_name,
-            row.id,
-        )
-        .execute(pool)
-        .await
-        {
-            warn!(
-                error = %e,
+    for row in &rows {
+        let normalized = normalize_display_name(&row.name, row.label.as_deref());
+
+        // Validate the normalization result
+        if normalized.is_empty() {
+            error!(
                 profile_id = row.id,
-                "Failed to update display_name for profile"
+                name = row.name,
+                label = ?row.label,
+                stored = row.display_name,
+                "Normalization produced empty string — this should never happen"
             );
+            empty_results += 1;
             continue;
         }
 
-        count += 1;
+        if normalized.len() < 3 {
+            warn!(
+                profile_id = row.id,
+                name = row.name,
+                label = ?row.label,
+                display_name = normalized,
+                "Normalization produced suspiciously short display name (<3 chars)"
+            );
+            short_results += 1;
+        }
+
+        // Only update if the stored value differs
+        if row.display_name == normalized {
+            continue;
+        }
+
+        if let Err(e) = sqlx::query!(
+            "UPDATE shader_version_profiles SET display_name = $1 WHERE id = $2",
+            normalized,
+            row.id,
+        )
+        .execute(&pool)
+        .await
+        {
+            error!(
+                error = %e,
+                profile_id = row.id,
+                name = row.name,
+                old_display_name = row.display_name,
+                new_display_name = normalized,
+                "Failed to update display_name for profile"
+            );
+            errors += 1;
+            continue;
+        }
+
+        updated += 1;
     }
 
-    count
+    // Summary report
+    if errors > 0 || empty_results > 0 {
+        error!(
+            total,
+            updated,
+            errors,
+            empty_results,
+            short_results,
+            "Profile normalization completed with errors"
+        );
+    } else if short_results > 0 || updated > 0 {
+        warn!(
+            total,
+            updated, short_results, "Profile normalization completed with warnings"
+        );
+    } else {
+        info!(
+            total,
+            "Profile normalization completed — all display names are current"
+        );
+    }
 }

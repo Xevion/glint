@@ -86,8 +86,19 @@ const selectedVersion = $derived(
 	versions.find((v) => v.id === selectedVersionId) ?? versions[0] ?? null
 );
 
-// Profiles from extraction data for the selected version
-const extractedProfiles = $derived(shader.profiles ?? []);
+// Profiles from extraction data for the selected version.
+// Filter out any with empty display_name — these would render as invisible buttons.
+const extractedProfiles = $derived.by(() => {
+	const raw = shader.profiles ?? [];
+	const valid = raw.filter((p) => p.display_name.length > 0);
+	if (valid.length < raw.length) {
+		console.error(
+			`[profiles] ${raw.length - valid.length} profile(s) have empty display_name and were hidden`,
+			raw.filter((p) => p.display_name.length === 0)
+		);
+	}
+	return valid;
+});
 
 // Header metadata derivations
 const allFeatures = $derived.by(() => {

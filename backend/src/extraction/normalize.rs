@@ -4,6 +4,10 @@
 //! raw `name` (from shaders.properties) and optional `label` (from en_US.lang).
 //! Strips Minecraft formatting codes, decorative Unicode, metadata suffixes,
 //! and falls back to humanizing the raw name when no label is available.
+//!
+//! **Invariant:** The output is always at least 1 character. Empty strings are
+//! never returned — they would collide with the database sentinel value and
+//! render as invisible profile buttons in the frontend.
 
 /// Known-bad profile names that should never appear as display names.
 const BOGUS_NAMES: &[&str] = &["SHADER_VERSION_LABEL"];
@@ -112,6 +116,36 @@ const ABBREVIATION_LENGTH_THRESHOLD: usize = 3;
 /// 8. If humanized name is also empty, fall back to raw `name`
 /// 9. If raw name is known-bad, return "Default"
 pub fn normalize_display_name(name: &str, label: Option<&str>) -> String {
+    let result = normalize_inner(name, label);
+
+    // Enforce the non-empty invariant. This should never trigger — if it does,
+    // there's a logic bug in the normalization pipeline.
+    if result.is_empty() {
+        debug_assert!(
+            false,
+            "normalize_display_name produced empty string for name={name:?} label={label:?}"
+        );
+        tracing::error!(
+            name,
+            ?label,
+            "normalize_display_name produced empty string — falling back to \"Default\""
+        );
+        return "Default".to_string();
+    }
+
+    if result.len() < 3 {
+        tracing::warn!(
+            name,
+            ?label,
+            display_name = result,
+            "normalize_display_name produced short result (<3 chars)"
+        );
+    }
+
+    result
+}
+
+fn normalize_inner(name: &str, label: Option<&str>) -> String {
     let label_text = label.filter(|l| !l.trim().is_empty());
 
     if let Some(label) = label_text {
