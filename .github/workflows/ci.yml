@@ -31,6 +31,15 @@ jobs:
         working-directory: frontend
         run: bunx svelte-kit sync
 
+      - name: Verify gql-tada output
+        working-directory: frontend
+        run: |
+          bunx gql-tada generate output
+          if ! git diff --exit-code src/lib/graphql/graphql-env.d.ts; then
+            echo "::error::graphql-env.d.ts is stale. Run 'just bindings' locally to regenerate."
+            exit 1
+          fi
+
       - name: Check formatting
         working-directory: frontend
         run: |
@@ -182,6 +191,8 @@ jobs:
 
       - name: Run backend tests
         run: cargo nextest run --manifest-path backend/Cargo.toml -E 'not test(export_bindings)'
+        env:
+          GRAPHQL_SCHEMA_CHECK: "1"
 
   mod-smoke:
     name: Mod Smoke Test

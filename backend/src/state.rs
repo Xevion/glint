@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use aws_sdk_s3::Client as S3Client;
 use oauth2::{EndpointNotSet, EndpointSet};
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 
 use crate::{
     analytics::Analytics,
@@ -10,6 +10,7 @@ use crate::{
     config::Config,
     db::{DbPool, DbTransaction},
     error::{AppError, AppResult},
+    graphql::events::DomainEvent,
     platform::{curseforge::CurseForgeClient, modrinth::ModrinthClient},
 };
 
@@ -36,11 +37,13 @@ pub struct AppStateInner {
     pub modrinth: ModrinthClient,
     pub curseforge: Option<CurseForgeClient>,
     pub metadata_tx: mpsc::UnboundedSender<String>,
+    pub event_tx: broadcast::Sender<DomainEvent>,
     pub analytics: Option<Analytics>,
     pub session_cache: SessionCache,
 }
 
 impl AppState {
+    #[allow(clippy::too_many_arguments)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: DbPool,
@@ -51,6 +54,7 @@ impl AppState {
         modrinth: ModrinthClient,
         curseforge: Option<CurseForgeClient>,
         metadata_tx: mpsc::UnboundedSender<String>,
+        event_tx: broadcast::Sender<DomainEvent>,
         analytics: Option<Analytics>,
         session_cache: SessionCache,
     ) -> Self {
@@ -64,6 +68,7 @@ impl AppState {
                 modrinth,
                 curseforge,
                 metadata_tx,
+                event_tx,
                 analytics,
                 session_cache,
             }),
@@ -100,6 +105,10 @@ impl AppState {
 
     pub fn metadata_tx(&self) -> &mpsc::UnboundedSender<String> {
         &self.inner.metadata_tx
+    }
+
+    pub fn event_tx(&self) -> &broadcast::Sender<DomainEvent> {
+        &self.inner.event_tx
     }
 
     pub fn analytics(&self) -> Option<&Analytics> {

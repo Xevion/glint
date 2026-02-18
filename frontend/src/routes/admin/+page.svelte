@@ -1,6 +1,8 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
 import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
+import { useSubscription } from '$lib/graphql';
+import { CaptureCompletedSubscription } from '$lib/graphql/subscriptions/captures';
 import { AdminCaptureCard } from '$lib/components/admin';
 import { ItemGrid } from '$lib/components/item-grid';
 import ErrorBanner from '$lib/components/ErrorBanner.svelte';
@@ -32,7 +34,7 @@ import {
 	Svg,
 	Tooltip
 } from 'layerchart';
-import { onDestroy, onMount } from 'svelte';
+import { onMount } from 'svelte';
 import type { PageData } from './$types';
 
 interface Props {
@@ -73,6 +75,16 @@ let autoRefresh = $state(true);
 let lastRefreshed = $state<Date | null>(null);
 
 let refreshInterval: number | undefined;
+
+// Live capture events via GraphQL subscription (supplements polling with instant updates)
+const captureEvents = useSubscription(CaptureCompletedSubscription, {});
+
+// Trigger a refresh when a new capture event arrives
+$effect(() => {
+	if (captureEvents.data) {
+		void refresh();
+	}
+});
 
 interface StatCard {
 	label: string;
@@ -117,10 +129,14 @@ onMount(() => {
 	}
 });
 
-onDestroy(() => {
-	if (refreshInterval) {
-		clearInterval(refreshInterval);
-	}
+// Clean up polling interval when autoRefresh toggles or component unmounts
+$effect(() => {
+	return () => {
+		if (refreshInterval) {
+			clearInterval(refreshInterval);
+			refreshInterval = undefined;
+		}
+	};
 });
 </script>
 

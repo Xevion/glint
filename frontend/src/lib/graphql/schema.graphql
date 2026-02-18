@@ -1,0 +1,166 @@
+type CaptureCompletedEvent {
+	captureId: CaptureId!
+	shaderVersionId: ShaderVersionId!
+	sceneId: SceneId!
+}
+
+scalar CaptureId
+
+"""
+Implement the DateTime<Utc> scalar
+
+The input/output is a string in RFC3339 format.
+"""
+scalar DateTime
+
+"""
+Relay-style page info.
+"""
+type PageInfo {
+	hasNextPage: Boolean!
+	hasPreviousPage: Boolean!
+	startCursor: String
+	endCursor: String
+}
+
+type PresetNode {
+	id: ScenePresetId!
+	sceneId: SceneId!
+	name: String!
+	slug: String!
+	timeOfDayTicks: Int!
+	weather: String!
+	weatherIntensity: Float!
+	moonPhase: Int
+	sortOrder: Int!
+	createdAt: DateTime!
+	updatedAt: DateTime!
+}
+
+"""
+Root query type — merges all domain query types.
+"""
+type QueryRoot {
+	"""
+	List active scenes with cursor-based pagination.
+	"""
+	scenes(
+		"""
+		Number of items to return (max 100)
+		"""
+		first: Int! = 20
+		"""
+		Cursor from a previous page's endCursor
+		"""
+		after: String
+	): SceneConnection!
+	"""
+	Get a single scene by ID or slug.
+	"""
+	scene(
+		"""
+		Scene ID (nanoid) or slug
+		"""
+		id: String!
+	): SceneNode
+}
+
+"""
+Concrete Relay-style connection for scenes.
+"""
+type SceneConnection {
+	edges: [SceneEdge!]!
+	pageInfo: PageInfo!
+	totalCount: Int!
+}
+
+"""
+Concrete Relay-style edge for scenes.
+"""
+type SceneEdge {
+	cursor: String!
+	node: SceneNode!
+}
+
+scalar SceneId
+
+"""
+GraphQL representation of a Scene.
+"""
+type SceneNode {
+	id: SceneId!
+	name: String!
+	slug: String!
+	description: String
+	dimension: String!
+	active: Boolean!
+	createdAt: DateTime!
+	"""
+	Presets for this scene (time/weather variations)
+	"""
+	presets: [PresetNode!]!
+	"""
+	Representative thumbnail image path for this scene.
+	"""
+	imagePath: String
+	"""
+	Thumbhash placeholder for the representative thumbnail.
+	"""
+	thumbhash: String
+	"""
+	Number of completed captures for this scene.
+	"""
+	captureCount: Int!
+	"""
+	Latest version (camera position, world settings) for this scene.
+	"""
+	version: SceneVersionNode
+}
+
+scalar ScenePresetId
+
+scalar SceneVersionId
+
+type SceneVersionNode {
+	id: SceneVersionId!
+	sceneId: SceneId!
+	x: Float!
+	y: Float!
+	z: Float!
+	pitch: Float!
+	yaw: Float!
+	timeOfDayTicks: Int!
+	weather: String!
+	weatherIntensity: Float!
+	moonPhase: Int
+	biome: String
+	fov: Int!
+	renderDistance: Int!
+	createdAt: DateTime!
+}
+
+scalar ShaderVersionId
+
+type SubscriptionRoot {
+	"""
+	Stream of newly completed captures.
+	"""
+	captureCompleted: CaptureCompletedEvent!
+}
+
+"""
+Directs the executor to include this field or fragment only when the `if` argument is true.
+"""
+directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+"""
+Directs the executor to skip this field or fragment when the `if` argument is true.
+"""
+directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+"""
+Provides a scalar specification URL for specifying the behavior of custom scalar types.
+"""
+directive @specifiedBy(url: String!) on SCALAR
+schema {
+	query: QueryRoot
+	subscription: SubscriptionRoot
+}

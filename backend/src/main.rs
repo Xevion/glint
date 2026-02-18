@@ -148,6 +148,9 @@ async fn main() -> anyhow::Result<()> {
     let (metadata_tx, metadata_rx) = tokio::sync::mpsc::unbounded_channel();
     let integrity_metadata_tx = metadata_tx.clone();
 
+    // Create domain event broadcast channel for GraphQL subscriptions
+    let (event_tx, _) = tokio::sync::broadcast::channel::<glint::graphql::events::DomainEvent>(256);
+
     // Build application state
     let session_cache = SessionCache::new();
     let state = AppState::new(
@@ -159,6 +162,7 @@ async fn main() -> anyhow::Result<()> {
         modrinth_client,
         curseforge_client,
         metadata_tx,
+        event_tx,
         analytics,
         session_cache,
     );
@@ -283,12 +287,20 @@ async fn main() -> anyhow::Result<()> {
         warn!("Rate limiting disabled");
     }
 
+    // Build GraphQL schema (AppState injected so WS subscriptions can access it)
+    let graphql_schema = glint::graphql::build_schema(state.clone());
+
     // Build router. CSP report endpoint is merged outside the analytics layer
     // so browser-fired violation reports don't generate PostHog events.
     let analytics_layer =
         glint::middleware::analytics::AnalyticsLayer::new(state.analytics().cloned());
-    let tracked =
-        routes::router(state.clone(), &config.rate_limit, state.analytics()).layer(analytics_layer);
+    let tracked = routes::router(
+        state.clone(),
+        &config.rate_limit,
+        state.analytics(),
+        graphql_schema,
+    )
+    .layer(analytics_layer);
     let app = tracked
         .nest(
             "/api/csp-report",

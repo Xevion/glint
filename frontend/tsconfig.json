@@ -10,7 +10,14 @@
 		"skipLibCheck": true,
 		"sourceMap": true,
 		"strict": true,
-		"moduleResolution": "bundler"
+		"moduleResolution": "bundler",
+		"plugins": [
+			{
+				"name": "gql.tada/ts-plugin",
+				"schema": "./src/lib/graphql/schema.graphql",
+				"tadaOutputLocation": "./src/lib/graphql/graphql-env.d.ts"
+			}
+		]
 	},
 	"include": [
 		".svelte-kit/ambient.d.ts",

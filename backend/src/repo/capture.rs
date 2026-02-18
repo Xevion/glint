@@ -1135,6 +1135,56 @@ impl CaptureRepo {
         Ok(rows.into_iter().map(|r| (r.scene_id, r.count)).collect())
     }
 
+    /// Get the thumbnail for a single scene (most recent completed capture).
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn thumbnail_for_scene(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_id: &str,
+    ) -> AppResult<Option<ThumbnailInfo>> {
+        struct Row {
+            image_path: String,
+            thumbhash: Option<String>,
+        }
+        let row = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT c.image_path as "image_path!", c.thumbhash
+            FROM captures c
+            WHERE c.scene_id = $1
+              AND c.status = 'completed'
+              AND c.image_path IS NOT NULL
+            ORDER BY c.captured_at DESC NULLS LAST
+            LIMIT 1
+            "#,
+            scene_id
+        )
+        .fetch_optional(executor)
+        .await
+        .context("failed to fetch scene thumbnail")?;
+
+        Ok(row.map(|r| ThumbnailInfo {
+            image_path: r.image_path,
+            thumbhash: r.thumbhash,
+        }))
+    }
+
+    /// Count completed captures for a single scene.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn count_for_scene(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_id: &str,
+    ) -> AppResult<i64> {
+        let count = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) as "count!" FROM captures WHERE scene_id = $1 AND status = 'completed'"#,
+            scene_id
+        )
+        .fetch_one(executor)
+        .await
+        .context("failed to count captures for scene")?;
+
+        Ok(count)
+    }
+
     /// Get aggregate storage statistics for completed captures
     #[instrument(skip(executor), level = "debug")]
     pub async fn storage_stats(executor: impl sqlx::PgExecutor<'_>) -> AppResult<StorageStats> {

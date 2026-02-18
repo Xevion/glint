@@ -317,6 +317,15 @@ async fn confirm_upload(
     // Queue capture metadata processing (fire-and-forget)
     let _ = state.metadata_tx().send(capture_id_str.to_string());
 
+    // Broadcast domain event for GraphQL subscriptions
+    let _ = state
+        .event_tx()
+        .send(crate::graphql::events::DomainEvent::CaptureCompleted {
+            capture_id: capture_id.clone(),
+            shader_version_id: item.shader_version_id.clone(),
+            scene_id: item.scene_id.clone(),
+        });
+
     debug!(item_id, capture_id = capture_id_str, "Upload confirmed");
     Ok(StatusCode::OK)
 }

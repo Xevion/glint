@@ -4,6 +4,7 @@ use anyhow::Context;
 use tracing::{debug, instrument};
 
 use crate::error::{AppError, AppResult};
+use crate::graphql::types::connection::CursorPage;
 use crate::id::{SceneId, SceneVersionId};
 use chrono::{DateTime, Utc};
 
@@ -125,6 +126,66 @@ impl SceneRepo {
 
         debug!(count = scenes.len(), "Listed active scenes");
         Ok(scenes)
+    }
+
+    /// Cursor-paginated list of active scenes (for GraphQL).
+    /// Ordered by created_at DESC, id DESC.
+    #[instrument(skip(pool), level = "debug")]
+    pub async fn list_active_cursor(
+        pool: &crate::db::DbPool,
+        first: i32,
+        after: Option<(DateTime<Utc>, String)>,
+    ) -> AppResult<CursorPage<Scene>> {
+        let limit = first.clamp(1, 100) as i64;
+
+        let items = if let Some((cursor_ts, cursor_id)) = &after {
+            sqlx::query_as!(
+                Scene,
+                r#"
+                SELECT * FROM scenes
+                WHERE active = TRUE
+                  AND (created_at, id) < ($1, $2)
+                ORDER BY created_at DESC, id DESC
+                LIMIT $3
+                "#,
+                cursor_ts,
+                cursor_id,
+                limit + 1,
+            )
+            .fetch_all(pool)
+            .await
+            .context("failed to list scenes (cursor)")?
+        } else {
+            sqlx::query_as!(
+                Scene,
+                r#"
+                SELECT * FROM scenes
+                WHERE active = TRUE
+                ORDER BY created_at DESC, id DESC
+                LIMIT $1
+                "#,
+                limit + 1,
+            )
+            .fetch_all(pool)
+            .await
+            .context("failed to list scenes (cursor, no after)")?
+        };
+
+        let has_next_page = items.len() as i64 > limit;
+        let items: Vec<Scene> = items.into_iter().take(limit as usize).collect();
+
+        let total_count = sqlx::query_scalar!("SELECT COUNT(*) FROM scenes WHERE active = TRUE")
+            .fetch_one(pool)
+            .await
+            .context("failed to count active scenes")?
+            .unwrap_or(0);
+
+        Ok(CursorPage {
+            items,
+            has_next_page,
+            has_previous_page: after.is_some(),
+            total_count,
+        })
     }
 
     /// Find active scenes by slug (globally unique now)

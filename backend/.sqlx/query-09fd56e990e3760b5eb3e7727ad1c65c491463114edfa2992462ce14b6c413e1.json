@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT c.image_path as \"image_path!\", c.thumbhash\n            FROM captures c\n            WHERE c.scene_id = $1\n              AND c.status = 'completed'\n              AND c.image_path IS NOT NULL\n            ORDER BY c.captured_at DESC NULLS LAST\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "image_path!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "thumbhash",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "09fd56e990e3760b5eb3e7727ad1c65c491463114edfa2992462ce14b6c413e1"
+}

@@ -51,13 +51,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 			// (frontend routes like /login, external URLs like Discord OAuth)
 			// must pass through to the browser so Set-Cookie headers and
 			// redirect destinations are preserved.
+			//
+			// 307/308 preserve the original method; 301/302/303 convert to GET
+			// per HTTP spec (browsers do this, and so should we).
 			if (response.status >= 300 && response.status < 400) {
 				const location = response.headers.get('location');
 				if (location?.startsWith('/api/')) {
+					const redirectMethod = response.status === 307 || response.status === 308 ? method : 'GET';
 					response = await fetch(`${backendUrl}${location}`, {
-						method: 'GET',
+						method: redirectMethod,
 						headers,
-						redirect: 'manual'
+						body: redirectMethod === method ? event.request.body : undefined,
+						redirect: 'manual',
+						// @ts-expect-error Bun supports duplex streaming
+						duplex: redirectMethod !== 'GET' ? 'half' : undefined
 					});
 				}
 			}

@@ -22,6 +22,7 @@ use tracing::instrument;
 
 use crate::{
     analytics::Analytics,
+    graphql::GlintSchema,
     middleware::{
         cache_control::CacheControlLayer,
         rate_limit::{RateLimitConfig, RateLimitLayer},
@@ -33,6 +34,7 @@ pub fn router(
     state: AppState,
     rate_limit: &RateLimitConfig,
     analytics: Option<&Analytics>,
+    graphql_schema: GlintSchema,
 ) -> Router {
     Router::new()
         // Health endpoint lives outside api_router so it's not subject to any
@@ -40,11 +42,15 @@ pub fn router(
         .route("/api/health", get(health))
         // Sitemap is outside rate limiting — crawlers should never be throttled.
         .route("/api/sitemap.xml", get(sitemap::sitemap))
-        .nest("/api", api_router(rate_limit, analytics))
+        .nest("/api", api_router(rate_limit, analytics, graphql_schema))
         .with_state(state)
 }
 
-fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<AppState> {
+fn api_router(
+    rl: &RateLimitConfig,
+    analytics: Option<&Analytics>,
+    graphql_schema: GlintSchema,
+) -> Router<AppState> {
     let make_layer = |tier: &crate::middleware::rate_limit::TierConfig, name: &'static str| {
         RateLimitLayer::new(
             tier,
@@ -114,6 +120,7 @@ fn api_router(rl: &RateLimitConfig, analytics: Option<&Analytics>) -> Router<App
         .nest("/admin/capture-health", capture_health::router())
         .nest("/admin/shaders", extraction::router())
         .nest("/admin/storage", storage::router())
+        .merge(crate::graphql::router(graphql_schema))
         // Intentional double rate limiting: routes like /auth and /device
         // have tier-specific limiters that enforce tight per-category budgets. The
         // global limiter below acts as an overall request ceiling across all routes.

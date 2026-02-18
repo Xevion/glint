@@ -183,6 +183,58 @@ const rustSrcMtime = Math.max(
 	}
 }
 
+// Regenerate GraphQL schema + gql-tada output if Rust sources are newer.
+{
+	const SCHEMA_PATH = 'frontend/src/lib/graphql/schema.graphql';
+	const GQL_ENV_PATH = 'frontend/src/lib/graphql/graphql-env.d.ts';
+
+	const schemaMtime = existsSync(SCHEMA_PATH) ? statSync(SCHEMA_PATH).mtimeMs : 0;
+	const schemaStale = schemaMtime === 0 || rustSrcMtime > schemaMtime;
+
+	if (schemaStale) {
+		const t = Date.now();
+		process.stdout.write(
+			c('1;36', '→ Regenerating GraphQL schema (Rust sources changed)...') + '\n'
+		);
+		const result = runPiped(['cargo', 'test', '--test', 'graphql_schema', '--quiet'], {
+			cwd: 'backend',
+		});
+		if (result.exitCode !== 0) {
+			process.stdout.write(c('31', '✗ graphql schema generation failed') + '\n');
+			if (result.stdout) process.stdout.write(result.stdout);
+			if (result.stderr) process.stderr.write(result.stderr);
+			process.exit(1);
+		}
+		process.stdout.write(c('32', '✓ graphql schema') + ` (${elapsed(t)}s)\n`);
+	} else {
+		process.stdout.write(c('2', '· graphql schema up-to-date, skipped') + '\n');
+	}
+
+	// Regenerate gql-tada introspection output if schema is newer than the env file
+	const gqlEnvMtime = existsSync(GQL_ENV_PATH) ? statSync(GQL_ENV_PATH).mtimeMs : 0;
+	const newSchemaMtime = existsSync(SCHEMA_PATH) ? statSync(SCHEMA_PATH).mtimeMs : 0;
+	const gqlEnvStale = gqlEnvMtime === 0 || newSchemaMtime > gqlEnvMtime;
+
+	if (gqlEnvStale) {
+		const t = Date.now();
+		process.stdout.write(
+			c('1;36', '→ Regenerating gql-tada introspection output...') + '\n'
+		);
+		const result = runPiped(['bunx', 'gql-tada', 'generate', 'output'], {
+			cwd: 'frontend',
+		});
+		if (result.exitCode !== 0) {
+			process.stdout.write(c('31', '✗ gql-tada generate failed') + '\n');
+			if (result.stdout) process.stdout.write(result.stdout);
+			if (result.stderr) process.stderr.write(result.stderr);
+			process.exit(1);
+		}
+		process.stdout.write(c('32', '✓ gql-tada') + ` (${elapsed(t)}s)\n`);
+	} else {
+		process.stdout.write(c('2', '· gql-tada output up-to-date, skipped') + '\n');
+	}
+}
+
 interface Check {
 	name: string;
 	cmd: string[];
@@ -231,7 +283,7 @@ const checks: Check[] = [
 			'--manifest-path',
 			'backend/Cargo.toml',
 			'-E',
-			'not test(export_bindings)'
+			'not test(export_bindings) and not test(export_graphql_sdl)'
 		]
 	},
 	// Mod checks (4)

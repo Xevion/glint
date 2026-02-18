@@ -120,3 +120,13 @@ define_id!(CaptureId);
 define_id!(CaptureRunId);
 define_id!(ShaderVersionProfileId);
 define_id!(PendingSceneUploadId);
+
+// Register ID types as GraphQL scalars (serialized as strings via serde)
+async_graphql::scalar!(ShaderId);
+async_graphql::scalar!(ShaderVersionId);
+async_graphql::scalar!(SceneId);
+async_graphql::scalar!(SceneVersionId);
+async_graphql::scalar!(ScenePresetId);
+async_graphql::scalar!(BackgroundId);
+async_graphql::scalar!(CaptureId);
+async_graphql::scalar!(CaptureRunId);

@@ -171,10 +171,12 @@ alias s3 := r2
 
 # === Utilities ===
 
-# Regenerate TypeScript bindings from Rust types
+# Regenerate TypeScript bindings from Rust types + GraphQL schema
 bindings:
     cd backend && cargo test export_bindings --quiet
     bun scripts/bindings-barrel.ts
+    cd backend && cargo test --test graphql_schema --quiet
+    cd frontend && bunx gql-tada generate output
 
 # Query Minecraft source JAR
 # Usage:

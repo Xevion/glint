@@ -144,6 +144,24 @@ impl IntoResponse for AppError {
     }
 }
 
+impl async_graphql::ErrorExtensions for AppError {
+    fn extend(&self) -> async_graphql::Error {
+        let (_, code) = self.status_and_code();
+        let message = match self {
+            AppError::Database(db_err) => {
+                error!(error = ?db_err, "Database error in GraphQL resolver");
+                "Database error occurred".to_string()
+            }
+            AppError::Internal(anyhow_err) => {
+                error!(error = ?anyhow_err, "Internal error in GraphQL resolver");
+                "Internal server error occurred".to_string()
+            }
+            other => other.to_string(),
+        };
+        async_graphql::Error::new(message).extend_with(|_, e| e.set("code", code))
+    }
+}
+
 pub type AppResult<T> = Result<T, AppError>;
 
 /// Extension trait for `Option<T>` to convert `None` into [`AppError::NotFound`].
