@@ -121,11 +121,7 @@ function formatMs(value?: number): string {
 <div class="space-y-6">
 	<!-- Breadcrumb Header -->
 	<header class="flex items-center justify-between">
-		<AdminBreadcrumb
-			backHref="/admin/captures"
-			backLabel="Back to captures"
-			segments={breadcrumbs}
-		>
+		<AdminBreadcrumb segments={breadcrumbs}>
 			{#snippet trailing()}
 				{#if capture.status !== 'completed'}
 					<span

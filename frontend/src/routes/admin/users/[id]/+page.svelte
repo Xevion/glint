@@ -77,8 +77,6 @@ async function deleteSession(tokenPrefix: string) {
 <div class="space-y-6">
 	<!-- Breadcrumb -->
 	<AdminBreadcrumb
-		backHref="/admin/users"
-		backLabel="Back to users"
 		segments={[{ label: 'Users', href: '/admin/users' }, { label: user.discord_username }]}
 	>
 		{#snippet trailing()}

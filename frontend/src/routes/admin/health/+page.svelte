@@ -1,7 +1,6 @@
 <script lang="ts">
-import { invalidateAll } from '$app/navigation';
 import type { CaptureTargetHealth, StaleReason, TargetHealth } from '$lib/bindings';
-import RefreshButton from '$lib/components/RefreshButton.svelte';
+import { AdminBreadcrumb } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
 import * as Table from '$lib/components/ui/table';
@@ -18,7 +17,6 @@ let { data }: Props = $props();
 
 let health = $derived(data.health);
 let workQueue = $derived(data.workQueue);
-let refreshing = $state(false);
 let selectedCell = $state<{ shaderSlug: string; sceneSlug: string } | null>(null);
 
 // Derive unique shaders and scenes for grid axes
@@ -171,23 +169,12 @@ function formatTime(iso: string | null | undefined): string {
 		minute: '2-digit'
 	});
 }
-
-async function refresh() {
-	refreshing = true;
-	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
-	refreshing = false;
-}
 </script>
 
 <svelte:head><title>Health - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<header class="flex items-center justify-between">
-		<div class="flex items-baseline gap-3">
-			<h1 class="text-2xl font-semibold">Capture Health</h1>
-		</div>
-		<RefreshButton {refreshing} onclick={refresh} />
-	</header>
+	<AdminBreadcrumb segments={[{ label: 'Capture Health' }]} />
 
 	{#if health.error}
 		<Alert variant="destructive">Error: {health.error}</Alert>

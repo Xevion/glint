@@ -1,9 +1,9 @@
 <script lang="ts">
-import { goto, invalidateAll } from '$app/navigation';
+import { goto } from '$app/navigation';
 import type { SceneListAdmin } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminPageHeader } from '$lib/components/admin';
+import { AdminBreadcrumb } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import * as Checkbox from '$lib/components/ui/checkbox';
 import { MapPin } from '@lucide/svelte';
@@ -14,24 +14,18 @@ interface Props {
 }
 let { data }: Props = $props();
 let scenes: SceneListAdmin[] = $derived(data.scenes);
-let refreshing = $state(false);
 let showInactive = $state(false);
 let error = $derived(data.error);
 
 const filteredScenes = $derived(showInactive ? scenes : scenes.filter((s) => s.active));
-
-async function refresh() {
-	refreshing = true;
-	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
-	refreshing = false;
-}
 </script>
 
 <svelte:head><title>Scenes - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<AdminPageHeader title="Scenes" count={filteredScenes.length} {refreshing} onrefresh={refresh}>
-		{#snippet actions()}
+	<div class="flex items-center justify-between">
+		<AdminBreadcrumb segments={[{ label: 'Scenes' }]} />
+		<div class="flex items-center gap-3">
 			{#if showInactive && scenes.some((s) => !s.active)}
 			<span class="text-sm text-foreground">
 				({scenes.filter((s) => !s.active).length} inactive)
@@ -44,8 +38,8 @@ async function refresh() {
 				/>
 				<span>Show inactive</span>
 			</label>
-		{/snippet}
-	</AdminPageHeader>
+		</div>
+	</div>
 
 	{#if error}
 		<Alert variant="destructive">Error: {error}</Alert>

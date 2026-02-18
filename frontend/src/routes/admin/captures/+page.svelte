@@ -1,9 +1,9 @@
 <script lang="ts">
-import { goto, invalidateAll } from '$app/navigation';
+import { goto } from '$app/navigation';
 import { page as pageStore } from '$app/state';
 import type { CaptureWithContext } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
-import { AdminPageHeader } from '$lib/components/admin';
+import { AdminBreadcrumb } from '$lib/components/admin';
 import { DataTable, createDataTable } from '$lib/components/data-table';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
@@ -23,7 +23,6 @@ let pageSize = $derived(data.pageSize);
 let totalPages = $derived(Math.ceil(totalCount / pageSize));
 let shaders = $derived(data.shaders);
 let scenes = $derived(data.scenes);
-let refreshing = $state(false);
 let error = $derived(data.error);
 
 const table = createDataTable<CaptureWithContext>({
@@ -59,18 +58,12 @@ function setFilter(key: string, value: string) {
 	url.searchParams.set('page', '1');
 	void goto(url.toString(), { keepFocus: true });
 }
-
-async function refresh() {
-	refreshing = true;
-	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
-	refreshing = false;
-}
 </script>
 
 <svelte:head><title>Captures - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<AdminPageHeader title="Captures" count={totalCount} {refreshing} onrefresh={refresh} />
+	<AdminBreadcrumb segments={[{ label: 'Captures' }]} />
 
 	<!-- Filter bar -->
 	<div class="flex flex-wrap items-center gap-3">

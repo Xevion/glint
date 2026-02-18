@@ -1,12 +1,13 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
 import type { CaptureRun, CaptureRunItemWithContext } from '$lib/bindings';
+import { AdminBreadcrumb } from '$lib/components/admin';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import * as Table from '$lib/components/ui/table';
 import { formatDuration } from '$lib/utils/format';
 import { statusColorFallback, statusColors } from '$lib/utils/status';
-import { ArrowLeft, ExternalLink } from '@lucide/svelte';
+import { ExternalLink } from '@lucide/svelte';
 import type { PageData } from './$types';
 
 interface Props {
@@ -46,24 +47,24 @@ const statCards = $derived([
 
 <div class="space-y-6">
 	<!-- Header -->
-	<header class="space-y-2">
+	<div class="space-y-2">
 		<div class="flex items-center gap-2">
-		<a href="/admin/runs" class="text-foreground/70 hover:text-foreground" aria-label="Back to runs">
-			<ArrowLeft class="h-4 w-4" />
-		</a>
-			<h1 class="text-2xl font-semibold">Capture Run</h1>
-			<span
-class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
-				run.status
-			] ?? statusColorFallback}"
+			<AdminBreadcrumb
+				segments={[{ label: 'Runs', href: '/admin/runs' }, { label: 'Capture Run' }]}
 			>
-				{run.status}
-			</span>
+				{#snippet trailing()}
+					<span
+						class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[run.status] ?? statusColorFallback}"
+					>
+						{run.status}
+					</span>
+				{/snippet}
+			</AdminBreadcrumb>
 			<div class="ml-auto">
 				<RefreshButton {refreshing} onclick={refresh} />
 			</div>
 		</div>
-		<div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+		<div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-foreground">
 			<span>ID: <code class="text-xs">{run.id}</code></span>
 			{#if run.agent_id}
 				<span>Agent: {run.agent_id}</span>
@@ -73,7 +74,7 @@ class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {st
 				<span>Duration: {formatDuration(run)}</span>
 			{/if}
 		</div>
-	</header>
+	</div>
 
 	<!-- Stat Cards -->
 	<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">

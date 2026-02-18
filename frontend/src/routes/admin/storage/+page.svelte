@@ -6,7 +6,7 @@ import type {
 	StorageAuditResult,
 	StorageCleanupResult
 } from '$lib/bindings';
-import { AdminPageHeader } from '$lib/components/admin';
+import { AdminBreadcrumb } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
@@ -185,7 +185,7 @@ let categories = $derived.by((): Category[] => {
 <svelte:head><title>Storage - Glint</title></svelte:head>
 
 <div class="space-y-6">
-	<AdminPageHeader title="Storage" />
+	<AdminBreadcrumb segments={[{ label: 'Storage' }]} />
 
 	<!-- Stats cards -->
 	{#if data.stats}

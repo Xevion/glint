@@ -1,7 +1,7 @@
 <script lang="ts">
-import { goto, invalidateAll } from '$app/navigation';
+import { goto } from '$app/navigation';
 import type { CaptureRun } from '$lib/bindings';
-import { AdminPageHeader } from '$lib/components/admin';
+import { AdminBreadcrumb } from '$lib/components/admin';
 import { DataTable, DataTablePagination, createDataTable } from '$lib/components/data-table';
 import { Alert } from '$lib/components/ui/alert';
 import { formatDuration } from '$lib/utils/format';
@@ -14,8 +14,6 @@ interface Props {
 }
 let { data }: Props = $props();
 let runs = $derived(data.runs);
-let refreshing = $state(false);
-
 const table = createDataTable<CaptureRun>({
 	get data() {
 		return runs;
@@ -24,18 +22,12 @@ const table = createDataTable<CaptureRun>({
 	pageSize: 25,
 	selection: false
 });
-
-async function refresh() {
-	refreshing = true;
-	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
-	refreshing = false;
-}
 </script>
 
 <svelte:head><title>Runs - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<AdminPageHeader title="Capture Runs" count={runs.length} {refreshing} onrefresh={refresh} />
+	<AdminBreadcrumb segments={[{ label: 'Capture Runs' }]} />
 
 	{#if data.error}
 		<Alert variant="destructive">Error: {data.error}</Alert>

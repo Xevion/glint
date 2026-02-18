@@ -1,7 +1,7 @@
 <script lang="ts">
-import { goto, invalidateAll } from '$app/navigation';
+import { goto } from '$app/navigation';
 import type { User } from '$lib/bindings';
-import { AdminPageHeader } from '$lib/components/admin';
+import { AdminBreadcrumb } from '$lib/components/admin';
 import { DataTable, DataTablePagination, createDataTable } from '$lib/components/data-table';
 import { Alert } from '$lib/components/ui/alert';
 import type { PageData } from './$types';
@@ -12,8 +12,6 @@ interface Props {
 }
 let { data }: Props = $props();
 let users = $derived(data.users);
-let refreshing = $state(false);
-
 const table = createDataTable<User>({
 	get data() {
 		return users;
@@ -29,12 +27,6 @@ const roleColors: Record<string, string> = {
 	user: 'bg-muted text-muted-foreground'
 };
 
-async function refresh() {
-	refreshing = true;
-	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
-	refreshing = false;
-}
-
 function handleRowClick(user: User) {
 	void goto(`/admin/users/${user.id}`);
 }
@@ -43,7 +35,7 @@ function handleRowClick(user: User) {
 <svelte:head><title>Users - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<AdminPageHeader title="Users" count={users.length} {refreshing} onrefresh={refresh} />
+	<AdminBreadcrumb segments={[{ label: 'Users' }]} />
 
 	{#if data.error}
 		<Alert variant="destructive">Error: {data.error}</Alert>

@@ -12,9 +12,9 @@ import { formatMoonPhase, formatTimeTicks } from '$lib/utils/display';
 import { freshnessColors } from '$lib/utils/status';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import {
+	AdminBreadcrumb,
 	AdminCaptureCard,
 	AdminDetailField,
-	AdminDetailHeader,
 	createAdminAction,
 	createAdminForm
 } from '$lib/components/admin';
@@ -241,15 +241,13 @@ function handleDragEnd() {
 
 <div class="space-y-6">
 	<!-- Header -->
-	<AdminDetailHeader
-		backHref="/admin/scenes"
-		backLabel="Back to scenes"
-		title={scene.name}
+	<AdminBreadcrumb
+		segments={[{ label: 'Scenes', href: '/admin/scenes' }, { label: scene.name }]}
 	>
 		{#snippet trailing()}
-			<StatusBadge status={scene.active ? 'active' : 'inactive'}>{scene.active ? 'Active' : 'Inactive'}</StatusBadge>
+			<StatusBadge class="ml-2" status={scene.active ? 'active' : 'inactive'}>{scene.active ? 'Active' : 'Inactive'}</StatusBadge>
 		{/snippet}
-	</AdminDetailHeader>
+	</AdminBreadcrumb>
 
 	{#if !scene.active}
 		<Alert variant="warning" class="flex items-center justify-between">

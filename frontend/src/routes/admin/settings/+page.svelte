@@ -4,7 +4,7 @@
 import { invalidateAll } from '$app/navigation';
 import { createApiClient } from '$lib/api';
 import type { Background, ThemeMode } from '$lib/bindings';
-import { AdminPageHeader } from '$lib/components/admin';
+import { AdminBreadcrumb } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
@@ -19,7 +19,6 @@ let { data }: { data: PageData } = $props();
 let backgrounds = $derived(data.backgrounds);
 let error = $derived(data.error);
 
-let refreshing = $state(false);
 let uploading = $state(false);
 let uploadError = $state<string | null>(null);
 let dragOver = $state(false);
@@ -31,9 +30,7 @@ let actionLoading = $state(false);
 const api = createApiClient();
 
 async function refresh() {
-	refreshing = true;
-	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
-	refreshing = false;
+	await invalidateAll();
 }
 
 // -- Upload flow --
@@ -217,7 +214,7 @@ const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
 </script>
 
 <div class="space-y-6">
-	<AdminPageHeader title="Settings" {refreshing} onrefresh={refresh} />
+	<AdminBreadcrumb segments={[{ label: 'Settings' }]} />
 
 	<!-- Backgrounds Section -->
 	<section class="space-y-4">

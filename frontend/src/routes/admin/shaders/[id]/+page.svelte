@@ -13,9 +13,9 @@ import { createDataTable, DataTable } from '$lib/components/data-table';
 import { ItemGrid } from '$lib/components/item-grid';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import {
+	AdminBreadcrumb,
 	AdminCaptureCard,
 	AdminDetailField,
-	AdminDetailHeader,
 	createAdminAction,
 	createAdminForm
 } from '$lib/components/admin';
@@ -217,21 +217,19 @@ function handleLinkKeydown(e: KeyboardEvent) {
 
 <div class="space-y-6">
     <!-- Header -->
-    <AdminDetailHeader
-        backHref="/admin/shaders"
-        backLabel="Back to shaders"
-        title={shader.name}
+    <AdminBreadcrumb
+        segments={[{ label: 'Shaders', href: '/admin/shaders' }, { label: shader.name }]}
     >
         {#snippet trailing()}
             {#if shader.icon_url}
                 <img
                     src={shader.icon_url}
                     alt="{shader.name} icon"
-                    class="h-6 w-6 rounded"
+                    class="ml-2 h-5 w-5 rounded"
                 />
             {/if}
         {/snippet}
-    </AdminDetailHeader>
+    </AdminBreadcrumb>
 
     {#if form.error}
         <Alert variant="destructive">{form.error}</Alert>

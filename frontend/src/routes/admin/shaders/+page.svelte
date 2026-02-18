@@ -6,7 +6,7 @@ import type { Shader, ShaderListItem, ShaderSearchResult, ShaderSearchSort } fro
 import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
 import { createDataTable, DataTable, DataTablePagination } from '$lib/components/data-table';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminPageHeader } from '$lib/components/admin';
+import { AdminBreadcrumb } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
@@ -218,7 +218,7 @@ function handleShaderAdopted(shader: Shader) {
 <svelte:head><title>Shaders - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<AdminPageHeader title="Shaders" />
+	<AdminBreadcrumb segments={[{ label: 'Shaders' }]} />
 
 	<Tabs.Root value={activeTab} onValueChange={handleTabChange}>
 		<Tabs.List>
