@@ -10,4 +10,12 @@ import type { ShaderVersionProfileId } from "./ShaderVersionProfileId";
 /**
  * Capture with denormalized shader/version info for API responses
  */
-export type CaptureWithContext = { id: CaptureId, scene_id: SceneId, shader_slug: string, shader_name: string, shader_version: string, profile_id?: ShaderVersionProfileId, profile_name?: string, image_path?: string, image_url?: string, thumbhash?: string, captured_at?: string, resolution_width?: number, resolution_height?: number, file_size_bytes?: number, run_id?: CaptureRunId, run_status?: CaptureRunStatus, shader_author?: string, scene_name?: string, scene_slug?: string, preset_id?: ScenePresetId, preset_name?: string, preset_slug?: string, freshness: CaptureFreshness, };
+export type CaptureWithContext = { id: CaptureId, scene_id: SceneId, shader_slug: string, shader_name: string, shader_version: string, profile_id?: ShaderVersionProfileId, 
+/**
+ * Internal profile identifier (e.g. "HIGH", "ULTRA")
+ */
+profile_name?: string, 
+/**
+ * Human-readable profile name (e.g. "High", "Ultra")
+ */
+profile_display_name?: string, image_path?: string, image_url?: string, thumbhash?: string, captured_at?: string, resolution_width?: number, resolution_height?: number, file_size_bytes?: number, run_id?: CaptureRunId, run_status?: CaptureRunStatus, shader_author?: string, scene_name?: string, scene_slug?: string, preset_id?: ScenePresetId, preset_name?: string, preset_slug?: string, freshness: CaptureFreshness, };

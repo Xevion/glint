@@ -1021,8 +1021,8 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                     </div>
                                     <div class="text-xs text-muted-foreground">
                                         {capture.shader_version}
-                                        {#if capture.profile_name}
-                                            &middot; {capture.profile_name}
+                                        {#if capture.profile_display_name}
+                                            &middot; {capture.profile_display_name}
                                         {/if}
                                     </div>
                                 </div>

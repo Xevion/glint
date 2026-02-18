@@ -31,7 +31,22 @@ These are logical groupings that don't (yet) have their own database tables but 
 | **Category** | A stylistic classification for a Shader (e.g., realistic, fantasy, cartoon). Many-to-many. Describes the visual *feel*. |
 | **Feature**  | A technical capability of a Shader (e.g., volumetric lighting, PBR, ray tracing). Many-to-many. Describes what the shader *does*. |
 | **Tag**      | A descriptive label for a Scene (e.g., indoor, sunset, underwater, village). Many-to-many. Describes the scene's characteristics. |
-| **Profile**  | An Iris shader profile name (e.g., "Ultra", "High", "Potato"). Profiles are *discovered* — the mod reports available profiles after first loading a shader version, and they're stored as a JSON array on ShaderVersion. A null profile means the shader's default configuration. |
+| **Profile**  | An Iris shader profile configuration for a shader version. Profiles are *discovered* — extracted from shader pack zip files during the extraction pipeline (parsing `shaders.properties` and `.lang` files). A null profile means the shader's default configuration. Each profile has three name representations (see below). |
+
+### Profile Name Representations
+
+A profile has three distinct name fields. These serve different purposes and must not be confused:
+
+| Field | DB Column | Example | Purpose |
+|-------|-----------|---------|---------|
+| **Profile Name** | `name` | `HIGH`, `ULTRA`, `POTATO` | Internal identifier from `shaders.properties`. Used by Iris to load profiles. The mod **must** use this value — display names will cause `Profile not found` errors. |
+| **Profile Label** | `label` | `§aHigh §7Quality`, `§6✦ Ultra §7Premium` | Raw label from `.lang` files. Contains Minecraft formatting codes (`§`), decorative Unicode, and metadata suffixes. Admin-only — never shown to end users. |
+| **Profile Display Name** | `display_name` | `High Quality`, `Ultra Premium` | Normalized label with formatting codes, decorative characters, and metadata stripped. Used in all user-facing UI. Computed during extraction and backfilled for existing profiles. |
+
+**In API responses:**
+- `profile_name` = the internal name (for the mod and internal references)
+- `profile_display_name` = the display name (for UI rendering)
+- The label is only exposed on the `ShaderVersionProfile` entity (admin detail views)
 
 ## Platform Integration
 

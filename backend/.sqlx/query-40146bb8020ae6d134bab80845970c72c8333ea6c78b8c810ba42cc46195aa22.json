@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                cri.id,\n                cri.run_id AS \"run_id: CaptureRunId\",\n                cri.shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                cri.scene_id AS \"scene_id: SceneId\",\n                cri.profile_id AS \"profile_id: ShaderVersionProfileId\",\n                svp.display_name AS \"profile_name?\",\n                cri.preset_id AS \"preset_id: ScenePresetId\",\n                cri.status AS \"status!: CaptureRunItemStatus\",\n                cri.capture_id AS \"capture_id: CaptureId\",\n                cri.error_message, cri.error_log, cri.duration_ms,\n                cri.started_at, cri.completed_at,\n                s.name as shader_name,\n                s.slug as shader_slug,\n                sv.version as shader_version,\n                sc.name as scene_name\n            FROM capture_run_items cri\n            JOIN shader_versions sv ON cri.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            JOIN scenes sc ON cri.scene_id = sc.id\n            LEFT JOIN shader_version_profiles svp ON cri.profile_id = svp.id\n            WHERE cri.run_id = $1\n            ORDER BY cri.started_at ASC NULLS LAST\n            ",
+  "query": "\n            SELECT\n                cri.id,\n                cri.run_id AS \"run_id: CaptureRunId\",\n                cri.shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                cri.scene_id AS \"scene_id: SceneId\",\n                cri.profile_id AS \"profile_id: ShaderVersionProfileId\",\n                svp.name AS \"profile_name?\",\n                svp.display_name AS \"profile_display_name?\",\n                cri.preset_id AS \"preset_id: ScenePresetId\",\n                cri.status AS \"status!: CaptureRunItemStatus\",\n                cri.capture_id AS \"capture_id: CaptureId\",\n                cri.error_message, cri.error_log, cri.duration_ms,\n                cri.started_at, cri.completed_at,\n                s.name as shader_name,\n                s.slug as shader_slug,\n                sv.version as shader_version,\n                sc.name as scene_name\n            FROM capture_run_items cri\n            JOIN shader_versions sv ON cri.shader_version_id = sv.id\n            JOIN shaders s ON sv.shader_id = s.id\n            JOIN scenes sc ON cri.scene_id = sc.id\n            LEFT JOIN shader_version_profiles svp ON cri.profile_id = svp.id\n            WHERE cri.run_id = $1\n            ORDER BY cri.started_at ASC NULLS LAST\n            ",
   "describe": {
     "columns": [
       {
@@ -35,61 +35,66 @@
       },
       {
         "ordinal": 6,
-        "name": "preset_id: ScenePresetId",
+        "name": "profile_display_name?",
         "type_info": "Text"
       },
       {
         "ordinal": 7,
-        "name": "status!: CaptureRunItemStatus",
+        "name": "preset_id: ScenePresetId",
         "type_info": "Text"
       },
       {
         "ordinal": 8,
-        "name": "capture_id: CaptureId",
+        "name": "status!: CaptureRunItemStatus",
         "type_info": "Text"
       },
       {
         "ordinal": 9,
-        "name": "error_message",
+        "name": "capture_id: CaptureId",
         "type_info": "Text"
       },
       {
         "ordinal": 10,
-        "name": "error_log",
+        "name": "error_message",
         "type_info": "Text"
       },
       {
         "ordinal": 11,
+        "name": "error_log",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
         "name": "duration_ms",
         "type_info": "Int4"
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "started_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "completed_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "shader_name",
         "type_info": "Text"
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "shader_slug",
         "type_info": "Text"
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "shader_version",
         "type_info": "Text"
       },
       {
-        "ordinal": 17,
+        "ordinal": 18,
         "name": "scene_name",
         "type_info": "Text"
       }
@@ -106,6 +111,7 @@
       false,
       true,
       false,
+      false,
       true,
       false,
       true,
@@ -120,5 +126,5 @@
       false
     ]
   },
-  "hash": "405273020040de7736f40a733384917e3629fee87c7e48de6e0b5c9c9e7804bc"
+  "hash": "40146bb8020ae6d134bab80845970c72c8333ea6c78b8c810ba42cc46195aa22"
 }

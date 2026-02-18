@@ -161,9 +161,9 @@ const ogDescription = $derived.by(() => {
 												{selectedCapture.shader_name}
 											</h3>
 											<div class="flex items-center gap-2">
-								{#if selectedCapture.profile_name}
-												<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
-													{selectedCapture.profile_name}
+							{#if selectedCapture.profile_display_name}
+											<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
+												{selectedCapture.profile_display_name}
 												</span>
 											{/if}
 												{#if selectedCapture.shader_version}
@@ -272,7 +272,7 @@ const ogDescription = $derived.by(() => {
 		{#snippet overlay(capture: CaptureWithContext)}
 			<CaptureBadges
 				shaderName={capture.shader_name}
-				profileName={capture.profile_name}
+				profileName={capture.profile_display_name}
 				version={capture.shader_version}
 			/>
 		{/snippet}

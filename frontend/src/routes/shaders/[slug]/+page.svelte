@@ -524,7 +524,7 @@ const ogDescription = $derived.by(() => {
 								<div class="absolute right-0 bottom-0 left-0 p-3">
 									<CaptureBadges
 										sceneName={capture.scene_name}
-										profileName={capture.profile_name}
+										profileName={capture.profile_display_name}
 										version={capture.shader_version}
 										{formatVersion}
 									/>

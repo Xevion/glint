@@ -66,7 +66,7 @@ async function fetchShaderOgData(api: ApiClient, slug: string): Promise<OgImageD
 	if (heroCapture?.shader_author) metaParts.push(`by ${heroCapture.shader_author}`);
 	if (shader.upstream_downloads)
 		metaParts.push(`${formatNumber(shader.upstream_downloads)} downloads`);
-	if (heroCapture?.profile_name) metaParts.push(heroCapture.profile_name);
+	if (heroCapture?.profile_display_name) metaParts.push(heroCapture.profile_display_name);
 
 	return {
 		imageUrl: heroCapture?.image_url ?? null,

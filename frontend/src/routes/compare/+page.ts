@@ -6,7 +6,12 @@ import type { PageLoad } from './$types';
 type CompareScene = Pick<SceneListItem, 'slug' | 'name' | 'capture_count'>;
 type CompareCapture = Pick<
 	CaptureWithContext,
-	'thumbhash' | 'shader_name' | 'shader_version' | 'shader_author' | 'profile_name' | 'preset_name'
+	| 'thumbhash'
+	| 'shader_name'
+	| 'shader_version'
+	| 'shader_author'
+	| 'profile_display_name'
+	| 'preset_name'
 > & { image_path: string };
 
 interface ComparePageData {
@@ -51,7 +56,7 @@ export const load: PageLoad = async ({ fetch, url }): Promise<ComparePageData> =
 						'shader_name',
 						'shader_version',
 						'shader_author',
-						'profile_name',
+						'profile_display_name',
 						'preset_name'
 					]),
 					image_path: c.image_path

@@ -144,11 +144,11 @@ function tooltipSummary(shaderSlug: string, sceneSlug: string): string {
 	if (targets.length === 1) {
 		const t = targets[0];
 		const detail = targetDetail(t);
-		return t.profile_name ? `${detail} (${t.profile_name})` : detail;
+		return t.profile_display_name ? `${detail} (${t.profile_display_name})` : detail;
 	}
 	return targets
 		.map((t) => {
-			const label = t.profile_name ?? 'Default';
+			const label = t.profile_display_name ?? 'Default';
 			return `${label}: ${targetDetail(t)}`;
 		})
 		.join('\n');
@@ -286,11 +286,11 @@ function formatTime(iso: string | null | undefined): string {
 								{selectedTargets[0].shader_name} / {selectedTargets[0].scene_name}
 							</h3>
 							<div class="space-y-2">
-								{#each selectedTargets as target (target.profile_name ?? '__default')}
+								{#each selectedTargets as target (target.profile_display_name ?? '__default')}
 									<div class="rounded border p-2 text-sm">
 										<div class="flex items-center justify-between">
 										<span class="text-muted-foreground">
-											{target.profile_name ?? 'Default'}
+											{target.profile_display_name ?? 'Default'}
 										</span>
 											<Badge variant={BADGE_VARIANTS[target.status]} class="text-xs">
 												{STATUS_LABELS[target.status]}
@@ -342,7 +342,7 @@ function formatTime(iso: string | null | undefined): string {
 							<Table.Cell class="p-3">
 							<a href="/admin/scenes/{item.scene.id}" class="hover:underline">{item.scene.name}</a>
 							</Table.Cell>
-							<Table.Cell class="p-3 text-muted-foreground">{item.shader.profile_name ?? '—'}</Table.Cell>
+							<Table.Cell class="p-3 text-muted-foreground">{item.shader.profile_display_name ?? '—'}</Table.Cell>
 						</Table.Row>
 					{/each}
 				</Table.Body>

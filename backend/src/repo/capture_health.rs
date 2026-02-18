@@ -71,6 +71,7 @@ pub struct CaptureTargetHealth {
     pub scene_slug: String,
     pub profile_id: Option<String>,
     pub profile_name: Option<String>,
+    pub profile_display_name: Option<String>,
     pub status: TargetHealth,
     pub stale_reason: Option<StaleReason>,
     #[ts(as = "Option<String>")]
@@ -109,6 +110,7 @@ struct CaptureHealthRow {
     scene_slug: String,
     profile_id: Option<String>,
     profile_name: Option<String>,
+    profile_display_name: Option<String>,
     capture_failure_count: i32,
     last_capture_at: Option<DateTime<Utc>>,
     status: TargetHealth,
@@ -156,7 +158,8 @@ impl CaptureHealthRepo {
                 sc.name AS "scene_name!",
                 sc.slug AS "scene_slug!",
                 tm.profile_id,
-                svp.display_name AS "profile_name?",
+                svp.name AS "profile_name?",
+                svp.display_name AS "profile_display_name?",
                 sv.capture_failure_count AS "capture_failure_count!",
                 bc.captured_at AS last_capture_at,
                 CASE
@@ -211,6 +214,7 @@ impl CaptureHealthRepo {
                     scene_slug: row.scene_slug,
                     profile_id: row.profile_id,
                     profile_name: row.profile_name,
+                    profile_display_name: row.profile_display_name,
                     status: row.status,
                     stale_reason,
                     last_capture_at: row.last_capture_at,

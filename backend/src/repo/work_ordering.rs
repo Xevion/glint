@@ -328,6 +328,7 @@ mod tests {
                 version: "1.0".to_string(),
                 profile_id: profile_id.map(|p| ShaderVersionProfileId(p.to_string())),
                 profile_name: profile_id.map(|p| p.to_string()),
+                profile_display_name: profile_id.map(|p| p.to_string()),
                 ..Default::default()
             },
             scene: WorkScene {

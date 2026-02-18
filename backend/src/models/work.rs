@@ -47,6 +47,7 @@ pub struct WorkItemRow {
     pub scene_version_id: Option<SceneVersionId>,
     pub profile_id: Option<ShaderVersionProfileId>,
     pub profile_name: Option<String>,
+    pub profile_display_name: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -61,7 +62,10 @@ pub struct WorkShader {
     pub download_url: Option<String>,
     pub file_hash: Option<String>,
     pub profile_id: Option<ShaderVersionProfileId>,
+    /// Internal profile identifier (e.g. "HIGH", "ULTRA"). Used by the mod to load Iris profiles.
     pub profile_name: Option<String>,
+    /// Human-readable profile name (e.g. "High", "Ultra"). Used for display in the UI.
+    pub profile_display_name: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -150,6 +154,7 @@ impl From<WorkItemRow> for WorkItem {
                 file_hash: row.file_hash,
                 profile_id: row.profile_id,
                 profile_name: row.profile_name,
+                profile_display_name: row.profile_display_name,
             },
             scene: WorkScene {
                 id: row.scene_id,

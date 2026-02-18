@@ -1,0 +1,248 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH has_captures AS (\n                SELECT DISTINCT shader_version_id\n                FROM captures\n                WHERE status = 'completed'\n            ),\n            best_captures AS (\n                SELECT DISTINCT ON (shader_version_id, scene_id, preset_id, profile_id)\n                    shader_version_id, scene_id, preset_id, profile_id, freshness\n                FROM captures_with_freshness\n                WHERE status IN ('completed', 'uploading')\n                ORDER BY shader_version_id, scene_id, preset_id, profile_id, captured_at DESC\n            ),\n            eligible AS (\n                SELECT\n                    tm.shader_version_id,\n                    tm.scene_id,\n                    tm.preset_id,\n                    tm.profile_id,\n                    sh.id AS shader_id,\n                    COALESCE(sh.upstream_downloads, 0) AS downloads,\n                    sh.name AS shader_name,\n                    hc.shader_version_id IS NOT NULL AS has_existing_captures\n                FROM capture_target_matrix tm\n                JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id\n                JOIN shaders sh ON sh.id = sv.shader_id\n                JOIN scenes sc ON sc.id = tm.scene_id\n                LEFT JOIN has_captures hc ON hc.shader_version_id = tm.shader_version_id\n                LEFT JOIN best_captures bc\n                    ON bc.shader_version_id = tm.shader_version_id\n                    AND bc.scene_id = tm.scene_id\n                    AND (bc.preset_id IS NOT DISTINCT FROM tm.preset_id)\n                    AND (bc.profile_id IS NOT DISTINCT FROM tm.profile_id)\n                WHERE ($2 OR sv.capture_failure_count < 3)\n                  AND ($2 OR bc.shader_version_id IS NULL OR bc.freshness != 'fresh')\n                  AND ($3::text IS NULL OR sh.slug = ANY(string_to_array($3, ',')))\n                  AND ($4::text IS NULL OR sc.slug = ANY(string_to_array($4, ',')))\n            ),\n            ranked_shaders AS (\n                SELECT DISTINCT shader_version_id,\n                    DENSE_RANK() OVER (\n                        ORDER BY has_existing_captures ASC,\n                                 downloads DESC,\n                                 shader_name ASC\n                    ) AS shader_rank\n                FROM eligible\n            ),\n            selected AS (\n                SELECT e.*\n                FROM eligible e\n                JOIN ranked_shaders rs\n                    ON rs.shader_version_id = e.shader_version_id\n                WHERE rs.shader_rank <= $1\n            )\n            SELECT\n                s.shader_version_id AS \"shader_version_id!: ShaderVersionId\",\n                sh.id AS \"shader_id!: ShaderId\",\n                sh.slug AS \"shader_slug!\",\n                sh.name AS \"shader_name!\",\n                sv.version AS \"version!\",\n                sv.download_url,\n                sv.file_hash,\n                s.scene_id AS \"scene_id!: SceneId\",\n                sc.slug AS \"scene_slug!\",\n                sc.name AS \"scene_name!\",\n                sc.dimension AS \"scene_dimension!\",\n                lsv.x AS \"scene_x!\",\n                lsv.y AS \"scene_y!\",\n                lsv.z AS \"scene_z!\",\n                lsv.yaw AS \"scene_yaw!\",\n                lsv.pitch AS \"scene_pitch!\",\n                lsv.time_of_day_ticks AS \"scene_time_of_day_ticks!\",\n                lsv.weather AS \"scene_weather!\",\n                lsv.weather_intensity AS \"scene_weather_intensity!\",\n                lsv.moon_phase AS scene_moon_phase,\n                lsv.biome AS scene_biome,\n                s.preset_id AS \"preset_id: ScenePresetId\",\n                sp.name AS preset_name,\n                sp.slug AS preset_slug,\n                sp.time_of_day_ticks AS preset_time_of_day_ticks,\n                sp.weather AS preset_weather,\n                sp.weather_intensity AS preset_weather_intensity,\n                sp.moon_phase AS preset_moon_phase,\n                lsv.package_url,\n                lsv.package_hash,\n                lsv.package_size_bytes,\n                lsv.minecraft_version AS scene_minecraft_version,\n                lsv.fov AS \"scene_fov!\",\n                lsv.render_distance AS \"scene_render_distance!\",\n                lsv.id AS \"scene_version_id: SceneVersionId\",\n                s.profile_id AS \"profile_id: ShaderVersionProfileId\",\n                svp.name AS \"profile_name?\",\n                svp.display_name AS \"profile_display_name?\"\n            FROM selected s\n            JOIN latest_shader_versions sv ON sv.id = s.shader_version_id\n            JOIN shaders sh ON sh.id = s.shader_id\n            JOIN scenes sc ON sc.id = s.scene_id\n            JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id\n            LEFT JOIN scene_presets sp ON sp.id = s.preset_id\n            LEFT JOIN shader_version_profiles svp ON svp.id = s.profile_id\n            ORDER BY\n                s.has_existing_captures ASC,\n                s.downloads DESC,\n                sh.name ASC,\n                svp.sort_order ASC NULLS FIRST\n            LIMIT $5\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_version_id!: ShaderVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_id!: ShaderId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "shader_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "shader_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "version!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "download_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "file_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "scene_id!: SceneId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "scene_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "scene_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "scene_dimension!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "scene_x!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 12,
+        "name": "scene_y!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 13,
+        "name": "scene_z!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 14,
+        "name": "scene_yaw!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 15,
+        "name": "scene_pitch!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 16,
+        "name": "scene_time_of_day_ticks!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 17,
+        "name": "scene_weather!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "scene_weather_intensity!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 19,
+        "name": "scene_moon_phase",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 20,
+        "name": "scene_biome",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "preset_id: ScenePresetId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 22,
+        "name": "preset_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 23,
+        "name": "preset_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 24,
+        "name": "preset_time_of_day_ticks",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 25,
+        "name": "preset_weather",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 26,
+        "name": "preset_weather_intensity",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 27,
+        "name": "preset_moon_phase",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 28,
+        "name": "package_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 29,
+        "name": "package_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 30,
+        "name": "package_size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 31,
+        "name": "scene_minecraft_version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 32,
+        "name": "scene_fov!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 33,
+        "name": "scene_render_distance!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 34,
+        "name": "scene_version_id: SceneVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 35,
+        "name": "profile_id: ShaderVersionProfileId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 36,
+        "name": "profile_name?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 37,
+        "name": "profile_display_name?",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Bool",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "a82124d6d0286307ffc6dea1927da7ebc4461bbd1c6fd85ce894cbef1d234a84"
+}

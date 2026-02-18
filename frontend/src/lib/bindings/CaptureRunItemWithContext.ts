@@ -10,4 +10,4 @@ import type { ShaderVersionProfileId } from "./ShaderVersionProfileId";
 /**
  * Capture run item with denormalized shader/scene info for API responses
  */
-export type CaptureRunItemWithContext = { id: string, run_id: CaptureRunId, shader_version_id: ShaderVersionId, scene_id: SceneId, profile_id?: ShaderVersionProfileId, profile_name?: string, preset_id?: ScenePresetId, status: CaptureRunItemStatus, capture_id?: CaptureId, error_message?: string, error_log?: string, duration_ms?: number, started_at?: string, completed_at?: string, shader_name: string, shader_slug: string, shader_version: string, scene_name: string, };
+export type CaptureRunItemWithContext = { id: string, run_id: CaptureRunId, shader_version_id: ShaderVersionId, scene_id: SceneId, profile_id?: ShaderVersionProfileId, profile_name?: string, profile_display_name?: string, preset_id?: ScenePresetId, status: CaptureRunItemStatus, capture_id?: CaptureId, error_message?: string, error_log?: string, duration_ms?: number, started_at?: string, completed_at?: string, shader_name: string, shader_slug: string, shader_version: string, scene_name: string, };

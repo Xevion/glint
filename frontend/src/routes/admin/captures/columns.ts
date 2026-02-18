@@ -27,7 +27,7 @@ export const columns: ColumnDef<CaptureWithContext>[] = [
 		cell: ({ row }) => renderComponent(ShaderCell, { capture: row.original })
 	},
 	textColumn<CaptureWithContext>('scene_name', 'Scene', { sortable: false }),
-	textColumn<CaptureWithContext>('profile_name', 'Profile', { sortable: false }),
+	textColumn<CaptureWithContext>('profile_display_name', 'Profile', { sortable: false }),
 	{
 		accessorKey: 'resolution_width',
 		header: 'Resolution',

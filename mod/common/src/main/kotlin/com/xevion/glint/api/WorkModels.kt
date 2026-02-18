@@ -16,7 +16,10 @@ data class WorkShader(
     val downloadUrl: String? = null,
     val fileHash: String? = null,
     val profileId: String? = null,
+    /** Internal profile identifier (e.g. "HIGH", "ULTRA") — used to load Iris profiles. */
     val profileName: String? = null,
+    /** Human-readable profile name (e.g. "High", "Ultra") — for display/logging only. */
+    val profileDisplayName: String? = null,
 )
 
 /** Scene positioning and environment within a work item. */
@@ -147,6 +150,7 @@ data class CaptureRunItem(
     val sceneId: String,
     val profileId: String? = null,
     val profileName: String? = null,
+    val profileDisplayName: String? = null,
     val presetId: String? = null,
     val status: String,
     val captureId: String? = null,

@@ -90,7 +90,7 @@ const authorShadow = $derived(brightnessToShadow(authorBrightness));
 
 const displayAuthor = $derived(shader.author ?? 'Unknown Author');
 const displayMeta = $derived(
-	[formatVersion(shader.version), shader.profile_name, shader.preset_name]
+	[formatVersion(shader.version), shader.profile_display_name, shader.preset_name]
 		.filter(Boolean)
 		.join(' \u2022 ')
 );

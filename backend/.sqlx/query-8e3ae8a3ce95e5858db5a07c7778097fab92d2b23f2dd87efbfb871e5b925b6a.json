@@ -1,0 +1,110 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH best_captures AS (\n                SELECT DISTINCT ON (shader_version_id, scene_id, preset_id, profile_id)\n                    shader_version_id,\n                    scene_id,\n                    preset_id,\n                    profile_id,\n                    captured_at,\n                    freshness,\n                    scene_version_id\n                FROM captures_with_freshness\n                WHERE status IN ('completed', 'uploading')\n                ORDER BY shader_version_id, scene_id, preset_id, profile_id, captured_at DESC\n            )\n            SELECT\n                sh.id AS \"shader_id!: ShaderId\",\n                sh.name AS \"shader_name!\",\n                sh.slug AS \"shader_slug!\",\n                sv.id AS \"shader_version_id!: ShaderVersionId\",\n                sv.version AS \"version!\",\n                sc.id AS \"scene_id!: SceneId\",\n                sc.name AS \"scene_name!\",\n                sc.slug AS \"scene_slug!\",\n                tm.profile_id,\n                svp.name AS \"profile_name?\",\n                svp.display_name AS \"profile_display_name?\",\n                sv.capture_failure_count AS \"capture_failure_count!\",\n                bc.captured_at AS last_capture_at,\n                CASE\n                    WHEN sv.capture_failure_count >= 3 THEN 'failed'\n                    WHEN bc.captured_at IS NULL THEN 'missing'\n                    WHEN bc.freshness != 'fresh' THEN 'stale'\n                    ELSE 'completed'\n                END AS \"status!: TargetHealth\",\n                COALESCE(bc.scene_version_id IS NOT NULL AND bc.scene_version_id IS DISTINCT FROM lsv.id, FALSE) AS \"scene_outdated!\",\n                COALESCE(sp.id IS NOT NULL AND bc.captured_at < sp.updated_at, FALSE) AS \"preset_outdated!\"\n            FROM capture_target_matrix tm\n            JOIN latest_shader_versions sv ON sv.id = tm.shader_version_id\n            JOIN shaders sh ON sh.id = sv.shader_id\n            JOIN scenes sc ON sc.id = tm.scene_id\n            LEFT JOIN best_captures bc\n                ON bc.shader_version_id = tm.shader_version_id\n                AND bc.scene_id = tm.scene_id\n                AND (bc.preset_id IS NOT DISTINCT FROM tm.preset_id)\n                AND (bc.profile_id IS NOT DISTINCT FROM tm.profile_id)\n            LEFT JOIN shader_version_profiles svp ON svp.id = tm.profile_id\n            LEFT JOIN scene_presets sp ON sp.id = tm.preset_id\n            LEFT JOIN latest_scene_versions lsv ON lsv.scene_id = sc.id\n            ORDER BY sh.name ASC, sv.version DESC, sc.name ASC, tm.profile_id NULLS LAST\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_id!: ShaderId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "shader_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "shader_version_id!: ShaderVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "version!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "scene_id!: SceneId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "scene_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "scene_slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "profile_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "profile_name?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "profile_display_name?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "capture_failure_count!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "last_capture_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "status!: TargetHealth",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "scene_outdated!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 15,
+        "name": "preset_outdated!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "8e3ae8a3ce95e5858db5a07c7778097fab92d2b23f2dd87efbfb871e5b925b6a"
+}

@@ -222,6 +222,13 @@
         "name": {
           "type": "string"
         },
+        "profile_display_name": {
+          "description": "Human-readable profile name (e.g. \"High\", \"Ultra\"). Used for display in the UI.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "profile_id": {
           "type": [
             "string",
@@ -229,6 +236,7 @@
           ]
         },
         "profile_name": {
+          "description": "Internal profile identifier (e.g. \"HIGH\", \"ULTRA\"). Used by the mod to load Iris profiles.",
           "type": [
             "string",
             "null"

@@ -139,7 +139,8 @@ impl WorkRepo {
                 lsv.render_distance AS "scene_render_distance!",
                 lsv.id AS "scene_version_id: SceneVersionId",
                 s.profile_id AS "profile_id: ShaderVersionProfileId",
-                svp.display_name AS "profile_name?"
+                svp.name AS "profile_name?",
+                svp.display_name AS "profile_display_name?"
             FROM selected s
             JOIN latest_shader_versions sv ON sv.id = s.shader_version_id
             JOIN shaders sh ON sh.id = s.shader_id

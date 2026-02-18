@@ -20,7 +20,7 @@ export type ShaderDetailCapture = Pick<
 	| 'image_path'
 	| 'thumbhash'
 	| 'scene_name'
-	| 'profile_name'
+	| 'profile_display_name'
 	| 'shader_version'
 	| 'shader_name'
 >;
@@ -73,7 +73,7 @@ export function _trimCapture(c: CaptureWithContext): ShaderDetailCapture {
 		'image_path',
 		'thumbhash',
 		'scene_name',
-		'profile_name',
+		'profile_display_name',
 		'shader_version',
 		'shader_name'
 	]);

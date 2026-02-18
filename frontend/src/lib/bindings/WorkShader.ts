@@ -3,4 +3,12 @@ import type { ShaderId } from "./ShaderId";
 import type { ShaderVersionId } from "./ShaderVersionId";
 import type { ShaderVersionProfileId } from "./ShaderVersionProfileId";
 
-export type WorkShader = { version_id: ShaderVersionId, id: ShaderId, slug: string, name: string, version: string, download_url?: string, file_hash?: string, profile_id?: ShaderVersionProfileId, profile_name?: string, };
+export type WorkShader = { version_id: ShaderVersionId, id: ShaderId, slug: string, name: string, version: string, download_url?: string, file_hash?: string, profile_id?: ShaderVersionProfileId, 
+/**
+ * Internal profile identifier (e.g. "HIGH", "ULTRA"). Used by the mod to load Iris profiles.
+ */
+profile_name?: string, 
+/**
+ * Human-readable profile name (e.g. "High", "Ultra"). Used for display in the UI.
+ */
+profile_display_name?: string, };

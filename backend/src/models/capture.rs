@@ -267,6 +267,7 @@ pub struct CaptureRunItemWithContext {
     pub scene_id: SceneId,
     pub profile_id: Option<ShaderVersionProfileId>,
     pub profile_name: Option<String>,
+    pub profile_display_name: Option<String>,
     pub preset_id: Option<ScenePresetId>,
     pub status: CaptureRunItemStatus,
     pub capture_id: Option<CaptureId>,
@@ -326,7 +327,10 @@ pub struct CaptureWithContext {
     pub shader_name: String,
     pub shader_version: String,
     pub profile_id: Option<ShaderVersionProfileId>,
+    /// Internal profile identifier (e.g. "HIGH", "ULTRA")
     pub profile_name: Option<String>,
+    /// Human-readable profile name (e.g. "High", "Ultra")
+    pub profile_display_name: Option<String>,
     pub image_path: Option<String>,
     pub image_url: Option<String>,
     pub thumbhash: Option<String>,

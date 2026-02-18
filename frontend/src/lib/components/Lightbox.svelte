@@ -10,7 +10,7 @@ interface CaptureItem {
 	id: string;
 	image_path?: string | null;
 	thumbhash?: string | null;
-	profile_name?: string | null;
+	profile_display_name?: string | null;
 	shader_version?: string | null;
 	scene_id?: string;
 	scene_name?: string | null;
@@ -587,11 +587,11 @@ function handleTouchEnd(e: TouchEvent) {
 								{currentCapture.scene_name}
 							</span>
 						{/if}
-						{#if currentCapture.profile_name}
-							<span
-								class="rounded bg-primary px-2 py-1 text-sm font-medium text-primary-foreground"
-							>
-								{currentCapture.profile_name}
+					{#if currentCapture.profile_display_name}
+						<span
+							class="rounded bg-primary px-2 py-1 text-sm font-medium text-primary-foreground"
+						>
+							{currentCapture.profile_display_name}
 							</span>
 						{/if}
 						{#if currentCapture.shader_version}

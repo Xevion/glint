@@ -39,8 +39,8 @@ let breadcrumbs = $derived.by(() => {
 		{ label: 'Captures', href: '/admin/captures' },
 		{ label: capture.shader_name, href: `/admin/shaders/${capture.shader_slug}` }
 	];
-	if (capture.profile_name) {
-		segments.push({ label: capture.profile_name });
+	if (capture.profile_display_name) {
+		segments.push({ label: capture.profile_display_name });
 	}
 	if (capture.scene_name) {
 		segments.push({
@@ -218,9 +218,9 @@ function formatMs(value?: number): string {
 						{/if}
 					</dd>
 
-			{#if capture.profile_name}
-				<dt class="text-muted-foreground">Profile</dt>
-				<dd>{capture.profile_name}</dd>
+		{#if capture.profile_display_name}
+			<dt class="text-muted-foreground">Profile</dt>
+			<dd>{capture.profile_display_name}</dd>
 			{/if}
 
 			{#if capture.preset_name}
@@ -375,12 +375,12 @@ function formatMs(value?: number): string {
 					<div class="p-2">
 						<div class="flex items-center justify-between">
 							<div class="text-sm font-medium">
-							{c.shader_version}
-							{#if c.profile_name}
-								&middot; {c.profile_name}
-							{/if}
-						</div>
-						{#if c.freshness !== 'fresh'}
+						{c.shader_version}
+						{#if c.profile_display_name}
+							&middot; {c.profile_display_name}
+						{/if}
+					</div>
+					{#if c.freshness !== 'fresh'}
 							<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[c.freshness]}">
 									{c.freshness}
 								</span>
@@ -407,16 +407,16 @@ function formatMs(value?: number): string {
 							<div class="text-sm font-medium">{c.shader_name}</div>
 						<div class="text-xs text-muted-foreground">
 							{c.shader_version}
-							{#if c.profile_name}
-								&middot; {c.profile_name}
+							{#if c.profile_display_name}
+								&middot; {c.profile_display_name}
 							{/if}
 						</div>
-					</div>
-				</AdminCaptureCard>
-			{/snippet}
-			</ItemGrid>
-		</Tabs.Content>
-	{/if}
+						</div>
+					</AdminCaptureCard>
+				{/snippet}
+				</ItemGrid>
+			</Tabs.Content>
+		{/if}
 
 	{#if capture.same_run.length > 0}
 			<Tabs.Content value="run">
@@ -426,9 +426,9 @@ function formatMs(value?: number): string {
 						<div class="p-2">
 							<div class="text-sm font-medium">{c.shader_name}</div>
 						<div class="text-xs text-muted-foreground">
-							{c.scene_name ?? c.scene_id}
-							{#if c.profile_name}
-								&middot; {c.profile_name}
+						{c.scene_name ?? c.scene_id}
+						{#if c.profile_display_name}
+							&middot; {c.profile_display_name}
 							{/if}
 						</div>
 						</div>
