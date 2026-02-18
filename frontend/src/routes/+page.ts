@@ -1,45 +1,65 @@
-import { createApiClient } from '$lib/api';
-import type { FeaturedPair, ShaderListItem, Stats } from '$lib/bindings';
+import { ShaderCardFragment, type ShaderCardShader } from '$lib/components/ShaderCard.svelte';
+import type { HeroPair } from '$lib/components/hero/types';
+import { createGraphQLClient, graphql, query } from '$lib/graphql';
 import type { PageLoad } from './$types';
 
+const HomePageQuery = graphql(
+	`
+		query HomePage($shaderCount: Int!, $featuredCount: Int!) {
+			stats {
+				shaderCount
+				sceneCount
+				captureCount
+			}
+			shaders(first: $shaderCount) {
+				edges {
+					node {
+						...ShaderCardFields
+					}
+				}
+			}
+			featured(count: $featuredCount) {
+				left {
+					imagePath
+					thumbhash
+					shaderName
+					shaderSlug
+					shaderAuthor
+					shaderVersion
+					sceneName
+				}
+				right {
+					imagePath
+					thumbhash
+					shaderName
+					shaderSlug
+					shaderAuthor
+					shaderVersion
+					sceneName
+				}
+			}
+		}
+	`,
+	[ShaderCardFragment]
+);
+
 export const load: PageLoad = async ({ fetch }) => {
-	const api = createApiClient(fetch);
-	const errors: string[] = [];
+	const client = createGraphQLClient(fetch);
 
-	const [statsResult, shadersResult, featuredResult] = await Promise.all([
-		api.stats.getStats(),
-		api.shaders.list({ pageSize: 6 }),
-		api.featured.list()
-	]);
+	const result = await query(client, HomePageQuery, { shaderCount: 6, featuredCount: 6 });
 
-	const stats = statsResult.match({
-		Ok: (s): Stats => s,
-		Err: (e) => {
-			errors.push(`Stats: ${e.message}`);
-			return { shader_count: 0, scene_count: 0, capture_count: 0 } as Stats;
-		}
+	return result.match({
+		Ok: (data) => ({
+			stats: data.stats,
+			shaders: data.shaders.edges.map((edge) => edge.node),
+			featuredPairs: data.featured,
+			errors: [] as string[]
+		}),
+		Err: (e) => ({
+			stats: { shaderCount: 0, sceneCount: 0, captureCount: 0 },
+			shaders: [] as ShaderCardShader[],
+			featuredPairs: [] as HeroPair[],
+			errors: [`Home: ${e.message}`]
+		})
 	});
-
-	const shaders = shadersResult.match({
-		Ok: (result): ShaderListItem[] => result.items,
-		Err: (e) => {
-			errors.push(`Shaders: ${e.message}`);
-			return [] as ShaderListItem[];
-		}
-	});
-
-	const featuredPairs = featuredResult.match({
-		Ok: (pairs): FeaturedPair[] => pairs,
-		Err: (e) => {
-			errors.push(`Featured: ${e.message}`);
-			return [] as FeaturedPair[];
-		}
-	});
-
-	return {
-		stats,
-		shaders,
-		featuredPairs,
-		errors
-	};
 };

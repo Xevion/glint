@@ -33,7 +33,7 @@ pub use capture::{
     CaptureWithContext,
 };
 pub use extraction::{ExtractionStatus, ShaderVersionMetadata, ShaderVersionProfile};
-pub use featured::FeaturedPair;
+pub use featured::{FeaturedPair, FeaturedSide};
 pub use pagination::{Page, PageBody, PageQuery, Paginated};
 pub use scene::{
     Camera, CompleteUploadRequest, CompleteUploadResponse, CreatePresetRequest, CreateSceneRequest,

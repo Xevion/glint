@@ -1,12 +1,11 @@
-import type { Shader } from '$lib/bindings';
-
 /** Display-only shader info for comparison overlays */
-export type ShaderDisplayInfo = Pick<Shader, 'name'> & {
+export interface ShaderDisplayInfo {
+	name: string;
 	version: string;
 	author?: string | null;
-	profile_display_name?: string | null;
-	preset_name?: string | null;
-};
+	profileDisplayName?: string | null;
+	presetName?: string | null;
+}
 
 /** Comparison display modes */
 export type CompareMode = 'slider' | 'split' | 'toggle';

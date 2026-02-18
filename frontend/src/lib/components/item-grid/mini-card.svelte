@@ -8,9 +8,9 @@ interface Props {
 	/** Secondary text (author, subtitle, etc.) */
 	subtitle?: string;
 	/** Thumbnail image URL */
-	image?: string;
+	image?: string | null;
 	/** Thumbhash for image placeholder */
-	thumbhash?: string;
+	thumbhash?: string | null;
 	/** Link destination */
 	href?: string;
 	/** Custom CSS class */

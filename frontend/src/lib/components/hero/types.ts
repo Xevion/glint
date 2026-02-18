@@ -1,48 +1,32 @@
-import type { FeaturedPair } from '$lib/bindings';
-
 export type Orientation = 'vertical' | 'horizontal' | 'diagonal';
 
 /** Degrees of skew for diagonal clip-path and divider line. Shared across hero components. */
 export const SKEW_DEG = 8;
 
-/** Data for one side of a comparison slider. */
+/** Data for one side of a comparison slider. Matches FeaturedSideNode GraphQL shape. */
 export interface SliderSide {
-	image: string;
+	imagePath: string;
 	thumbhash?: string | null;
-	label: string;
-	slug: string;
-	author?: string | null;
-	version: string;
+	shaderName: string;
+	shaderSlug: string;
+	shaderAuthor?: string | null;
+	shaderVersion: string;
+	sceneName: string;
 }
 
 /** Empty SliderSide for initialization before data loads. */
 export const EMPTY_SIDE: SliderSide = {
-	image: '',
-	label: '',
-	slug: '',
-	version: ''
+	imagePath: '',
+	shaderName: '',
+	shaderSlug: '',
+	shaderVersion: '',
+	sceneName: ''
 };
 
-/** Extract left and right SliderSide from a FeaturedPair. */
-export function pairToSides(pair: FeaturedPair): { left: SliderSide; right: SliderSide } {
-	return {
-		left: {
-			image: pair.left_image_path,
-			thumbhash: pair.left_thumbhash ?? null,
-			label: pair.left_shader_name,
-			slug: pair.left_shader_slug,
-			author: pair.left_shader_author,
-			version: pair.left_shader_version
-		},
-		right: {
-			image: pair.right_image_path,
-			thumbhash: pair.right_thumbhash ?? null,
-			label: pair.right_shader_name,
-			slug: pair.right_shader_slug,
-			author: pair.right_shader_author,
-			version: pair.right_shader_version
-		}
-	};
+/** A featured shader comparison pair. Matches FeaturedPairNode GraphQL shape. */
+export interface HeroPair {
+	left: SliderSide;
+	right: SliderSide;
 }
 
 /**

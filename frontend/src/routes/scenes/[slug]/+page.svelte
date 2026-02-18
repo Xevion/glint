@@ -1,7 +1,6 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
-import { createApiClient } from '$lib/api';
-import type { CaptureWithContext } from '$lib/bindings';
+import type { SceneCapture } from './+page';
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureGallery from '$lib/components/CaptureGallery.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
@@ -19,50 +18,32 @@ interface Props {
 let { data }: Props = $props();
 const scene = $derived(data.scene);
 
-// Infinite scroll state for captures grid
-const api = createApiClient(fetch);
+// Client-side "show more" from the full captures array (all loaded via GraphQL)
 const capturesPageSize = 24;
 
-let allCaptures = $state<CaptureWithContext[]>([]);
-let capturesPage = $state(1);
-let capturesTotal = $state(0);
-let capturesLoading = $state(false);
-const hasMoreCaptures = $derived(allCaptures.length < capturesTotal);
+let visibleCount = $state(capturesPageSize);
+const allCaptures = $derived(
+	data.scene.captures.filter((c): c is SceneCapture & { imagePath: string } => c.imagePath != null)
+);
+const visibleCaptures = $derived(allCaptures.slice(0, visibleCount));
+const hasMoreCaptures = $derived(visibleCount < allCaptures.length);
 
-// Initialize from SSR data
+// Reset visible count when scene data changes
 $effect(() => {
-	const d = data.capturesData;
-	allCaptures = d.items;
-	capturesPage = d.page;
-	capturesTotal = d.total;
+	// eslint-disable-next-line @typescript-eslint/no-unused-expressions -- Svelte $effect dependency tracking
+	data.capturesData;
+	visibleCount = capturesPageSize;
 });
 
-async function loadMoreCaptures() {
-	if (capturesLoading || !hasMoreCaptures) return;
-	capturesLoading = true;
-	const nextPage = capturesPage + 1;
-	const result = await api.scenes.listCaptures(data.scene.slug, {
-		page: nextPage,
-		pageSize: capturesPageSize
-	});
-	result.match({
-		Ok: (paginated) => {
-			allCaptures = [...allCaptures, ...paginated.items];
-			capturesPage = paginated.page;
-			capturesTotal = paginated.total;
-		},
-		Err: (err) => {
-			console.warn('Failed to load more captures:', err.message);
-		}
-	});
-	capturesLoading = false;
+function loadMoreCaptures() {
+	visibleCount = Math.min(visibleCount + capturesPageSize, allCaptures.length);
 }
 
 // Use original scene captures for the shader thumbnail strip (not paginated)
 const sceneCaptures = $derived(scene.captures);
 
 // Selected capture for the main preview
-let selectedCapture = $state<CaptureWithContext | null>(null);
+let selectedCapture = $state<SceneCapture | null>(null);
 
 // Initialize selected capture when scene captures change
 $effect(() => {
@@ -74,10 +55,10 @@ $effect(() => {
 // Group captures by shader (from full scene data, not paginated)
 const capturesByShader = $derived.by(() => {
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- ephemeral map inside $derived.by
-	const map = new Map<string, CaptureWithContext>();
+	const map = new Map<string, SceneCapture>();
 	for (const capture of sceneCaptures) {
-		if (!map.has(capture.shader_slug)) {
-			map.set(capture.shader_slug, capture);
+		if (!map.has(capture.shaderSlug)) {
+			map.set(capture.shaderSlug, capture);
 		}
 	}
 	return Array.from(map.values());
@@ -88,8 +69,8 @@ const weatherLabel = $derived.by(() => {
 	const v = scene.version;
 	if (!v) return null;
 	if (v.weather === 'clear') return 'Clear';
-	if (v.weather === 'rain') return `Rain (${Math.round(v.weather_intensity * 100)}%)`;
-	if (v.weather === 'thunder') return `Thunder (${Math.round(v.weather_intensity * 100)}%)`;
+	if (v.weather === 'rain') return `Rain (${Math.round(v.weatherIntensity * 100)}%)`;
+	if (v.weather === 'thunder') return `Thunder (${Math.round(v.weatherIntensity * 100)}%)`;
 	return v.weather;
 });
 
@@ -97,11 +78,11 @@ const weatherLabel = $derived.by(() => {
 const timeLabel = $derived.by(() => {
 	const v = scene.version;
 	if (!v) return null;
-	return formatTimeTicks(v.time_of_day_ticks);
+	return formatTimeTicks(v.timeOfDayTicks);
 });
 
 // OG metadata
-const ogImage = $derived(sceneCaptures[0]?.image_path ?? null);
+const ogImage = $derived(sceneCaptures[0]?.imagePath ?? null);
 const ogDescription = $derived.by(() => {
 	const parts = [`${scene.name} scene for Minecraft shader comparison`];
 	if (sceneCaptures.length > 0)
@@ -141,11 +122,11 @@ const ogDescription = $derived.by(() => {
 					<div class="shadow-theme-lg relative aspect-video w-full overflow-hidden rounded-xl">
 						{#if selectedCapture}
 						<CaptureImage
-							src={selectedCapture.image_path}
+							src={selectedCapture.imagePath}
 							thumbhash={selectedCapture.thumbhash}
 							preset="hero"
 							priority
-							alt="{scene.name} with {selectedCapture.shader_name}"
+							alt="{scene.name} with {selectedCapture.shaderName}"
 								class="h-full w-full object-cover"
 								containerClass="h-full w-full"
 							/>
@@ -158,19 +139,19 @@ const ogDescription = $derived.by(() => {
 									<div class="flex items-end justify-between">
 										<div>
 											<h3 class="mb-2 text-xl font-bold text-white">
-												{selectedCapture.shader_name}
+												{selectedCapture.shaderName}
 											</h3>
 											<div class="flex items-center gap-2">
-							{#if selectedCapture.profile_display_name}
+							{#if selectedCapture.profileDisplayName}
 											<span class="rounded bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
-												{selectedCapture.profile_display_name}
+												{selectedCapture.profileDisplayName}
 												</span>
 											{/if}
-												{#if selectedCapture.shader_version}
+												{#if selectedCapture.shaderVersion}
 													<span
 														class="rounded bg-white/20 px-2 py-0.5 text-xs font-bold text-white"
 													>
-														v{selectedCapture.shader_version}
+														v{selectedCapture.shaderVersion}
 													</span>
 												{/if}
 											</div>
@@ -201,10 +182,10 @@ const ogDescription = $derived.by(() => {
 										: 'border-transparent'}"
 								>
 								<CaptureImage
-									src={capture.image_path}
+									src={capture.imagePath}
 									thumbhash={capture.thumbhash}
 									preset="thumbnail"
-									alt="{capture.shader_name} thumbnail"
+									alt="{capture.shaderName} thumbnail"
 										class="h-full w-full object-cover"
 										containerClass="aspect-video"
 									/>
@@ -238,12 +219,12 @@ const ogDescription = $derived.by(() => {
 									<span class="font-medium text-foreground">{weatherLabel}</span>
 								</div>
 							{/if}
-							{#if scene.version.moon_phase != null}
-								<div class="flex items-center justify-between text-sm">
-									<span class="text-muted-foreground">Moon</span>
-									<span class="font-medium text-foreground">{formatMoonPhase(scene.version.moon_phase)}</span>
-								</div>
-							{/if}
+						{#if scene.version?.moonPhase != null}
+							<div class="flex items-center justify-between text-sm">
+								<span class="text-muted-foreground">Moon</span>
+								<span class="font-medium text-foreground">{formatMoonPhase(scene.version.moonPhase)}</span>
+							</div>
+						{/if}
 						</div>
 					{/if}
 
@@ -259,24 +240,32 @@ const ogDescription = $derived.by(() => {
 			</div>
 
 	<!-- Captures Grid -->
+	<!-- eslint-disable @typescript-eslint/no-unsafe-member-access -- GraphQL type resolution in callbacks -->
 	<CaptureGallery
-		captures={allCaptures}
+		captures={visibleCaptures}
 		title="Shader Renders"
 		emptyMessage="Captures for this scene are being generated."
-		onclick={(capture: CaptureWithContext) => (selectedCapture = capture)}
-		alt={(capture: CaptureWithContext) => `${capture.shader_name} render`}
+		onclick={(capture) => (selectedCapture = visibleCaptures.find(c => c.id === capture.id) ?? null)}
+		alt={(capture) => {
+			const c = visibleCaptures.find(v => v.id === capture.id);
+			return c ? `${c.shaderName} render` : 'Capture';
+		}}
 		hasMore={hasMoreCaptures}
-		loading={capturesLoading}
+		loading={false}
 		onLoadMore={loadMoreCaptures}
 	>
-		{#snippet overlay(capture: CaptureWithContext)}
-			<CaptureBadges
-				shaderName={capture.shader_name}
-				profileName={capture.profile_display_name}
-				version={capture.shader_version}
-			/>
+		{#snippet overlay(capture)}
+			{@const c = visibleCaptures.find(v => v.id === capture.id)}
+			{#if c}
+				<CaptureBadges
+					shaderName={c.shaderName}
+					profileName={c.profileDisplayName}
+					version={c.shaderVersion}
+				/>
+			{/if}
 		{/snippet}
 		</CaptureGallery>
+		<!-- eslint-enable @typescript-eslint/no-unsafe-member-access -->
 		</div>
 	{/key}
 {/if}

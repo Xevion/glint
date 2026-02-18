@@ -1,6 +1,5 @@
 <script lang="ts">
 import { browser } from '$app/environment';
-import type { FeaturedPair } from '$lib/bindings';
 import { preloadImage } from '$lib/utils/image';
 import { createTimerGroup } from '$lib/utils/timer';
 import { createTween } from '$lib/utils/tween';
@@ -8,10 +7,10 @@ import PauseIcon from '@lucide/svelte/icons/pause';
 import PlayIcon from '@lucide/svelte/icons/play';
 import { onMount } from 'svelte';
 import ComparisonSlider from './ComparisonSlider.svelte';
-import { EMPTY_SIDE, type Orientation, SKEW_DEG, type SliderSide, pairToSides } from './types';
+import { EMPTY_SIDE, type HeroPair, type Orientation, SKEW_DEG, type SliderSide } from './types';
 
 interface Props {
-	pairs: FeaturedPair[];
+	pairs: HeroPair[];
 	overlayVisible?: boolean;
 }
 
@@ -76,8 +75,8 @@ const SHOWCASE_PATTERNS: ShowcasePattern[] = [
 const ORIENTATIONS: Orientation[] = ['vertical', 'horizontal', 'diagonal'];
 
 // Image pools (SliderSide arrays derived from pairs)
-const leftPool = $derived<SliderSide[]>(pairs.map((p) => pairToSides(p).left));
-const rightPool = $derived<SliderSide[]>(pairs.map((p) => pairToSides(p).right));
+const leftPool = $derived<SliderSide[]>(pairs.map((p) => p.left));
+const rightPool = $derived<SliderSide[]>(pairs.map((p) => p.right));
 
 // Transition state machine
 type TransitionState = 'resting' | 'showcase' | 'sweep-out' | 'swapping' | 'sweep-in';
@@ -283,8 +282,8 @@ async function beginTransition() {
 		// If the two visible sides now show different scenes, do a double-swap:
 		// sweep through to the opposite edge to hide the stale side, swap it too.
 		let finalEdgeIsLeft = hidingLeft;
-		const leftScene = pairs[leftIndex].left_scene_name;
-		const rightScene = pairs[rightIndex].right_scene_name;
+		const leftScene = pairs[leftIndex].left.sceneName;
+		const rightScene = pairs[rightIndex].right.sceneName;
 
 		if (leftScene !== rightScene) {
 			await generationDelay(SWAP_DELAY, gen);
@@ -293,10 +292,10 @@ async function beginTransition() {
 			// Preload the other side's next image during the cross-sweep
 			if (hidingLeft) {
 				const nextIdx = (rightIndex + 1) % rightPool.length;
-				preloadImage(rightPool[nextIdx].image);
+				preloadImage(rightPool[nextIdx].imagePath);
 			} else {
 				const nextIdx = (leftIndex + 1) % leftPool.length;
-				preloadImage(leftPool[nextIdx].image);
+				preloadImage(leftPool[nextIdx].imagePath);
 			}
 
 			// Sweep from current edge all the way to the opposite edge
@@ -434,10 +433,10 @@ $effect(() => {
 	if (transitionState === 'showcase' && hasMultiplePairs && browser) {
 		if (swapSide === 'left') {
 			const nextIdx = (leftIndex + 1) % leftPool.length;
-			img = preloadImage(leftPool[nextIdx].image);
+			img = preloadImage(leftPool[nextIdx].imagePath);
 		} else {
 			const nextIdx = (rightIndex + 1) % rightPool.length;
-			img = preloadImage(rightPool[nextIdx].image);
+			img = preloadImage(rightPool[nextIdx].imagePath);
 		}
 	}
 	return () => {

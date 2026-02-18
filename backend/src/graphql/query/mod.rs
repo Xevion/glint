@@ -1,3 +1,9 @@
+pub mod backgrounds;
+pub mod captures;
+pub mod featured;
+pub mod shaders;
+pub mod stats;
+
 use async_graphql::{Context, MergedObject, Object, Result};
 
 use crate::graphql::types::connection::decode_cursor;
@@ -5,9 +11,22 @@ use crate::graphql::types::scene::{SceneConnection, SceneNode};
 use crate::repo::SceneRepo;
 use crate::state::AppState;
 
+use backgrounds::BackgroundQuery;
+use captures::CaptureQuery;
+use featured::FeaturedQuery;
+use shaders::ShaderQuery;
+use stats::StatsQuery;
+
 /// Root query type — merges all domain query types.
 #[derive(MergedObject, Default)]
-pub struct QueryRoot(SceneQuery);
+pub struct QueryRoot(
+    SceneQuery,
+    ShaderQuery,
+    CaptureQuery,
+    StatsQuery,
+    FeaturedQuery,
+    BackgroundQuery,
+);
 
 #[derive(Default)]
 pub struct SceneQuery;

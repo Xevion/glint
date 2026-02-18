@@ -11,24 +11,33 @@ import {
 	getDimensionDisplayName,
 	getWeatherDisplayName
 } from '$lib/utils/display';
-import type { SceneListItem, SceneVersion } from '$lib/bindings';
 import { ArrowRight, Sun } from '@lucide/svelte';
 
-type SceneCardItem = Pick<
-	SceneListItem,
-	'slug' | 'name' | 'description' | 'dimension' | 'image_path' | 'thumbhash' | 'capture_count'
-> & {
-	version: Pick<SceneVersion, 'time_of_day_ticks' | 'weather' | 'biome'>;
-};
+export interface SceneCardVersion {
+	timeOfDayTicks: number;
+	weather: string;
+	biome?: string | null;
+}
+
+export interface SceneCardScene {
+	slug: string;
+	name: string;
+	description?: string | null;
+	dimension: string;
+	imagePath?: string | null;
+	thumbhash?: string | null;
+	captureCount: number;
+	version: SceneCardVersion | null;
+}
 
 interface Props {
-	scene: SceneCardItem;
+	scene: SceneCardScene;
 	class?: string;
 }
 
 let { scene, class: className }: Props = $props();
 
-const timeOfDay = $derived(formatTimeTicks(scene.version.time_of_day_ticks));
+const timeOfDay = $derived(scene.version ? formatTimeTicks(scene.version.timeOfDayTicks) : null);
 
 function handleCardClick() {
 	void goto(resolve('/scenes/[slug]', { slug: scene.slug }), { invalidateAll: true });
@@ -57,9 +66,9 @@ function handleKeyDown(e: KeyboardEvent) {
 >
 	<!-- Thumbnail Image -->
 	<div class="relative">
-		<CaptureImage
-		src={scene.image_path}
-		thumbhash={scene.thumbhash}
+	<CaptureImage
+	src={scene.imagePath}
+	thumbhash={scene.thumbhash}
 			preset="card"
 			alt="{scene.name} scene preview"
 			class="h-full w-full object-cover transition-all duration-500 ease-out group-hover:scale-105"
@@ -71,14 +80,16 @@ function handleKeyDown(e: KeyboardEvent) {
 		<ImageOverlay />
 
 		<!-- Time badge - top left -->
-		<div class="absolute top-3 left-3 flex">
-			<span
-				class="inline-flex items-center gap-1.5 rounded-md bg-info/80 px-2 py-1 text-xs font-medium text-white capitalize shadow-theme-sm backdrop-blur-sm"
-			>
-				<Sun class="h-3 w-3" strokeWidth={2} />
-				{timeOfDay}
-			</span>
-		</div>
+		{#if timeOfDay}
+			<div class="absolute top-3 left-3 flex">
+				<span
+					class="inline-flex items-center gap-1.5 rounded-md bg-info/80 px-2 py-1 text-xs font-medium text-white capitalize shadow-theme-sm backdrop-blur-sm"
+				>
+					<Sun class="h-3 w-3" strokeWidth={2} />
+					{timeOfDay}
+				</span>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Card Body -->
@@ -96,7 +107,7 @@ function handleKeyDown(e: KeyboardEvent) {
 				{scene.name}
 			</a>
 			<div class="flex items-center gap-2">
-		{#if scene.version.biome}
+		{#if scene.version?.biome}
 			<StatusBadge status="active">
 				{getBiomeDisplayName(scene.version.biome)}
 			</StatusBadge>
@@ -121,9 +132,9 @@ function handleKeyDown(e: KeyboardEvent) {
 		<!-- Footer -->
 		<div class="mt-auto flex items-center justify-between border-t border-border pt-3">
 			<div class="flex items-center gap-2 text-xs text-muted-foreground">
-			<span>{getWeatherDisplayName(scene.version.weather)}</span>
+			{#if scene.version}<span>{getWeatherDisplayName(scene.version.weather)}</span>{/if}
 			<span>•</span>
-				<span>{scene.capture_count} capture{scene.capture_count !== 1 ? 's' : ''}</span>
+				<span>{scene.captureCount} capture{scene.captureCount !== 1 ? 's' : ''}</span>
 			</div>
 			<span
 				class="inline-flex items-center gap-1 text-xs font-medium text-primary transition-transform group-hover:translate-x-1"

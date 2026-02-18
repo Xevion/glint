@@ -451,7 +451,14 @@ function formatMs(value?: number): string {
 
 {#if lightboxOpen && capture.image_path}
 	<Lightbox
-		captures={[capture]}
+		captures={[{
+			id: capture.id,
+			imagePath: capture.image_path,
+			thumbhash: capture.thumbhash,
+			sceneName: capture.scene_name,
+			profileDisplayName: capture.profile_display_name,
+			shaderVersion: capture.shader_version,
+		}]}
 		currentIndex={0}
 		onClose={() => (lightboxOpen = false)}
 		onNavigate={() => { /* single capture, no navigation */ }}

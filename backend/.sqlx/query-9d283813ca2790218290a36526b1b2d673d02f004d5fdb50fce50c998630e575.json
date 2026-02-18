@@ -1,0 +1,78 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    c.id AS \"id: CaptureId\",\n                    c.shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                    c.scene_id AS \"scene_id: SceneId\",\n                    c.status AS \"status!: CaptureStatus\",\n                    c.profile_id,\n                    c.image_path,\n                    c.thumbhash,\n                    c.captured_at,\n                    c.resolution_width,\n                    c.resolution_height\n                FROM captures c\n                JOIN scenes sc ON c.scene_id = sc.id\n                WHERE c.status = 'completed'\n                  AND sc.active = TRUE\n                  AND (c.captured_at, c.id) < ($1, $2)\n                ORDER BY c.captured_at DESC NULLS LAST, c.id DESC\n                LIMIT $3\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: CaptureId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_version_id: ShaderVersionId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "scene_id: SceneId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "status!: CaptureStatus",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "profile_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "image_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "thumbhash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "captured_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "resolution_width",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "resolution_height",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "9d283813ca2790218290a36526b1b2d673d02f004d5fdb50fce50c998630e575"
+}

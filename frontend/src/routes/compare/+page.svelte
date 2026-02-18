@@ -25,19 +25,17 @@ type CompareImageOption = ImageOption & { shader: ShaderDisplayInfo };
 
 const images: CompareImageOption[] = $derived(
 	data.captures.map((c) => {
-		const suffix = [c.shader_version, c.profile_display_name, c.preset_name]
-			.filter(Boolean)
-			.join(' · ');
+		const suffix = [c.shaderVersion, c.profileDisplayName, c.presetName].filter(Boolean).join(' · ');
 		return {
-			url: c.image_path,
-			label: suffix ? `${c.shader_name} (${suffix})` : c.shader_name,
+			url: c.imagePath,
+			label: suffix ? `${c.shaderName} (${suffix})` : c.shaderName,
 			thumbhash: c.thumbhash,
 			shader: {
-				name: c.shader_name,
-				version: c.shader_version,
-				author: c.shader_author ?? null,
-				profile_display_name: c.profile_display_name,
-				preset_name: c.preset_name
+				name: c.shaderName,
+				version: c.shaderVersion,
+				author: c.shaderAuthor ?? null,
+				profileDisplayName: c.profileDisplayName,
+				presetName: c.presetName
 			}
 		};
 	})
@@ -89,7 +87,7 @@ const ogTitle = $derived.by(() => {
 	}
 	return 'Compare Shaders';
 });
-const ogImage = $derived(data.captures[0]?.image_path ?? null);
+const ogImage = $derived(data.captures[0]?.imagePath ?? null);
 const ogImagePath = $derived(
 	data.selectedSceneSlug ? `/og/compare/${data.selectedSceneSlug}/og.png` : null
 );
@@ -123,7 +121,7 @@ const ogDescription = $derived.by(() => {
 			>
 					{#each data.scenes as scene (scene.slug)}
 						<option value={scene.slug}>
-							{scene.name} ({scene.capture_count})
+							{scene.name} ({scene.captureCount})
 						</option>
 					{/each}
 				</select>

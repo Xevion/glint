@@ -3,9 +3,12 @@ use chrono::{DateTime, Utc};
 
 use crate::id::SceneId;
 use crate::models::Scene;
+use crate::models::capture::CaptureStatus;
+use crate::repo::capture::{CaptureDistinct, CaptureFilters};
 use crate::repo::{CaptureRepo, ScenePresetRepo, SceneVersionRepo};
 use crate::state::AppState;
 
+use super::capture::CaptureWithContextNode;
 use super::connection::{CursorEncodable, CursorPage, PageInfo, encode_cursor};
 use super::preset::PresetNode;
 use super::version::SceneVersionNode;
@@ -57,6 +60,20 @@ impl SceneNode {
         let state = ctx.data_unchecked::<AppState>();
         let version = SceneVersionRepo::get_latest(state.db(), self.id.as_ref()).await?;
         Ok(version.map(Into::into))
+    }
+
+    /// Completed captures for this scene, one per shader (deduplicated).
+    async fn captures(&self, ctx: &Context<'_>) -> Result<Vec<CaptureWithContextNode>> {
+        let state = ctx.data_unchecked::<AppState>();
+        let filters = CaptureFilters {
+            scene_id: Some(self.id.clone()),
+            status: Some(CaptureStatus::Completed),
+            ..Default::default()
+        };
+        let (captures, _) =
+            CaptureRepo::list_with_context(state.db(), &filters, None, CaptureDistinct::PerShader)
+                .await?;
+        Ok(captures.into_iter().map(Into::into).collect())
     }
 }
 

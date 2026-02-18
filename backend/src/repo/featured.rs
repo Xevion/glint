@@ -5,7 +5,7 @@ use rand::seq::SliceRandom;
 
 use crate::db::DbPool;
 use crate::error::AppResult;
-use crate::models::FeaturedPair;
+use crate::models::{FeaturedPair, FeaturedSide};
 
 struct CandidateRow {
     image_path: String,
@@ -104,21 +104,21 @@ impl FeaturedRepo {
     }
 }
 
+fn make_side(c: &CandidateRow) -> FeaturedSide {
+    FeaturedSide {
+        image_path: c.image_path.clone(),
+        thumbhash: c.thumbhash.clone(),
+        shader_name: c.shader_name.clone(),
+        shader_slug: c.shader_slug.clone(),
+        shader_author: c.shader_author.clone(),
+        shader_version: c.shader_version.clone(),
+        scene_name: c.scene_name.clone(),
+    }
+}
+
 fn make_pair(left: &CandidateRow, right: &CandidateRow) -> FeaturedPair {
     FeaturedPair {
-        left_image_path: left.image_path.clone(),
-        left_thumbhash: left.thumbhash.clone(),
-        left_shader_name: left.shader_name.clone(),
-        left_shader_slug: left.shader_slug.clone(),
-        left_shader_author: left.shader_author.clone(),
-        left_shader_version: left.shader_version.clone(),
-        left_scene_name: left.scene_name.clone(),
-        right_image_path: right.image_path.clone(),
-        right_thumbhash: right.thumbhash.clone(),
-        right_shader_name: right.shader_name.clone(),
-        right_shader_slug: right.shader_slug.clone(),
-        right_shader_author: right.shader_author.clone(),
-        right_shader_version: right.shader_version.clone(),
-        right_scene_name: right.scene_name.clone(),
+        left: make_side(left),
+        right: make_side(right),
     }
 }

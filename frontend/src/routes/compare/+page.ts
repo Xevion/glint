@@ -1,18 +1,45 @@
-import { createApiClient } from '$lib/api';
-import type { CaptureWithContext, SceneListItem } from '$lib/bindings';
-import { pick } from '$lib/utils';
+import { createGraphQLClient, graphql, query } from '$lib/graphql';
+import type { ResultOf } from '$lib/graphql/tada';
 import type { PageLoad } from './$types';
 
-type CompareScene = Pick<SceneListItem, 'slug' | 'name' | 'capture_count'>;
-type CompareCapture = Pick<
-	CaptureWithContext,
-	| 'thumbhash'
-	| 'shader_name'
-	| 'shader_version'
-	| 'shader_author'
-	| 'profile_display_name'
-	| 'preset_name'
-> & { image_path: string };
+/** Lightweight query for the scene selector — only fields the dropdown needs. */
+const CompareScenesQuery = graphql(`
+	query CompareScenes($first: Int!) {
+		scenes(first: $first) {
+			edges {
+				node {
+					slug
+					name
+					captureCount
+				}
+			}
+		}
+	}
+`);
+
+/** Captures for the selected scene — only fields the comparison UI needs. */
+const CompareCapturesQuery = graphql(`
+	query CompareCaptures($id: String!) {
+		scene(id: $id) {
+			captures {
+				thumbhash
+				shaderName
+				shaderVersion
+				shaderAuthor
+				profileDisplayName
+				presetName
+				imagePath
+			}
+		}
+	}
+`);
+
+type CompareScene = NonNullable<
+	ResultOf<typeof CompareScenesQuery>['scenes']['edges'][number]['node']
+>;
+type CompareCapture = NonNullable<
+	ResultOf<typeof CompareCapturesQuery>['scene']
+>['captures'][number] & { imagePath: string };
 
 interface ComparePageData {
 	scenes: CompareScene[];
@@ -22,18 +49,18 @@ interface ComparePageData {
 }
 
 export const load: PageLoad = async ({ fetch, url }): Promise<ComparePageData> => {
-	const api = createApiClient(fetch);
+	const client = createGraphQLClient(fetch);
 	const sceneSlug = url.searchParams.get('scene') ?? undefined;
 
-	const scenesResult = await api.scenes.list();
+	const scenesResult = await query(client, CompareScenesQuery, { first: 100 });
 
 	const scenes: CompareScene[] = scenesResult.match({
-		Ok: (v) => v.map((s) => pick(s, ['slug', 'name', 'capture_count'])),
+		Ok: (data) => data.scenes.edges.map((edge) => edge.node),
 		Err: () => []
 	});
 
 	// Pick the target scene: explicit slug, or first scene with captures
-	const targetSlug = sceneSlug ?? scenes.find((s) => s.capture_count > 0)?.slug ?? scenes[0]?.slug;
+	const targetSlug = sceneSlug ?? scenes.find((s) => s.captureCount > 0)?.slug ?? scenes[0]?.slug;
 
 	if (!targetSlug) {
 		return {
@@ -44,23 +71,11 @@ export const load: PageLoad = async ({ fetch, url }): Promise<ComparePageData> =
 		};
 	}
 
-	const sceneResult = await api.scenes.getBySlug(targetSlug);
+	const sceneResult = await query(client, CompareCapturesQuery, { id: targetSlug });
 
 	return sceneResult.match({
-		Ok: (data) => {
-			const captures: CompareCapture[] = (data[0]?.captures ?? [])
-				.filter((c): c is typeof c & { image_path: string } => !!c.image_path)
-				.map((c) => ({
-					...pick(c, [
-						'thumbhash',
-						'shader_name',
-						'shader_version',
-						'shader_author',
-						'profile_display_name',
-						'preset_name'
-					]),
-					image_path: c.image_path
-				}));
+		Ok: (data): ComparePageData => {
+			const captures = (data.scene?.captures ?? []).filter((c): c is CompareCapture => !!c.imagePath);
 			return {
 				scenes,
 				captures,

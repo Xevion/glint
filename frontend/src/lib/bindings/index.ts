@@ -38,6 +38,7 @@ export type { ExtractionStatus } from "./ExtractionStatus";
 export type { ExtractionSummary } from "./ExtractionSummary";
 export type { Feature } from "./Feature";
 export type { FeaturedPair } from "./FeaturedPair";
+export type { FeaturedSide } from "./FeaturedSide";
 export type { Paginated } from "./Paginated";
 export type { PendingSceneUploadId } from "./PendingSceneUploadId";
 export type { Role } from "./Role";

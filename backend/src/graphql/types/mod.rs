@@ -1,4 +1,11 @@
+pub mod background;
+pub mod capture;
 pub mod connection;
+pub mod featured;
 pub mod preset;
 pub mod scene;
+pub mod shader;
+pub mod stats;
+pub mod taxonomy;
+pub mod user;
 pub mod version;

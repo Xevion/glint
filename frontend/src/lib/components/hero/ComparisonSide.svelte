@@ -23,21 +23,24 @@ let loaded = $state(false);
 let errored = $state(false);
 
 const placeholder = $derived(browser ? decodeThumbhash(side.thumbhash) : null);
-const src = $derived(imageUrl(side.image, 'hero'));
-const srcset = $derived(imageSrcset(side.image, 'hero'));
+const src = $derived(imageUrl(side.imagePath, 'hero'));
+const srcset = $derived(imageSrcset(side.imagePath, 'hero'));
 
 // Reset loaded/errored state when the image URL changes
 $effect(() => {
-	void side.image;
+	void side.imagePath;
 	loaded = false;
 	errored = false;
 });
 
-const href = $derived(side.slug ? resolve('/shaders/[slug]', { slug: side.slug }) : undefined);
+const href = $derived(
+	side.shaderSlug ? resolve('/shaders/[slug]', { slug: side.shaderSlug }) : undefined
+);
 const detail = $derived.by(() => {
-	if (side.author && side.version) return `by ${side.author}, ${formatVersion(side.version)}`;
-	if (side.version) return formatVersion(side.version);
-	if (side.author) return `by ${side.author}`;
+	if (side.shaderAuthor && side.shaderVersion)
+		return `by ${side.shaderAuthor}, ${formatVersion(side.shaderVersion)}`;
+	if (side.shaderVersion) return formatVersion(side.shaderVersion);
+	if (side.shaderAuthor) return `by ${side.shaderAuthor}`;
 	return undefined;
 });
 
@@ -72,7 +75,7 @@ const [send, receive] = crossfade({
 		{src}
 		{srcset}
 		sizes="(min-width: 1024px) 66vw, 100vw"
-		alt={side.label || `${position} comparison`}
+		alt={side.shaderName || `${position} comparison`}
 		class="pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
 		class:opacity-0={!loaded || errored}
 		loading="eager"
@@ -88,7 +91,7 @@ const [send, receive] = crossfade({
 			<span class="mt-1 text-xs">Image unavailable</span>
 		</div>
 	{/if}
-	{#if side.label}
+	{#if side.shaderName}
 		{#key isTop}
 			<a
 				in:receive={{ key: position }}
@@ -96,7 +99,7 @@ const [send, receive] = crossfade({
 				{href}
 				class="pointer-events-auto absolute z-20 block rounded-md border border-white/15 bg-black/60 px-3 py-1.5 backdrop-blur-sm hover:border-white/30 hover:bg-black/70 {horizontalClass} {verticalClass}"
 			>
-				<span class="text-sm font-medium text-white">{side.label}</span>
+				<span class="text-sm font-medium text-white">{side.shaderName}</span>
 				{#if detail}
 					<div class="hidden text-xs text-white/70 md:block">{detail}</div>
 				{/if}

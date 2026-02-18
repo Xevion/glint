@@ -7,6 +7,7 @@ use tracing::{debug, instrument};
 
 use crate::db::DbPool;
 use crate::error::{AppResult, OptionNotFoundExt};
+use crate::graphql::types::connection::CursorPage;
 use crate::id::{
     CaptureId, CaptureRunId, SceneId, ScenePresetId, SceneVersionId, ShaderId, ShaderVersionId,
     ShaderVersionProfileId,
@@ -146,6 +147,127 @@ impl CaptureRepo {
 
         debug!(count = total, "Listed capture items");
         Ok((items, total))
+    }
+
+    /// Cursor-based paginated list of completed captures for public browsing.
+    /// Ordered by captured_at DESC NULLS LAST, id DESC.
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_items_cursor(
+        db: &DbPool,
+        first: i32,
+        after: Option<(DateTime<Utc>, String)>,
+    ) -> AppResult<CursorPage<CaptureListItem>> {
+        let limit = first.clamp(1, 100) as i64;
+
+        struct Row {
+            id: CaptureId,
+            shader_version_id: ShaderVersionId,
+            scene_id: SceneId,
+            status: CaptureStatus,
+            profile_id: Option<String>,
+            image_path: String,
+            thumbhash: Option<String>,
+            captured_at: Option<DateTime<Utc>>,
+            resolution_width: Option<i32>,
+            resolution_height: Option<i32>,
+        }
+
+        let rows = if let Some((ref cursor_ts, ref cursor_id)) = after {
+            sqlx::query_as!(
+                Row,
+                r#"
+                SELECT
+                    c.id AS "id: CaptureId",
+                    c.shader_version_id AS "shader_version_id: ShaderVersionId",
+                    c.scene_id AS "scene_id: SceneId",
+                    c.status AS "status!: CaptureStatus",
+                    c.profile_id,
+                    c.image_path,
+                    c.thumbhash,
+                    c.captured_at,
+                    c.resolution_width,
+                    c.resolution_height
+                FROM captures c
+                JOIN scenes sc ON c.scene_id = sc.id
+                WHERE c.status = 'completed'
+                  AND sc.active = TRUE
+                  AND (c.captured_at, c.id) < ($1, $2)
+                ORDER BY c.captured_at DESC NULLS LAST, c.id DESC
+                LIMIT $3
+                "#,
+                cursor_ts,
+                cursor_id,
+                limit + 1,
+            )
+            .fetch_all(db)
+            .await
+            .context("failed to list capture items (cursor)")?
+        } else {
+            sqlx::query_as!(
+                Row,
+                r#"
+                SELECT
+                    c.id AS "id: CaptureId",
+                    c.shader_version_id AS "shader_version_id: ShaderVersionId",
+                    c.scene_id AS "scene_id: SceneId",
+                    c.status AS "status!: CaptureStatus",
+                    c.profile_id,
+                    c.image_path,
+                    c.thumbhash,
+                    c.captured_at,
+                    c.resolution_width,
+                    c.resolution_height
+                FROM captures c
+                JOIN scenes sc ON c.scene_id = sc.id
+                WHERE c.status = 'completed'
+                  AND sc.active = TRUE
+                ORDER BY c.captured_at DESC NULLS LAST, c.id DESC
+                LIMIT $1
+                "#,
+                limit + 1,
+            )
+            .fetch_all(db)
+            .await
+            .context("failed to list capture items (cursor, no after)")?
+        };
+
+        let has_next_page = rows.len() as i64 > limit;
+        let items: Vec<CaptureListItem> = rows
+            .into_iter()
+            .take(limit as usize)
+            .map(|r| CaptureListItem {
+                id: r.id,
+                shader_version_id: r.shader_version_id,
+                scene_id: r.scene_id,
+                status: r.status,
+                profile_id: r.profile_id.map(ShaderVersionProfileId),
+                image_path: r.image_path,
+                thumbhash: r.thumbhash,
+                captured_at: r.captured_at,
+                resolution_width: r.resolution_width,
+                resolution_height: r.resolution_height,
+            })
+            .collect();
+
+        let total_count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) FROM captures c
+            JOIN scenes sc ON c.scene_id = sc.id
+            WHERE c.status = 'completed' AND sc.active = TRUE
+            "#
+        )
+        .fetch_one(db)
+        .await
+        .context("failed to count capture items (cursor)")?
+        .unwrap_or(0);
+
+        debug!(total_count, has_next_page, "Listed capture items (cursor)");
+        Ok(CursorPage {
+            items,
+            has_next_page,
+            has_previous_page: after.is_some(),
+            total_count,
+        })
     }
 
     /// List captures by shader version

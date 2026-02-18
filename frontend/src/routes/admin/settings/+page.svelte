@@ -3,7 +3,7 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
 import { createApiClient } from '$lib/api';
-import type { Background, ThemeMode } from '$lib/bindings';
+import type { ThemeMode } from '$lib/bindings';
 import { AdminBreadcrumb } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
@@ -14,6 +14,7 @@ import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { Eye, EyeOff, ImagePlus, Trash2, Upload } from '@lucide/svelte';
 import { rgbaToThumbHash } from 'thumbhash';
 import type { PageData } from './$types';
+import type { AdminBackground } from './+page';
 
 let { data }: { data: PageData } = $props();
 let backgrounds = $derived(data.backgrounds);
@@ -23,7 +24,7 @@ let uploading = $state(false);
 let uploadError = $state<string | null>(null);
 let dragOver = $state(false);
 
-let deleteTarget = $state<Background | null>(null);
+let deleteTarget = $state<AdminBackground | null>(null);
 let showDeleteConfirm = $state(false);
 let actionLoading = $state(false);
 
@@ -157,7 +158,7 @@ async function computeImageMetadata(
 
 // -- Toggle / Update --
 
-async function toggleEnabled(bg: Background) {
+async function toggleEnabled(bg: AdminBackground) {
 	actionLoading = true;
 	const result = await api.backgrounds.update(bg.id, { enabled: !bg.enabled });
 	if (result.isErr) {
@@ -167,7 +168,7 @@ async function toggleEnabled(bg: Background) {
 	await refresh();
 }
 
-async function updateThemeMode(bg: Background, mode: ThemeMode) {
+async function updateThemeMode(bg: AdminBackground, mode: ThemeMode) {
 	actionLoading = true;
 	const result = await api.backgrounds.update(bg.id, { theme_mode: mode });
 	if (result.isErr) {
@@ -179,7 +180,7 @@ async function updateThemeMode(bg: Background, mode: ThemeMode) {
 
 // -- Delete --
 
-function requestDelete(bg: Background) {
+function requestDelete(bg: AdminBackground) {
 	deleteTarget = bg;
 	showDeleteConfirm = true;
 }
@@ -198,12 +199,17 @@ async function confirmDelete() {
 
 // -- Helpers --
 
-function getThumbnailUrl(bg: Background): string | null {
-	return imageUrl(bg.image_path, { width: 320, quality: 70, format: 'webp' });
+function getThumbnailUrl(bg: AdminBackground): string | null {
+	return imageUrl(bg.imagePath, { width: 320, quality: 70, format: 'webp' });
 }
 
-function getThumbhashUrl(bg: Background): string | null {
+function getThumbhashUrl(bg: AdminBackground): string | null {
 	return decodeThumbhash(bg.thumbhash);
+}
+
+/** Lowercase GraphQL enum to ThemeMode for display and comparison */
+function themeMode(bg: AdminBackground): ThemeMode {
+	return bg.themeMode.toLowerCase() as ThemeMode;
 }
 
 const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
@@ -223,7 +229,7 @@ const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
 				<h2 class="text-lg font-semibold">Backgrounds</h2>
 				<p class="text-sm text-muted-foreground">
 					Manage background images shown behind pages. {backgrounds.length} total, {backgrounds.filter(
-						(b: Background) => b.enabled
+						(b) => b.enabled
 					).length} enabled.
 				</p>
 			</div>
@@ -298,7 +304,7 @@ const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
 							{#if thumbnailUrl}
 								<img
 									src={thumbnailUrl}
-									alt={bg.original_filename ?? 'Background'}
+									alt={bg.originalFilename ?? 'Background'}
 									class="relative h-full w-full object-cover"
 									loading="lazy"
 								/>
@@ -327,14 +333,14 @@ const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
 							<div class="flex items-start justify-between gap-2">
 								<div class="min-w-0 flex-1">
 									<p class="truncate text-sm font-medium">
-										{bg.original_filename ?? bg.id}
+										{bg.originalFilename ?? bg.id}
 									</p>
 									<p class="text-xs text-muted-foreground">
 										{#if bg.width && bg.height}
 											{bg.width}&times;{bg.height}
 										{/if}
-										{#if bg.file_size_bytes}
-											&middot; {formatBytes(bg.file_size_bytes)}
+										{#if bg.fileSizeBytes}
+											&middot; {formatBytes(bg.fileSizeBytes)}
 										{/if}
 									</p>
 								</div>
@@ -345,14 +351,14 @@ const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
 								<span class="text-xs text-muted-foreground">Theme:</span>
 								<Select.Root
 									type="single"
-									value={bg.theme_mode}
+									value={themeMode(bg)}
 								onValueChange={(v) => {
 									if (v) void updateThemeMode(bg, v as ThemeMode);
 								}}
 								>
 									<Select.Trigger class="h-7 w-24 text-xs">
-										{THEME_MODE_OPTIONS.find((o) => o.value === bg.theme_mode)?.label ??
-											bg.theme_mode}
+										{THEME_MODE_OPTIONS.find((o) => o.value === themeMode(bg))?.label ??
+											bg.themeMode}
 									</Select.Trigger>
 									<Select.Content>
 										{#each THEME_MODE_OPTIONS as opt (opt.value)}

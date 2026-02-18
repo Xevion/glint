@@ -1,5 +1,4 @@
 <script lang="ts">
-import type { CaptureWithContext } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ItemGrid } from '$lib/components/item-grid';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
@@ -7,17 +6,23 @@ import { ImageOff } from '@lucide/svelte';
 import type { Snippet } from 'svelte';
 import { fade } from 'svelte/transition';
 
+export interface CaptureGalleryItem {
+	id: string;
+	imagePath: string;
+	thumbhash?: string | null;
+}
+
 interface Props {
-	captures: CaptureWithContext[];
+	captures: CaptureGalleryItem[];
 	title: string;
 	/** Text shown in the empty state below "No Captures Yet" */
 	emptyMessage?: string;
 	/** Custom overlay content rendered over each capture on hover. Receives the capture. */
-	overlay?: Snippet<[CaptureWithContext]>;
+	overlay?: Snippet<[CaptureGalleryItem]>;
 	/** Called when a capture is clicked */
-	onclick?: (capture: CaptureWithContext) => void;
+	onclick?: (capture: CaptureGalleryItem) => void;
 	/** Alt text for each capture image. Defaults to "Capture". */
-	alt?: (capture: CaptureWithContext) => string;
+	alt?: (capture: CaptureGalleryItem) => string;
 	/** Whether more items are available to load (infinite scroll) */
 	hasMore?: boolean;
 	/** Whether more items are currently being loaded */
@@ -46,21 +51,21 @@ let {
 
 	<ItemGrid
 		items={captures}
-		key={(capture: CaptureWithContext) => capture.id}
+		key={(capture: CaptureGalleryItem) => capture.id}
 		mode="card"
 		empty={{ icon: ImageOff, title: 'No Captures Yet', message: emptyMessage }}
 		{hasMore}
 		{loading}
 		{onLoadMore}
 	>
-		{#snippet card(capture: CaptureWithContext)}
+		{#snippet card(capture: CaptureGalleryItem)}
 			<button
 				type="button"
 				onclick={() => onclick?.(capture)}
 				class="group relative overflow-hidden rounded-xl transition-transform hover:scale-[1.02]"
 			>
 			<CaptureImage
-				src={capture.image_path}
+				src={capture.imagePath}
 				thumbhash={capture.thumbhash}
 					preset="card"
 					alt={alt ? alt(capture) : 'Capture'}

@@ -1,11 +1,11 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
-import type { ShaderListItem } from '$lib/bindings';
 import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import { ItemGrid } from '$lib/components/item-grid';
 import Meta from '$lib/components/Meta.svelte';
 import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
+import type { ShaderCardShader } from '$lib/components/ShaderCard.svelte';
 import HeroSlider from '$lib/components/hero/HeroSlider.svelte';
 import { Button } from '$lib/components/ui/button';
 import { fade, fly } from 'svelte/transition';
@@ -14,28 +14,28 @@ import type { PageData } from './$types';
 let { data }: { data: PageData } = $props();
 const errors = $derived(data.errors ?? []);
 
-// Featured shaders (already limited to 6 by page_size param)
+// Featured shaders (already limited to 6 by first param)
 const featuredShaders = $derived(data.shaders ?? []);
 
-// Stats from dedicated endpoint
+// Stats from GraphQL
 const stats = $derived(data.stats);
 const featuredPairs = $derived(data.featuredPairs ?? []);
-const hasStats = $derived(stats.shader_count > 0 || stats.capture_count > 0);
+const hasStats = $derived(stats.shaderCount > 0 || stats.captureCount > 0);
 const hasFeaturedPairs = $derived(featuredPairs.length > 0);
 
 let overlayVisible = $state(true);
 
 // OG image: use first featured pair's right image (the shader-enhanced one)
-const ogImage = $derived(featuredPairs[0]?.right_image_path ?? null);
+const ogImage = $derived(featuredPairs[0]?.right.imagePath ?? null);
 </script>
 
 {#snippet statsBar()}
 	<div class="inline-flex items-center gap-6 rounded-full bg-muted/50 backdrop-blur-sm px-6 py-2 text-sm">
-		<span><strong class="text-foreground">{stats.shader_count}</strong> <span class="text-muted-foreground">Shaders</span></span>
+		<span><strong class="text-foreground">{stats.shaderCount}</strong> <span class="text-muted-foreground">Shaders</span></span>
 		<span class="text-foreground/30">|</span>
-		<span><strong class="text-foreground">{stats.scene_count}</strong> <span class="text-muted-foreground">Scenes</span></span>
+		<span><strong class="text-foreground">{stats.sceneCount}</strong> <span class="text-muted-foreground">Scenes</span></span>
 		<span class="text-foreground/30">|</span>
-		<span><strong class="text-foreground">{stats.capture_count}</strong> <span class="text-muted-foreground">Captures</span></span>
+		<span><strong class="text-foreground">{stats.captureCount}</strong> <span class="text-muted-foreground">Captures</span></span>
 	</div>
 {/snippet}
 
@@ -152,11 +152,12 @@ const ogImage = $derived(featuredPairs[0]?.right_image_path ?? null);
 				</a>
 			</div>
 
-			<ItemGrid items={featuredShaders} key={(s: ShaderListItem) => s.id} size="medium">
-				{#snippet card(shader: ShaderListItem)}
-					<ShaderCard {shader} />
-				{/snippet}
-			</ItemGrid>
+		<!-- eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access -- gql.tada fragment types unresolvable in Svelte templates -->
+		<ItemGrid items={featuredShaders} key={(s: ShaderCardShader) => s.id} size="medium">
+			{#snippet card(shader: ShaderCardShader)}
+				<ShaderCard {shader} />
+			{/snippet}
+		</ItemGrid>
 		</section>
 	</SectionBoundary>
 {/if}

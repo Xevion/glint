@@ -1,18 +1,19 @@
 <script lang="ts">
-import type { ShaderListItem } from '$lib/bindings';
+import type { ShaderCardShader } from '$lib/components/ShaderCard.svelte';
 import BrowseToolbar from '$lib/components/BrowseToolbar.svelte';
 import { CompactRow, ItemGrid, ViewToggle } from '$lib/components/item-grid';
 import type { GridMode } from '$lib/components/item-grid';
 import Meta from '$lib/components/Meta.svelte';
-import Pagination from '$lib/components/Pagination.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
+import { createGraphQLClient, query } from '$lib/graphql';
 import { AlertTriangle, ChevronRight, Search, X } from '@lucide/svelte';
 import { goto, invalidateAll } from '$app/navigation';
 import { page } from '$app/stores';
 import { fly } from 'svelte/transition';
 import type { PageData } from './$types';
+import { _BrowseShadersQuery } from './+page';
 
 interface Props {
 	data: PageData;
@@ -25,6 +26,19 @@ let searchOverride = $state<string | undefined>(undefined);
 const searchInput = $derived(searchOverride ?? data.q);
 let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
+// Cursor-based pagination state
+let allShaders = $state<ShaderCardShader[]>([]);
+let endCursor = $state<string | null>(null);
+let hasNextPage = $state(false);
+let loadingMore = $state(false);
+
+// Reset accumulated shaders when SSR data changes (search/sort navigation)
+$effect(() => {
+	allShaders = data.shaders;
+	endCursor = data.endCursor;
+	hasNextPage = data.hasNextPage;
+});
+
 // Clear override when URL-driven data catches up (browser back/forward, navigation)
 $effect(() => {
 	void data.q;
@@ -36,6 +50,35 @@ $effect(() => {
 	return () => clearTimeout(debounceTimer);
 });
 
+// GraphQL client for client-side "load more" fetches
+const gqlClient = createGraphQLClient(fetch);
+
+async function loadMore() {
+	if (loadingMore || !hasNextPage || !endCursor) return;
+	loadingMore = true;
+	const result = await query(gqlClient, _BrowseShadersQuery, {
+		first: 24,
+		after: endCursor,
+		search: data.q || undefined,
+		sort: data.sort || undefined
+	});
+	result.match({
+		Ok: (d) => {
+			/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- gql.tada fragment types unresolvable */
+			const newShaders = d.shaders.edges.map((e) => e.node as ShaderCardShader);
+			const existingIds = new Set(allShaders.map((s) => s.id));
+			allShaders = [...allShaders, ...newShaders.filter((s) => !existingIds.has(s.id))];
+			/* eslint-enable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
+			endCursor = d.shaders.pageInfo.endCursor ?? null;
+			hasNextPage = d.shaders.pageInfo.hasNextPage;
+		},
+		Err: (err) => {
+			console.warn('Failed to load more shaders:', err.message);
+		}
+	});
+	loadingMore = false;
+}
+
 // Navigation helpers
 function onSearchInput(value: string) {
 	searchOverride = value;
@@ -44,7 +87,6 @@ function onSearchInput(value: string) {
 		const url = new URL($page.url);
 		if (value) url.searchParams.set('q', value);
 		else url.searchParams.delete('q');
-		url.searchParams.set('page', '1');
 		void goto(url.toString(), { keepFocus: true });
 	}, 300);
 }
@@ -54,20 +96,12 @@ function clearSearch() {
 	clearTimeout(debounceTimer);
 	const url = new URL($page.url);
 	url.searchParams.delete('q');
-	url.searchParams.set('page', '1');
-	void goto(url.toString(), { keepFocus: true });
-}
-
-function navigateToPage(p: number) {
-	const url = new URL($page.url);
-	url.searchParams.set('page', String(p));
 	void goto(url.toString(), { keepFocus: true });
 }
 
 function setSort(sort: string) {
 	const url = new URL($page.url);
 	url.searchParams.set('sort', sort);
-	url.searchParams.set('page', '1');
 	void goto(url.toString(), { keepFocus: true });
 }
 
@@ -75,7 +109,8 @@ const hasError = $derived(!!data.error);
 const hasFilters = $derived(data.q !== '');
 
 // OG image: use the most popular shader's capture image
-const ogImage = $derived(data.shaders[0]?.image_path ?? null);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- gql.tada fragment types
+const ogImage = $derived(allShaders[0]?.imagePath ?? null);
 </script>
 
 <Meta
@@ -162,37 +197,38 @@ const ogImage = $derived(data.shaders[0]?.image_path ?? null);
 			</Button>
 		</div>
 	{:else}
+		<!-- eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment -- gql.tada fragment types unresolvable in Svelte templates -->
 		<ItemGrid
-			items={data.shaders}
-			key={(s: ShaderListItem) => s.id}
+			items={allShaders}
+			key={(s: ShaderCardShader) => s.id}
 			mode={viewMode}
 			size="medium"
 			empty={{ icon: Search, title: 'No shaders found', message: 'Try adjusting your filters' }}
 		>
-			{#snippet card(shader: ShaderListItem)}
+			{#snippet card(shader: ShaderCardShader)}
 				<ShaderCard {shader} />
 			{/snippet}
-			{#snippet row(shader: ShaderListItem)}
+			{#snippet row(shader: ShaderCardShader)}
 				<CompactRow
 				name={shader.name}
 				subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
-				image={shader.image_path}
-				thumbhash={shader.thumbhash}
+				image={shader.imagePath ?? undefined}
+				thumbhash={shader.thumbhash ?? undefined}
 				href={`/shaders/${shader.slug}`}
 				>
 					{#snippet metadata()}
 						{#if shader.categories.length > 0}
 							<div class="flex gap-1">
-								{#each shader.categories.slice(0, 3) as category (category)}
+								{#each shader.categories.slice(0, 3) as category (category.id)}
 									<span
 										class="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
 									>
-										{category}
+										{category.name}
 									</span>
 								{/each}
 							</div>
-						{:else if shader.latest_version}
-							<span>{shader.latest_version}</span>
+						{:else if shader.latestVersion}
+							<span>{shader.latestVersion}</span>
 						{/if}
 					{/snippet}
 					{#snippet trailing()}
@@ -202,11 +238,26 @@ const ogImage = $derived(data.shaders[0]?.image_path ?? null);
 			{/snippet}
 		</ItemGrid>
 
-		<Pagination
-			totalCount={data.total}
-			page={data.page}
-			pageSize={data.pageSize}
-			onPageChange={(p: number) => navigateToPage(p)}
-		/>
+		{#if allShaders.length > 0}
+			<p class="mt-2 pl-2 text-xs text-foreground/70">
+				Showing {allShaders.length} of {data.total} shaders
+			</p>
+		{/if}
+
+		{#if hasNextPage}
+			<div class="mt-6 flex justify-center">
+				<Button
+					variant="outline"
+					onclick={loadMore}
+					disabled={loadingMore}
+				>
+					{#if loadingMore}
+						Loading...
+					{:else}
+						Load More
+					{/if}
+				</Button>
+			</div>
+		{/if}
 	{/if}
 </div>

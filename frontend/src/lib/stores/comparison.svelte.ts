@@ -1,15 +1,19 @@
-import type { Shader } from '$lib/bindings';
+/** Minimal shader identity needed by the comparison store and its consumers. */
+export interface ComparisonShader {
+	id: string;
+	name: string;
+}
 
 function createComparisonStore() {
-	let leftShader = $state<Shader | null>(null);
-	let rightShader = $state<Shader | null>(null);
+	let leftShader = $state<ComparisonShader | null>(null);
+	let rightShader = $state<ComparisonShader | null>(null);
 	let _selectionMode = $state(false);
 
 	return {
-		get left(): Shader | null {
+		get left(): ComparisonShader | null {
 			return leftShader;
 		},
-		get right(): Shader | null {
+		get right(): ComparisonShader | null {
 			return rightShader;
 		},
 		get canCompare(): boolean {
@@ -35,7 +39,7 @@ function createComparisonStore() {
 		},
 
 		/** Assign shader to the first empty slot, or replace right if both full. */
-		select(shader: Shader) {
+		select(shader: ComparisonShader) {
 			if (leftShader?.id === shader.id || rightShader?.id === shader.id) {
 				// Already selected — deselect
 				if (leftShader?.id === shader.id) leftShader = null;
@@ -47,11 +51,11 @@ function createComparisonStore() {
 			else rightShader = shader;
 		},
 
-		setLeft(shader: Shader | null) {
+		setLeft(shader: ComparisonShader | null) {
 			leftShader = shader;
 		},
 
-		setRight(shader: Shader | null) {
+		setRight(shader: ComparisonShader | null) {
 			rightShader = shader;
 		},
 

@@ -1,7 +1,40 @@
+<script lang="ts" module>
+import { graphql, type ResultOf } from '$lib/graphql';
+
+/** Shared fragment for shader card fields — used by browse, home, and similar queries. */
+export const ShaderCardFragment = graphql(`
+	fragment ShaderCardFields on ShaderNode @_unmask {
+		id
+		name
+		slug
+		description
+		imagePath
+		thumbhash
+		latestVersion
+		modrinthId
+		curseforgeId
+		websiteUrl
+		authors {
+			name
+		}
+		categories {
+			id
+			name
+		}
+		features {
+			id
+			name
+		}
+	}
+`);
+
+/** Type derived from the ShaderCardFields fragment via gql.tada. */
+export type ShaderCardShader = ResultOf<typeof ShaderCardFragment>;
+</script>
+
 <script lang="ts">
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import type { ShaderListItem } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import { comparisonStore } from '$lib/stores/comparison.svelte';
@@ -11,7 +44,7 @@ import { Check, ExternalLink } from '@lucide/svelte';
 import BrandIcon from './icons/BrandIcon.svelte';
 
 interface Props {
-	shader: ShaderListItem;
+	shader: ShaderCardShader;
 	class?: string;
 }
 
@@ -22,8 +55,8 @@ const selectionMode = $derived(comparisonStore.selectionMode);
 const isSelected = $derived(selectionMode && comparisonStore.isSelected(shader.id));
 const hasAnySelection = $derived(selectionMode && comparisonStore.hasSelection());
 
-const modrinthUrl = $derived(getModrinthUrl(shader.modrinth_id));
-const curseforgeUrl = $derived(getCurseforgeUrl(shader.curseforge_id));
+const modrinthUrl = $derived(getModrinthUrl(shader.modrinthId));
+const curseforgeUrl = $derived(getCurseforgeUrl(shader.curseforgeId));
 
 function handleCardClick(e: MouseEvent) {
 	const target = e.target as HTMLElement;
@@ -82,7 +115,7 @@ function handleCheckboxClick(e: MouseEvent) {
 	<!-- Thumbnail Image -->
 	<div class="relative">
 		<CaptureImage
-		src={shader.image_path}
+		src={shader.imagePath}
 		thumbhash={shader.thumbhash}
 			preset="card"
 			alt="{shader.name} preview"
@@ -170,7 +203,7 @@ function handleCheckboxClick(e: MouseEvent) {
 			<div class="flex min-w-0 items-center gap-3">
 				<!-- Version -->
 				<span class="inline-flex shrink-0 items-center gap-1 text-xs">
-					<span class="font-medium text-card-foreground">{shader.latest_version ? formatVersion(shader.latest_version) : '\u2014'}</span>
+					<span class="font-medium text-card-foreground">{shader.latestVersion ? formatVersion(shader.latestVersion) : '\u2014'}</span>
 				</span>
 			</div>
 
@@ -203,9 +236,9 @@ function handleCheckboxClick(e: MouseEvent) {
 						<BrandIcon name="curseforge" colorOnHover />
 					</a>
 				{/if}
-				{#if shader.website_url}
-					<a
-						href={shader.website_url}
+			{#if shader.websiteUrl}
+				<a
+					href={shader.websiteUrl}
 						target="_blank"
 						rel="noopener noreferrer"
 						data-external-link

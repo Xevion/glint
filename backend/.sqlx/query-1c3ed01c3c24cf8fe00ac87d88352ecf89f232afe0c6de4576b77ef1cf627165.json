@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) FROM captures c\n            JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.status = 'completed' AND sc.active = TRUE\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "1c3ed01c3c24cf8fe00ac87d88352ecf89f232afe0c6de4576b77ef1cf627165"
+}

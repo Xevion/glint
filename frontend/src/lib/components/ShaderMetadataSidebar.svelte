@@ -1,7 +1,22 @@
 <script lang="ts">
-import type { ShaderVersionMetadata, ShaderVersionProfile } from '$lib/bindings';
 import { formatNumber } from '$lib/utils/display';
 import { Camera, Code, Download, ExternalLink, Eye, Globe, Layers } from '@lucide/svelte';
+
+/** Minimal shader version metadata for the sidebar (camelCase, GraphQL-sourced). */
+export interface SidebarMetadata {
+	irisFeaturesRequired?: string[] | null;
+	irisFeaturesOptional?: string[] | null;
+	dimensionSupport?: string[] | null;
+	hasCustomTextures?: boolean | null;
+}
+
+/** Minimal shader profile for the sidebar (camelCase, GraphQL-sourced). */
+export interface SidebarProfile {
+	id: string;
+	name: string;
+	label?: string | null;
+	description?: string | null;
+}
 
 interface Props {
 	name: string;
@@ -9,8 +24,8 @@ interface Props {
 	captureCount: number;
 	upstreamDownloads?: number;
 	viewCount: number;
-	metadata?: ShaderVersionMetadata;
-	profiles: ShaderVersionProfile[];
+	metadata?: SidebarMetadata;
+	profiles: SidebarProfile[];
 	websiteUrl?: string;
 	modrinthId?: string;
 	curseforgeId?: string;
@@ -37,8 +52,8 @@ let {
 const allFeatures = $derived.by(() => {
 	if (!metadata) return [];
 	const features: string[] = [];
-	if (metadata.iris_features_required) features.push(...metadata.iris_features_required);
-	if (metadata.iris_features_optional) features.push(...metadata.iris_features_optional);
+	if (metadata.irisFeaturesRequired) features.push(...metadata.irisFeaturesRequired);
+	if (metadata.irisFeaturesOptional) features.push(...metadata.irisFeaturesOptional);
 	return features;
 });
 
@@ -90,7 +105,7 @@ function formatFeatureName(feature: string): string {
 	</div>
 
 	<!-- Features -->
-	{#if allFeatures.length > 0 || metadata?.has_custom_textures}
+	{#if allFeatures.length > 0 || metadata?.hasCustomTextures}
 		<div class="mt-3 border-t border-card-foreground/10 pt-3">
 			<h3 class="mb-1.5 text-xs font-semibold tracking-wide text-card-foreground uppercase">
 				Features
@@ -103,7 +118,7 @@ function formatFeatureName(feature: string): string {
 						{formatFeatureName(feature)}
 					</span>
 				{/each}
-				{#if metadata?.has_custom_textures}
+				{#if metadata?.hasCustomTextures}
 					<span
 						class="inline-flex items-center rounded-md bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground ring-1 ring-border/50"
 					>
@@ -115,13 +130,13 @@ function formatFeatureName(feature: string): string {
 	{/if}
 
 	<!-- Dimension support -->
-	{#if metadata?.dimension_support && metadata.dimension_support.length > 0}
+	{#if metadata?.dimensionSupport && metadata.dimensionSupport.length > 0}
 		<div class="mt-3 border-t border-card-foreground/10 pt-3">
 			<h3 class="mb-1.5 text-xs font-semibold tracking-wide text-card-foreground uppercase">
 				Dimensions
 			</h3>
 			<div class="flex flex-wrap gap-1.5">
-				{#each metadata.dimension_support as dim (dim)}
+				{#each metadata.dimensionSupport as dim (dim)}
 					<span
 						class="inline-flex items-center rounded-md bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground ring-1 ring-border/50 capitalize"
 					>

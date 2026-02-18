@@ -1,10 +1,111 @@
+scalar BackgroundId
+
+type BackgroundNode {
+	id: BackgroundId!
+	imagePath: String!
+	thumbhash: String
+	themeMode: ThemeModeEnum!
+	enabled: Boolean!
+	sortOrder: Int!
+	originalFilename: String
+	width: Int
+	height: Int
+	fileSizeBytes: Int
+	contentType: String
+	createdAt: DateTime!
+	updatedAt: DateTime!
+}
+
 type CaptureCompletedEvent {
 	captureId: CaptureId!
 	shaderVersionId: ShaderVersionId!
 	sceneId: SceneId!
 }
 
+"""
+Relay-style connection for captures.
+"""
+type CaptureConnection {
+	edges: [CaptureEdge!]!
+	pageInfo: PageInfo!
+	totalCount: Int!
+}
+
+"""
+Relay-style edge for captures.
+"""
+type CaptureEdge {
+	cursor: String!
+	node: CaptureNode!
+}
+
+enum CaptureFreshnessEnum {
+	FRESH
+	STALE
+	SUPERSEDED
+}
+
 scalar CaptureId
+
+"""
+Lightweight capture for public list endpoints.
+"""
+type CaptureNode {
+	id: CaptureId!
+	shaderVersionId: ShaderVersionId!
+	sceneId: SceneId!
+	status: CaptureStatusEnum!
+	profileId: ShaderVersionProfileId
+	imagePath: String!
+	thumbhash: String
+	capturedAt: DateTime
+	resolutionWidth: Int
+	resolutionHeight: Int
+}
+
+scalar CaptureRunId
+
+enum CaptureStatusEnum {
+	UPLOADING
+	COMPLETED
+	FAILED
+}
+
+"""
+Capture with denormalized shader/scene context.
+"""
+type CaptureWithContextNode {
+	id: CaptureId!
+	sceneId: SceneId!
+	shaderSlug: String!
+	shaderName: String!
+	shaderVersion: String!
+	profileId: ShaderVersionProfileId
+	profileName: String
+	profileDisplayName: String
+	imagePath: String!
+	thumbhash: String
+	capturedAt: DateTime
+	resolutionWidth: Int
+	resolutionHeight: Int
+	fileSizeBytes: Int
+	runId: CaptureRunId
+	runStatus: String
+	shaderAuthor: String
+	sceneName: String
+	sceneSlug: String
+	presetId: ScenePresetId
+	presetName: String
+	presetSlug: String
+	freshness: CaptureFreshnessEnum!
+}
+
+type CategoryNode {
+	id: Int!
+	slug: String!
+	name: String!
+	description: String
+}
 
 """
 Implement the DateTime<Utc> scalar
@@ -12,6 +113,51 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
+
+enum ExtractionStatusEnum {
+	PENDING
+	COMPLETED
+	FAILED
+	SKIPPED
+}
+
+type ExtractionSummaryNode {
+	completed: Int!
+	failed: Int!
+	pending: Int!
+	skipped: Int!
+	total: Int!
+}
+
+type FeatureNode {
+	id: Int!
+	slug: String!
+	name: String!
+	description: String
+}
+
+type FeaturedPairNode {
+	left: FeaturedSideNode!
+	right: FeaturedSideNode!
+}
+
+"""
+One side of a featured comparison pair.
+"""
+type FeaturedSideNode {
+	imagePath: String!
+	thumbhash: String
+	shaderName: String!
+	shaderSlug: String!
+	shaderAuthor: String
+	shaderVersion: String!
+	sceneName: String!
+}
+
+"""
+A scalar that can represent any JSON value.
+"""
+scalar JSON
 
 """
 Relay-style page info.
@@ -63,6 +209,86 @@ type QueryRoot {
 		"""
 		id: String!
 	): SceneNode
+	"""
+	Paginated list of shaders with cursor pagination.
+	"""
+	shaders(
+		"""
+		Number of items to return (max 100)
+		"""
+		first: Int! = 20
+		"""
+		Cursor from a previous page's endCursor
+		"""
+		after: String
+		"""
+		Search by name
+		"""
+		search: String
+		"""
+		Sort: popular, name, or default (recent)
+		"""
+		sort: String
+	): ShaderConnection!
+	"""
+	Get a shader by ID or slug with full detail.
+
+	Returns a `ShaderNode` whose nested fields (versions, authors) are
+	resolved on demand via `ComplexObject` resolvers.
+	"""
+	shader(
+		"""
+		Shader ID (nanoid) or slug
+		"""
+		id: String!
+	): ShaderNode
+	"""
+	Trending shaders by recent view count.
+	"""
+	trendingShaders(
+		"""
+		Number of days to consider (1-90)
+		"""
+		days: Int! = 7
+		"""
+		Number of items to return (max 100)
+		"""
+		first: Int! = 20
+	): [TrendingShaderNode!]!
+	"""
+	Paginated list of completed captures (public).
+	"""
+	captures(
+		"""
+		Number of items to return (max 100)
+		"""
+		first: Int! = 20
+		"""
+		Cursor from a previous page's endCursor
+		"""
+		after: String
+	): CaptureConnection!
+	"""
+	Aggregate counts for the index page.
+	"""
+	stats: StatsNode!
+	"""
+	Random popular shader pairs for homepage hero.
+	"""
+	featured(
+		"""
+		Number of pairs to return
+		"""
+		count: Int! = 6
+	): [FeaturedPairNode!]!
+	"""
+	List enabled backgrounds (public, for frontend layout).
+	"""
+	backgrounds: [BackgroundNode!]!
+	"""
+	List all backgrounds including disabled (admin only).
+	"""
+	allBackgrounds: [BackgroundNode!]!
 }
 
 """
@@ -115,6 +341,10 @@ type SceneNode {
 	Latest version (camera position, world settings) for this scene.
 	"""
 	version: SceneVersionNode
+	"""
+	Completed captures for this scene, one per shader (deduplicated).
+	"""
+	captures: [CaptureWithContextNode!]!
 }
 
 scalar ScenePresetId
@@ -139,13 +369,243 @@ type SceneVersionNode {
 	createdAt: DateTime!
 }
 
+type ShaderAuthorNode {
+	id: String!
+	shaderId: ShaderId!
+	name: String!
+	url: String
+	platform: String!
+}
+
+"""
+Relay-style connection for shaders.
+"""
+type ShaderConnection {
+	edges: [ShaderEdge!]!
+	pageInfo: PageInfo!
+	totalCount: Int!
+}
+
+"""
+Relay-style edge for shaders.
+"""
+type ShaderEdge {
+	cursor: String!
+	node: ShaderNode!
+}
+
+scalar ShaderId
+
+type ShaderNode {
+	id: ShaderId!
+	name: String!
+	slug: String!
+	description: String
+	modrinthId: String
+	curseforgeId: String
+	websiteUrl: String
+	iconUrl: String
+	sourceUrl: String
+	licenseId: String
+	upstreamDownloads: Int
+	upstreamUpdatedAt: DateTime
+	lastSyncedAt: DateTime
+	createdAt: DateTime!
+	updatedAt: DateTime!
+	viewCount: Int!
+	"""
+	All versions of this shader, ordered by publish date descending.
+	"""
+	versions: [ShaderVersionDetailNode!]!
+	"""
+	Authors attributed to this shader from upstream platforms.
+	"""
+	authors: [ShaderAuthorNode!]!
+	"""
+	Categories (style tags) associated with this shader.
+	"""
+	categories: [CategoryNode!]!
+	"""
+	Feature tags associated with this shader.
+	"""
+	features: [FeatureNode!]!
+	"""
+	Latest version string (e.g. "1.7.2") for display purposes.
+	"""
+	latestVersion: String
+	"""
+	Representative thumbnail image path for this shader.
+	"""
+	imagePath: String
+	"""
+	Thumbhash placeholder for the representative thumbnail.
+	"""
+	thumbhash: String
+	"""
+	Total number of versions for this shader.
+	"""
+	versionCount: Int!
+	"""
+	Extraction summary across all versions.
+	"""
+	extractionSummary: ExtractionSummaryNode
+	"""
+	Completed captures for this shader, optionally filtered by version and profile.
+
+	Returns one capture per scene (deduplication via `CaptureDistinct::PerScene`),
+	matching the behavior of the REST shader detail endpoint.
+	"""
+	captures(
+		"""
+		Filter to a specific shader version. Defaults to the latest version.
+		"""
+		versionId: String
+		"""
+		Filter to a specific profile within the version.
+		"""
+		profileId: String
+	): [CaptureWithContextNode!]!
+	"""
+	Profiles for this shader, optionally filtered to a specific version.
+
+	Defaults to the latest version's profiles when no `version_id` is given.
+	"""
+	profiles(
+		"""
+		Filter to a specific shader version. Defaults to the latest version.
+		"""
+		versionId: String
+	): [ShaderVersionProfileNode!]!
+	"""
+	Extracted metadata for this shader, optionally for a specific version.
+
+	Defaults to the latest version's metadata when no `version_id` is given.
+	"""
+	metadata(
+		"""
+		Filter to a specific shader version. Defaults to the latest version.
+		"""
+		versionId: String
+	): ShaderVersionMetadataNode
+}
+
+"""
+A shader version with its completed capture count.
+"""
+type ShaderVersionDetailNode {
+	version: ShaderVersionNode!
+	captureCount: Int!
+}
+
 scalar ShaderVersionId
+
+type ShaderVersionMetadataNode {
+	shaderVersionId: ShaderVersionId!
+	hasCustomTextures: Boolean
+	extractedAt: DateTime!
+	"""
+	Pipeline features (e.g. `{"separateAo": true, "clouds": "fancy"}`).
+	"""
+	pipelineFeatures: JSON
+	"""
+	Iris features required by this shader.
+	"""
+	irisFeaturesRequired: JSON
+	"""
+	Iris features optionally used by this shader.
+	"""
+	irisFeaturesOptional: JSON
+	"""
+	Settings screen configuration.
+	"""
+	settingsScreen: JSON
+	"""
+	Shader file paths.
+	"""
+	filePaths: JSON
+	"""
+	Supported dimensions (e.g. `["overworld", "nether", "end"]`).
+	"""
+	dimensionSupport: JSON
+}
+
+type ShaderVersionNode {
+	id: ShaderVersionId!
+	shaderId: ShaderId!
+	version: String!
+	modrinthVersionId: String
+	curseforgeFileId: Int
+	downloadUrl: String
+	fileHash: String
+	fileSize: Int
+	gameVersions: [String!]
+	releaseChannel: String
+	upstreamPublishedAt: DateTime
+	createdAt: DateTime!
+	captureFailureCount: Int!
+	lastCaptureError: String
+	extractionStatus: ExtractionStatusEnum!
+	extractionError: String
+	extractedAt: DateTime
+}
+
+scalar ShaderVersionProfileId
+
+type ShaderVersionProfileNode {
+	id: ShaderVersionProfileId!
+	shaderVersionId: ShaderVersionId!
+	name: String!
+	label: String
+	displayName: String!
+	description: String
+	"""
+	Profile options as structured JSON.
+	"""
+	options: JSON
+	sortOrder: Int!
+	createdAt: DateTime!
+}
+
+type StatsNode {
+	shaderCount: Int!
+	sceneCount: Int!
+	captureCount: Int!
+	latestCaptureAt: DateTime
+}
 
 type SubscriptionRoot {
 	"""
 	Stream of newly completed captures.
 	"""
 	captureCompleted: CaptureCompletedEvent!
+}
+
+enum ThemeModeEnum {
+	LIGHT
+	DARK
+	BOTH
+}
+
+type TrendingShaderNode {
+	id: ShaderId!
+	name: String!
+	slug: String!
+	description: String
+	modrinthId: String
+	curseforgeId: String
+	websiteUrl: String
+	iconUrl: String
+	sourceUrl: String
+	licenseId: String
+	upstreamDownloads: Int
+	upstreamUpdatedAt: DateTime
+	lastSyncedAt: DateTime
+	createdAt: DateTime!
+	updatedAt: DateTime!
+	viewCount: Int!
+	trendingViews: Int!
+	imagePath: String
+	thumbhash: String
 }
 
 """

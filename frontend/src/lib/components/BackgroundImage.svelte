@@ -1,14 +1,18 @@
 <script lang="ts">
-import type { Background } from '$lib/bindings';
 import { imageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { onMount } from 'svelte';
 import type { Snippet } from 'svelte';
 
-type BackgroundItem = Pick<
-	Background,
-	'id' | 'image_path' | 'thumbhash' | 'theme_mode' | 'width' | 'height'
->;
+/** Minimal background shape for the wallpaper layer (camelCase, GraphQL-sourced). */
+export interface BackgroundItem {
+	id: string;
+	imagePath: string;
+	thumbhash?: string | null;
+	themeMode: string;
+	width?: number | null;
+	height?: number | null;
+}
 
 interface Props {
 	backgrounds: BackgroundItem[];
@@ -50,10 +54,10 @@ let initialAnimationDone = $state(false);
 
 // Split backgrounds by theme mode
 const lightBackgrounds = $derived(
-	backgrounds.filter((b) => b.theme_mode === 'light' || b.theme_mode === 'both')
+	backgrounds.filter((b) => b.themeMode === 'light' || b.themeMode === 'both')
 );
 const darkBackgrounds = $derived(
-	backgrounds.filter((b) => b.theme_mode === 'dark' || b.theme_mode === 'both')
+	backgrounds.filter((b) => b.themeMode === 'dark' || b.themeMode === 'both')
 );
 
 // Calculate the displayed height of each wallpaper section based on scale
@@ -73,7 +77,7 @@ const sectionsNeeded = $derived.by(() => {
 });
 
 function getImageUrl(bg: BackgroundItem): string {
-	return imageUrl(bg.image_path, { width: 480, quality: 50, format: 'webp' }) ?? bg.image_path;
+	return imageUrl(bg.imagePath, { width: 480, quality: 50, format: 'webp' }) ?? bg.imagePath;
 }
 
 function getThumbhashBackground(bg: BackgroundItem): string | null {

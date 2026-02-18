@@ -34,7 +34,7 @@ const filteredScenes = $derived.by(() => {
 const hasFilters = $derived(searchQuery !== '');
 
 // OG image: first scene's representative capture
-const ogImage: string | null = $derived(scenes[0]?.image_path ?? null);
+const ogImage: string | null = $derived(scenes[0]?.imagePath ?? null);
 </script>
 
 <Meta
@@ -110,7 +110,7 @@ const ogImage: string | null = $derived(scenes[0]?.image_path ?? null);
 	{:else}
 		<ItemGrid
 			items={filteredScenes}
-			key={(s: PageData['scenes'][number]) => s.id}
+			key={(s: PageData['scenes'][number]) => s.slug}
 			mode={viewMode}
 			size="small"
 			empty={hasFilters
@@ -128,24 +128,26 @@ const ogImage: string | null = $derived(scenes[0]?.image_path ?? null);
 				<CompactRow
 				name={scene.name}
 				subtitle={scene.dimension}
-				image={scene.image_path}
+				image={scene.imagePath}
 				thumbhash={scene.thumbhash}
 				href={`/scenes/${scene.slug}`}
 				>
 					{#snippet metadata()}
-						<div class="flex items-center gap-2">
-							{#if scene.version.biome}
-								<Badge variant="secondary" class="text-[11px]">
-									{scene.version.biome.replace('minecraft:', '')}
-								</Badge>
-							{/if}
+					<div class="flex items-center gap-2">
+						{#if scene.version?.biome}
+							<Badge variant="secondary" class="text-[11px]">
+								{scene.version.biome.replace('minecraft:', '')}
+							</Badge>
+						{/if}
+						{#if scene.version}
 							<span class="text-xs text-muted-foreground">
-								{formatTimeTicks(scene.version.time_of_day_ticks)}
+								{formatTimeTicks(scene.version.timeOfDayTicks)}
 							</span>
-							{#if scene.capture_count > 0}
+						{/if}
+							{#if scene.captureCount > 0}
 								<span class="flex items-center gap-1 text-xs text-muted-foreground">
 									<Camera class="h-3 w-3" strokeWidth={2} />
-									{scene.capture_count}
+									{scene.captureCount}
 								</span>
 							{/if}
 						</div>

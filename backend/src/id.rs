@@ -130,3 +130,4 @@ async_graphql::scalar!(ScenePresetId);
 async_graphql::scalar!(BackgroundId);
 async_graphql::scalar!(CaptureId);
 async_graphql::scalar!(CaptureRunId);
+async_graphql::scalar!(ShaderVersionProfileId);

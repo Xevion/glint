@@ -2,24 +2,25 @@ use serde::Serialize;
 use serde_with::skip_serializing_none;
 use ts_rs::TS;
 
-/// A before/after pair for the homepage hero slider.
-/// Dynamically selected from popular shaders.
+/// One side of a featured comparison pair (shader + capture context).
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export, optional_fields)]
+pub struct FeaturedSide {
+    pub image_path: String,
+    pub thumbhash: Option<String>,
+    pub shader_name: String,
+    pub shader_slug: String,
+    pub shader_author: Option<String>,
+    pub shader_version: String,
+    pub scene_name: String,
+}
+
+/// A before/after pair for the homepage hero slider.
+/// Dynamically selected from popular shaders.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
 pub struct FeaturedPair {
-    pub left_image_path: String,
-    pub left_thumbhash: Option<String>,
-    pub left_shader_name: String,
-    pub left_shader_slug: String,
-    pub left_shader_author: Option<String>,
-    pub left_shader_version: String,
-    pub left_scene_name: String,
-    pub right_image_path: String,
-    pub right_thumbhash: Option<String>,
-    pub right_shader_name: String,
-    pub right_shader_slug: String,
-    pub right_shader_author: Option<String>,
-    pub right_shader_version: String,
-    pub right_scene_name: String,
+    pub left: FeaturedSide,
+    pub right: FeaturedSide,
 }

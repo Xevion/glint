@@ -110,7 +110,7 @@ async function fetchHomeOgData(api: ApiClient): Promise<OgImageData> {
 	const result = await api.featured.list();
 
 	const imageUrl =
-		result.isOk && result.value.length > 0 ? rawImageUrl(result.value[0]?.right_image_path) : null;
+		result.isOk && result.value.length > 0 ? rawImageUrl(result.value[0]?.right.image_path) : null;
 
 	return {
 		imageUrl,

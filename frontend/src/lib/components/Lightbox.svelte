@@ -6,14 +6,14 @@ import { ChevronLeft, ChevronRight, ImageOff, X } from '@lucide/svelte';
 import { fade } from 'svelte/transition';
 import { Spring } from 'svelte/motion';
 
-interface CaptureItem {
+export interface CaptureItem {
 	id: string;
-	image_path?: string | null;
+	imagePath?: string | null;
 	thumbhash?: string | null;
-	profile_display_name?: string | null;
-	shader_version?: string | null;
-	scene_id?: string;
-	scene_name?: string | null;
+	profileDisplayName?: string | null;
+	shaderVersion?: string | null;
+	sceneId?: string;
+	sceneName?: string | null;
 }
 
 interface Props {
@@ -66,7 +66,7 @@ const currentCapture = $derived(captures[currentIndex]);
 const hasPrev = $derived(currentIndex > 0);
 const hasNext = $derived(currentIndex < captures.length - 1);
 
-const fullImageUrl = $derived(imageUrl(currentCapture?.image_path, 'full'));
+const fullImageUrl = $derived(imageUrl(currentCapture?.imagePath, 'full'));
 const placeholderUrl = $derived(decodeThumbhash(currentCapture?.thumbhash));
 
 // Zoom and pan state
@@ -79,7 +79,7 @@ let imgEl = $state<HTMLImageElement | null>(null);
 // Progressive raw image: loaded on zoom for full fidelity
 let rawImageLoaded = $state(false);
 let rawImageRequested = $state(false);
-const rawUrl = $derived(rawImageUrl(currentCapture?.image_path) ?? null);
+const rawUrl = $derived(rawImageUrl(currentCapture?.imagePath) ?? null);
 
 // Reset zoom and loaded state when navigating to a different image
 $effect(() => {
@@ -113,7 +113,7 @@ $effect(() => {
 		(i) => i >= 0 && i < captures.length
 	);
 	for (const i of preloadIndices) {
-		const path = captures[i]?.image_path;
+		const path = captures[i]?.imagePath;
 		if (path) {
 			const img = new Image();
 			img.src = imageUrl(path, 'full') ?? '';
@@ -425,7 +425,7 @@ function handleTouchEnd(e: TouchEvent) {
 	{/if}
 
 	<!-- Main image viewport -->
-	{#if currentCapture?.image_path}
+	{#if currentCapture?.imagePath}
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<div
 			class="relative h-[90vh] w-[90vw] select-none overflow-hidden"
@@ -458,8 +458,8 @@ function handleTouchEnd(e: TouchEvent) {
 			bind:clientWidth={containerWidth}
 		>
 			<!-- Previous image panel -->
-		{#if prevCapture?.image_path && containerWidth > 0}
-			{@const prevUrl = imageUrl(prevCapture.image_path, 'full')}
+		{#if prevCapture?.imagePath && containerWidth > 0}
+			{@const prevUrl = imageUrl(prevCapture.imagePath, 'full')}
 				{@const prevThumb = decodeThumbhash(prevCapture.thumbhash)}
 				<div
 					class="absolute inset-0 flex items-center justify-center"
@@ -544,8 +544,8 @@ function handleTouchEnd(e: TouchEvent) {
 			</div>
 
 			<!-- Next image panel -->
-		{#if nextCapture?.image_path && containerWidth > 0}
-			{@const nextUrl = imageUrl(nextCapture.image_path, 'full')}
+		{#if nextCapture?.imagePath && containerWidth > 0}
+			{@const nextUrl = imageUrl(nextCapture.imagePath, 'full')}
 				{@const nextThumb = decodeThumbhash(nextCapture.thumbhash)}
 				<div
 					class="absolute inset-0 flex items-center justify-center"
@@ -582,23 +582,23 @@ function handleTouchEnd(e: TouchEvent) {
 			>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2">
-						{#if currentCapture.scene_name}
-							<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
-								{currentCapture.scene_name}
-							</span>
-						{/if}
-					{#if currentCapture.profile_display_name}
-						<span
-							class="rounded bg-primary px-2 py-1 text-sm font-medium text-primary-foreground"
-						>
-							{currentCapture.profile_display_name}
-							</span>
-						{/if}
-						{#if currentCapture.shader_version}
-							<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
-								v{currentCapture.shader_version}
-							</span>
-						{/if}
+					{#if currentCapture.sceneName}
+						<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
+							{currentCapture.sceneName}
+						</span>
+					{/if}
+				{#if currentCapture.profileDisplayName}
+					<span
+						class="rounded bg-primary px-2 py-1 text-sm font-medium text-primary-foreground"
+					>
+						{currentCapture.profileDisplayName}
+						</span>
+					{/if}
+					{#if currentCapture.shaderVersion}
+						<span class="rounded bg-white/20 px-2 py-1 text-sm font-medium text-white">
+							v{currentCapture.shaderVersion}
+						</span>
+					{/if}
 					</div>
 					<span class="text-sm text-white/70">
 						{currentIndex + 1} / {captures.length}
