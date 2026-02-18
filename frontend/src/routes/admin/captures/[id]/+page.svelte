@@ -2,11 +2,11 @@
 import { goto } from '$app/navigation';
 import { api } from '$lib/api';
 import type { CaptureDetail, CaptureWithContext } from '$lib/bindings';
-import { ItemGrid } from '$lib/components/item-grid';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminBreadcrumb, AdminCaptureCard, createAdminAction } from '$lib/components/admin';
+import { ItemGrid } from '$lib/components/item-grid';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';

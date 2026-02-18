@@ -12,7 +12,7 @@ export { default as DataTablePagination } from './data-table-pagination.svelte';
 export { default as DataTableColumnHeader } from './data-table-column-header.svelte';
 
 // Column helpers
-export { timeColumn, imageColumn } from './columns.js';
+export { textColumn, timeColumn, imageColumn } from './columns.js';
 
 // Re-export commonly used TanStack types for convenience
 export type { ColumnDef, SortingState, ColumnFiltersState } from '@tanstack/table-core';

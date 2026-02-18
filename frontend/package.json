@@ -81,7 +81,6 @@
 		"cookie": "^0.7.0"
 	},
 	"dependencies": {
-		"@careswitch/svelte-data-table": "^0.6.3",
 		"@fontsource/geist-sans": "^5.2.5",
 		"@fontsource/inter": "^5.2.8",
 		"@logtape/logtape": "^2.0.2",

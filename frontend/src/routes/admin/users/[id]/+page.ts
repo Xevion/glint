@@ -1,4 +1,4 @@
-import { createApiClient, ApiErrorType } from '$lib/api';
+import { ApiErrorType, createApiClient } from '$lib/api';
 import { pageError } from '$lib/api/errors';
 import type { PageLoad } from './$types';
 

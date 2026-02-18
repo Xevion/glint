@@ -2,14 +2,15 @@
 import { goto, invalidateAll } from '$app/navigation';
 import { page as pageStore } from '$app/state';
 import type { CaptureWithContext } from '$lib/bindings';
-import AdminTable from '$lib/components/AdminTable.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { AdminPageHeader } from '$lib/components/admin';
+import { DataTable, createDataTable } from '$lib/components/data-table';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { formatBytes } from '$lib/utils/format';
 import { freshnessColors, statusColorFallback, statusColors } from '$lib/utils/status';
 import type { PageData } from './$types';
+import { columns } from './columns.js';
 
 interface Props {
 	data: PageData;
@@ -24,6 +25,16 @@ let shaders = $derived(data.shaders);
 let scenes = $derived(data.scenes);
 let refreshing = $state(false);
 let error = $derived(data.error);
+
+const table = createDataTable<CaptureWithContext>({
+	get data() {
+		return captures;
+	},
+	columns,
+	pageSize: false,
+	selection: false,
+	sorting: false
+});
 
 function navigateToPage(p: number) {
 	const url = new URL(pageStore.url);
@@ -48,18 +59,6 @@ function setFilter(key: string, value: string) {
 	url.searchParams.set('page', '1');
 	void goto(url.toString(), { keepFocus: true });
 }
-
-const columns = [
-	{ id: 'preview', key: 'image_url', name: 'Preview' },
-	{ id: 'shader', key: 'shader_name', name: 'Shader' },
-	{ id: 'scene', key: 'scene_name', name: 'Scene' },
-	{ id: 'profile', key: 'profile_name', name: 'Profile' },
-	{ id: 'resolution', key: 'resolution_width', name: 'Resolution' },
-	{ id: 'file_size', key: 'file_size_bytes', name: 'Size' },
-	{ id: 'captured_at', key: 'captured_at', name: 'Captured', component: 'time' as const },
-	{ id: 'freshness', key: 'freshness', name: 'Freshness' },
-	{ id: 'run', key: 'runId', name: 'Run' }
-];
 
 async function refresh() {
 	refreshing = true;
@@ -121,86 +120,76 @@ async function refresh() {
 	{:else if captures.length === 0}
 		<p class="text-muted-foreground">No captures yet.</p>
 	{:else}
-		<AdminTable
-			data={captures}
-			{columns}
+		<DataTable
+			{table}
 			onRowClick={(capture: CaptureWithContext) => goto(`/admin/captures/${capture.id}`)}
-			getRowId={(c: CaptureWithContext) => c.id}
 		>
-			{#snippet cell({ columnId, value, row }: { columnId: string; value: unknown; row: CaptureWithContext })}
-			{#if columnId === 'preview'}
-				{#if value ?? row.thumbhash}
-					<CaptureImage
-						src={value as string}
-						thumbhash={row.thumbhash}
-						preset="thumbnail"
-						alt="Capture preview"
-						class="h-full w-full object-cover"
-						containerClass="h-12 w-20 rounded"
-					/>
-				{:else}
-					<div
-						class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground"
-					>
-						{row.image_path ? 'No URL' : 'N/A'}
-					</div>
-				{/if}
-				{:else if columnId === 'shader'}
-					<div>
-						<a
-							href="/shaders/{row.shader_slug}"
-							class="font-medium text-primary hover:underline"
-							onclick={(e) => e.stopPropagation()}>{row.shader_name}</a
-						>
-						<div class="text-xs text-muted-foreground">{row.shader_version}</div>
-					</div>
-				{:else if columnId === 'scene'}
-					{value ?? row.scene_id}
-				{:else if columnId === 'profile'}
-					{value ?? '-'}
-				{:else if columnId === 'resolution'}
-					{row.resolution_width && row.resolution_height
-						? `${row.resolution_width}x${row.resolution_height}`
-						: '-'}
-			{:else if columnId === 'file_size'}
-			{value ? formatBytes(value as number) : '-'}
-		{:else if columnId === 'freshness'}
-			<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[row.freshness]}">
-					{row.freshness}
-				</span>
-		{:else if columnId === 'run'}
-					{#if row.run_id}
-						<a
-							href="/admin/runs/{row.run_id}"
-							class="inline-flex items-center gap-1"
-							onclick={(e) => e.stopPropagation()}
-						>
-							<span
-								class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
-									row.run_status ?? ''
-								] ?? statusColorFallback}"
-							>
-								{row.run_status ?? '?'}
-							</span>
-						</a>
+			{#snippet card(capture: CaptureWithContext)}
+				<div class="flex gap-3">
+					{#if capture.image_url ?? capture.thumbhash}
+						<CaptureImage
+							src={capture.image_url}
+							thumbhash={capture.thumbhash}
+							preset="thumbnail"
+							alt="Capture preview"
+							class="h-full w-full object-cover"
+							containerClass="h-12 w-20 shrink-0 rounded"
+						/>
 					{:else}
-						<span class="text-muted-foreground">&mdash;</span>
+						<div
+							class="flex h-12 w-20 shrink-0 items-center justify-center rounded bg-muted text-xs text-muted-foreground"
+						>
+							{capture.image_path ? 'No URL' : 'N/A'}
+						</div>
 					{/if}
-				{:else}
-					{value ?? '-'}
-				{/if}
+					<div class="min-w-0 flex-1">
+						<div class="font-medium">{capture.shader_name}</div>
+						<div class="text-xs text-muted-foreground">
+							{capture.shader_version}
+							{#if capture.scene_name}
+								&middot; {capture.scene_name}
+							{/if}
+						</div>
+						<div class="mt-1 flex items-center gap-2">
+							<span
+								class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[capture.freshness]}"
+							>
+								{capture.freshness}
+							</span>
+							{#if capture.resolution_width && capture.resolution_height}
+								<span class="text-xs text-muted-foreground">
+									{capture.resolution_width}x{capture.resolution_height}
+								</span>
+							{/if}
+							{#if capture.file_size_bytes}
+								<span class="text-xs text-muted-foreground">
+									{formatBytes(capture.file_size_bytes)}
+								</span>
+							{/if}
+						</div>
+					</div>
+					{#if capture.run_id && capture.run_status}
+						<div class="shrink-0">
+							<span
+								class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[capture.run_status] ?? statusColorFallback}"
+							>
+								{capture.run_status}
+							</span>
+						</div>
+					{/if}
+				</div>
 			{/snippet}
-		</AdminTable>
+		</DataTable>
 	{/if}
 
 	{#if totalPages > 1}
 		<div class="flex items-center justify-between border-t pt-4">
-	<div class="text-sm text-muted-foreground">
-		Showing {(currentPage - 1) * pageSize + 1}&ndash;{Math.min(
-				currentPage * pageSize,
-				totalCount
-			)} of {totalCount}
-		</div>
+			<div class="text-sm text-muted-foreground">
+				Showing {(currentPage - 1) * pageSize + 1}&ndash;{Math.min(
+					currentPage * pageSize,
+					totalCount
+				)} of {totalCount}
+			</div>
 			<div class="flex items-center gap-2">
 				<Button
 					variant="outline"
@@ -220,11 +209,11 @@ async function refresh() {
 					Next
 				</Button>
 			</div>
-		<select
-			class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-			value={pageSize}
-			onchange={(e) => changePageSize(Number(e.currentTarget.value))}
-		>
+			<select
+				class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+				value={pageSize}
+				onchange={(e) => changePageSize(Number(e.currentTarget.value))}
+			>
 				<option value={25}>25 per page</option>
 				<option value={50}>50 per page</option>
 				<option value={100}>100 per page</option>

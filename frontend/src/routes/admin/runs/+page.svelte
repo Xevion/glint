@@ -1,13 +1,13 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
 import type { CaptureRun } from '$lib/bindings';
-import AdminTable from '$lib/components/AdminTable.svelte';
 import { AdminPageHeader } from '$lib/components/admin';
+import { DataTable, DataTablePagination, createDataTable } from '$lib/components/data-table';
 import { Alert } from '$lib/components/ui/alert';
-import * as Tooltip from '$lib/components/ui/tooltip';
 import { formatDuration } from '$lib/utils/format';
 import { statusColorFallback, statusColors } from '$lib/utils/status';
 import type { PageData } from './$types';
+import { columns } from './columns.js';
 
 interface Props {
 	data: PageData;
@@ -16,13 +16,14 @@ let { data }: Props = $props();
 let runs = $derived(data.runs);
 let refreshing = $state(false);
 
-const columns = [
-	{ id: 'status', key: 'status', name: 'Status' },
-	{ id: 'agent', key: 'agent_id', name: 'Agent' },
-	{ id: 'progress', key: 'completed_items', name: 'Progress' },
-	{ id: 'duration', key: 'started_at', name: 'Duration' },
-	{ id: 'started_at', key: 'started_at', name: 'Started', component: 'time' as const }
-];
+const table = createDataTable<CaptureRun>({
+	get data() {
+		return runs;
+	},
+	columns,
+	pageSize: 25,
+	selection: false
+});
 
 async function refresh() {
 	refreshing = true;
@@ -41,68 +42,62 @@ async function refresh() {
 	{:else if runs.length === 0}
 		<p class="text-muted-foreground">No capture runs yet.</p>
 	{:else}
-		<AdminTable
-			data={runs}
-			{columns}
-			onRowClick={(run: CaptureRun) => void goto(`/admin/runs/${run.id}`)}
-			getRowId={(r: CaptureRun) => r.id}
-		>
-			{#snippet cell({ columnId, row }: { columnId: string; value: unknown; row: CaptureRun })}
-				{#if columnId === 'status'}
-					<span
-						class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[row.status] ?? statusColorFallback}"
-					>
-						{row.status}
-					</span>
-				{:else if columnId === 'agent'}
-					{row.agent_id ?? '—'}
-			{:else if columnId === 'progress'}
-				{@const total = row.total_items}
-				{@const remaining = total - row.completed_items - row.failed_items - row.skipped_items}
-				{@const isTimedOut = row.status === 'timed_out'}
-			{#if total > 0}
-				<Tooltip.Provider delayDuration={0} disableHoverableContent>
-					<Tooltip.Root>
-						<Tooltip.Trigger class="flex h-2.5 w-28 overflow-hidden rounded-full bg-muted">
-							{#if row.completed_items > 0}
-								<div
-									class="bg-success"
-									style="width: {(row.completed_items / total) * 100}%"
-								></div>
-							{/if}
-							{#if row.failed_items > 0}
-								<div
-									class="bg-destructive"
-									style="width: {(row.failed_items / total) * 100}%"
-								></div>
-							{/if}
-							{#if row.skipped_items > 0}
-								<div
-									class="bg-muted-foreground/30"
-									style="width: {(row.skipped_items / total) * 100}%"
-								></div>
-							{/if}
-							{#if remaining > 0}
-								<div
-									class={isTimedOut ? 'bg-warning' : 'bg-info'}
-									style="width: {(remaining / total) * 100}%"
-								></div>
-							{/if}
-						</Tooltip.Trigger>
-						<Tooltip.Content>
-							<p class="text-xs">
-								{row.completed_items} completed, {row.failed_items} failed, {row.skipped_items} skipped, {remaining} remaining
+		<DataTable {table} onRowClick={(run: CaptureRun) => void goto(`/admin/runs/${run.id}`)}>
+			{#snippet card(run: CaptureRun)}
+				{@const remaining = run.total_items - run.completed_items - run.failed_items - run.skipped_items}
+				<div class="flex items-start justify-between gap-3">
+					<div class="min-w-0 flex-1 space-y-1">
+						<div class="flex items-center gap-2">
+							<span
+								class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[run.status] ?? statusColorFallback}"
+							>
+								{run.status}
+							</span>
+							<span class="text-xs text-muted-foreground">
+								{run.agent_id ?? '—'}
+							</span>
+						</div>
+						{#if run.total_items > 0}
+							<div class="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+								{#if run.completed_items > 0}
+									<div
+										class="bg-success"
+										style="width: {(run.completed_items / run.total_items) * 100}%"
+									></div>
+								{/if}
+								{#if run.failed_items > 0}
+									<div
+										class="bg-destructive"
+										style="width: {(run.failed_items / run.total_items) * 100}%"
+									></div>
+								{/if}
+								{#if run.skipped_items > 0}
+									<div
+										class="bg-muted-foreground/30"
+										style="width: {(run.skipped_items / run.total_items) * 100}%"
+									></div>
+								{/if}
+								{#if remaining > 0}
+									<div
+										class={run.status === 'timed_out' ? 'bg-warning' : 'bg-info'}
+										style="width: {(remaining / run.total_items) * 100}%"
+									></div>
+								{/if}
+							</div>
+							<p class="text-xs text-muted-foreground">
+								{run.completed_items}/{run.total_items} done
+								{#if run.failed_items > 0}, {run.failed_items} failed{/if}
 							</p>
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
-				{:else}
-					<span class="text-muted-foreground">&mdash;</span>
-				{/if}
-				{:else if columnId === 'duration'}
-					{formatDuration(row)}
-				{/if}
+						{/if}
+					</div>
+					<div class="shrink-0 text-right text-xs text-muted-foreground">
+						{formatDuration(run)}
+					</div>
+				</div>
 			{/snippet}
-		</AdminTable>
+		</DataTable>
+		<div class="mt-3">
+			<DataTablePagination {table} />
+		</div>
 	{/if}
 </div>

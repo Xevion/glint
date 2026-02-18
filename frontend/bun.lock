@@ -5,7 +5,6 @@
     "": {
       "name": "frontend",
       "dependencies": {
-        "@careswitch/svelte-data-table": "^0.6.3",
         "@fontsource/geist-sans": "^5.2.5",
         "@fontsource/inter": "^5.2.8",
         "@logtape/logtape": "^2.0.2",
@@ -120,8 +119,6 @@
     "@biomejs/cli-win32-arm64": ["@biomejs/cli-win32-arm64@1.9.4", "", { "os": "win32", "cpu": "arm64" }, "sha512-tlbhLk+WXZmgwoIKwHIHEBZUwxml7bRJgk0X2sPyNR3S93cdRq6XulAZRQJ17FYGGzWne0fgrXBKpl7l4M87Hg=="],
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@1.9.4", "", { "os": "win32", "cpu": "x64" }, "sha512-8Y5wMhVIPaWe6jw2H+KlEm4wP/f7EW3810ZLmDlrEEy5KvBsb9ECEfu/kMWD484ijfQ8+nIi0giMgu9g1UAuuA=="],
-
-    "@careswitch/svelte-data-table": ["@careswitch/svelte-data-table@0.6.3", "", { "peerDependencies": { "svelte": "^5.0.0-next.1" } }, "sha512-CJEMMfa/jhwt5DE/LpQ3FoBAPEqrOyi7Ky5LT/5tZz5hOIhaQicWVEVBtK2NYJkaKFYNnOCvtiCa4vlTyhP+pg=="],
 
     "@csstools/color-helpers": ["@csstools/color-helpers@6.0.1", "", {}, "sha512-NmXRccUJMk2AWA5A7e5a//3bCIMyOu2hAtdRYrhPPHjDxINuCwX1w6rnIZ4xjLcp0ayv6h8Pc3X0eJUGiAAXHQ=="],
 

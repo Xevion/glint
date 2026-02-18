@@ -7,6 +7,38 @@ import DataTableColumnHeader from './data-table-column-header.svelte';
 import { renderComponent } from './render-helpers.js';
 
 /**
+ * Creates a basic text column with an optional sortable header.
+ *
+ * @example
+ * ```ts
+ * const columns: ColumnDef<User>[] = [
+ *   textColumn('discord_username', 'Username'),
+ *   textColumn('role', 'Role', { sortable: false }),
+ * ];
+ * ```
+ */
+export function textColumn<TData extends RowData>(
+	accessorKey: string & keyof TData,
+	header: string,
+	opts: {
+		sortable?: boolean;
+		size?: number;
+		minSize?: number;
+	} = {}
+): ColumnDef<TData> {
+	const { sortable = true, size, minSize } = opts;
+	return {
+		accessorKey,
+		...(size != null && { size }),
+		...(minSize != null && { minSize }),
+		header: sortable
+			? ({ column }) => renderComponent(DataTableColumnHeader, { column, title: header })
+			: header,
+		enableSorting: sortable
+	};
+}
+
+/**
  * Creates a time-ago column that renders a `<TimeAgo>` component.
  *
  * @example
