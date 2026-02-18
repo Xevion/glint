@@ -1,5 +1,4 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
 import type { CaptureRun } from '$lib/bindings';
 import { AdminBreadcrumb } from '$lib/components/admin';
 import { DataTable, DataTablePagination, createDataTable } from '$lib/components/data-table';
@@ -34,7 +33,7 @@ const table = createDataTable<CaptureRun>({
 	{:else if runs.length === 0}
 		<p class="text-muted-foreground">No capture runs yet.</p>
 	{:else}
-		<DataTable {table} onRowClick={(run: CaptureRun) => void goto(`/admin/runs/${run.id}`)}>
+		<DataTable {table} getRowHref={(run: CaptureRun) => `/admin/runs/${run.id}`}>
 			{#snippet card(run: CaptureRun)}
 				{@const remaining = run.total_items - run.completed_items - run.failed_items - run.skipped_items}
 				<div class="flex items-start justify-between gap-3">

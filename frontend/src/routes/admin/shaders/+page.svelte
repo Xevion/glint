@@ -1,5 +1,5 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
+import { goto, invalidateAll } from '$app/navigation';
 import { page } from '$app/state';
 import { api } from '$lib/api';
 import type { Shader, ShaderListItem, ShaderSearchResult, ShaderSearchSort } from '$lib/bindings';
@@ -213,7 +213,7 @@ function handleShaderAdopted(shader: Shader) {
 		return r;
 	});
 	// Reload the My Shaders list
-	void goto(page.url, { invalidateAll: true, noScroll: true });
+	void invalidateAll();
 }
 </script>
 
@@ -252,7 +252,7 @@ function handleShaderAdopted(shader: Shader) {
 			{:else}
 				<DataTable
 					{table}
-					onRowClick={(shader: ShaderListItem) => goto(`/admin/shaders/${shader.id}`)}
+					getRowHref={(shader: ShaderListItem) => `/admin/shaders/${shader.id}`}
 				>
 					{#snippet card(shader: ShaderListItem)}
 						<div class="flex gap-3">

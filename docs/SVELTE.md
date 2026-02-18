@@ -144,6 +144,65 @@ Svelte 5 `$props()` with TypeScript interfaces:
 
 External URLs (Modrinth, CurseForge, etc.) should NOT use `resolve()` — disable the `svelte/no-navigation-without-resolve` rule with `<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->` above the link. Only internal app routes need `resolve()`.
 
+## Navigation Patterns
+
+### Use `<a>` tags for user-initiated navigation
+
+Any element whose primary purpose is "click to go to URL X" MUST be a native `<a>` tag with an `href` attribute. This includes cards, table rows, list items, image thumbnails, and any other clickable region that navigates to a page.
+
+`<a>` tags provide:
+- **SvelteKit preloading** — data is fetched on hover/touchstart before the user clicks
+- **Browser status bar** — shows destination URL on hover
+- **Middle-click / right-click** — "Open in new tab" works natively
+- **Accessibility** — screen readers announce the element as a link with its destination
+- **Keyboard navigation** — Enter follows the link natively (no `onkeydown` handler needed)
+
+Using `goto()` on a `<div>` or `<button>` click handler breaks ALL of these. Never do it for navigational elements.
+
+### When `goto()` IS appropriate
+
+- **Form submission redirects** — navigating after a successful save/delete
+- **URL state sync** — updating search params from inputs, dropdowns, or filters
+- **Programmatic redirects** — auth guards, error recovery, post-action navigation
+- **`invalidateAll()`** — reloading current page data (use this instead of `goto(currentUrl)`)
+
+### Card components with nested interactive elements
+
+When a card is a link but contains other interactive elements (external links, buttons, dropdowns), use the **stretched link** pattern to avoid nested `<a>` tags (which are invalid HTML):
+
+```svelte
+<!-- Card wrapper is a plain div -->
+<div class="group relative ...">
+    <!-- The primary link stretches over the entire card via ::after -->
+    <a
+        href="/items/{item.slug}"
+        class="... after:absolute after:inset-0 after:content-['']"
+    >
+        {item.name}
+    </a>
+
+    <!-- Interactive sub-elements sit above the stretched link -->
+    <div class="relative z-10">
+        <a href={externalUrl} target="_blank">External</a>
+    </div>
+</div>
+```
+
+### Components that navigate should accept `href`, not `onclick`
+
+Design components that might navigate to accept an `href` prop and render an `<a>` tag. This lets SvelteKit handle preloading automatically.
+
+- **Good:** `CompactRow` accepts `href` and renders `<a>` when provided
+- **Good:** `DataTable` accepts `getRowHref` and renders stretched `<a>` links in rows
+- **Bad:** A component that accepts `onclick` and calls `goto()` inside — callers can't benefit from preloading
+
+### Reference implementations
+
+- `CompactRow` (`$lib/components/item-grid/compact-row.svelte`) — renders `<a>`, `<button>`, or `<div>` based on props
+- `AdminCaptureCard` (`$lib/components/admin/AdminCaptureCard.svelte`) — entire card wrapped in `<a>`
+- `DataTable` (`$lib/components/data-table/data-table.svelte`) — `getRowHref` for row-level navigation
+- `ShaderCard` (`$lib/components/ShaderCard.svelte`) — stretched-link pattern for cards with nested interactive elements
+
 ## Styling
 
 - **Tailwind utility classes** directly on elements

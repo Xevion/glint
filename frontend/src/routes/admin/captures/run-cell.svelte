@@ -12,8 +12,7 @@ let { capture }: Props = $props();
 {#if capture.run_id}
 	<a
 		href="/admin/runs/{capture.run_id}"
-		class="inline-flex items-center gap-1"
-		onclick={(e) => e.stopPropagation()}
+		class="relative z-10 inline-flex items-center gap-1"
 	>
 		<span
 			class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[capture.run_status ?? ''] ?? statusColorFallback}"

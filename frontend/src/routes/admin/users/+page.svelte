@@ -1,5 +1,4 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
 import type { User } from '$lib/bindings';
 import { AdminBreadcrumb } from '$lib/components/admin';
 import { DataTable, DataTablePagination, createDataTable } from '$lib/components/data-table';
@@ -26,10 +25,6 @@ const roleColors: Record<string, string> = {
 	agent: 'bg-info/15 text-info',
 	user: 'bg-muted text-muted-foreground'
 };
-
-function handleRowClick(user: User) {
-	void goto(`/admin/users/${user.id}`);
-}
 </script>
 
 <svelte:head><title>Users - Glint</title></svelte:head>
@@ -42,7 +37,7 @@ function handleRowClick(user: User) {
 	{:else if users.length === 0}
 		<p class="text-muted-foreground">No users yet.</p>
 	{:else}
-		<DataTable {table} onRowClick={handleRowClick}>
+		<DataTable {table} getRowHref={(user: User) => `/admin/users/${user.id}`}>
 			{#snippet card(user: User)}
 				<div class="flex items-center gap-3">
 					{#if user.discord_avatar}

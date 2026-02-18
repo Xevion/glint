@@ -1,5 +1,4 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
@@ -38,29 +37,15 @@ interface Props {
 let { scene, class: className }: Props = $props();
 
 const timeOfDay = $derived(scene.version ? formatTimeTicks(scene.version.timeOfDayTicks) : null);
-
-function handleCardClick() {
-	void goto(resolve('/scenes/[slug]', { slug: scene.slug }), { invalidateAll: true });
-}
-
-function handleKeyDown(e: KeyboardEvent) {
-	if (e.key === 'Enter' || e.key === ' ') {
-		e.preventDefault();
-		void goto(resolve('/scenes/[slug]', { slug: scene.slug }), { invalidateAll: true });
-	}
-}
 </script>
 
-<div
-	role="button"
-	tabindex="0"
-	onclick={handleCardClick}
-	onkeydown={handleKeyDown}
+<a
+	href={resolve('/scenes/[slug]', { slug: scene.slug })}
 	class={cn(
 		'group relative flex flex-col overflow-hidden rounded-xl bg-card transition-all duration-300',
 		'border border-border shadow-theme-sm',
-		'focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
-		'cursor-pointer hover:-translate-y-1 hover:border-primary/50 hover:shadow-theme-lg',
+		'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2',
+		'hover:-translate-y-1 hover:border-primary/50 hover:shadow-theme-lg',
 		className
 	)}
 >
@@ -96,16 +81,9 @@ function handleKeyDown(e: KeyboardEvent) {
 	<div class="flex flex-1 flex-col gap-3 p-4">
 		<!-- Header -->
 		<div class="space-y-1.5">
-			<a
-				href={resolve('/scenes/[slug]', { slug: scene.slug })}
-				data-clickable
-				onclick={(e) => {
-					e.stopPropagation();
-				}}
-				class="line-clamp-1 block text-lg font-semibold text-card-foreground transition-colors hover:text-primary"
-			>
-				{scene.name}
-			</a>
+		<span class="line-clamp-1 block text-lg font-semibold text-card-foreground">
+			{scene.name}
+		</span>
 			<div class="flex items-center gap-2">
 		{#if scene.version?.biome}
 			<StatusBadge status="active">
@@ -144,4 +122,4 @@ function handleKeyDown(e: KeyboardEvent) {
 			</span>
 		</div>
 	</div>
-</div>
+</a>

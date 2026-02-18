@@ -6,7 +6,9 @@ import type { Snippet } from 'svelte';
 
 interface Props {
 	table: Table<TData>;
-	/** Optional row click handler (e.g. for navigation). */
+	/** URL generator for row navigation. Renders a stretched <a> in the first cell (desktop) and wraps mobile cards in <a>. Prefer over onRowClick for navigation. */
+	getRowHref?: (item: TData) => string;
+	/** Optional row click handler (e.g. for non-navigation actions). */
 	onRowClick?: (item: TData) => void;
 	/** Optional toolbar rendered above the table (filters, search, actions). */
 	toolbar?: Snippet;
@@ -16,7 +18,7 @@ interface Props {
 	empty?: Snippet;
 }
 
-let { table, onRowClick, toolbar, card, empty }: Props = $props();
+let { table, getRowHref, onRowClick, toolbar, card, empty }: Props = $props();
 </script>
 
 <div class="space-y-3">
@@ -55,22 +57,30 @@ let { table, onRowClick, toolbar, card, empty }: Props = $props();
 				</TableUI.Header>
 				<TableUI.Body>
 					{#if table.getRowModel().rows.length}
-						{#each table.getRowModel().rows as row (row.id)}
-							<TableUI.Row
-								data-state={row.getIsSelected() ? 'selected' : undefined}
-								class={onRowClick ? 'cursor-pointer' : ''}
-								onclick={() => onRowClick?.(row.original)}
-							>
-								{#each row.getVisibleCells() as cell (cell.id)}
-									<TableUI.Cell>
-										<FlexRender
-											content={cell.column.columnDef.cell}
-											context={cell.getContext()}
-										/>
-									</TableUI.Cell>
-								{/each}
-							</TableUI.Row>
-						{/each}
+					{#each table.getRowModel().rows as row (row.id)}
+						<TableUI.Row
+							data-state={row.getIsSelected() ? 'selected' : undefined}
+							class="{getRowHref || onRowClick ? 'cursor-pointer' : ''} {getRowHref ? 'relative' : ''}"
+							onclick={getRowHref ? undefined : onRowClick ? () => onRowClick(row.original) : undefined}
+						>
+							{#each row.getVisibleCells() as cell, i (cell.id)}
+								<TableUI.Cell>
+									{#if i === 0 && getRowHref}
+										<a
+											href={getRowHref(row.original)}
+											class="absolute inset-0 z-0"
+											tabindex="-1"
+											aria-hidden="true"
+										></a>
+									{/if}
+									<FlexRender
+										content={cell.column.columnDef.cell}
+										context={cell.getContext()}
+									/>
+								</TableUI.Cell>
+							{/each}
+						</TableUI.Row>
+					{/each}
 					{:else}
 						<TableUI.Row>
 							<TableUI.Cell
@@ -96,13 +106,14 @@ let { table, onRowClick, toolbar, card, empty }: Props = $props();
 			{#if table.getRowModel().rows.length}
 			{#each table.getRowModel().rows as row (row.id)}
 				<svelte:element
-					this={onRowClick ? 'button' : 'div'}
-					type={onRowClick ? 'button' : undefined}
-					role={onRowClick ? 'button' : undefined}
+					this={getRowHref ? 'a' : onRowClick ? 'button' : 'div'}
+					href={getRowHref ? getRowHref(row.original) : undefined}
+					type={!getRowHref && onRowClick ? 'button' : undefined}
+					role={!getRowHref && onRowClick ? 'button' : undefined}
 					class="w-full rounded-lg border bg-card p-4 text-left transition-colors
-						{onRowClick ? 'hover:bg-muted/50' : ''}
+						{onRowClick || getRowHref ? 'hover:bg-muted/50' : ''}
 						{row.getIsSelected() ? 'bg-muted ring-2 ring-primary' : ''}"
-					onclick={onRowClick ? () => onRowClick(row.original) : undefined}
+					onclick={!getRowHref && onRowClick ? () => onRowClick(row.original) : undefined}
 				>
 					{@render card(row.original)}
 				</svelte:element>

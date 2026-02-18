@@ -6,7 +6,7 @@ import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { AdminBreadcrumb } from '$lib/components/admin';
 import { DataTable, createDataTable } from '$lib/components/data-table';
 import { Alert } from '$lib/components/ui/alert';
-import { Button } from '$lib/components/ui/button';
+import { buttonVariants } from '$lib/components/ui/button';
 import { formatBytes } from '$lib/utils/format';
 import { freshnessColors, statusColorFallback, statusColors } from '$lib/utils/status';
 import type { PageData } from './$types';
@@ -35,10 +35,10 @@ const table = createDataTable<CaptureWithContext>({
 	sorting: false
 });
 
-function navigateToPage(p: number) {
+function pageUrl(p: number): string {
 	const url = new URL(pageStore.url);
 	url.searchParams.set('page', String(p));
-	void goto(url.toString(), { keepFocus: true });
+	return url.toString();
 }
 
 function changePageSize(size: number) {
@@ -47,6 +47,9 @@ function changePageSize(size: number) {
 	url.searchParams.set('page', '1');
 	void goto(url.toString(), { keepFocus: true });
 }
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- tv() return type unresolvable in svelte files
+const paginationBtnClass: string = buttonVariants({ variant: 'outline', size: 'sm' });
 
 function setFilter(key: string, value: string) {
 	const url = new URL(pageStore.url);
@@ -115,7 +118,7 @@ function setFilter(key: string, value: string) {
 	{:else}
 		<DataTable
 			{table}
-			onRowClick={(capture: CaptureWithContext) => goto(`/admin/captures/${capture.id}`)}
+			getRowHref={(capture: CaptureWithContext) => `/admin/captures/${capture.id}`}
 		>
 			{#snippet card(capture: CaptureWithContext)}
 				<div class="flex gap-3">
@@ -184,23 +187,33 @@ function setFilter(key: string, value: string) {
 				)} of {totalCount}
 			</div>
 			<div class="flex items-center gap-2">
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={currentPage <= 1}
-					onclick={() => navigateToPage(currentPage - 1)}
-				>
-					Previous
-				</Button>
+				{#if currentPage > 1}
+					<a
+						href={pageUrl(currentPage - 1)}
+						data-sveltekit-keepfocus
+						class={paginationBtnClass}
+					>
+						Previous
+					</a>
+				{:else}
+					<span class="{paginationBtnClass} pointer-events-none opacity-50">
+						Previous
+					</span>
+				{/if}
 				<span class="text-sm">Page {currentPage} of {totalPages}</span>
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={currentPage >= totalPages}
-					onclick={() => navigateToPage(currentPage + 1)}
-				>
-					Next
-				</Button>
+				{#if currentPage < totalPages}
+					<a
+						href={pageUrl(currentPage + 1)}
+						data-sveltekit-keepfocus
+						class={paginationBtnClass}
+					>
+						Next
+					</a>
+				{:else}
+					<span class="{paginationBtnClass} pointer-events-none opacity-50">
+						Next
+					</span>
+				{/if}
 			</div>
 			<select
 				class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"

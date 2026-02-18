@@ -1,5 +1,4 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
 import type { SceneListAdmin } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
@@ -52,11 +51,10 @@ const filteredScenes = $derived(showInactive ? scenes : scenes.filter((s) => s.a
 	{:else}
 		<div class="flex flex-col overflow-hidden rounded-lg border border-border">
 			{#each filteredScenes as scene (scene.id)}
-				<button
-					type="button"
-					class="group flex w-full cursor-pointer gap-4 border-b border-border bg-card p-4 text-left transition-colors last:border-b-0 hover:bg-muted/50"
-					onclick={() => goto(`/admin/scenes/${scene.id}`)}
-				>
+			<a
+				href="/admin/scenes/{scene.id}"
+				class="group flex w-full gap-4 border-b border-border bg-card p-4 transition-colors last:border-b-0 hover:bg-muted/50"
+			>
 					<!-- Preview thumbnail -->
 					<div class="hidden shrink-0 sm:block">
 					{#if scene.image_path ?? scene.thumbhash}
@@ -108,7 +106,7 @@ const filteredScenes = $derived(showInactive ? scenes : scenes.filter((s) => s.a
 							<span>Created <TimeAgo timestamp={scene.created_at} /></span>
 						</div>
 					</div>
-				</button>
+				</a>
 			{/each}
 		</div>
 	{/if}

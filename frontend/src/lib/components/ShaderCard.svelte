@@ -33,14 +33,12 @@ export type ShaderCardShader = ResultOf<typeof ShaderCardFragment>;
 </script>
 
 <script lang="ts">
-import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
-import { comparisonStore } from '$lib/stores/comparison.svelte';
 import { cn } from '$lib/utils';
 import { formatVersion, getCurseforgeUrl, getModrinthUrl } from '$lib/utils/display';
-import { Check, ExternalLink } from '@lucide/svelte';
+import { ExternalLink } from '@lucide/svelte';
 import BrandIcon from './icons/BrandIcon.svelte';
 
 interface Props {
@@ -50,65 +48,15 @@ interface Props {
 
 let { shader, class: className }: Props = $props();
 
-let isHovered = $state(false);
-const selectionMode = $derived(comparisonStore.selectionMode);
-const isSelected = $derived(selectionMode && comparisonStore.isSelected(shader.id));
-const hasAnySelection = $derived(selectionMode && comparisonStore.hasSelection());
-
 const modrinthUrl = $derived(getModrinthUrl(shader.modrinthId));
 const curseforgeUrl = $derived(getCurseforgeUrl(shader.curseforgeId));
-
-function handleCardClick(e: MouseEvent) {
-	const target = e.target as HTMLElement;
-
-	if (target.closest('[data-external-link]') || target.closest('[data-checkbox]')) {
-		return;
-	}
-
-	if (target.closest('[data-clickable]')) {
-		return;
-	}
-
-	if (hasAnySelection) {
-		e.preventDefault();
-		comparisonStore.select(shader);
-		return;
-	}
-
-	void goto(resolve('/shaders/[slug]', { slug: shader.slug }), { invalidateAll: true });
-}
-
-function handleKeyDown(e: KeyboardEvent) {
-	if (e.key === 'Enter' || e.key === ' ') {
-		e.preventDefault();
-		if (hasAnySelection) {
-			comparisonStore.select(shader);
-		} else {
-			void goto(resolve('/shaders/[slug]', { slug: shader.slug }), { invalidateAll: true });
-		}
-	}
-}
-
-function handleCheckboxClick(e: MouseEvent) {
-	e.stopPropagation();
-	comparisonStore.select(shader);
-}
 </script>
 
 <div
-	role="button"
-	tabindex="0"
-	onclick={handleCardClick}
-	onkeydown={handleKeyDown}
-	onmouseenter={() => (isHovered = true)}
-	onmouseleave={() => (isHovered = false)}
 	class={cn(
 		'group relative flex h-full flex-col overflow-hidden rounded-xl bg-card transition-all duration-300',
 		'border border-border shadow-theme-sm',
-		'focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
-		hasAnySelection
-			? 'cursor-default'
-			: 'cursor-pointer hover:-translate-y-1 hover:border-primary/50 hover:shadow-theme-lg',
+		'hover:-translate-y-1 hover:border-primary/50 hover:shadow-theme-lg',
 		className
 	)}
 >
@@ -126,27 +74,6 @@ function handleCheckboxClick(e: MouseEvent) {
 
 		<!-- Gradient overlay -->
 		<ImageOverlay />
-
-		<!-- Compare checkbox - only visible in selection mode -->
-		{#if selectionMode}
-			<button
-				type="button"
-				data-checkbox
-				onclick={handleCheckboxClick}
-				class={cn(
-					'absolute top-3 right-3 flex h-5 w-5 cursor-pointer items-center justify-center rounded border-2 transition-all duration-200',
-					isSelected
-						? 'border-primary bg-primary'
-						: 'border-gray-400 bg-gray-900/70 backdrop-blur-sm hover:border-gray-300',
-					isSelected || isHovered || hasAnySelection ? 'opacity-100' : 'opacity-0',
-					!isSelected && hasAnySelection && !isHovered && 'opacity-60'
-				)}
-			>
-				{#if isSelected}
-					<Check class="h-3 w-3 text-primary-foreground" strokeWidth={3} />
-				{/if}
-			</button>
-		{/if}
 	</div>
 
 	<!-- Card Body -->
@@ -155,14 +82,7 @@ function handleCheckboxClick(e: MouseEvent) {
 		<div class="flex items-baseline gap-x-2 overflow-hidden">
 			<a
 				href={resolve('/shaders/[slug]', { slug: shader.slug })}
-				data-clickable
-				onclick={(e) => {
-					e.stopPropagation();
-				}}
-				class={cn(
-					'block truncate text-base font-semibold text-card-foreground transition-colors hover:text-primary',
-					hasAnySelection ? 'cursor-pointer' : ''
-				)}
+				class="block truncate text-base font-semibold text-card-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 after:absolute after:inset-0 after:content-['']"
 			>
 				{shader.name}
 			</a>
@@ -209,14 +129,13 @@ function handleCheckboxClick(e: MouseEvent) {
 
 			<!-- External links don't need resolve() - only internal app routes -->
 			<!-- eslint-disable svelte/no-navigation-without-resolve -->
-			<div class="flex items-center gap-1">
+			<div class="relative z-10 flex items-center gap-1">
 				{#if modrinthUrl}
 					<a
 						href={modrinthUrl}
 						target="_blank"
 						rel="noopener noreferrer"
 						data-external-link
-						data-clickable
 						class="group/modrinth inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent"
 						title="View on Modrinth"
 					>
@@ -229,7 +148,6 @@ function handleCheckboxClick(e: MouseEvent) {
 						target="_blank"
 						rel="noopener noreferrer"
 						data-external-link
-						data-clickable
 						class="group/curseforge inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent"
 						title="View on CurseForge"
 					>
@@ -242,7 +160,6 @@ function handleCheckboxClick(e: MouseEvent) {
 						target="_blank"
 						rel="noopener noreferrer"
 						data-external-link
-						data-clickable
 						class="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent"
 						title="Visit website"
 					>
