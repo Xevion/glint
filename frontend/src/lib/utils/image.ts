@@ -105,7 +105,10 @@ export function rawImageUrl(path: string | null | undefined): string | null {
 // Internals
 // ---------------------------------------------------------------------------
 
-function buildCloudflareUrl(path: string, opts: ImageTransformOptions): string {
+function buildCloudflareUrl(path: string, opts: ImageTransformOptions): string | null {
+	const cdnUrl = env.PUBLIC_CDN_URL;
+	if (!cdnUrl) return null;
+
 	const parts: string[] = [];
 	if (opts.width) parts.push(`width=${opts.width}`);
 	if (opts.height) parts.push(`height=${opts.height}`);
@@ -113,7 +116,6 @@ function buildCloudflareUrl(path: string, opts: ImageTransformOptions): string {
 	if (opts.fit) parts.push(`fit=${opts.fit}`);
 	parts.push(`format=${opts.format ?? 'auto'}`);
 
-	const cdnUrl = env.PUBLIC_CDN_URL;
 	return `${cdnUrl}/cdn-cgi/image/${parts.join(',')}/${path}`;
 }
 
