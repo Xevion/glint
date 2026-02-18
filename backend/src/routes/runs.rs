@@ -86,11 +86,6 @@ pub struct ClaimItemResponse {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ConfirmUploadRequest {
-    pub image_path: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct UploadUrlRequest {
     pub shader_id: String,
     pub scene_id: String,
@@ -273,7 +268,7 @@ async fn claim_item(
         item.shader_version_id.as_ref(),
         item.scene_id.as_ref(),
         item.profile_id.as_ref().map(AsRef::as_ref),
-        Some(&r2_key),
+        &r2_key,
         Some(request.resolution_width),
         Some(request.resolution_height),
         Some(request.captured_at),
@@ -294,12 +289,11 @@ async fn claim_item(
     }))
 }
 
-#[instrument(skip(state, _user, request), fields(user_id = _user.user.id))]
+#[instrument(skip(state, _user), fields(user_id = _user.user.id))]
 async fn confirm_upload(
     _user: AgentUser,
     State(state): State<AppState>,
     Path((run_id, item_id)): Path<(String, String)>,
-    Json(request): Json<ConfirmUploadRequest>,
 ) -> AppResult<StatusCode> {
     let item = CaptureRunRepo::get_item_by_id(state.db(), &item_id).await?;
     if item.run_id.as_ref() != run_id {
@@ -316,7 +310,7 @@ async fn confirm_upload(
     let capture_id_str: &str = capture_id.as_ref();
 
     let mut tx = state.begin_tx().await?;
-    CaptureRepo::confirm_upload(&mut *tx, capture_id_str, request.image_path.as_deref()).await?;
+    CaptureRepo::confirm_upload(&mut *tx, capture_id_str).await?;
     CaptureRunRepo::complete_item(&mut *tx, &item_id, capture_id_str, None).await?;
     tx.commit().await?;
 

@@ -164,16 +164,16 @@ async fn delete_capture(
     }
 
     // Best-effort R2 cleanup
-    if let (Some(image_path), Some(s3)) = (capture.image_path, state.s3()) {
+    if let Some(s3) = state.s3() {
         let bucket = state.config().r2.bucket.as_deref().unwrap_or("glint");
         if let Err(e) = s3
             .delete_object()
             .bucket(bucket)
-            .key(&image_path)
+            .key(&capture.image_path)
             .send()
             .await
         {
-            warn!(image_path, error = %e, "Failed to delete capture image from R2");
+            warn!(image_path = capture.image_path, error = %e, "Failed to delete capture image from R2");
         }
     }
 

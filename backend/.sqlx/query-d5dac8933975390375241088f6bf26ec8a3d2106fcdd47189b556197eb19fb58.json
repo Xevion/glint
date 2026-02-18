@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id AS \"id!: CaptureId\", scene_id AS \"scene_id!: SceneId\",\n                shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                shader_version AS \"shader_version!\",\n                shader_version_id AS \"shader_version_id!: ShaderVersionId\",\n                profile_id, profile_name, profile_display_name, image_path, thumbhash,\n                captured_at, resolution_width, resolution_height, file_size_bytes,\n                run_id AS \"run_id: CaptureRunId\",\n                run_status AS \"run_status: CaptureRunStatus\",\n                shader_author, scene_name, scene_slug,\n                preset_id AS \"preset_id: ScenePresetId\", preset_name, preset_slug,\n                freshness AS \"freshness!: CaptureFreshness\",\n                status AS \"status!: CaptureStatus\", error_message, video_url,\n                avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,\n                minecraft_version, iris_version, gpu_model, content_type,\n                scene_version_id AS \"scene_version_id: SceneVersionId\",\n                created_at AS \"created_at!\", updated_at AS \"updated_at!\"\n            FROM capture_details\n            WHERE id = $1\n            ",
+  "query": "\n            SELECT\n                id AS \"id!: CaptureId\", scene_id AS \"scene_id!: SceneId\",\n                shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                shader_version AS \"shader_version!\",\n                shader_version_id AS \"shader_version_id!: ShaderVersionId\",\n                profile_id, profile_name, profile_display_name, image_path AS \"image_path!\", thumbhash,\n                captured_at, resolution_width, resolution_height, file_size_bytes,\n                run_id AS \"run_id: CaptureRunId\",\n                run_status AS \"run_status: CaptureRunStatus\",\n                shader_author, scene_name, scene_slug,\n                preset_id AS \"preset_id: ScenePresetId\", preset_name, preset_slug,\n                freshness AS \"freshness!: CaptureFreshness\",\n                status AS \"status!: CaptureStatus\", error_message, video_url,\n                avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,\n                minecraft_version, iris_version, gpu_model, content_type,\n                scene_version_id AS \"scene_version_id: SceneVersionId\",\n                created_at AS \"created_at!\", updated_at AS \"updated_at!\"\n            FROM capture_details\n            WHERE id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -50,7 +50,7 @@
       },
       {
         "ordinal": 9,
-        "name": "image_path",
+        "name": "image_path!",
         "type_info": "Text"
       },
       {
@@ -246,5 +246,5 @@
       true
     ]
   },
-  "hash": "578ac995673b8e2865c3f6b5a051a3e7736612dd71f86c92db0013dc4f842e15"
+  "hash": "d5dac8933975390375241088f6bf26ec8a3d2106fcdd47189b556197eb19fb58"
 }

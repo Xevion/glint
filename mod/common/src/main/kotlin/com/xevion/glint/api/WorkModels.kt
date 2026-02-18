@@ -195,9 +195,7 @@ data class ClaimItemResponse(
 
 /** Request to confirm an upload has completed. */
 @Serializable
-data class ConfirmUploadRequest(
-    val imagePath: String? = null,
-)
+class ConfirmUploadRequest
 
 /** Request to report a persistent shader failure. */
 @Serializable

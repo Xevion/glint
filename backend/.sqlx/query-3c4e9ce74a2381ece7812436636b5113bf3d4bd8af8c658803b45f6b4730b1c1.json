@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE captures\n            SET status = 'completed', updated_at = now()\n            WHERE id = $1 AND status = 'uploading'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3c4e9ce74a2381ece7812436636b5113bf3d4bd8af8c658803b45f6b4730b1c1"
+}

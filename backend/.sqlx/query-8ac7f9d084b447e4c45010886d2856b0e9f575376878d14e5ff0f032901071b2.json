@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id AS \"id!\", scene_id AS \"scene_id!\",\n                shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                shader_version AS \"shader_version!\",\n                profile_id AS \"profile_id: ShaderVersionProfileId\", profile_name, profile_display_name, image_path, thumbhash, captured_at,\n                resolution_width, resolution_height, file_size_bytes,\n                run_id AS \"run_id: CaptureRunId\", run_status AS \"run_status: CaptureRunStatus\",\n                shader_author, scene_name, scene_slug,\n                preset_id AS \"preset_id: ScenePresetId\", preset_name, preset_slug,\n                freshness AS \"freshness!: CaptureFreshness\"\n            FROM capture_contexts\n            WHERE scene_id = $1\n              AND shader_id = (SELECT shader_id FROM shader_versions WHERE id = $2)\n              AND id != $3\n              AND capture_status = 'completed'\n            ORDER BY captured_at DESC NULLS LAST\n            LIMIT 8\n            ",
+  "query": "\n            SELECT\n                id AS \"id!\", scene_id AS \"scene_id!\",\n                shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                shader_version AS \"shader_version!\",\n                profile_id AS \"profile_id: ShaderVersionProfileId\", profile_name, profile_display_name, image_path AS \"image_path!\", thumbhash, captured_at,\n                resolution_width, resolution_height, file_size_bytes,\n                run_id AS \"run_id: CaptureRunId\", run_status AS \"run_status: CaptureRunStatus\",\n                shader_author, scene_name, scene_slug,\n                preset_id AS \"preset_id: ScenePresetId\", preset_name, preset_slug,\n                freshness AS \"freshness!: CaptureFreshness\"\n            FROM capture_contexts\n            WHERE id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -45,7 +45,7 @@
       },
       {
         "ordinal": 8,
-        "name": "image_path",
+        "name": "image_path!",
         "type_info": "Text"
       },
       {
@@ -121,8 +121,6 @@
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Text",
         "Text"
       ]
     },
@@ -152,5 +150,5 @@
       true
     ]
   },
-  "hash": "f4286f5050c77f4e07ff88aab59092bcac27cc10857d7acb181bbad0a862b08c"
+  "hash": "8ac7f9d084b447e4c45010886d2856b0e9f575376878d14e5ff0f032901071b2"
 }

@@ -75,25 +75,11 @@ async fn sweep_orphaned_uploads(pool: &PgPool, http: &reqwest::Client, r2_config
     for capture in &captures {
         let id = capture.id.as_ref();
 
-        let image_path = match capture.image_path {
-            Some(ref p) if !p.is_empty() => p.as_str(),
-            _ => {
-                if let Err(e) =
-                    CaptureRepo::mark_failed(pool, id, "Orphaned upload: no image_path was set")
-                        .await
-                {
-                    error!(capture_id = id, error = %e, "Failed to mark orphaned capture as failed");
-                }
-                failed += 1;
-                continue;
-            }
-        };
-
-        let image_url = r2_config.public_url_for_key(image_path);
+        let image_url = r2_config.public_url_for_key(&capture.image_path);
         match head_check(http, &image_url).await {
             HeadResult::Exists => {
                 // Image is in R2 but confirmation was lost — complete it
-                match CaptureRepo::confirm_upload(pool, id, None).await {
+                match CaptureRepo::confirm_upload(pool, id).await {
                     Ok(true) => {
                         info!(
                             capture_id = id,
@@ -177,20 +163,7 @@ async fn sweep_unverified_completions(
     for capture in &captures {
         let id = capture.id.as_ref();
 
-        let image_path = match capture.image_path {
-            Some(ref p) if !p.is_empty() => p.as_str(),
-            _ => {
-                if let Err(e) =
-                    CaptureRepo::mark_failed(pool, id, "Completed capture has no image_path").await
-                {
-                    error!(capture_id = id, error = %e, "Failed to mark capture as failed");
-                }
-                failed += 1;
-                continue;
-            }
-        };
-
-        let image_url = r2_config.public_url_for_key(image_path);
+        let image_url = r2_config.public_url_for_key(&capture.image_path);
         match head_check(http, &image_url).await {
             HeadResult::Exists => {
                 // Image exists but metadata processing failed — re-queue

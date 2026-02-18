@@ -169,9 +169,8 @@ async fn main() -> anyhow::Result<()> {
     services.spawn("metadata-worker", {
         let pool = pool.clone();
         let http = http_client.clone();
-        let s3 = s3_client.clone();
         let r2 = config.r2.clone();
-        |ctx| services::metadata::run(ctx, metadata_rx, pool, http, s3, r2)
+        |ctx| services::metadata::run(ctx, metadata_rx, pool, http, r2)
     });
 
     services.spawn("run-monitor", {

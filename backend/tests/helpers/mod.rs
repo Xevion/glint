@@ -147,9 +147,10 @@ pub async fn seed_capture(
     preset_id: Option<&str>,
     status: &str,
 ) {
+    let image_path = format!("captures/{shader_version_id}/{scene_id}/{id}.webp");
     sqlx::query(
-        "INSERT INTO captures (id, shader_version_id, scene_id, profile_id, preset_id, status, captured_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, now())",
+        "INSERT INTO captures (id, shader_version_id, scene_id, profile_id, preset_id, status, captured_at, image_path) \
+         VALUES ($1, $2, $3, $4, $5, $6, now(), $7)",
     )
     .bind(id)
     .bind(shader_version_id)
@@ -157,6 +158,7 @@ pub async fn seed_capture(
     .bind(profile_id)
     .bind(preset_id)
     .bind(status)
+    .bind(&image_path)
     .execute(pool)
     .await
     .expect("seed_capture");
@@ -174,9 +176,10 @@ pub async fn seed_capture_full(
     captured_at: DateTime<Utc>,
     scene_version_id: Option<&str>,
 ) {
+    let image_path = format!("captures/{shader_version_id}/{scene_id}/{id}.webp");
     sqlx::query(
-        "INSERT INTO captures (id, shader_version_id, scene_id, profile_id, preset_id, status, captured_at, scene_version_id) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        "INSERT INTO captures (id, shader_version_id, scene_id, profile_id, preset_id, status, captured_at, scene_version_id, image_path) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     )
     .bind(id)
     .bind(shader_version_id)
@@ -186,6 +189,7 @@ pub async fn seed_capture_full(
     .bind(status)
     .bind(captured_at)
     .bind(scene_version_id)
+    .bind(&image_path)
     .execute(pool)
     .await
     .expect("seed_capture_full");

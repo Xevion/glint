@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id AS \"id!\", scene_id AS \"scene_id!\",\n                shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                shader_version AS \"shader_version!\",\n                profile_id AS \"profile_id: ShaderVersionProfileId\", profile_name, profile_display_name, image_path, thumbhash, captured_at,\n                resolution_width, resolution_height, file_size_bytes,\n                run_id AS \"run_id: CaptureRunId\", run_status AS \"run_status: CaptureRunStatus\",\n                shader_author, scene_name, scene_slug,\n                preset_id AS \"preset_id: ScenePresetId\", preset_name, preset_slug,\n                freshness AS \"freshness!: CaptureFreshness\"\n            FROM capture_contexts\n            WHERE scene_id = $1\n              AND shader_id != (SELECT shader_id FROM shader_versions WHERE id = $2)\n              AND id != $3\n              AND capture_status = 'completed'\n            ORDER BY captured_at DESC NULLS LAST\n            LIMIT 8\n            ",
+  "query": "\n                        SELECT\n                            id AS \"id!\", scene_id AS \"scene_id!\",\n                            shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                            shader_version AS \"shader_version!\",\n                            profile_id AS \"profile_id: ShaderVersionProfileId\", profile_name, profile_display_name, image_path AS \"image_path!\", thumbhash, captured_at,\n                            resolution_width, resolution_height, file_size_bytes,\n                            run_id AS \"run_id: CaptureRunId\", run_status AS \"run_status: CaptureRunStatus\",\n                            shader_author, scene_name, scene_slug,\n                            preset_id AS \"preset_id: ScenePresetId\", preset_name, preset_slug,\n                            freshness AS \"freshness!: CaptureFreshness\"\n                        FROM capture_contexts\n                        WHERE ($1::text IS NULL OR shader_id = $1)\n                          AND ($2::text IS NULL OR shader_slug = $2)\n                          AND ($3::text IS NULL OR scene_id = $3)\n                          AND ($4::text IS NULL OR shader_version_id = $4)\n                          AND ($5::text IS NULL OR profile_id = $5)\n                          AND ($6::text IS NULL OR capture_status = $6)\n                          AND ($7::text IS NULL OR run_id = $7)\n                          AND ($8::bool IS NULL OR scene_active = $8)\n                        ORDER BY captured_at DESC NULLS LAST\n                        LIMIT $9 OFFSET $10\n                        ",
   "describe": {
     "columns": [
       {
@@ -45,7 +45,7 @@
       },
       {
         "ordinal": 8,
-        "name": "image_path",
+        "name": "image_path!",
         "type_info": "Text"
       },
       {
@@ -123,7 +123,14 @@
       "Left": [
         "Text",
         "Text",
-        "Text"
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Int8",
+        "Int8"
       ]
     },
     "nullable": [
@@ -152,5 +159,5 @@
       true
     ]
   },
-  "hash": "c383d16b057efe126f8ea23ae1b7a73a760e7b90004c313ca74c9cd4c21c7024"
+  "hash": "00272fea698ba0230e70a346056591f57f5694d9bace19bd993b7b76bb3af564"
 }

@@ -1,5 +1,3 @@
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_s3::primitives::ByteStream;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use image::imageops::FilterType;
 use sqlx::PgPool;
@@ -12,9 +10,8 @@ use crate::services::lifecycle::ServiceContext;
 
 /// Run the capture metadata background worker.
 ///
-/// On startup, backfills any completed captures missing thumbhash or file metadata,
-/// then transcodes any remaining PNG captures to WebP. After backfill, loops on the
-/// channel processing new capture IDs as they arrive.
+/// On startup, backfills any completed captures missing thumbhash or file metadata.
+/// After backfill, loops on the channel processing new capture IDs as they arrive.
 ///
 /// On shutdown, drains any remaining items from the channel so queued work
 /// is not silently lost.
@@ -23,7 +20,6 @@ pub async fn run(
     mut rx: mpsc::UnboundedReceiver<String>,
     pool: PgPool,
     http: reqwest::Client,
-    s3: Option<S3Client>,
     r2_config: R2Config,
 ) {
     // Backfill existing captures missing thumbhash or file metadata
@@ -46,27 +42,6 @@ pub async fn run(
         Err(e) => {
             error!(error = %e, "Metadata worker failed to query unprocessed captures");
         }
-    }
-
-    // Backfill PNG → WebP transcoding
-    if let Some(ref s3_client) = s3 {
-        match CaptureRepo::list_png_capture_ids(&pool).await {
-            Ok(ids) if !ids.is_empty() => {
-                info!(count = ids.len(), "Transcoding PNG captures to WebP");
-                for id in &ids {
-                    transcode_capture(&pool, &http, s3_client, &r2_config, id).await;
-                }
-                info!(count = ids.len(), "PNG→WebP transcoding backfill complete");
-            }
-            Ok(_) => {
-                info!("No PNG captures to transcode");
-            }
-            Err(e) => {
-                error!(error = %e, "Failed to query PNG captures for transcoding");
-            }
-        }
-    } else {
-        debug!("S3 not configured, skipping PNG→WebP transcoding");
     }
 
     // Process new captures as they arrive, exiting on shutdown signal
@@ -156,12 +131,7 @@ async fn try_process_capture(
         Err(e) => return Err(ProcessError::Transient(e.into())),
     };
 
-    let image_path = match capture.image_path {
-        Some(ref p) if !p.is_empty() => p.clone(),
-        _ => return Err(ProcessError::Permanent("no image_path".into())),
-    };
-
-    let image_url = r2_config.public_url_for_key(&image_path);
+    let image_url = r2_config.public_url_for_key(&capture.image_path);
 
     let needs_thumbhash = capture.thumbhash.is_none();
     let needs_file_metadata = capture.file_size_bytes.is_none();
@@ -205,128 +175,6 @@ async fn try_process_capture(
     }
 
     Ok(())
-}
-
-/// Transcode a single PNG capture to WebP and update R2 + DB.
-async fn transcode_capture(
-    pool: &PgPool,
-    http: &reqwest::Client,
-    s3: &S3Client,
-    r2_config: &R2Config,
-    capture_id: &str,
-) {
-    let capture = match CaptureRepo::find_by_id(pool, capture_id).await {
-        Ok(Some(c)) => c,
-        Ok(None) => {
-            warn!(capture_id, "Transcode: capture not found");
-            return;
-        }
-        Err(e) => {
-            error!(capture_id, error = %e, "Transcode: failed to fetch capture");
-            return;
-        }
-    };
-
-    let image_path = match capture.image_path {
-        Some(ref p) if !p.is_empty() => p.clone(),
-        _ => {
-            debug!(capture_id, "Transcode: no image_path, skipping");
-            return;
-        }
-    };
-
-    // Download the PNG from R2 via public URL
-    let image_url = r2_config.public_url_for_key(&image_path);
-    let png_bytes = match http.get(&image_url).send().await {
-        Ok(resp) => match resp.bytes().await {
-            Ok(b) => b,
-            Err(e) => {
-                warn!(capture_id, error = %e, "Transcode: failed to download image body");
-                return;
-            }
-        },
-        Err(e) => {
-            warn!(capture_id, error = %e, "Transcode: failed to download image");
-            return;
-        }
-    };
-
-    // Encode to WebP in a blocking task (CPU-intensive)
-    let png_bytes_clone = png_bytes.clone();
-    let webp_bytes =
-        match tokio::task::spawn_blocking(move || encode_to_webp(&png_bytes_clone)).await {
-            Ok(Ok(bytes)) => bytes,
-            Ok(Err(e)) => {
-                warn!(capture_id, error = %e, "Transcode: WebP encoding failed");
-                return;
-            }
-            Err(e) => {
-                error!(capture_id, error = %e, "Transcode: blocking task panicked");
-                return;
-            }
-        };
-
-    let webp_size = webp_bytes.len() as i64;
-    let png_size = png_bytes.len() as i64;
-
-    let new_image_path = image_path.replace(".png", ".webp");
-    let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
-
-    // Upload WebP to R2
-    if let Err(e) = s3
-        .put_object()
-        .bucket(bucket)
-        .key(&new_image_path)
-        .content_type("image/webp")
-        .body(ByteStream::from(webp_bytes))
-        .send()
-        .await
-    {
-        error!(capture_id, error = %e, "Transcode: failed to upload WebP to R2");
-        return;
-    }
-
-    // Update DB with new image path, content type, and file size
-    if let Err(e) = CaptureRepo::update_image_after_transcode(
-        pool,
-        capture_id,
-        &new_image_path,
-        webp_size,
-        "image/webp",
-    )
-    .await
-    {
-        error!(capture_id, error = %e, "Transcode: failed to update DB");
-        return;
-    }
-
-    // Delete old PNG from R2 (best-effort)
-    if new_image_path != image_path
-        && let Err(e) = s3
-            .delete_object()
-            .bucket(bucket)
-            .key(&image_path)
-            .send()
-            .await
-    {
-        warn!(capture_id, error = %e, "Transcode: failed to delete old PNG from R2");
-    }
-
-    info!(
-        capture_id,
-        png_size,
-        webp_size,
-        ratio = format_args!("{:.1}x", png_size as f64 / webp_size as f64),
-        "Transcoded PNG→WebP"
-    );
-}
-
-/// Encode raw image bytes (any supported format) to WebP.
-fn encode_to_webp(input: &[u8]) -> anyhow::Result<Vec<u8>> {
-    let img = image::load_from_memory(input)?;
-    let mut buf = std::io::Cursor::new(Vec::new());
-    img.write_to(&mut buf, image::ImageFormat::WebP)?;
-    Ok(buf.into_inner())
 }
 
 /// Full GET: download image, generate thumbhash, extract file size and content type.

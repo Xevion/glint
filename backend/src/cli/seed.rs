@@ -238,15 +238,17 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
     ];
 
     for (id, shader_version_id, scene_id, preset_id) in &captures {
+        let image_path = format!("captures/{shader_version_id}/{scene_id}/{id}.webp");
         sqlx::query!(
             r#"
-            INSERT INTO captures (id, shader_version_id, scene_id, preset_id, status)
-            VALUES ($1, $2, $3, $4, 'completed')
+            INSERT INTO captures (id, shader_version_id, scene_id, preset_id, status, image_path)
+            VALUES ($1, $2, $3, $4, 'completed', $5)
             "#,
             *id,
             *shader_version_id,
             *scene_id,
             *preset_id,
+            image_path,
         )
         .execute(pool)
         .await?;

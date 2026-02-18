@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                        SELECT\n                            id AS \"id!\", scene_id AS \"scene_id!\",\n                            shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                            shader_version AS \"shader_version!\",\n                            profile_id AS \"profile_id: ShaderVersionProfileId\", profile_name, profile_display_name, image_path, thumbhash, captured_at,\n                            resolution_width, resolution_height, file_size_bytes,\n                            run_id AS \"run_id: CaptureRunId\", run_status AS \"run_status: CaptureRunStatus\",\n                            shader_author, scene_name, scene_slug,\n                            preset_id AS \"preset_id: ScenePresetId\", preset_name, preset_slug,\n                            freshness AS \"freshness!: CaptureFreshness\"\n                        FROM (\n                            SELECT DISTINCT ON (scene_id) *\n                            FROM capture_contexts\n                            WHERE ($1::text IS NULL OR shader_id = $1)\n                              AND ($2::text IS NULL OR shader_slug = $2)\n                              AND ($3::text IS NULL OR scene_id = $3)\n                              AND ($4::text IS NULL OR shader_version_id = $4)\n                              AND ($5::text IS NULL OR profile_id = $5)\n                              AND ($6::text IS NULL OR capture_status = $6)\n                              AND ($7::text IS NULL OR run_id = $7)\n                              AND ($8::bool IS NULL OR scene_active = $8)\n                            ORDER BY scene_id, captured_at DESC NULLS LAST\n                        ) sub\n                        ORDER BY captured_at DESC NULLS LAST\n                        LIMIT $9 OFFSET $10\n                        ",
+  "query": "\n                        SELECT\n                            id AS \"id!\", scene_id AS \"scene_id!\",\n                            shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                            shader_version AS \"shader_version!\",\n                            profile_id AS \"profile_id: ShaderVersionProfileId\", profile_name, profile_display_name, image_path AS \"image_path!\", thumbhash, captured_at,\n                            resolution_width, resolution_height, file_size_bytes,\n                            run_id AS \"run_id: CaptureRunId\", run_status AS \"run_status: CaptureRunStatus\",\n                            shader_author, scene_name, scene_slug,\n                            preset_id AS \"preset_id: ScenePresetId\", preset_name, preset_slug,\n                            freshness AS \"freshness!: CaptureFreshness\"\n                        FROM (\n                            SELECT DISTINCT ON (scene_id) *\n                            FROM capture_contexts\n                            WHERE ($1::text IS NULL OR shader_id = $1)\n                              AND ($2::text IS NULL OR shader_slug = $2)\n                              AND ($3::text IS NULL OR scene_id = $3)\n                              AND ($4::text IS NULL OR shader_version_id = $4)\n                              AND ($5::text IS NULL OR profile_id = $5)\n                              AND ($6::text IS NULL OR capture_status = $6)\n                              AND ($7::text IS NULL OR run_id = $7)\n                              AND ($8::bool IS NULL OR scene_active = $8)\n                            ORDER BY scene_id, captured_at DESC NULLS LAST\n                        ) sub\n                        ORDER BY captured_at DESC NULLS LAST\n                        LIMIT $9 OFFSET $10\n                        ",
   "describe": {
     "columns": [
       {
@@ -45,7 +45,7 @@
       },
       {
         "ordinal": 8,
-        "name": "image_path",
+        "name": "image_path!",
         "type_info": "Text"
       },
       {
@@ -159,5 +159,5 @@
       true
     ]
   },
-  "hash": "2cb182758f26caf3470c4131ca1bf03c16f15cab8818477b25bc04839e0c0b45"
+  "hash": "eea705a1490e981eb28fbbae81f707dca330055cc582d270f5e06358d6191e6c"
 }

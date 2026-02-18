@@ -91,7 +91,7 @@ impl CaptureRepo {
             scene_id: SceneId,
             status: CaptureStatus,
             profile_id: Option<String>,
-            image_path: Option<String>,
+            image_path: String,
             thumbhash: Option<String>,
             captured_at: Option<DateTime<Utc>>,
             resolution_width: Option<i32>,
@@ -246,7 +246,7 @@ impl CaptureRepo {
                             id AS "id!", scene_id AS "scene_id!",
                             shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                             shader_version AS "shader_version!",
-                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path, thumbhash, captured_at,
+                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path AS "image_path!", thumbhash, captured_at,
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
@@ -286,7 +286,7 @@ impl CaptureRepo {
                             id AS "id!", scene_id AS "scene_id!",
                             shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                             shader_version AS "shader_version!",
-                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path, thumbhash, captured_at,
+                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path AS "image_path!", thumbhash, captured_at,
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
@@ -326,7 +326,7 @@ impl CaptureRepo {
                             id AS "id!", scene_id AS "scene_id!",
                             shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                             shader_version AS "shader_version!",
-                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path, thumbhash, captured_at,
+                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path AS "image_path!", thumbhash, captured_at,
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
@@ -370,7 +370,7 @@ impl CaptureRepo {
                             id AS "id!", scene_id AS "scene_id!",
                             shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                             shader_version AS "shader_version!",
-                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path, thumbhash, captured_at,
+                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path AS "image_path!", thumbhash, captured_at,
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
@@ -410,7 +410,7 @@ impl CaptureRepo {
                             id AS "id!", scene_id AS "scene_id!",
                             shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                             shader_version AS "shader_version!",
-                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path, thumbhash, captured_at,
+                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path AS "image_path!", thumbhash, captured_at,
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
@@ -454,7 +454,7 @@ impl CaptureRepo {
                             id AS "id!", scene_id AS "scene_id!",
                             shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                             shader_version AS "shader_version!",
-                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path, thumbhash, captured_at,
+                            profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path AS "image_path!", thumbhash, captured_at,
                             resolution_width, resolution_height, file_size_bytes,
                             run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                             shader_author, scene_name, scene_slug,
@@ -583,7 +583,7 @@ impl CaptureRepo {
         shader_version_id: &str,
         scene_id: &str,
         profile_id: Option<&str>,
-        image_path: Option<&str>,
+        image_path: &str,
         resolution_width: Option<i32>,
         resolution_height: Option<i32>,
         captured_at: Option<DateTime<Utc>>,
@@ -624,19 +624,14 @@ impl CaptureRepo {
 
     /// Confirm an upload: transition capture from 'uploading' to 'completed'
     #[instrument(skip(executor), level = "debug")]
-    pub async fn confirm_upload(
-        executor: impl sqlx::PgExecutor<'_>,
-        id: &str,
-        image_path: Option<&str>,
-    ) -> AppResult<bool> {
+    pub async fn confirm_upload(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<bool> {
         let result = sqlx::query!(
             r#"
             UPDATE captures
-            SET status = 'completed', image_path = $2, updated_at = now()
+            SET status = 'completed', updated_at = now()
             WHERE id = $1 AND status = 'uploading'
             "#,
             id,
-            image_path
         )
         .execute(executor)
         .await
@@ -661,7 +656,7 @@ impl CaptureRepo {
                 id AS "id!", scene_id AS "scene_id!",
                 shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                 shader_version AS "shader_version!",
-                profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path, thumbhash, captured_at,
+                profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path AS "image_path!", thumbhash, captured_at,
                 resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
@@ -695,7 +690,7 @@ impl CaptureRepo {
             profile_id: Option<String>,
             profile_name: Option<String>,
             profile_display_name: Option<String>,
-            image_path: Option<String>,
+            image_path: String,
             thumbhash: Option<String>,
             captured_at: Option<DateTime<Utc>>,
             resolution_width: Option<i32>,
@@ -736,7 +731,7 @@ impl CaptureRepo {
                 shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                 shader_version AS "shader_version!",
                 shader_version_id AS "shader_version_id!: ShaderVersionId",
-                profile_id, profile_name, profile_display_name, image_path, thumbhash,
+                profile_id, profile_name, profile_display_name, image_path AS "image_path!", thumbhash,
                 captured_at, resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId",
                 run_status AS "run_status: CaptureRunStatus",
@@ -772,7 +767,7 @@ impl CaptureRepo {
                 id AS "id!", scene_id AS "scene_id!",
                 shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                 shader_version AS "shader_version!",
-                profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path, thumbhash, captured_at,
+                profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path AS "image_path!", thumbhash, captured_at,
                 resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
@@ -800,7 +795,7 @@ impl CaptureRepo {
                 id AS "id!", scene_id AS "scene_id!",
                 shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                 shader_version AS "shader_version!",
-                profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path, thumbhash, captured_at,
+                profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path AS "image_path!", thumbhash, captured_at,
                 resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
@@ -828,7 +823,7 @@ impl CaptureRepo {
                     id AS "id!", scene_id AS "scene_id!",
                     shader_slug AS "shader_slug!", shader_name AS "shader_name!",
                     shader_version AS "shader_version!",
-                    profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path, thumbhash, captured_at,
+                    profile_id AS "profile_id: ShaderVersionProfileId", profile_name, profile_display_name, image_path AS "image_path!", thumbhash, captured_at,
                     resolution_width, resolution_height, file_size_bytes,
                 run_id AS "run_id: CaptureRunId", run_status AS "run_status: CaptureRunStatus",
                 shader_author, scene_name, scene_slug,
@@ -1112,59 +1107,6 @@ impl CaptureRepo {
         .context(format!("failed to set file metadata for capture '{}'", id))?;
 
         Ok(())
-    }
-
-    /// Update image fields after transcoding a capture from PNG to WebP
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn update_image_after_transcode(
-        executor: impl sqlx::PgExecutor<'_>,
-        id: &str,
-        image_path: &str,
-        file_size_bytes: i64,
-        content_type: &str,
-    ) -> AppResult<()> {
-        sqlx::query!(
-            r#"
-            UPDATE captures
-            SET image_path = $2, file_size_bytes = $3, content_type = $4, updated_at = now()
-            WHERE id = $1
-            "#,
-            id,
-            Some(image_path),
-            file_size_bytes,
-            content_type
-        )
-        .execute(executor)
-        .await
-        .context(format!(
-            "failed to update image after transcode for '{}'",
-            id
-        ))?;
-
-        debug!("Updated capture image after transcode");
-        Ok(())
-    }
-
-    /// List IDs of completed captures still stored as PNG (for WebP transcoding backfill)
-    #[instrument(skip(executor), level = "debug")]
-    pub async fn list_png_capture_ids(
-        executor: impl sqlx::PgExecutor<'_>,
-    ) -> AppResult<Vec<String>> {
-        let ids = sqlx::query_scalar!(
-            r#"
-            SELECT id
-            FROM captures
-            WHERE status = 'completed'
-              AND image_path IS NOT NULL
-              AND (content_type = 'image/png' OR image_path LIKE '%.png')
-            ORDER BY created_at ASC
-            "#
-        )
-        .fetch_all(executor)
-        .await
-        .context("failed to list PNG capture ids for transcoding")?;
-
-        Ok(ids)
     }
 
     /// Count completed captures per scene (active scenes only)
