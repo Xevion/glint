@@ -45,13 +45,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 				duplex: 'half'
 			});
 
-			// Follow backend redirects (e.g. slug canonicalization) internally
+			// Follow backend-to-backend redirects (e.g. slug canonicalization)
 			// so SSR load functions receive the final response, not the 308.
+			// Only follow redirects that stay within /api/ — everything else
+			// (frontend routes like /login, external URLs like Discord OAuth)
+			// must pass through to the browser so Set-Cookie headers and
+			// redirect destinations are preserved.
 			if (response.status >= 300 && response.status < 400) {
 				const location = response.headers.get('location');
-				if (location) {
-					const redirectUrl = location.startsWith('/') ? `${backendUrl}${location}` : location;
-					response = await fetch(redirectUrl, {
+				if (location?.startsWith('/api/')) {
+					response = await fetch(`${backendUrl}${location}`, {
 						method: 'GET',
 						headers,
 						redirect: 'manual'
