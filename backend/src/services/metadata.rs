@@ -36,7 +36,7 @@ pub async fn run(
                     "Metadata worker started, backfilling unprocessed captures"
                 );
                 for id in ids {
-                    process_capture(&pool, &http, &id).await;
+                    process_capture(&pool, &http, &r2_config, &id).await;
                 }
                 info!(count, "Metadata backfill complete");
             } else {
@@ -74,7 +74,7 @@ pub async fn run(
         tokio::select! {
             item = rx.recv() => {
                 match item {
-                    Some(capture_id) => process_capture(&pool, &http, &capture_id).await,
+                    Some(capture_id) => process_capture(&pool, &http, &r2_config, &capture_id).await,
                     None => break, // channel closed
                 }
             }
@@ -85,7 +85,7 @@ pub async fn run(
     // Drain any items buffered in the channel so queued work isn't lost
     let mut drained = 0u32;
     while let Ok(capture_id) = rx.try_recv() {
-        process_capture(&pool, &http, &capture_id).await;
+        process_capture(&pool, &http, &r2_config, &capture_id).await;
         drained += 1;
     }
     if drained > 0 {
@@ -99,9 +99,14 @@ const MAX_RETRIES: u32 = 3;
 /// Initial retry delay (doubles each attempt: 10s, 20s, 40s)
 const INITIAL_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(10);
 
-async fn process_capture(pool: &PgPool, http: &reqwest::Client, capture_id: &str) {
+async fn process_capture(
+    pool: &PgPool,
+    http: &reqwest::Client,
+    r2_config: &R2Config,
+    capture_id: &str,
+) {
     for attempt in 0..MAX_RETRIES {
-        match try_process_capture(pool, http, capture_id).await {
+        match try_process_capture(pool, http, r2_config, capture_id).await {
             Ok(()) => return,
             Err(ProcessError::Permanent(msg)) => {
                 debug!(capture_id, reason = %msg, "Metadata: skipping (permanent)");
@@ -142,6 +147,7 @@ enum ProcessError {
 async fn try_process_capture(
     pool: &PgPool,
     http: &reqwest::Client,
+    r2_config: &R2Config,
     capture_id: &str,
 ) -> Result<(), ProcessError> {
     let capture = match CaptureRepo::find_by_id(pool, capture_id).await {
@@ -150,10 +156,12 @@ async fn try_process_capture(
         Err(e) => return Err(ProcessError::Transient(e.into())),
     };
 
-    let image_url = match capture.image_url {
-        Some(ref url) if !url.is_empty() => url.clone(),
-        _ => return Err(ProcessError::Permanent("no image_url".into())),
+    let image_path = match capture.image_path {
+        Some(ref p) if !p.is_empty() => p.clone(),
+        _ => return Err(ProcessError::Permanent("no image_path".into())),
     };
+
+    let image_url = r2_config.public_url_for_key(&image_path);
 
     let needs_thumbhash = capture.thumbhash.is_none();
     let needs_file_metadata = capture.file_size_bytes.is_none();
@@ -219,15 +227,16 @@ async fn transcode_capture(
         }
     };
 
-    let image_url = match capture.image_url {
-        Some(ref url) if !url.is_empty() => url.clone(),
+    let image_path = match capture.image_path {
+        Some(ref p) if !p.is_empty() => p.clone(),
         _ => {
-            debug!(capture_id, "Transcode: no image_url, skipping");
+            debug!(capture_id, "Transcode: no image_path, skipping");
             return;
         }
     };
 
-    // Download the PNG
+    // Download the PNG from R2 via public URL
+    let image_url = r2_config.public_url_for_key(&image_path);
     let png_bytes = match http.get(&image_url).send().await {
         Ok(resp) => match resp.bytes().await {
             Ok(b) => b,
@@ -260,17 +269,14 @@ async fn transcode_capture(
     let webp_size = webp_bytes.len() as i64;
     let png_size = png_bytes.len() as i64;
 
-    // Derive the new R2 key by replacing .png with .webp in the old URL
-    let old_r2_key = r2_config.key_from_url(&image_url);
-    let new_r2_key = old_r2_key.replace(".png", ".webp");
-    let new_image_url = r2_config.public_url_for_key(&new_r2_key);
+    let new_image_path = image_path.replace(".png", ".webp");
     let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
 
     // Upload WebP to R2
     if let Err(e) = s3
         .put_object()
         .bucket(bucket)
-        .key(&new_r2_key)
+        .key(&new_image_path)
         .content_type("image/webp")
         .body(ByteStream::from(webp_bytes))
         .send()
@@ -280,16 +286,11 @@ async fn transcode_capture(
         return;
     }
 
-    // Update DB with new image URL, content type, and file size
-    let new_image_path = capture
-        .image_path
-        .as_deref()
-        .map(|p| p.replace(".png", ".webp"));
+    // Update DB with new image path, content type, and file size
     if let Err(e) = CaptureRepo::update_image_after_transcode(
         pool,
         capture_id,
-        &new_image_url,
-        new_image_path.as_deref(),
+        &new_image_path,
         webp_size,
         "image/webp",
     )
@@ -300,11 +301,11 @@ async fn transcode_capture(
     }
 
     // Delete old PNG from R2 (best-effort)
-    if old_r2_key != new_r2_key
+    if new_image_path != image_path
         && let Err(e) = s3
             .delete_object()
             .bucket(bucket)
-            .key(&old_r2_key)
+            .key(&image_path)
             .send()
             .await
     {

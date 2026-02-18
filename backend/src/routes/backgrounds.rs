@@ -78,7 +78,6 @@ async fn initiate_upload(
     };
 
     let r2_key = format!("backgrounds/{}.{}", id, ext);
-    let image_url = r2_config.public_url_for_key(&r2_key);
 
     let presigned = s3
         .put_object()
@@ -97,19 +96,11 @@ async fn initiate_upload(
         })?;
 
     // Create the DB record
-    BackgroundRepo::insert(
-        state.db(),
-        id.as_ref(),
-        &image_url,
-        &r2_key,
-        Some(&request.filename),
-    )
-    .await?;
+    BackgroundRepo::insert(state.db(), id.as_ref(), &r2_key, Some(&request.filename)).await?;
 
     Ok(Json(BackgroundUploadResponse {
         id,
         presigned_url: presigned.uri().to_string(),
-        image_url,
         image_path: r2_key,
     }))
 }

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE captures\n            SET image_path = $2, file_size_bytes = $3, content_type = $4, updated_at = now()\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6b5b91ab89ab12f83a91f3fc6f946d875987cf3357d53983c1bc1483ba641129"
+}

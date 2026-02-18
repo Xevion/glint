@@ -8,7 +8,6 @@ use ts_rs::TS;
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export, optional_fields)]
 pub struct FeaturedPair {
-    pub left_image_url: String,
     pub left_image_path: String,
     pub left_thumbhash: Option<String>,
     pub left_shader_name: String,
@@ -16,7 +15,6 @@ pub struct FeaturedPair {
     pub left_shader_author: Option<String>,
     pub left_shader_version: String,
     pub left_scene_name: String,
-    pub right_image_url: String,
     pub right_image_path: String,
     pub right_thumbhash: Option<String>,
     pub right_shader_name: String,

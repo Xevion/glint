@@ -62,7 +62,7 @@ impl ShaderRepo {
                  JOIN scenes sc ON c.scene_id = sc.id
                  WHERE sv.shader_id = s.id
                    AND c.status = 'completed'
-                   AND c.image_url IS NOT NULL
+                    AND c.image_path IS NOT NULL
                    AND sc.active = TRUE
              )",
             );

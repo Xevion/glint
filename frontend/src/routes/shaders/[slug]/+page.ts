@@ -16,7 +16,6 @@ export type ShaderDetailVersion = Pick<ShaderVersionDetail, 'id' | 'version' | '
 export type ShaderDetailCapture = Pick<
 	CaptureWithContext,
 	| 'id'
-	| 'image_url'
 	| 'image_path'
 	| 'thumbhash'
 	| 'scene_name'
@@ -69,7 +68,6 @@ function deduplicateAuthors(authors: ShaderAuthor[]): ShaderDetailAuthor[] {
 export function _trimCapture(c: CaptureWithContext): ShaderDetailCapture {
 	return pick(c, [
 		'id',
-		'image_url',
 		'image_path',
 		'thumbhash',
 		'scene_name',

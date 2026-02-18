@@ -1,5 +1,6 @@
 import { createApiClient } from '$lib/api';
 import { formatNumber, formatVersion } from '$lib/utils/display';
+import { rawImageUrl } from '$lib/utils/image';
 import type { TextOverlayProps } from './text';
 
 export type OgType = 'shader' | 'scene' | 'home' | 'shaders' | 'scenes' | 'compare';
@@ -69,7 +70,7 @@ async function fetchShaderOgData(api: ApiClient, slug: string): Promise<OgImageD
 	if (heroCapture?.profile_display_name) metaParts.push(heroCapture.profile_display_name);
 
 	return {
-		imageUrl: heroCapture?.image_url ?? null,
+		imageUrl: rawImageUrl(heroCapture?.image_path),
 		text: {
 			title: shader.name,
 			subtitle: latestVersion ? formatVersion(latestVersion.version) : undefined,
@@ -94,7 +95,7 @@ async function fetchSceneOgData(api: ApiClient, slug: string): Promise<OgImageDa
 	const captureCount = scene.captures.length;
 
 	return {
-		imageUrl: firstCapture?.image_url ?? null,
+		imageUrl: rawImageUrl(firstCapture?.image_path),
 		text: {
 			title: scene.name,
 			meta:
@@ -108,7 +109,8 @@ async function fetchSceneOgData(api: ApiClient, slug: string): Promise<OgImageDa
 async function fetchHomeOgData(api: ApiClient): Promise<OgImageData> {
 	const result = await api.featured.list();
 
-	const imageUrl = result.isOk && result.value.length > 0 ? result.value[0].right_image_url : null;
+	const imageUrl =
+		result.isOk && result.value.length > 0 ? rawImageUrl(result.value[0]?.right_image_path) : null;
 
 	return {
 		imageUrl,
@@ -124,7 +126,9 @@ async function fetchShadersListOgData(api: ApiClient): Promise<OgImageData> {
 	const result = await api.shaders.list({ pageSize: 1 });
 
 	const imageUrl =
-		result.isOk && result.value.items.length > 0 ? (result.value.items[0].image_url ?? null) : null;
+		result.isOk && result.value.items.length > 0
+			? rawImageUrl(result.value.items[0]?.image_path)
+			: null;
 
 	return {
 		imageUrl,
@@ -138,10 +142,10 @@ async function fetchShadersListOgData(api: ApiClient): Promise<OgImageData> {
 async function fetchScenesListOgData(api: ApiClient): Promise<OgImageData> {
 	const result = await api.scenes.list();
 
-	const firstWithImage = result.isOk ? result.value.find((s) => s.image_url != null) : undefined;
+	const firstWithImage = result.isOk ? result.value.find((s) => s.image_path != null) : undefined;
 
 	return {
-		imageUrl: firstWithImage?.image_url ?? null,
+		imageUrl: rawImageUrl(firstWithImage?.image_path),
 		text: {
 			title: 'Scenes',
 			meta: result.isOk
@@ -179,7 +183,7 @@ async function fetchCompareOgData(api: ApiClient, sceneSlug: string): Promise<Og
 	const firstCapture = scene.captures[0];
 
 	return {
-		imageUrl: firstCapture?.image_url ?? null,
+		imageUrl: rawImageUrl(firstCapture?.image_path),
 		text: {
 			title: 'Compare Shaders',
 			subtitle: scene.name,

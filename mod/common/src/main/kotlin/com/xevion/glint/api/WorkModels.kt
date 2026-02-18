@@ -162,7 +162,6 @@ data class CaptureRunItem(
 data class CompleteItemRequest(
     val captureId: String,
     val imagePath: String,
-    val imageUrl: String,
     val resolutionWidth: Int,
     val resolutionHeight: Int,
     val capturedAt: String,
@@ -192,7 +191,6 @@ data class ClaimItemRequest(
 data class ClaimItemResponse(
     val captureId: String,
     val presignedUrl: String,
-    val imageUrl: String,
 )
 
 /** Request to confirm an upload has completed. */

@@ -5,15 +5,7 @@ import type { PageLoad } from './$types';
 
 type TrimmedScene = Pick<
 	SceneListItem,
-	| 'id'
-	| 'slug'
-	| 'name'
-	| 'description'
-	| 'dimension'
-	| 'image_url'
-	| 'image_path'
-	| 'thumbhash'
-	| 'capture_count'
+	'id' | 'slug' | 'name' | 'description' | 'dimension' | 'image_path' | 'thumbhash' | 'capture_count'
 > & {
 	version: Pick<SceneVersion, 'time_of_day_ticks' | 'weather' | 'biome'>;
 };
@@ -26,7 +18,6 @@ function trimScene(s: SceneListItem): TrimmedScene {
 			'name',
 			'description',
 			'dimension',
-			'image_url',
 			'image_path',
 			'thumbhash',
 			'capture_count'

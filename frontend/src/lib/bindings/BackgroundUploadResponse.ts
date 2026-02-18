@@ -4,4 +4,4 @@ import type { BackgroundId } from "./BackgroundId";
 /**
  * Response for initiating a background upload.
  */
-export type BackgroundUploadResponse = { id: BackgroundId, presigned_url: string, image_url: string, image_path: string, };
+export type BackgroundUploadResponse = { id: BackgroundId, presigned_url: string, image_path: string, };

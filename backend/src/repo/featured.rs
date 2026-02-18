@@ -8,7 +8,6 @@ use crate::error::AppResult;
 use crate::models::FeaturedPair;
 
 struct CandidateRow {
-    image_url: String,
     image_path: String,
     thumbhash: Option<String>,
     shader_name: String,
@@ -31,7 +30,6 @@ impl FeaturedRepo {
             CandidateRow,
             r#"
             SELECT DISTINCT ON (sh.id, sc.id)
-                c.image_url AS "image_url!",
                 c.image_path AS "image_path!",
                 c.thumbhash,
                 sh.name AS "shader_name!",
@@ -45,7 +43,7 @@ impl FeaturedRepo {
             JOIN shaders sh ON sv.shader_id = sh.id
             JOIN scenes sc ON c.scene_id = sc.id
             WHERE c.status = 'completed'
-              AND c.image_url IS NOT NULL
+              AND c.image_path IS NOT NULL
               AND sc.active = true
             ORDER BY sh.id, sc.id, COALESCE(sh.upstream_downloads, 0) DESC, c.created_at DESC
             "#,
@@ -108,7 +106,6 @@ impl FeaturedRepo {
 
 fn make_pair(left: &CandidateRow, right: &CandidateRow) -> FeaturedPair {
     FeaturedPair {
-        left_image_url: left.image_url.clone(),
         left_image_path: left.image_path.clone(),
         left_thumbhash: left.thumbhash.clone(),
         left_shader_name: left.shader_name.clone(),
@@ -116,7 +113,6 @@ fn make_pair(left: &CandidateRow, right: &CandidateRow) -> FeaturedPair {
         left_shader_author: left.shader_author.clone(),
         left_shader_version: left.shader_version.clone(),
         left_scene_name: left.scene_name.clone(),
-        right_image_url: right.image_url.clone(),
         right_image_path: right.image_path.clone(),
         right_thumbhash: right.thumbhash.clone(),
         right_shader_name: right.shader_name.clone(),

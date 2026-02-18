@@ -11,4 +11,4 @@ import type { ShaderVersionProfileId } from "./ShaderVersionProfileId";
  * Omits performance metrics, GPU info, error details, and other fields
  * that are only needed on the detail view (`GET /api/captures/{id}`).
  */
-export type CaptureListItem = { id: CaptureId, shader_version_id: ShaderVersionId, scene_id: SceneId, status: CaptureStatus, profile_id?: ShaderVersionProfileId, image_url?: string, image_path?: string, thumbhash?: string, captured_at?: string, resolution_width?: number, resolution_height?: number, };
+export type CaptureListItem = { id: CaptureId, shader_version_id: ShaderVersionId, scene_id: SceneId, status: CaptureStatus, profile_id?: ShaderVersionProfileId, image_path?: string, thumbhash?: string, captured_at?: string, resolution_width?: number, resolution_height?: number, };

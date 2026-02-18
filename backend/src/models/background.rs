@@ -68,7 +68,6 @@ impl sqlx::Encode<'_, sqlx::Postgres> for ThemeMode {
 #[ts(export, optional_fields)]
 pub struct Background {
     pub id: BackgroundId,
-    pub image_url: String,
     pub image_path: String,
     pub thumbhash: Option<String>,
     pub theme_mode: ThemeMode,
@@ -100,7 +99,6 @@ pub struct UpdateBackgroundRequest {
 pub struct BackgroundUploadResponse {
     pub id: BackgroundId,
     pub presigned_url: String,
-    pub image_url: String,
     pub image_path: String,
 }
 

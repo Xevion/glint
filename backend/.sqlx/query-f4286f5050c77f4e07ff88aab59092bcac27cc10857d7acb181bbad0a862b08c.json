@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                        SELECT DISTINCT ON (shader_id)\n                            id AS \"id!\", scene_id AS \"scene_id!\",\n                            shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                            shader_version AS \"shader_version!\",\n                            profile_id AS \"profile_id: ShaderVersionProfileId\", profile_name, profile_display_name, image_path, image_url, thumbhash, captured_at,\n                            resolution_width, resolution_height, file_size_bytes,\n                            run_id AS \"run_id: CaptureRunId\", run_status AS \"run_status: CaptureRunStatus\",\n                            shader_author, scene_name, scene_slug,\n                            preset_id AS \"preset_id: ScenePresetId\", preset_name, preset_slug,\n                            freshness AS \"freshness!: CaptureFreshness\"\n                        FROM capture_contexts\n                        WHERE ($1::text IS NULL OR shader_id = $1)\n                          AND ($2::text IS NULL OR shader_slug = $2)\n                          AND ($3::text IS NULL OR scene_id = $3)\n                          AND ($4::text IS NULL OR shader_version_id = $4)\n                          AND ($5::text IS NULL OR profile_id = $5)\n                          AND ($6::text IS NULL OR capture_status = $6)\n                          AND ($7::text IS NULL OR run_id = $7)\n                          AND ($8::bool IS NULL OR scene_active = $8)\n                        ORDER BY shader_id, captured_at DESC NULLS LAST\n                        ",
+  "query": "\n            SELECT\n                id AS \"id!\", scene_id AS \"scene_id!\",\n                shader_slug AS \"shader_slug!\", shader_name AS \"shader_name!\",\n                shader_version AS \"shader_version!\",\n                profile_id AS \"profile_id: ShaderVersionProfileId\", profile_name, profile_display_name, image_path, thumbhash, captured_at,\n                resolution_width, resolution_height, file_size_bytes,\n                run_id AS \"run_id: CaptureRunId\", run_status AS \"run_status: CaptureRunStatus\",\n                shader_author, scene_name, scene_slug,\n                preset_id AS \"preset_id: ScenePresetId\", preset_name, preset_slug,\n                freshness AS \"freshness!: CaptureFreshness\"\n            FROM capture_contexts\n            WHERE scene_id = $1\n              AND shader_id = (SELECT shader_id FROM shader_versions WHERE id = $2)\n              AND id != $3\n              AND capture_status = 'completed'\n            ORDER BY captured_at DESC NULLS LAST\n            LIMIT 8\n            ",
   "describe": {
     "columns": [
       {
@@ -50,76 +50,71 @@
       },
       {
         "ordinal": 9,
-        "name": "image_url",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 10,
         "name": "thumbhash",
         "type_info": "Text"
       },
       {
-        "ordinal": 11,
+        "ordinal": 10,
         "name": "captured_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 12,
+        "ordinal": 11,
         "name": "resolution_width",
         "type_info": "Int4"
       },
       {
-        "ordinal": 13,
+        "ordinal": 12,
         "name": "resolution_height",
         "type_info": "Int4"
       },
       {
-        "ordinal": 14,
+        "ordinal": 13,
         "name": "file_size_bytes",
         "type_info": "Int8"
       },
       {
-        "ordinal": 15,
+        "ordinal": 14,
         "name": "run_id: CaptureRunId",
         "type_info": "Text"
       },
       {
-        "ordinal": 16,
+        "ordinal": 15,
         "name": "run_status: CaptureRunStatus",
         "type_info": "Text"
       },
       {
-        "ordinal": 17,
+        "ordinal": 16,
         "name": "shader_author",
         "type_info": "Text"
       },
       {
-        "ordinal": 18,
+        "ordinal": 17,
         "name": "scene_name",
         "type_info": "Text"
       },
       {
-        "ordinal": 19,
+        "ordinal": 18,
         "name": "scene_slug",
         "type_info": "Text"
       },
       {
-        "ordinal": 20,
+        "ordinal": 19,
         "name": "preset_id: ScenePresetId",
         "type_info": "Text"
       },
       {
-        "ordinal": 21,
+        "ordinal": 20,
         "name": "preset_name",
         "type_info": "Text"
       },
       {
-        "ordinal": 22,
+        "ordinal": 21,
         "name": "preset_slug",
         "type_info": "Text"
       },
       {
-        "ordinal": 23,
+        "ordinal": 22,
         "name": "freshness!: CaptureFreshness",
         "type_info": "Text"
       }
@@ -128,12 +123,7 @@
       "Left": [
         "Text",
         "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Bool"
+        "Text"
       ]
     },
     "nullable": [
@@ -159,9 +149,8 @@
       true,
       true,
       true,
-      true,
       true
     ]
   },
-  "hash": "442662f89756caf93fadbcacfbe200362399ffb36d80c5de8fc60c26cbd67ca7"
+  "hash": "f4286f5050c77f4e07ff88aab59092bcac27cc10857d7acb181bbad0a862b08c"
 }

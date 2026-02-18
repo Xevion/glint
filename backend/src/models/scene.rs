@@ -67,7 +67,6 @@ pub struct SceneListItem {
     pub scene: Scene,
     pub version: SceneVersion,
     pub tags: Vec<Tag>,
-    pub image_url: Option<String>,
     pub image_path: Option<String>,
     pub thumbhash: Option<String>,
     pub capture_count: i64,
@@ -111,7 +110,6 @@ pub struct SceneListAdmin {
     #[serde(flatten)]
     pub scene: Scene,
     pub version: SceneVersion,
-    pub image_url: Option<String>,
     pub image_path: Option<String>,
     pub thumbhash: Option<String>,
     pub capture_count: i64,

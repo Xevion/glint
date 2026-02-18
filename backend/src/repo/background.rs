@@ -9,7 +9,7 @@ impl BackgroundRepo {
     pub async fn list_enabled(db: &DbPool) -> AppResult<Vec<Background>> {
         let rows = sqlx::query_as::<_, Background>(
             r#"
-            SELECT id, image_url, image_path, thumbhash, theme_mode, enabled,
+            SELECT id, image_path, thumbhash, theme_mode, enabled,
                    sort_order, original_filename, width, height,
                    file_size_bytes, content_type, created_at, updated_at
             FROM backgrounds
@@ -26,7 +26,7 @@ impl BackgroundRepo {
     pub async fn list_all(db: &DbPool) -> AppResult<Vec<Background>> {
         let rows = sqlx::query_as::<_, Background>(
             r#"
-            SELECT id, image_url, image_path, thumbhash, theme_mode, enabled,
+            SELECT id, image_path, thumbhash, theme_mode, enabled,
                    sort_order, original_filename, width, height,
                    file_size_bytes, content_type, created_at, updated_at
             FROM backgrounds
@@ -42,7 +42,7 @@ impl BackgroundRepo {
     pub async fn get_by_id(db: &DbPool, id: &str) -> AppResult<Option<Background>> {
         let row = sqlx::query_as::<_, Background>(
             r#"
-            SELECT id, image_url, image_path, thumbhash, theme_mode, enabled,
+            SELECT id, image_path, thumbhash, theme_mode, enabled,
                    sort_order, original_filename, width, height,
                    file_size_bytes, content_type, created_at, updated_at
             FROM backgrounds
@@ -59,21 +59,19 @@ impl BackgroundRepo {
     pub async fn insert(
         db: &DbPool,
         id: &str,
-        image_url: &str,
         image_path: &str,
         original_filename: Option<&str>,
     ) -> AppResult<Background> {
         let row = sqlx::query_as::<_, Background>(
             r#"
-            INSERT INTO backgrounds (id, image_url, image_path, original_filename)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, image_url, image_path, thumbhash, theme_mode, enabled,
+            INSERT INTO backgrounds (id, image_path, original_filename)
+            VALUES ($1, $2, $3)
+            RETURNING id, image_path, thumbhash, theme_mode, enabled,
                       sort_order, original_filename, width, height,
                       file_size_bytes, content_type, created_at, updated_at
             "#,
         )
         .bind(id)
-        .bind(image_url)
         .bind(image_path)
         .bind(original_filename)
         .fetch_one(db)
@@ -101,7 +99,7 @@ impl BackgroundRepo {
                 content_type = COALESCE($6, content_type),
                 updated_at = now()
             WHERE id = $1
-            RETURNING id, image_url, image_path, thumbhash, theme_mode, enabled,
+            RETURNING id, image_path, thumbhash, theme_mode, enabled,
                       sort_order, original_filename, width, height,
                       file_size_bytes, content_type, created_at, updated_at
             "#,
@@ -133,7 +131,7 @@ impl BackgroundRepo {
                 sort_order = COALESCE($4, sort_order),
                 updated_at = now()
             WHERE id = $1
-            RETURNING id, image_url, image_path, thumbhash, theme_mode, enabled,
+            RETURNING id, image_path, thumbhash, theme_mode, enabled,
                       sort_order, original_filename, width, height,
                       file_size_bytes, content_type, created_at, updated_at
             "#,

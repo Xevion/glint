@@ -157,13 +157,13 @@ function formatMs(value?: number): string {
 	<!-- Image + Metadata Split -->
 	<div class="grid gap-6 lg:grid-cols-[3fr_2fr]">
 		<!-- Hero Image -->
-		{#if capture.image_url ?? capture.thumbhash}
+		{#if capture.image_path ?? capture.thumbhash}
 			<button
 				type="button"
 				class="group relative w-full cursor-pointer overflow-hidden rounded-lg border"
 				onclick={() => (lightboxOpen = true)}
 				onmouseenter={() => preloadImage(capture.image_path, 'full')}
-				disabled={!capture.image_url}
+				disabled={!capture.image_path}
 			>
 			<CaptureImage
 				src={capture.image_path}
@@ -449,7 +449,7 @@ function formatMs(value?: number): string {
 	onConfirm={deleteAction.execute}
 />
 
-{#if lightboxOpen && capture.image_url}
+{#if lightboxOpen && capture.image_path}
 	<Lightbox
 		captures={[capture]}
 		currentIndex={0}

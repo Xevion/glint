@@ -83,7 +83,6 @@ pub struct ClaimItemRequest {
 pub struct ClaimItemResponse {
     pub capture_id: String,
     pub presigned_url: String,
-    pub image_url: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,7 +101,6 @@ pub struct UploadUrlResponse {
     pub capture_id: String,
     pub r2_key: String,
     pub presigned_url: String,
-    pub image_url: String,
 }
 
 pub fn router() -> Router<AppState> {
@@ -260,11 +258,8 @@ async fn claim_item(
         shader_id, item.scene_id, capture_id
     );
 
-    let r2_config = &state.config().r2;
-    let image_url = r2_config.public_url_for_key(&r2_key);
-
     let presigned_url = if let Some(s3) = state.s3() {
-        let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+        let bucket = state.config().r2.bucket.as_deref().unwrap_or("glint");
         generate_presigned_put_url(s3, bucket, &r2_key, "image/webp", 3600).await?
     } else {
         format!("https://r2.example.com/{}", r2_key)
@@ -279,7 +274,6 @@ async fn claim_item(
         item.scene_id.as_ref(),
         item.profile_id.as_ref().map(AsRef::as_ref),
         Some(&r2_key),
-        Some(&image_url),
         Some(request.resolution_width),
         Some(request.resolution_height),
         Some(request.captured_at),
@@ -297,7 +291,6 @@ async fn claim_item(
     Ok(Json(ClaimItemResponse {
         capture_id,
         presigned_url,
-        image_url,
     }))
 }
 
@@ -405,11 +398,8 @@ async fn get_upload_url(
         request.shader_id, request.scene_id, capture_id
     );
 
-    let r2_config = &state.config().r2;
-    let image_url = r2_config.public_url_for_key(&r2_key);
-
     let presigned_url = if let Some(s3) = state.s3() {
-        let bucket = r2_config.bucket.as_deref().unwrap_or("glint");
+        let bucket = state.config().r2.bucket.as_deref().unwrap_or("glint");
         generate_presigned_put_url(s3, bucket, &r2_key, "image/webp", 3600).await?
     } else {
         format!("https://r2.example.com/{}", r2_key)
@@ -419,6 +409,5 @@ async fn get_upload_url(
         capture_id,
         r2_key,
         presigned_url,
-        image_url,
     }))
 }

@@ -11,6 +11,7 @@ use serde::Deserialize;
 use tracing::{instrument, warn};
 
 use crate::auth::AdminUser;
+use crate::config::R2Config;
 use crate::error::{AppError, AppResult};
 use crate::models::{
     AuditObject, AuditReference, AuditSummary, CleanupKeyResult, CleanupKeyStatus,
@@ -28,6 +29,17 @@ struct GrowthParams {
     days: Option<i32>,
     #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     interval_hours: Option<i32>,
+}
+
+/// Resolve a DB reference to an R2 object key.
+/// References that are already S3 keys (captures, backgrounds) are returned as-is.
+/// References that are full URLs (scene_versions.package_url) are converted via `key_from_url`.
+fn resolve_key(reference: &str, r2_config: &R2Config) -> String {
+    if reference.contains("://") {
+        r2_config.key_from_url(reference)
+    } else {
+        reference.to_string()
+    }
 }
 
 pub fn router() -> Router<AppState> {
@@ -112,21 +124,19 @@ async fn storage_audit(
     // Build a set of all R2 keys for quick lookup
     let r2_key_set: HashSet<&str> = r2_objects.iter().map(|(k, _, _)| k.as_str()).collect();
 
-    // 2. Get all DB references
-    let db_refs = StorageRepo::all_referenced_urls(state.db())
+    // 2. Get all DB references and resolve to R2 keys
+    let db_refs = StorageRepo::all_references(state.db())
         .await
         .map_err(AppError::Internal)?;
 
-    // 3. Convert DB URLs to keys and build referenced key set
     let r2_config = &state.config().r2;
     let mut referenced_keys: HashSet<String> = HashSet::new();
 
     for db_ref in &db_refs {
-        let key = r2_config.key_from_url(&db_ref.url);
-        referenced_keys.insert(key);
+        referenced_keys.insert(resolve_key(&db_ref.reference, r2_config));
     }
 
-    // 4. Categorize R2 objects
+    // 3. Categorize R2 objects
     let mut orphaned = Vec::new();
     let mut stale_staging = Vec::new();
     let mut unknown_prefix = Vec::new();
@@ -137,7 +147,6 @@ async fn storage_audit(
         total_r2_bytes += size;
 
         if referenced_keys.contains(key.as_str()) {
-            // Matched — skip
             continue;
         }
 
@@ -161,33 +170,17 @@ async fn storage_audit(
         }
     }
 
-    // 5. Check for missing R2 objects (DB references with no R2 object)
+    // 4. Check for missing R2 objects (DB references with no R2 object)
     let mut missing = Vec::new();
     for db_ref in &db_refs {
-        let key = r2_config.key_from_url(&db_ref.url);
+        let key = resolve_key(&db_ref.reference, r2_config);
 
         if !r2_key_set.contains(key.as_str()) {
             missing.push(AuditReference {
                 table: db_ref.table.to_string(),
                 row_id: db_ref.row_id.clone(),
-                stored_url: db_ref.url.clone(),
+                stored_url: db_ref.reference.clone(),
                 expected_url: None,
-            });
-        }
-    }
-
-    // 6. Check for URL mismatches
-    let mut url_mismatches = Vec::new();
-    for db_ref in &db_refs {
-        let key = r2_config.key_from_url(&db_ref.url);
-        let expected_url = r2_config.public_url_for_key(&key);
-
-        if expected_url != db_ref.url {
-            url_mismatches.push(AuditReference {
-                table: db_ref.table.to_string(),
-                row_id: db_ref.row_id.clone(),
-                stored_url: db_ref.url.clone(),
-                expected_url: Some(expected_url),
             });
         }
     }
@@ -201,7 +194,7 @@ async fn storage_audit(
         stale_staging_count: stale_staging.len() as i64,
         missing_count: missing.len() as i64,
         unknown_prefix_count: unknown_prefix.len() as i64,
-        url_mismatch_count: url_mismatches.len() as i64,
+        url_mismatch_count: 0,
     };
 
     Ok(Json(StorageAuditResult {
@@ -209,7 +202,7 @@ async fn storage_audit(
         stale_staging,
         missing,
         unknown_prefix,
-        url_mismatches,
+        url_mismatches: Vec::new(),
         summary,
     }))
 }
@@ -238,13 +231,13 @@ async fn storage_cleanup(
     let r2_config = &state.config().r2;
 
     // Build referenced key set for safety check
-    let db_refs = StorageRepo::all_referenced_urls(state.db())
+    let db_refs = StorageRepo::all_references(state.db())
         .await
         .map_err(AppError::Internal)?;
 
     let referenced_keys: HashSet<String> = db_refs
         .iter()
-        .map(|r| r2_config.key_from_url(&r.url))
+        .map(|r| resolve_key(&r.reference, r2_config))
         .collect();
 
     let mut results = Vec::with_capacity(request.keys.len());
@@ -270,7 +263,6 @@ async fn storage_cleanup(
             Ok(head) => head.content_length().unwrap_or(0),
             Err(e) => {
                 warn!(key = %key, error = %e, "HeadObject failed during cleanup");
-                // Object may not exist — attempt delete anyway, report 0 bytes
                 0
             }
         };

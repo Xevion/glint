@@ -188,7 +188,6 @@ pub struct Capture {
     pub shader_version_id: ShaderVersionId,
     pub scene_id: SceneId,
     pub profile_id: Option<ShaderVersionProfileId>,
-    pub image_url: Option<String>,
     pub image_path: Option<String>,
     pub video_url: Option<String>,
     pub avg_fps: Option<f64>,
@@ -332,7 +331,6 @@ pub struct CaptureWithContext {
     /// Human-readable profile name (e.g. "High", "Ultra")
     pub profile_display_name: Option<String>,
     pub image_path: Option<String>,
-    pub image_url: Option<String>,
     pub thumbhash: Option<String>,
     #[ts(as = "Option<String>")]
     pub captured_at: Option<DateTime<Utc>>,
@@ -401,7 +399,6 @@ pub struct CaptureListItem {
     pub scene_id: SceneId,
     pub status: CaptureStatus,
     pub profile_id: Option<ShaderVersionProfileId>,
-    pub image_url: Option<String>,
     pub image_path: Option<String>,
     pub thumbhash: Option<String>,
     #[ts(as = "Option<String>")]

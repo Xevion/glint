@@ -182,7 +182,8 @@ async fn main() -> anyhow::Result<()> {
     services.spawn("integrity-sweep", {
         let pool = pool.clone();
         let http = http_client.clone();
-        |ctx| services::integrity::run(ctx, pool, http, integrity_metadata_tx)
+        let r2 = config.r2.clone();
+        |ctx| services::integrity::run(ctx, pool, http, r2, integrity_metadata_tx)
     });
 
     services.spawn("extraction-worker", {

@@ -92,8 +92,7 @@ async fn list_scenes_public(State(state): State<AppState>) -> AppResult<Json<Vec
             })?;
             Ok(SceneListItem {
                 tags: tags_map.remove(id_str).unwrap_or_default(),
-                image_url: thumb.map(|t| t.image_url.clone()),
-                image_path: thumb.and_then(|t| t.image_path.clone()),
+                image_path: thumb.map(|t| t.image_path.clone()),
                 thumbhash: thumb.and_then(|t| t.thumbhash.clone()),
                 capture_count: counts.get(id_str).copied().unwrap_or(0),
                 version,

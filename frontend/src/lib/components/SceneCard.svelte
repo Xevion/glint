@@ -16,14 +16,7 @@ import { ArrowRight, Sun } from '@lucide/svelte';
 
 type SceneCardItem = Pick<
 	SceneListItem,
-	| 'slug'
-	| 'name'
-	| 'description'
-	| 'dimension'
-	| 'image_url'
-	| 'image_path'
-	| 'thumbhash'
-	| 'capture_count'
+	'slug' | 'name' | 'description' | 'dimension' | 'image_path' | 'thumbhash' | 'capture_count'
 > & {
 	version: Pick<SceneVersion, 'time_of_day_ticks' | 'weather' | 'biome'>;
 };

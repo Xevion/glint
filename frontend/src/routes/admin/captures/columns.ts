@@ -14,7 +14,7 @@ import SizeCell from './size-cell.svelte';
 
 export const columns: ColumnDef<CaptureWithContext>[] = [
 	{
-		accessorKey: 'image_url',
+		accessorKey: 'image_path',
 		header: 'Preview',
 		size: 96,
 		enableSorting: false,

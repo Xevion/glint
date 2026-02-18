@@ -166,7 +166,6 @@ data class ApiSceneListItem(
     val createdAt: String,
     val version: ApiSceneVersion,
     val tags: List<ApiTag> = emptyList(),
-    val imageUrl: String? = null,
     val thumbhash: String? = null,
     val captureCount: Long = 0,
 )

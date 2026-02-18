@@ -18,4 +18,4 @@ profile_name?: string,
 /**
  * Human-readable profile name (e.g. "High", "Ultra")
  */
-profile_display_name?: string, image_path?: string, image_url?: string, thumbhash?: string, captured_at?: string, resolution_width?: number, resolution_height?: number, file_size_bytes?: number, run_id?: CaptureRunId, run_status?: CaptureRunStatus, shader_author?: string, scene_name?: string, scene_slug?: string, preset_id?: ScenePresetId, preset_name?: string, preset_slug?: string, freshness: CaptureFreshness, };
+profile_display_name?: string, image_path?: string, thumbhash?: string, captured_at?: string, resolution_width?: number, resolution_height?: number, file_size_bytes?: number, run_id?: CaptureRunId, run_status?: CaptureRunStatus, shader_author?: string, scene_name?: string, scene_slug?: string, preset_id?: ScenePresetId, preset_name?: string, preset_slug?: string, freshness: CaptureFreshness, };

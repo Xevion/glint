@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use tokio::time::interval;
 use tracing::{debug, error, info, trace, warn};
 
+use crate::config::R2Config;
 use crate::repo::CaptureRepo;
 use crate::services::lifecycle::ServiceContext;
 
@@ -35,19 +36,20 @@ pub async fn run(
     ctx: ServiceContext,
     pool: PgPool,
     http: reqwest::Client,
+    r2_config: R2Config,
     metadata_tx: tokio::sync::mpsc::UnboundedSender<String>,
 ) {
     let mut ticker = interval(Duration::from_secs(SWEEP_INTERVAL_SECS));
 
     while ctx.tick(&mut ticker).await {
-        sweep_orphaned_uploads(&pool, &http).await;
-        sweep_unverified_completions(&pool, &http, &metadata_tx).await;
+        sweep_orphaned_uploads(&pool, &http, &r2_config).await;
+        sweep_unverified_completions(&pool, &http, &r2_config, &metadata_tx).await;
     }
 }
 
 /// Check captures stuck in 'uploading' beyond the threshold.
 /// HEAD request to R2 determines whether to complete or fail them.
-async fn sweep_orphaned_uploads(pool: &PgPool, http: &reqwest::Client) {
+async fn sweep_orphaned_uploads(pool: &PgPool, http: &reqwest::Client, r2_config: &R2Config) {
     let captures =
         match CaptureRepo::list_stale_uploading(pool, UPLOADING_ORPHAN_THRESHOLD_SECS).await {
             Ok(c) => c,
@@ -73,12 +75,11 @@ async fn sweep_orphaned_uploads(pool: &PgPool, http: &reqwest::Client) {
     for capture in &captures {
         let id = capture.id.as_ref();
 
-        let image_url = match capture.image_url {
-            Some(ref url) if !url.is_empty() => url.as_str(),
+        let image_path = match capture.image_path {
+            Some(ref p) if !p.is_empty() => p.as_str(),
             _ => {
-                // No URL at all — definitely failed
                 if let Err(e) =
-                    CaptureRepo::mark_failed(pool, id, "Orphaned upload: no image URL was set")
+                    CaptureRepo::mark_failed(pool, id, "Orphaned upload: no image_path was set")
                         .await
                 {
                     error!(capture_id = id, error = %e, "Failed to mark orphaned capture as failed");
@@ -88,7 +89,8 @@ async fn sweep_orphaned_uploads(pool: &PgPool, http: &reqwest::Client) {
             }
         };
 
-        match head_check(http, image_url).await {
+        let image_url = r2_config.public_url_for_key(image_path);
+        match head_check(http, &image_url).await {
             HeadResult::Exists => {
                 // Image is in R2 but confirmation was lost — complete it
                 match CaptureRepo::confirm_upload(pool, id, None).await {
@@ -147,6 +149,7 @@ async fn sweep_orphaned_uploads(pool: &PgPool, http: &reqwest::Client) {
 async fn sweep_unverified_completions(
     pool: &PgPool,
     http: &reqwest::Client,
+    r2_config: &R2Config,
     metadata_tx: &tokio::sync::mpsc::UnboundedSender<String>,
 ) {
     let captures =
@@ -174,11 +177,11 @@ async fn sweep_unverified_completions(
     for capture in &captures {
         let id = capture.id.as_ref();
 
-        let image_url = match capture.image_url {
-            Some(ref url) if !url.is_empty() => url.as_str(),
+        let image_path = match capture.image_path {
+            Some(ref p) if !p.is_empty() => p.as_str(),
             _ => {
                 if let Err(e) =
-                    CaptureRepo::mark_failed(pool, id, "Completed capture has no image URL").await
+                    CaptureRepo::mark_failed(pool, id, "Completed capture has no image_path").await
                 {
                     error!(capture_id = id, error = %e, "Failed to mark capture as failed");
                 }
@@ -187,7 +190,8 @@ async fn sweep_unverified_completions(
             }
         };
 
-        match head_check(http, image_url).await {
+        let image_url = r2_config.public_url_for_key(image_path);
+        match head_check(http, &image_url).await {
             HeadResult::Exists => {
                 // Image exists but metadata processing failed — re-queue
                 let _ = metadata_tx.send(id.to_string());

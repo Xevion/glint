@@ -7,7 +7,7 @@ import type { Snippet } from 'svelte';
 
 type BackgroundItem = Pick<
 	Background,
-	'id' | 'image_url' | 'image_path' | 'thumbhash' | 'theme_mode' | 'width' | 'height'
+	'id' | 'image_path' | 'thumbhash' | 'theme_mode' | 'width' | 'height'
 >;
 
 interface Props {
@@ -73,8 +73,7 @@ const sectionsNeeded = $derived.by(() => {
 });
 
 function getImageUrl(bg: BackgroundItem): string {
-	// Use Cloudflare Image Transforms to serve optimized version (480px wide, webp)
-	return imageUrl(bg.image_path, { width: 480, quality: 50, format: 'webp' }) ?? bg.image_url;
+	return imageUrl(bg.image_path, { width: 480, quality: 50, format: 'webp' }) ?? bg.image_path;
 }
 
 function getThumbhashBackground(bg: BackgroundItem): string | null {

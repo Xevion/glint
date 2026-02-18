@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id AS \"id: CaptureId\",\n                shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                scene_id AS \"scene_id: SceneId\",\n                profile_id AS \"profile_id: ShaderVersionProfileId\", image_url, image_path,\n                video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,\n                minecraft_version, iris_version, gpu_model, resolution_width,\n                resolution_height, captured_at,\n                status AS \"status!: CaptureStatus\",\n                error_message, thumbhash, file_size_bytes, content_type,\n                preset_id AS \"preset_id: ScenePresetId\",\n                scene_version_id AS \"scene_version_id: SceneVersionId\",\n                created_at, updated_at\n            FROM captures\n            WHERE status = 'uploading'\n              AND created_at < now() - make_interval(secs => $1::float8)\n            ORDER BY created_at ASC\n            ",
+  "query": "\n            SELECT\n                id AS \"id: CaptureId\",\n                shader_version_id AS \"shader_version_id: ShaderVersionId\",\n                scene_id AS \"scene_id: SceneId\",\n                profile_id AS \"profile_id: ShaderVersionProfileId\", image_path,\n                video_url, avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,\n                minecraft_version, iris_version, gpu_model, resolution_width,\n                resolution_height, captured_at,\n                status AS \"status!: CaptureStatus\",\n                error_message, thumbhash, file_size_bytes, content_type,\n                preset_id AS \"preset_id: ScenePresetId\",\n                scene_version_id AS \"scene_version_id: SceneVersionId\",\n                created_at, updated_at\n            FROM captures\n            WHERE status = 'uploading'\n              AND created_at < now() - make_interval(secs => $1::float8)\n            ORDER BY created_at ASC\n            ",
   "describe": {
     "columns": [
       {
@@ -25,116 +25,111 @@
       },
       {
         "ordinal": 4,
-        "name": "image_url",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 5,
         "name": "image_path",
         "type_info": "Text"
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "video_url",
         "type_info": "Text"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "avg_fps",
         "type_info": "Float8"
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "min_fps",
         "type_info": "Float8"
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "max_fps",
         "type_info": "Float8"
       },
       {
-        "ordinal": 10,
+        "ordinal": 9,
         "name": "frame_time_avg",
         "type_info": "Float8"
       },
       {
-        "ordinal": 11,
+        "ordinal": 10,
         "name": "frame_time_p99",
         "type_info": "Float8"
       },
       {
-        "ordinal": 12,
+        "ordinal": 11,
         "name": "minecraft_version",
         "type_info": "Text"
       },
       {
-        "ordinal": 13,
+        "ordinal": 12,
         "name": "iris_version",
         "type_info": "Text"
       },
       {
-        "ordinal": 14,
+        "ordinal": 13,
         "name": "gpu_model",
         "type_info": "Text"
       },
       {
-        "ordinal": 15,
+        "ordinal": 14,
         "name": "resolution_width",
         "type_info": "Int4"
       },
       {
-        "ordinal": 16,
+        "ordinal": 15,
         "name": "resolution_height",
         "type_info": "Int4"
       },
       {
-        "ordinal": 17,
+        "ordinal": 16,
         "name": "captured_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 18,
+        "ordinal": 17,
         "name": "status!: CaptureStatus",
         "type_info": "Text"
       },
       {
-        "ordinal": 19,
+        "ordinal": 18,
         "name": "error_message",
         "type_info": "Text"
       },
       {
-        "ordinal": 20,
+        "ordinal": 19,
         "name": "thumbhash",
         "type_info": "Text"
       },
       {
-        "ordinal": 21,
+        "ordinal": 20,
         "name": "file_size_bytes",
         "type_info": "Int8"
       },
       {
-        "ordinal": 22,
+        "ordinal": 21,
         "name": "content_type",
         "type_info": "Text"
       },
       {
-        "ordinal": 23,
+        "ordinal": 22,
         "name": "preset_id: ScenePresetId",
         "type_info": "Text"
       },
       {
-        "ordinal": 24,
+        "ordinal": 23,
         "name": "scene_version_id: SceneVersionId",
         "type_info": "Text"
       },
       {
-        "ordinal": 25,
+        "ordinal": 24,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 26,
+        "ordinal": 25,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -162,7 +157,6 @@
       true,
       true,
       true,
-      true,
       false,
       true,
       true,
@@ -174,5 +168,5 @@
       false
     ]
   },
-  "hash": "ceedfefdb57d5896b292ffed5495a1f520b3d7706e0387e1d805ab4053407e84"
+  "hash": "f4430d8e846f284f7abf21fbe55cd46084c500d1d604cc776148d16ed124d294"
 }

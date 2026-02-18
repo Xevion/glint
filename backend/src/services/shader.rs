@@ -86,8 +86,7 @@ impl ShaderService {
                     categories: categories_map.remove(id_str).unwrap_or_default(),
                     features: features_map.remove(id_str).unwrap_or_default(),
                     latest_version: version.map(|v| v.version.clone()),
-                    image_url: thumb.map(|t| t.image_url.clone()),
-                    image_path: thumb.and_then(|t| t.image_path.clone()),
+                    image_path: thumb.map(|t| t.image_path.clone()),
                     thumbhash: thumb.and_then(|t| t.thumbhash.clone()),
                     version_count,
                     extraction_summary: summary,
@@ -132,8 +131,7 @@ impl ShaderService {
                 shader.map(|s| TrendingShader {
                     shader: s,
                     trending_views: entry.view_count,
-                    image_url: thumb.map(|t| t.image_url.clone()),
-                    image_path: thumb.and_then(|t| t.image_path.clone()),
+                    image_path: thumb.map(|t| t.image_path.clone()),
                     thumbhash: thumb.and_then(|t| t.thumbhash.clone()),
                 })
             })
