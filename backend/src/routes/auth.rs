@@ -99,7 +99,7 @@ async fn discord_login(
         .url();
 
     debug!(url = %auth_url, "Redirecting to Discord OAuth");
-    Ok((jar, Redirect::temporary(auth_url.as_str()).into_response()))
+    Ok((jar, Redirect::to(auth_url.as_str()).into_response()))
 }
 
 #[derive(Debug, Deserialize)]
@@ -168,7 +168,7 @@ async fn discord_callback(
                 error_code = code,
                 "OAuth callback failed, redirecting to login"
             );
-            (jar, Redirect::temporary(&url).into_response())
+            (jar, Redirect::to(&url).into_response())
         }
     }
 }
@@ -269,7 +269,7 @@ async fn discord_callback_inner(
         user_id = user.id,
         "Session created, redirecting to {}", redirect_url
     );
-    Ok((jar, Redirect::temporary(redirect_url).into_response()))
+    Ok((jar, Redirect::to(redirect_url).into_response()))
 }
 
 /// POST /api/auth/logout - Invalidates the current session
@@ -296,7 +296,7 @@ async fn logout(State(state): State<AppState>, jar: CookieJar) -> AppResult<(Coo
 
     let jar = jar.add(cookie);
 
-    Ok((jar, Redirect::temporary("/").into_response()))
+    Ok((jar, Redirect::to("/").into_response()))
 }
 
 /// Fetch user info from Discord API
