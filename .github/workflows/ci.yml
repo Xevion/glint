@@ -236,5 +236,4 @@ jobs:
         run: bun ci --frozen-lockfile
 
       - name: Frontend security audit
-        working-directory: frontend
-        run: bun audit --audit-level=moderate --ignore=GHSA-2g4f-4pwh-qvx6
+        run: bun scripts/audit.ts

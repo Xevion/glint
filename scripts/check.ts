@@ -275,8 +275,7 @@ const checks: Check[] = [
 	{
 		name: 'frontend-audit',
 		subsystem: 'security',
-		cmd: ['bun', 'audit', '--audit-level=moderate'],
-		cwd: 'frontend'
+		cmd: ['bun', 'scripts/audit.ts']
 	}
 ];
 
