@@ -6,8 +6,7 @@ import type {
 	ShaderVersionDetail,
 	ShaderVersionMetadata,
 	ShaderVersionProfile,
-	ShaderWithCaptures,
-	UpdateShaderRequest
+	ShaderWithCaptures
 } from '$lib/bindings';
 import { createDataTable, DataTable } from '$lib/components/data-table';
 import { ItemGrid } from '$lib/components/item-grid';
@@ -16,8 +15,7 @@ import {
 	AdminBreadcrumb,
 	AdminCaptureCard,
 	AdminDetailField,
-	createAdminAction,
-	createAdminForm
+	createAdminAction
 } from '$lib/components/admin';
 import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
@@ -26,8 +24,8 @@ import * as FolderCard from '$lib/components/folder-card';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Dialog from '$lib/components/ui/dialog';
+import * as Form from '$lib/components/ui/form';
 import { Input } from '$lib/components/ui/input';
-import { Label } from '$lib/components/ui/label';
 import { Textarea } from '$lib/components/ui/textarea';
 import { freshnessColors } from '$lib/utils/status';
 import {
@@ -40,10 +38,17 @@ import {
 	LoaderCircle,
 	PackageCheck,
 	PackageX,
+	Pin,
+	PinOff,
 	RefreshCw,
 	SkipForward,
 	Trash2
 } from '@lucide/svelte';
+import * as Select from '$lib/components/ui/select';
+import { Switch } from '$lib/components/ui/switch';
+import { superForm } from 'sveltekit-superforms';
+import { zod4Client } from 'sveltekit-superforms/adapters';
+import { shaderFormSchema } from './schema.js';
 import type { PageData } from './$types';
 import { createVersionColumns } from './version-columns.js';
 
@@ -83,29 +88,26 @@ function humanize(key: string): string {
 		.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-const form = createAdminForm({
-	source: () => shader,
-	fields: {
-		name: (s) => s.name,
-		description: (s) => s.description ?? '',
-		modrinth_id: (s) => s.modrinth_id ?? '',
-		curseforge_id: (s) => s.curseforge_id ?? '',
-		website_url: (s) => s.website_url ?? ''
-	},
-	onSave: (changes, source) => {
-		const request: UpdateShaderRequest = {};
-		for (const [key, value] of Object.entries(changes)) {
-			// Required fields (name) keep their value; optional fields convert empty → undefined
-			(request as Record<string, unknown>)[key] = key === 'name' ? value : value || undefined;
-		}
-		return api.admin.updateShader(source.id, request);
-	}
+// ── Superforms ──────────────────────────────────────────────
+// Superforms manages its own reactivity after initialization; the initial
+// data.form reference is intentional — updates come from server actions.
+// svelte-ignore state_referenced_locally
+const superform = superForm(data.form, {
+	validators: zod4Client(shaderFormSchema),
+	invalidateAll: 'force',
+	resetForm: false
 });
+const { form: formData, enhance, message, tainted, submitting } = superform;
+
+let isDirty = $derived($tainted != null && Object.values($tainted).some(Boolean));
+
+// ── Non-form actions (delete, sync, link) ───────────────────
+let actionError = $state<string | null>(null);
 
 const deleteAction = createAdminAction({
 	action: () => api.admin.deleteShader(shader.id),
 	onSuccess: () => void goto('/admin/shaders'),
-	setError: (msg) => (form.error = msg)
+	setError: (msg) => (actionError = msg)
 });
 
 let syncing = $state(false);
@@ -139,7 +141,7 @@ let syncStatus = $derived.by<'never' | 'fresh' | 'stale' | 'very-stale'>(() => {
 
 async function handleSync() {
 	syncing = true;
-	form.error = null;
+	actionError = null;
 	syncSuccess = false;
 
 	try {
@@ -151,7 +153,7 @@ async function handleSync() {
 				setTimeout(() => (syncSuccess = false), 3000);
 			},
 			Err: (err) => {
-				form.error = err.message;
+				actionError = err.message;
 			}
 		});
 	} finally {
@@ -231,8 +233,15 @@ function handleLinkKeydown(e: KeyboardEvent) {
         {/snippet}
     </AdminBreadcrumb>
 
-    {#if form.error}
-        <Alert variant="destructive">{form.error}</Alert>
+    {#if actionError}
+        <Alert variant="destructive">{actionError}</Alert>
+    {/if}
+
+    {#if $message}
+        {@const msg = String($message)}
+        <Alert variant={msg.includes('successfully') ? 'default' : 'destructive'}>
+            {msg}
+        </Alert>
     {/if}
 
     {#if syncSuccess}
@@ -263,7 +272,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
         <!-- Tab 1: Sync & Editing -->
         <FolderCard.Content value="sync">
             <div class="space-y-6">
-                <!-- Upstream Sync -->
+                <!-- Upstream Sync (not part of the form) -->
                 {#if hasLinkedPlatform}
                     <div class="space-y-1">
                         <div class="flex items-center justify-between">
@@ -385,9 +394,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
 
                                             <div class="grid gap-4 py-4">
                                                 <div class="grid gap-2">
-                                                    <Label for="link-url"
-                                                        >Platform URL</Label
-                                                    >
+                                                    <label for="link-url" class="text-sm font-medium">Platform URL</label>
                                                     <Input
                                                         id="link-url"
                                                         placeholder={shader.modrinth_id
@@ -455,58 +462,177 @@ function handleLinkKeydown(e: KeyboardEvent) {
                     </div>
                 {/if}
 
-                <!-- Edit Fields -->
-                <div class="space-y-4">
-                    <div class="grid gap-2">
-                        <Label for="name">Name</Label>
-                        <Input id="name" bind:value={form.fields.name} />
+                <!-- Edit Form -->
+                <form method="POST" use:enhance class="space-y-6">
+                    <!-- Capture Controls -->
+                    <div class="space-y-4">
+                        <h3 class="text-sm font-medium">Capture Controls</h3>
+
+                        <Form.Field form={superform} name="capture_enabled">
+                            <Form.Control>
+                                {#snippet children({ props })}
+                                    <div class="flex items-center justify-between rounded-lg border px-4 py-3">
+                                        <div class="space-y-0.5">
+                                            <Form.Label>Capture Enabled</Form.Label>
+                                            <Form.Description>
+                                                When disabled, no new captures will be scheduled for this shader.
+                                            </Form.Description>
+                                        </div>
+                                        <Switch
+                                            {...props}
+                                            bind:checked={$formData.capture_enabled}
+                                        />
+                                    </div>
+                                {/snippet}
+                            </Form.Control>
+                        </Form.Field>
+
+                        <Form.Field form={superform} name="preferred_version_id">
+                            <Form.Control>
+                                {#snippet children({ props })}
+                                    <div class="space-y-2 rounded-lg border px-4 py-3">
+                                        <div class="space-y-0.5">
+                                            <Form.Label>Preferred Version</Form.Label>
+                                            <Form.Description>
+                                                Pin a specific version for captures and as the default on the public page. When unset, the latest version is used.
+                                            </Form.Description>
+                                        </div>
+                                        <!-- eslint-disable @typescript-eslint/no-unsafe-member-access -- formsnap control props -->
+                                        <Select.Root
+                                            type="single"
+                                            value={$formData.preferred_version_id ?? '__clear__'}
+                                            onValueChange={(v: string) => {
+                                                $formData.preferred_version_id = v === '__clear__' ? null : v;
+                                            }}
+                                            name={props.name as string}
+                                        >
+                                        <!-- eslint-enable @typescript-eslint/no-unsafe-member-access -->
+                                            <Select.Trigger size="sm" class="w-full">
+                                                {#if $formData.preferred_version_id}
+                                                    {@const pinned = versions.find((v) => v.id === $formData.preferred_version_id)}
+                                                    <Pin class="mr-1.5 h-3.5 w-3.5 text-info" />
+                                                    {pinned ? pinned.version : $formData.preferred_version_id}
+                                                {:else}
+                                                    <span class="text-muted-foreground">Auto (latest version)</span>
+                                                {/if}
+                                            </Select.Trigger>
+                                            <Select.Content>
+                                                <Select.Item value="__clear__">
+                                                    <span class="flex items-center gap-2">
+                                                        <PinOff class="h-3.5 w-3.5 text-muted-foreground" />
+                                                        Auto (latest version)
+                                                    </span>
+                                                </Select.Item>
+                                                {#each versions as version, i (version.id)}
+                                                    <Select.Item value={version.id}>
+                                                        <span class="flex items-center gap-2">
+                                                            {version.version}
+                                                            {#if i === 0}
+                                                                <span class="rounded bg-info/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-info">
+                                                                    Latest
+                                                                </span>
+                                                            {/if}
+                                                            <span class="ml-auto text-xs text-muted-foreground">
+                                                                {version.capture_count} captures
+                                                            </span>
+                                                        </span>
+                                                    </Select.Item>
+                                                {/each}
+                                            </Select.Content>
+                                        </Select.Root>
+                                    </div>
+                                {/snippet}
+                            </Form.Control>
+                        </Form.Field>
                     </div>
 
-                    <div class="grid gap-2">
-                        <Label for="description">Description</Label>
-                        <Textarea
-                            id="description"
-                            bind:value={form.fields.description}
-                            rows={3}
-                        />
+                    <!-- Edit Fields -->
+                    <div class="space-y-4">
+                        <Form.Field form={superform} name="name">
+                            <Form.Control>
+                                {#snippet children({ props })}
+                                    <Form.Label>Name</Form.Label>
+                                    <Input {...props} bind:value={$formData.name} />
+                                {/snippet}
+                            </Form.Control>
+                            <Form.FieldErrors />
+                        </Form.Field>
+
+                        <Form.Field form={superform} name="description">
+                            <Form.Control>
+                                {#snippet children({ props })}
+                                    <Form.Label>Description</Form.Label>
+                                    <Textarea
+                                        {...props}
+                                        bind:value={$formData.description}
+                                        rows={3}
+                                    />
+                                {/snippet}
+                            </Form.Control>
+                            <Form.FieldErrors />
+                        </Form.Field>
+
+                        <Form.Field form={superform} name="modrinth_id">
+                            <Form.Control>
+                                {#snippet children({ props })}
+                                    <Form.Label>Modrinth ID</Form.Label>
+                                    <Input
+                                        {...props}
+                                        bind:value={$formData.modrinth_id}
+                                        placeholder="e.g., abc123"
+                                    />
+                                {/snippet}
+                            </Form.Control>
+                            <Form.FieldErrors />
+                        </Form.Field>
+
+                        <Form.Field form={superform} name="curseforge_id">
+                            <Form.Control>
+                                {#snippet children({ props })}
+                                    <Form.Label>CurseForge ID</Form.Label>
+                                    <Input
+                                        {...props}
+                                        bind:value={$formData.curseforge_id}
+                                        placeholder="e.g., 123456"
+                                    />
+                                {/snippet}
+                            </Form.Control>
+                            <Form.FieldErrors />
+                        </Form.Field>
+
+                        <Form.Field form={superform} name="website_url">
+                            <Form.Control>
+                                {#snippet children({ props })}
+                                    <Form.Label>Website URL</Form.Label>
+                                    <Input
+                                        {...props}
+                                        bind:value={$formData.website_url}
+                                        placeholder="e.g., https://example.com"
+                                    />
+                                {/snippet}
+                            </Form.Control>
+                            <Form.FieldErrors />
+                        </Form.Field>
                     </div>
 
-                    <div class="grid gap-2">
-                        <Label for="modrinth_id">Modrinth ID</Label>
-                        <Input
-                            id="modrinth_id"
-                            bind:value={form.fields.modrinth_id}
-                            placeholder="e.g., abc123"
-                        />
-                    </div>
-
-                    <div class="grid gap-2">
-                        <Label for="curseforge_id">CurseForge ID</Label>
-                        <Input
-                            id="curseforge_id"
-                            bind:value={form.fields.curseforge_id}
-                            placeholder="e.g., 123456"
-                        />
-                    </div>
-
-                    <div class="grid gap-2">
-                        <Label for="website_url">Website URL</Label>
-                        <Input
-                            id="website_url"
-                            bind:value={form.fields.website_url}
-                            placeholder="e.g., https://example.com"
-                        />
-                    </div>
-
-                    <div class="flex justify-end">
+                    <!-- Save / Reset -->
+                    <div class="flex justify-end gap-2">
                         <Button
-                            onclick={form.save}
-                            disabled={form.saving || !form.isDirty}
+                            type="button"
+                            variant="outline"
+                            disabled={!isDirty || $submitting}
+                            onclick={() => superform.reset()}
                         >
-                            {form.saving ? "Saving..." : "Save Changes"}
+                            Reset
                         </Button>
+                        <Form.Button disabled={!isDirty || $submitting}>
+                            {#if $submitting}
+                                <LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+                            {/if}
+                            {$submitting ? 'Saving...' : 'Save Changes'}
+                        </Form.Button>
                     </div>
-                </div>
+                </form>
             </div>
         </FolderCard.Content>
 

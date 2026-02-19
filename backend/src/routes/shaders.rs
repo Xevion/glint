@@ -272,10 +272,16 @@ async fn get_shader(
 
     let versions = ShaderVersionRepo::list_by_shader_with_counts(db, shader.id.as_ref()).await?;
 
-    // Default to latest version when no version_id is specified
+    // Default to preferred version (if set), otherwise latest
     let effective_version_id = query
         .version_id
         .map(ShaderVersionId::from)
+        .or_else(|| {
+            shader
+                .preferred_version_id
+                .clone()
+                .map(ShaderVersionId::from)
+        })
         .or_else(|| versions.first().map(|v| v.version.id.clone()));
 
     let filters = CaptureFilters {

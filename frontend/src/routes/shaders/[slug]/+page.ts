@@ -17,6 +17,7 @@ export const _ShaderDetailQuery = graphql(`
       sourceUrl
       upstreamDownloads
       viewCount
+      preferredVersionId
       versions {
         version {
           id
@@ -94,6 +95,7 @@ export interface ShaderDetail {
 	sourceUrl?: string | null;
 	upstreamDownloads?: number | null;
 	viewCount: number;
+	preferredVersionId?: string | null;
 	authors: ShaderDetailAuthor[];
 	versions: ShaderDetailVersion[];
 	captures: ShaderDetailCapture[];
@@ -181,6 +183,7 @@ export function _toShaderDetail(s: GqlShaderDetail): ShaderDetail {
 		sourceUrl: s.sourceUrl,
 		upstreamDownloads: s.upstreamDownloads,
 		viewCount: s.viewCount,
+		preferredVersionId: s.preferredVersionId,
 		authors: deduplicateAuthors(s.authors),
 		versions: s.versions.map(mapVersion),
 		captures: s.captures,

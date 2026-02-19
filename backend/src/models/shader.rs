@@ -35,6 +35,8 @@ pub struct Shader {
     #[ts(type = "string")]
     pub updated_at: DateTime<Utc>,
     pub view_count: i64,
+    pub preferred_version_id: Option<String>,
+    pub capture_enabled: bool,
 }
 
 /// Specific release of a shader pack
@@ -233,4 +235,7 @@ pub struct UpdateShaderRequest {
     pub modrinth_id: Option<String>,
     pub curseforge_id: Option<String>,
     pub website_url: Option<String>,
+    /// Set to a version ID to pin, empty string to clear, omit to leave unchanged.
+    pub preferred_version_id: Option<String>,
+    pub capture_enabled: Option<bool>,
 }

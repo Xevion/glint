@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            UPDATE shaders SET\n                name = COALESCE($1, name),\n                slug = COALESCE($2, slug),\n                description = COALESCE($3, description),\n                modrinth_id = COALESCE($4, modrinth_id),\n                curseforge_id = COALESCE($5, curseforge_id),\n                website_url = COALESCE($6, website_url),\n                updated_at = now()\n            WHERE id = $7\n            RETURNING *\n            ",
+  "query": "\n            UPDATE shaders SET\n                name = COALESCE($1, name),\n                slug = COALESCE($2, slug),\n                description = COALESCE($3, description),\n                modrinth_id = COALESCE($4, modrinth_id),\n                curseforge_id = COALESCE($5, curseforge_id),\n                website_url = COALESCE($6, website_url),\n                preferred_version_id = CASE WHEN $8 THEN $9 ELSE preferred_version_id END,\n                capture_enabled = COALESCE($10, capture_enabled),\n                updated_at = now()\n            WHERE id = $7\n            RETURNING *\n            ",
   "describe": {
     "columns": [
       {
@@ -82,6 +82,16 @@
         "ordinal": 15,
         "name": "view_count",
         "type_info": "Int8"
+      },
+      {
+        "ordinal": 16,
+        "name": "preferred_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "capture_enabled",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -92,7 +102,10 @@
         "Text",
         "Text",
         "Text",
-        "Text"
+        "Text",
+        "Bool",
+        "Text",
+        "Bool"
       ]
     },
     "nullable": [
@@ -111,8 +124,10 @@
       true,
       true,
       true,
+      false,
+      true,
       false
     ]
   },
-  "hash": "af99dc9e2f06adfc67c7a5d78578eb126a8d303c2457e066319fd066f5ccc933"
+  "hash": "b6d004a72be5b79c871ef8dd1ec52d59bd304dd65a2146ea279765742c006e6e"
 }

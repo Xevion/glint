@@ -52,6 +52,8 @@ pub struct ShaderNode {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub view_count: i64,
+    pub preferred_version_id: Option<String>,
+    pub capture_enabled: bool,
 }
 
 #[ComplexObject]
@@ -154,7 +156,9 @@ impl ShaderNode {
     async fn captures(
         &self,
         ctx: &Context<'_>,
-        #[graphql(desc = "Filter to a specific shader version. Defaults to the latest version.")]
+        #[graphql(
+            desc = "Filter to a specific shader version. Defaults to the preferred or latest version."
+        )]
         version_id: Option<String>,
         #[graphql(desc = "Filter to a specific profile within the version.")] profile_id: Option<
             String,
@@ -163,13 +167,17 @@ impl ShaderNode {
         let state = ctx.data_unchecked::<AppState>();
         let db = state.db();
 
-        // Default to latest version when none specified
+        // Default to preferred version (if set), otherwise latest
         let effective_version_id = match version_id {
             Some(vid) => Some(ShaderVersionId::from(vid)),
             None => {
-                let versions =
-                    ShaderVersionRepo::list_by_shader_with_counts(db, self.id.as_ref()).await?;
-                versions.first().map(|v| v.version.id.clone())
+                if let Some(ref pvid) = self.preferred_version_id {
+                    Some(ShaderVersionId::from(pvid.clone()))
+                } else {
+                    let versions =
+                        ShaderVersionRepo::list_by_shader_with_counts(db, self.id.as_ref()).await?;
+                    versions.first().map(|v| v.version.id.clone())
+                }
             }
         };
 
@@ -190,11 +198,13 @@ impl ShaderNode {
 
     /// Profiles for this shader, optionally filtered to a specific version.
     ///
-    /// Defaults to the latest version's profiles when no `version_id` is given.
+    /// Defaults to the preferred or latest version's profiles when no `version_id` is given.
     async fn profiles(
         &self,
         ctx: &Context<'_>,
-        #[graphql(desc = "Filter to a specific shader version. Defaults to the latest version.")]
+        #[graphql(
+            desc = "Filter to a specific shader version. Defaults to the preferred or latest version."
+        )]
         version_id: Option<String>,
     ) -> Result<Vec<ShaderVersionProfileNode>> {
         let state = ctx.data_unchecked::<AppState>();
@@ -203,9 +213,13 @@ impl ShaderNode {
         let effective_version_id = match version_id {
             Some(vid) => Some(ShaderVersionId::from(vid)),
             None => {
-                let versions =
-                    ShaderVersionRepo::list_by_shader_with_counts(db, self.id.as_ref()).await?;
-                versions.first().map(|v| v.version.id.clone())
+                if let Some(ref pvid) = self.preferred_version_id {
+                    Some(ShaderVersionId::from(pvid.clone()))
+                } else {
+                    let versions =
+                        ShaderVersionRepo::list_by_shader_with_counts(db, self.id.as_ref()).await?;
+                    versions.first().map(|v| v.version.id.clone())
+                }
             }
         };
 
@@ -220,11 +234,13 @@ impl ShaderNode {
 
     /// Extracted metadata for this shader, optionally for a specific version.
     ///
-    /// Defaults to the latest version's metadata when no `version_id` is given.
+    /// Defaults to the preferred or latest version's metadata when no `version_id` is given.
     async fn metadata(
         &self,
         ctx: &Context<'_>,
-        #[graphql(desc = "Filter to a specific shader version. Defaults to the latest version.")]
+        #[graphql(
+            desc = "Filter to a specific shader version. Defaults to the preferred or latest version."
+        )]
         version_id: Option<String>,
     ) -> Result<Option<ShaderVersionMetadataNode>> {
         let state = ctx.data_unchecked::<AppState>();
@@ -233,9 +249,13 @@ impl ShaderNode {
         let effective_version_id = match version_id {
             Some(vid) => Some(ShaderVersionId::from(vid)),
             None => {
-                let versions =
-                    ShaderVersionRepo::list_by_shader_with_counts(db, self.id.as_ref()).await?;
-                versions.first().map(|v| v.version.id.clone())
+                if let Some(ref pvid) = self.preferred_version_id {
+                    Some(ShaderVersionId::from(pvid.clone()))
+                } else {
+                    let versions =
+                        ShaderVersionRepo::list_by_shader_with_counts(db, self.id.as_ref()).await?;
+                    versions.first().map(|v| v.version.id.clone())
+                }
             }
         };
 
@@ -268,6 +288,8 @@ impl From<Shader> for ShaderNode {
             created_at: s.created_at,
             updated_at: s.updated_at,
             view_count: s.view_count,
+            preferred_version_id: s.preferred_version_id,
+            capture_enabled: s.capture_enabled,
         }
     }
 }
@@ -464,6 +486,8 @@ pub struct TrendingShaderNode {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub view_count: i64,
+    pub preferred_version_id: Option<String>,
+    pub capture_enabled: bool,
     pub trending_views: i64,
     pub image_path: Option<String>,
     pub thumbhash: Option<String>,
@@ -488,6 +512,8 @@ impl From<crate::models::TrendingShader> for TrendingShaderNode {
             created_at: t.shader.created_at,
             updated_at: t.shader.updated_at,
             view_count: t.shader.view_count,
+            preferred_version_id: t.shader.preferred_version_id,
+            capture_enabled: t.shader.capture_enabled,
             trending_views: t.trending_views,
             image_path: t.image_path,
             thumbhash: t.thumbhash,

@@ -24,22 +24,29 @@ FROM scene_versions
 ORDER BY scene_id, created_at DESC, id DESC;
 
 -- Latest shader version per shader (by upstream_published_at DESC, created_at DESC).
+-- Respects shaders.preferred_version_id: if set, that version sorts first.
 -- Replaces the latest_versions CTE in health and work queries.
+DROP VIEW IF EXISTS latest_shader_versions CASCADE;
 CREATE OR REPLACE VIEW latest_shader_versions AS
-SELECT DISTINCT ON (shader_id)
-    id, shader_id, version, capture_failure_count,
-    download_url, file_hash, file_size, game_versions, release_channel,
-    modrinth_version_id, curseforge_file_id,
-    upstream_published_at, created_at, last_capture_error,
-    extraction_status, extraction_error, extracted_at
-FROM shader_versions
-ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC;
+SELECT DISTINCT ON (sv.shader_id)
+    sv.id, sv.shader_id, sv.version, sv.capture_failure_count,
+    sv.download_url, sv.file_hash, sv.file_size, sv.game_versions, sv.release_channel,
+    sv.modrinth_version_id, sv.curseforge_file_id,
+    sv.upstream_published_at, sv.created_at, sv.last_capture_error,
+    sv.extraction_status, sv.extraction_error, sv.extracted_at
+FROM shader_versions sv
+JOIN shaders s ON s.id = sv.shader_id
+ORDER BY sv.shader_id,
+    (sv.id = s.preferred_version_id) DESC,
+    sv.upstream_published_at DESC NULLS LAST,
+    sv.created_at DESC;
 
 -- Layer 2: Composed views
 
 -- Every (shader_version, scene, preset, profile) tuple that should have a capture.
 -- Cross-joins scenes × presets × shader versions. Expands shader profiles via
 -- the shader_version_profiles table. Used by health and work queries.
+-- Filters out shaders with capture_enabled = FALSE.
 CREATE OR REPLACE VIEW capture_target_matrix AS
 -- Branch 1: shader versions WITH profiles
 SELECT
@@ -49,11 +56,13 @@ SELECT
     sp.id  AS preset_id,
     svp.id AS profile_id
 FROM latest_shader_versions sv
+JOIN shaders sh ON sh.id = sv.shader_id
 JOIN shader_version_profiles svp ON svp.shader_version_id = sv.id
 CROSS JOIN scenes s
 JOIN latest_scene_versions lsv ON lsv.scene_id = s.id
 JOIN scene_presets sp ON sp.scene_id = s.id
 WHERE s.active = TRUE
+  AND sh.capture_enabled = TRUE
 
 UNION ALL
 
@@ -65,10 +74,12 @@ SELECT
     sp.id  AS preset_id,
     NULL   AS profile_id
 FROM latest_shader_versions sv
+JOIN shaders sh ON sh.id = sv.shader_id
 CROSS JOIN scenes s
 JOIN latest_scene_versions lsv ON lsv.scene_id = s.id
 JOIN scene_presets sp ON sp.scene_id = s.id
 WHERE s.active = TRUE
+  AND sh.capture_enabled = TRUE
   AND NOT EXISTS (
       SELECT 1 FROM shader_version_profiles svp
       WHERE svp.shader_version_id = sv.id

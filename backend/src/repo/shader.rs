@@ -374,6 +374,14 @@ impl ShaderRepo {
         id: &str,
         req: &UpdateShaderRequest,
     ) -> AppResult<Shader> {
+        // Resolve preferred_version_id: None = don't change, Some("") = clear, Some(id) = set
+        let preferred_version_update: Option<Option<String>> = req
+            .preferred_version_id
+            .as_ref()
+            .map(|v| if v.is_empty() { None } else { Some(v.clone()) });
+        let update_preferred = preferred_version_update.is_some();
+        let preferred_value = preferred_version_update.flatten();
+
         sqlx::query_as!(
             Shader,
             r#"
@@ -384,6 +392,8 @@ impl ShaderRepo {
                 modrinth_id = COALESCE($4, modrinth_id),
                 curseforge_id = COALESCE($5, curseforge_id),
                 website_url = COALESCE($6, website_url),
+                preferred_version_id = CASE WHEN $8 THEN $9 ELSE preferred_version_id END,
+                capture_enabled = COALESCE($10, capture_enabled),
                 updated_at = now()
             WHERE id = $7
             RETURNING *
@@ -394,7 +404,10 @@ impl ShaderRepo {
             req.modrinth_id,
             req.curseforge_id,
             req.website_url,
-            id
+            id,
+            update_preferred,
+            preferred_value,
+            req.capture_enabled,
         )
         .fetch_one(executor)
         .await

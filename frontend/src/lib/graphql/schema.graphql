@@ -413,6 +413,8 @@ type ShaderNode {
 	createdAt: DateTime!
 	updatedAt: DateTime!
 	viewCount: Int!
+	preferredVersionId: String
+	captureEnabled: Boolean!
 	"""
 	All versions of this shader, ordered by publish date descending.
 	Not DataLoader-batched — only called on single-shader detail pages.
@@ -459,7 +461,7 @@ type ShaderNode {
 	"""
 	captures(
 		"""
-		Filter to a specific shader version. Defaults to the latest version.
+		Filter to a specific shader version. Defaults to the preferred or latest version.
 		"""
 		versionId: String
 		"""
@@ -470,22 +472,22 @@ type ShaderNode {
 	"""
 	Profiles for this shader, optionally filtered to a specific version.
 
-	Defaults to the latest version's profiles when no `version_id` is given.
+	Defaults to the preferred or latest version's profiles when no `version_id` is given.
 	"""
 	profiles(
 		"""
-		Filter to a specific shader version. Defaults to the latest version.
+		Filter to a specific shader version. Defaults to the preferred or latest version.
 		"""
 		versionId: String
 	): [ShaderVersionProfileNode!]!
 	"""
 	Extracted metadata for this shader, optionally for a specific version.
 
-	Defaults to the latest version's metadata when no `version_id` is given.
+	Defaults to the preferred or latest version's metadata when no `version_id` is given.
 	"""
 	metadata(
 		"""
-		Filter to a specific shader version. Defaults to the latest version.
+		Filter to a specific shader version. Defaults to the preferred or latest version.
 		"""
 		versionId: String
 	): ShaderVersionMetadataNode
@@ -605,6 +607,8 @@ type TrendingShaderNode {
 	createdAt: DateTime!
 	updatedAt: DateTime!
 	viewCount: Int!
+	preferredVersionId: String
+	captureEnabled: Boolean!
 	trendingViews: Int!
 	imagePath: String
 	thumbhash: String

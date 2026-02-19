@@ -82,6 +82,16 @@
         "ordinal": 15,
         "name": "view_count",
         "type_info": "Int8"
+      },
+      {
+        "ordinal": 16,
+        "name": "preferred_version_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "capture_enabled",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -110,6 +120,8 @@
       true,
       true,
       true,
+      true,
+      false,
       true,
       false
     ]

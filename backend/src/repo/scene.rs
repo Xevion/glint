@@ -392,8 +392,8 @@ impl SceneRepo {
                 lsv.fov AS version_fov,
                 lsv.render_distance AS version_render_distance,
                 lsv.created_at AS version_created_at,
-                cr.image_path,
-                cr.thumbhash,
+                cr.image_path AS "image_path?",
+                cr.thumbhash AS "thumbhash?",
                 cnt.capture_count
             FROM scenes sc
             LEFT JOIN LATERAL (

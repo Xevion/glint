@@ -1048,6 +1048,14 @@ export type introspection_types = {
 					};
 				};
 			};
+			captureEnabled: {
+				name: 'captureEnabled';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'Boolean'; ofType: null };
+				};
+			};
 			captures: {
 				name: 'captures';
 				type: {
@@ -1135,6 +1143,10 @@ export type introspection_types = {
 					name: never;
 					ofType: { kind: 'SCALAR'; name: 'String'; ofType: null };
 				};
+			};
+			preferredVersionId: {
+				name: 'preferredVersionId';
+				type: { kind: 'SCALAR'; name: 'String'; ofType: null };
 			};
 			profiles: {
 				name: 'profiles';
@@ -1454,6 +1466,14 @@ export type introspection_types = {
 		kind: 'OBJECT';
 		name: 'TrendingShaderNode';
 		fields: {
+			captureEnabled: {
+				name: 'captureEnabled';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'Boolean'; ofType: null };
+				};
+			};
 			createdAt: {
 				name: 'createdAt';
 				type: {
@@ -1484,6 +1504,10 @@ export type introspection_types = {
 					name: never;
 					ofType: { kind: 'SCALAR'; name: 'String'; ofType: null };
 				};
+			};
+			preferredVersionId: {
+				name: 'preferredVersionId';
+				type: { kind: 'SCALAR'; name: 'String'; ofType: null };
 			};
 			slug: {
 				name: 'slug';

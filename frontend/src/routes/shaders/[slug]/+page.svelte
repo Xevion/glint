@@ -25,7 +25,8 @@ import {
 	GitCompareArrows,
 	Globe,
 	ImageOff,
-	Layers
+	Layers,
+	Pin
 } from '@lucide/svelte';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-svelte';
 import { fly } from 'svelte/transition';
@@ -77,9 +78,15 @@ let captures = $derived(allCaptures.slice(0, visibleCount));
 
 // Version selection
 const versions = $derived(shader.versions);
-const defaultVersionId = $derived(
-	versions.find((v) => v.captureCount > 0)?.id ?? versions[0]?.id ?? null
-);
+const defaultVersionId = $derived.by(() => {
+	// Prefer pinned version if set
+	if (shader.preferredVersionId) {
+		const pinned = versions.find((v) => v.id === shader.preferredVersionId);
+		if (pinned) return pinned.id;
+	}
+	// Fall back to first version with captures, then first version overall
+	return versions.find((v) => v.captureCount > 0)?.id ?? versions[0]?.id ?? null;
+});
 let versionOverride = $state<string | null>(null);
 const selectedVersionId = $derived(versionOverride ?? defaultVersionId);
 const selectedVersion = $derived(
@@ -323,14 +330,20 @@ const ogDescription = $derived.by(() => {
 									class={version.captureCount === 0 ? 'opacity-40' : ''}
 								>
 									<span class="flex items-center gap-2">
+										{#if version.id === shader.preferredVersionId}
+											<Pin class="h-3 w-3 text-info" />
+										{/if}
 										{formatVersion(version.version)}
-										{#if i === 0 && version.captureCount > 0}
+										{#if i === 0}
 											<span
 												class="rounded bg-info/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-info"
 											>
 												Latest
 											</span>
 										{/if}
+										<span class="ml-auto text-xs text-muted-foreground">
+											{version.captureCount}
+										</span>
 									</span>
 								</Select.Item>
 							{/each}
