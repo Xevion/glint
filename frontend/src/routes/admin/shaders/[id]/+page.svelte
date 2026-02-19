@@ -1,13 +1,7 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
-import { api } from '$lib/api';
-import type {
-	CaptureWithContext,
-	ShaderVersionDetail,
-	ShaderVersionMetadata,
-	ShaderVersionProfile,
-	ShaderWithCaptures
-} from '$lib/bindings';
+import { untrack } from 'svelte';
+import { createGraphQLClient, graphql, mutation } from '$lib/graphql';
 import { createDataTable, DataTable } from '$lib/components/data-table';
 import { ItemGrid } from '$lib/components/item-grid';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
@@ -46,12 +40,49 @@ import {
 } from '@lucide/svelte';
 import * as Select from '$lib/components/ui/select';
 import { Switch } from '$lib/components/ui/switch';
-import { superForm } from 'sveltekit-superforms';
+import { defaults, superForm } from 'sveltekit-superforms';
 import { zod4Client } from 'sveltekit-superforms/adapters';
 import { toast } from 'svelte-sonner';
 import { shaderFormSchema } from './schema.js';
 import type { PageData } from './$types';
+import type {
+	AdminShaderData,
+	AdminShaderVersion,
+	AdminCapture,
+	AdminProfile,
+	AdminMetadata
+} from './queries';
 import { createVersionColumns } from './version-columns.js';
+
+const UpdateShaderMutation = graphql(`
+	mutation UpdateShader($id: ID!, $input: UpdateShaderInput!) {
+		updateShader(id: $id, input: $input) {
+			id
+		}
+	}
+`);
+
+const DeleteShaderMutation = graphql(`
+	mutation DeleteShader($id: ID!) {
+		deleteShader(id: $id)
+	}
+`);
+
+const SyncShaderMutation = graphql(`
+	mutation SyncShader($id: ID!) {
+		syncShader(id: $id) {
+			id
+		}
+	}
+`);
+
+const LinkShaderPlatformMutation = graphql(`
+	mutation LinkShaderPlatform($id: ID!, $url: String!) {
+		linkShaderPlatform(id: $id, url: $url) {
+			id
+		}
+	}
+`);
 
 const PLATFORM_URL_PATTERN =
 	/^https?:\/\/(www\.)?(modrinth\.com\/shader\/|curseforge\.com\/minecraft\/shaders\/)/i;
@@ -60,17 +91,17 @@ interface Props {
 	data: PageData;
 }
 let { data }: Props = $props();
-let shader: ShaderWithCaptures = $derived(data.shader);
-let versions: ShaderVersionDetail[] = $derived(data.shader.versions);
-let captures: CaptureWithContext[] = $derived(data.shader.captures);
-let profiles: ShaderVersionProfile[] = $derived(data.shader.profiles);
-let metadata: ShaderVersionMetadata | undefined = $derived(data.shader.metadata);
+let shader: AdminShaderData = $derived(data.shader);
+let versions: AdminShaderVersion[] = $derived(data.shader.versions);
+let captures: AdminCapture[] = $derived(data.shader.captures);
+let profiles: AdminProfile[] = $derived(data.shader.profiles);
+let metadata: AdminMetadata | null = $derived(data.shader.metadata);
 
 /** The effective (latest) version — matches what the backend returns profiles/metadata for */
 let effectiveVersion = $derived(versions.length > 0 ? versions[0] : null);
 
-let versionColumns = $derived(createVersionColumns(effectiveVersion?.id));
-const versionTable = createDataTable<ShaderVersionDetail>({
+let versionColumns = $derived(createVersionColumns(effectiveVersion?.version.id));
+const versionTable = createDataTable<AdminShaderVersion>({
 	get data() {
 		return versions;
 	},
@@ -89,32 +120,60 @@ function humanize(key: string): string {
 		.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// ── Superforms ──────────────────────────────────────────────
-// Superforms manages its own reactivity after initialization; the initial
-// data.form reference is intentional — updates come from server actions.
-// svelte-ignore state_referenced_locally
-const superform = superForm(data.form, {
-	validators: zod4Client(shaderFormSchema),
-	invalidateAll: 'force',
-	resetForm: false,
-	onUpdated({ form }) {
-		if (form.message) {
-			const msg = String(form.message);
-			if (msg.toLowerCase().includes('success')) {
-				toast.success(msg);
-			} else {
-				toast.error(msg);
-			}
+// ── Superforms (SPA mode) ──────────────────────────────────
+const client = createGraphQLClient();
+
+const initialShader = untrack(() => shader);
+const superform = superForm(
+	defaults(
+		{
+			name: initialShader.name,
+			description: initialShader.description ?? '',
+			modrinth_id: initialShader.modrinthId ?? '',
+			curseforge_id: initialShader.curseforgeId ?? '',
+			website_url: initialShader.websiteUrl ?? '',
+			capture_enabled: initialShader.captureEnabled,
+			preferred_version_id: initialShader.preferredVersionId ?? null
+		},
+		zod4Client(shaderFormSchema)
+	),
+	{
+		SPA: true,
+		validators: zod4Client(shaderFormSchema),
+		resetForm: false,
+		onUpdate({ form }) {
+			if (!form.valid) return;
+			void (async () => {
+				const result = await mutation(client, UpdateShaderMutation, {
+					id: shader.id,
+					input: {
+						name: form.data.name,
+						description: form.data.description || null,
+						modrinthId: form.data.modrinth_id || null,
+						curseforgeId: form.data.curseforge_id || null,
+						websiteUrl: form.data.website_url || null,
+						captureEnabled: form.data.capture_enabled,
+						preferredVersionId: form.data.preferred_version_id
+					}
+				});
+				result.match({
+					Ok: () => {
+						toast.success('Shader updated');
+						void invalidateAll();
+					},
+					Err: (err) => toast.error(err.message)
+				});
+			})();
 		}
 	}
-});
-const { form: formData, enhance, tainted, submitting } = superform;
+);
+const { form: formData, tainted, submitting, enhance } = superform;
 
 let isDirty = $derived($tainted != null && Object.values($tainted).some(Boolean));
 
 // ── Non-form actions (delete, sync, link) ───────────────────
 const deleteAction = createAdminAction({
-	action: () => api.admin.deleteShader(shader.id),
+	action: () => mutation(client, DeleteShaderMutation, { id: shader.id }),
 	onSuccess: () => void goto('/admin/shaders'),
 	setError: (msg) => toast.error(msg)
 });
@@ -126,13 +185,13 @@ let linkUrl = $state('');
 let linkError = $state<string | null>(null);
 let linking = $state(false);
 
-let hasLinkedPlatform = $derived(!!shader.modrinth_id || !!shader.curseforge_id);
-let canLinkMorePlatforms = $derived(!shader.modrinth_id || !shader.curseforge_id);
+let hasLinkedPlatform = $derived(!!shader.modrinthId || !!shader.curseforgeId);
+let canLinkMorePlatforms = $derived(!shader.modrinthId || !shader.curseforgeId);
 
 /** Compute sync staleness: how old the last sync is */
 let syncAge = $derived.by(() => {
-	if (!shader.last_synced_at) return null;
-	const ms = Date.now() - new Date(shader.last_synced_at).getTime();
+	if (!shader.lastSyncedAt) return null;
+	const ms = Date.now() - new Date(shader.lastSyncedAt).getTime();
 	return {
 		hours: ms / (1000 * 60 * 60),
 		days: ms / (1000 * 60 * 60 * 24)
@@ -151,7 +210,7 @@ async function handleSync() {
 	syncing = true;
 
 	try {
-		const result = await api.admin.syncShader(shader.id);
+		const result = await mutation(client, SyncShaderMutation, { id: shader.id });
 		result.match({
 			Ok: () => {
 				toast.success('Shader synced successfully from upstream.');
@@ -181,7 +240,10 @@ async function handleLink() {
 	linkError = null;
 
 	try {
-		const result = await api.admin.linkShaderPlatform(shader.id, trimmed);
+		const result = await mutation(client, LinkShaderPlatformMutation, {
+			id: shader.id,
+			url: trimmed
+		});
 		result.match({
 			Ok: () => {
 				linkDialogOpen = false;
@@ -226,9 +288,9 @@ function handleLinkKeydown(e: KeyboardEvent) {
         segments={[{ label: 'Shaders', href: '/admin/shaders' }, { label: shader.name }]}
     >
         {#snippet trailing()}
-            {#if shader.icon_url}
+            {#if shader.iconUrl}
                 <img
-                    src={shader.icon_url}
+                    src={shader.iconUrl}
                     alt="{shader.name} icon"
                     class="ml-2 h-5 w-5 rounded"
                 />
@@ -285,7 +347,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                         >
                                         <span
                                             >Last synced <TimeAgo
-                                                timestamp={shader.last_synced_at!}
+                                                timestamp={shader.lastSyncedAt!}
                                             /></span
                                         >
                                     {:else if syncStatus === "stale"}
@@ -296,7 +358,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                         >
                                         <span
                                             >Last synced <TimeAgo
-                                                timestamp={shader.last_synced_at!}
+                                                timestamp={shader.lastSyncedAt!}
                                             /></span
                                         >
                                     {:else}
@@ -307,7 +369,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                         >
                                         <span
                                             >Last synced <TimeAgo
-                                                timestamp={shader.last_synced_at!}
+                                                timestamp={shader.lastSyncedAt!}
                                             /></span
                                         >
                                     {/if}
@@ -315,20 +377,20 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                 <div
                                     class="flex items-center gap-3 text-xs text-muted-foreground"
                                 >
-                                    {#if shader.modrinth_id}
+                                    {#if shader.modrinthId}
                                         <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
                                         <a
-                                            href="https://modrinth.com/shader/{shader.modrinth_id}"
+                                            href="https://modrinth.com/shader/{shader.modrinthId}"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             class="hover:text-foreground"
                                             >Modrinth</a
                                         >
                                     {/if}
-                                    {#if shader.curseforge_id}
+                                    {#if shader.curseforgeId}
                                         <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
                                         <a
-                                            href="https://www.curseforge.com/minecraft/shaders/{shader.curseforge_id}"
+                                            href="https://www.curseforge.com/minecraft/shaders/{shader.curseforgeId}"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             class="hover:text-foreground"
@@ -364,7 +426,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                 >
                                                 <Dialog.Description>
                                                     Link an additional platform
-                                                    ({shader.modrinth_id
+                                                    ({shader.modrinthId
                                                         ? "CurseForge"
                                                         : "Modrinth"}) to this
                                                     shader.
@@ -385,7 +447,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                     <label for="link-url" class="text-sm font-medium">Platform URL</label>
                                                     <Input
                                                         id="link-url"
-                                                        placeholder={shader.modrinth_id
+                                                        placeholder={shader.modrinthId
                                                             ? "https://www.curseforge.com/minecraft/shaders/..."
                                                             : "https://modrinth.com/shader/..."}
                                                         bind:value={linkUrl}
@@ -395,7 +457,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                     <p
                                                         class="text-xs text-muted-foreground"
                                                     >
-                                                        Paste the {shader.modrinth_id
+                                                        Paste the {shader.modrinthId
                                                             ? "CurseForge"
                                                             : "Modrinth"} URL for
                                                         this shader
@@ -451,7 +513,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                 {/if}
 
                 <!-- Edit Form -->
-                <form method="POST" use:enhance class="space-y-6">
+                <form use:enhance class="space-y-6">
                     <!-- Capture Controls -->
                     <div class="space-y-4">
                         <h3 class="text-sm font-medium">Capture Controls</h3>
@@ -497,9 +559,9 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                         <!-- eslint-enable @typescript-eslint/no-unsafe-member-access -->
                                             <Select.Trigger size="sm" class="w-full">
                                                 {#if $formData.preferred_version_id}
-                                                    {@const pinned = versions.find((v) => v.id === $formData.preferred_version_id)}
+                                                    {@const pinned = versions.find((v) => v.version.id === $formData.preferred_version_id)}
                                                     <Pin class="mr-1.5 h-3.5 w-3.5 text-info" />
-                                                    {pinned ? pinned.version : $formData.preferred_version_id}
+                                                    {pinned ? pinned.version.version : $formData.preferred_version_id}
                                                 {:else}
                                                     <span class="text-muted-foreground">Auto (latest version)</span>
                                                 {/if}
@@ -511,17 +573,17 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                         Auto (latest version)
                                                     </span>
                                                 </Select.Item>
-                                                {#each versions as version, i (version.id)}
-                                                    <Select.Item value={version.id}>
+                                                {#each versions as version, i (version.version.id)}
+                                                    <Select.Item value={version.version.id}>
                                                         <span class="flex items-center gap-2">
-                                                            {version.version}
+                                                            {version.version.version}
                                                             {#if i === 0}
                                                                 <span class="rounded bg-info/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-info">
                                                                     Latest
                                                                 </span>
                                                             {/if}
                                                             <span class="ml-auto text-xs text-muted-foreground">
-                                                                {version.capture_count} captures
+                                                                {version.captureCount} captures
                                                             </span>
                                                         </span>
                                                     </Select.Item>
@@ -635,26 +697,26 @@ function handleLinkKeydown(e: KeyboardEvent) {
                     <AdminDetailField label="Slug">
                         {shader.slug}
                     </AdminDetailField>
-                    {#if shader.license_id}
+                    {#if shader.licenseId}
                         <AdminDetailField label="License">
-                            {shader.license_id}
+                            {shader.licenseId}
                         </AdminDetailField>
                     {/if}
-                    {#if shader.upstream_downloads}
+                    {#if shader.upstreamDownloads}
                         <AdminDetailField label="Upstream Downloads">
-                            {shader.upstream_downloads.toLocaleString()}
+                            {shader.upstreamDownloads.toLocaleString()}
                         </AdminDetailField>
                     {/if}
-                    {#if shader.upstream_updated_at}
+                    {#if shader.upstreamUpdatedAt}
                         <AdminDetailField label="Upstream Updated">
-                            <TimeAgo timestamp={shader.upstream_updated_at} />
+                            <TimeAgo timestamp={shader.upstreamUpdatedAt} />
                         </AdminDetailField>
                     {/if}
                     <AdminDetailField label="Created">
-                        <TimeAgo timestamp={shader.created_at} />
+                        <TimeAgo timestamp={shader.createdAt} />
                     </AdminDetailField>
                     <AdminDetailField label="Updated">
-                        <TimeAgo timestamp={shader.updated_at} />
+                        <TimeAgo timestamp={shader.updatedAt} />
                     </AdminDetailField>
                 </dl>
 
@@ -674,8 +736,8 @@ function handleLinkKeydown(e: KeyboardEvent) {
 
                 <!-- Extraction Data -->
                 {#if effectiveVersion}
-                    {@const estatus = effectiveVersion.extraction_status}
-                    {#if estatus === "completed" && (profiles.length > 0 || metadata)}
+                    {@const estatus = effectiveVersion.version.extractionStatus}
+                    {#if estatus === "COMPLETED" && (profiles.length > 0 || metadata)}
                         <div class="space-y-4">
                             <div class="flex items-center gap-3">
                                 <FlaskConical
@@ -685,7 +747,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                     Extraction Data
                                 </h3>
                                 <Badge variant="outline" class="text-xs"
-                                    >{effectiveVersion.version}</Badge
+                                    >{effectiveVersion.version.version}</Badge
                                 >
                             </div>
 
@@ -712,7 +774,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                             {#each profiles as profile (profile.id)}
                                                 {@const optionEntries =
                                                     Object.entries(
-                                                        profile.options ?? {},
+                                                        (profile.options ?? {}) as Record<string, unknown>,
                                                     )}
                                                 <Collapsible.Root class="group">
                                                     <Collapsible.Trigger
@@ -720,7 +782,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                     >
                                                         <span
                                                             class="shrink-0 text-xs text-muted-foreground tabular-nums"
-                                                            >#{profile.sort_order +
+                                                            >#{profile.sortOrder +
                                                                 1}</span
                                                         >
                                                         <div
@@ -728,7 +790,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                         >
                                                             <span
                                                                 class="font-medium text-sm"
-                                                                >{profile.display_name}</span
+                                                                >{profile.displayName}</span
                                                             >
                                                         </div>
                                                         <Badge
@@ -763,7 +825,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                                     <dd class="font-mono">{profile.label}</dd>
                                                                 {/if}
                                                                 <dt class="text-muted-foreground">Display Name</dt>
-                                                                <dd>{profile.display_name}</dd>
+                                                                <dd>{profile.displayName}</dd>
                                                             </dl>
                                                             {#if optionEntries.length > 0}
                                                                 <div
@@ -841,6 +903,12 @@ function handleLinkKeydown(e: KeyboardEvent) {
 
                                 <!-- Metadata -->
                                 {#if metadata}
+                                    {@const pipelineFeatures = (metadata.pipelineFeatures ?? {}) as Record<string, unknown>}
+                                    {@const irisFeaturesRequired = (metadata.irisFeaturesRequired ?? []) as string[]}
+                                    {@const irisFeaturesOptional = (metadata.irisFeaturesOptional ?? []) as string[]}
+                                    {@const dimensionSupport = (metadata.dimensionSupport ?? []) as string[]}
+                                    {@const filePaths = (metadata.filePaths ?? []) as string[]}
+                                    {@const settingsScreen = (metadata.settingsScreen ?? []) as unknown[]}
                                     <div class="rounded-lg border">
                                         <div
                                             class="flex items-center justify-between border-b px-4 py-3"
@@ -851,12 +919,12 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                             <span
                                                 class="text-xs text-muted-foreground"
                                                 ><TimeAgo
-                                                    timestamp={metadata.extracted_at}
+                                                    timestamp={metadata.extractedAt}
                                                 /></span
                                             >
                                         </div>
                                         <div class="space-y-4 px-4 py-3">
-                                            {#if metadata.pipeline_features && Object.keys(metadata.pipeline_features).length > 0}
+                                            {#if Object.keys(pipelineFeatures).length > 0}
                                                 <div>
                                                     <div
                                                         class="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground"
@@ -866,7 +934,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                     <div
                                                         class="flex flex-wrap gap-1.5"
                                                     >
-                                                        {#each Object.entries(metadata.pipeline_features) as [key, val] (key)}
+                                                        {#each Object.entries(pipelineFeatures) as [key, val] (key)}
                                                             {#if val === true}
                                                                 <Badge
                                                                     variant="default"
@@ -897,20 +965,20 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                 </div>
                                             {/if}
 
-                                            {#if (metadata.iris_features_required?.length ?? 0) > 0 || (metadata.iris_features_optional?.length ?? 0) > 0}
+                                            {#if irisFeaturesRequired.length > 0 || irisFeaturesOptional.length > 0}
                                                 <div>
                                                     <div
                                                         class="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground"
                                                     >
                                                         Iris Features
                                                     </div>
-                                                    {#if metadata.iris_features_required && metadata.iris_features_required.length > 0}
+                                                    {#if irisFeaturesRequired.length > 0}
                                                         <div class="mb-1">
                                                             <span
                                                                 class="mr-1.5 text-[10px] text-muted-foreground"
                                                                 >Required:</span
                                                             >
-                                                            {#each metadata.iris_features_required as feat (feat)}
+                                                            {#each irisFeaturesRequired as feat (feat)}
                                                                 <Badge
                                                                     variant="default"
                                                                     class="mr-1 mb-1 text-[11px]"
@@ -919,13 +987,13 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                             {/each}
                                                         </div>
                                                     {/if}
-                                                    {#if metadata.iris_features_optional && metadata.iris_features_optional.length > 0}
+                                                    {#if irisFeaturesOptional.length > 0}
                                                         <div>
                                                             <span
                                                                 class="mr-1.5 text-[10px] text-muted-foreground"
                                                                 >Optional:</span
                                                             >
-                                                            {#each metadata.iris_features_optional as feat (feat)}
+                                                            {#each irisFeaturesOptional as feat (feat)}
                                                                 <Badge
                                                                     variant="outline"
                                                                     class="mr-1 mb-1 text-[11px]"
@@ -937,7 +1005,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                 </div>
                                             {/if}
 
-                                            {#if metadata.dimension_support && metadata.dimension_support.length > 0}
+                                            {#if dimensionSupport.length > 0}
                                                 <div>
                                                     <div
                                                         class="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground"
@@ -947,7 +1015,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                     <div
                                                         class="flex flex-wrap gap-1.5"
                                                     >
-                                                        {#each metadata.dimension_support as dim (dim)}
+                                                        {#each dimensionSupport as dim (dim)}
                                                             <Badge
                                                                 variant="secondary"
                                                                 class="text-[11px]"
@@ -963,7 +1031,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                 </div>
                                             {/if}
 
-                                            {#if metadata.has_custom_textures != null}
+                                            {#if metadata.hasCustomTextures != null}
                                                 <div>
                                                     <div
                                                         class="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground"
@@ -973,7 +1041,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                     <div
                                                         class="flex items-center gap-1.5 text-sm"
                                                     >
-                                                        {#if metadata.has_custom_textures}
+                                                        {#if metadata.hasCustomTextures}
                                                             <PackageCheck
                                                                 class="h-4 w-4 text-success"
                                                             />
@@ -995,7 +1063,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                 </div>
                                             {/if}
 
-                                            {#if metadata.file_paths && metadata.file_paths.length > 0}
+                                            {#if filePaths.length > 0}
                                                 <Collapsible.Root>
                                                     <Collapsible.Trigger
                                                         class="flex w-full items-center gap-2 text-left"
@@ -1008,9 +1076,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                         <Badge
                                                             variant="secondary"
                                                             class="text-[10px]"
-                                                            >{metadata
-                                                                .file_paths
-                                                                .length} files</Badge
+                                                            >{filePaths.length} files</Badge
                                                         >
                                                         <ChevronDown
                                                             class="ml-auto h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=open]>&]:rotate-180"
@@ -1020,7 +1086,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                         <div
                                                             class="mt-2 max-h-64 overflow-y-auto rounded border bg-muted/30 p-2"
                                                         >
-                                                            {#each metadata.file_paths as path, i (path)}
+                                                            {#each filePaths as path, i (path)}
                                                                 <div
                                                                     class="px-1 py-0.5 font-mono text-[11px] {i %
                                                                         2 ===
@@ -1036,7 +1102,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                 </Collapsible.Root>
                                             {/if}
 
-                                            {#if metadata.settings_screen && metadata.settings_screen.length > 0}
+                                            {#if settingsScreen.length > 0}
                                                 <Collapsible.Root>
                                                     <Collapsible.Trigger
                                                         class="flex w-full items-center gap-2 text-left"
@@ -1050,9 +1116,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                         <Badge
                                                             variant="secondary"
                                                             class="text-[10px]"
-                                                            >{metadata
-                                                                .settings_screen
-                                                                .length} entries</Badge
+                                                            >{settingsScreen.length} entries</Badge
                                                         >
                                                         <ChevronDown
                                                             class="ml-auto h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=open]>&]:rotate-180"
@@ -1061,7 +1125,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                     <Collapsible.Content>
                                                         <pre
                                                             class="mt-2 max-h-80 overflow-y-auto rounded-md bg-muted p-3 font-mono text-xs">{JSON.stringify(
-                                                                metadata.settings_screen,
+                                                                settingsScreen,
                                                                 null,
                                                                 2,
                                                             )}</pre>
@@ -1073,28 +1137,28 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                 {/if}
                             </div>
                         </div>
-                    {:else if estatus === "failed"}
+                    {:else if estatus === "FAILED"}
                         <Alert variant="destructive">
                             <AlertTriangle class="h-4 w-4" />
                             <div>
-                                Extraction failed for v{effectiveVersion.version}{effectiveVersion.extraction_error
-                                    ? `: ${effectiveVersion.extraction_error}`
+                                Extraction failed for v{effectiveVersion.version.version}{effectiveVersion.version.extractionError
+                                    ? `: ${effectiveVersion.version.extractionError}`
                                     : ""}
                             </div>
                         </Alert>
-                    {:else if estatus === "pending"}
+                    {:else if estatus === "PENDING"}
                         <div
                             class="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
                         >
                             <Clock class="h-4 w-4" />
-                            Extraction pending for v{effectiveVersion.version}
+                            Extraction pending for v{effectiveVersion.version.version}
                         </div>
-                    {:else if estatus === "skipped"}
+                    {:else if estatus === "SKIPPED"}
                         <div
                             class="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
                         >
                             <SkipForward class="h-4 w-4" />
-                            Extraction skipped for v{effectiveVersion.version}
+                            Extraction skipped for v{effectiveVersion.version.version}
                         </div>
                     {/if}
                 {/if}
@@ -1115,28 +1179,28 @@ function handleLinkKeydown(e: KeyboardEvent) {
                             View all
                         </a>
                     </div>
-                    <ItemGrid items={captures} key={(c: CaptureWithContext) => c.id} size="small">
-                        {#snippet card(capture: CaptureWithContext)}
-                            <AdminCaptureCard {capture} alt={capture.scene_name ?? capture.scene_id}>
+                    <ItemGrid items={captures} key={(c: AdminCapture) => c.id} size="small">
+                        {#snippet card(capture: AdminCapture)}
+                            <AdminCaptureCard {capture} alt={capture.sceneName ?? capture.sceneId}>
                                 <div class="p-2">
                                     <div class="flex items-center justify-between">
                                         <div class="text-sm font-medium">
-                                            {capture.scene_name ?? capture.scene_id}
+                                            {capture.sceneName ?? capture.sceneId}
                                         </div>
-                                        {#if capture.freshness !== "fresh"}
+                                        {#if capture.freshness !== "FRESH"}
                                             <span
                                                 class="rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[
-                                                    capture.freshness
+                                                    capture.freshness.toLowerCase() as keyof typeof freshnessColors
                                                 ]}"
                                             >
-                                                {capture.freshness}
+                                                {capture.freshness.toLowerCase()}
                                             </span>
                                         {/if}
                                     </div>
                                     <div class="text-xs text-muted-foreground">
-                                        {capture.shader_version}
-                                        {#if capture.profile_display_name}
-                                            &middot; {capture.profile_display_name}
+                                        {capture.shaderVersion}
+                                        {#if capture.profileDisplayName}
+                                            &middot; {capture.profileDisplayName}
                                         {/if}
                                     </div>
                                 </div>

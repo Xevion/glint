@@ -37,7 +37,7 @@ fn trim_to_budget(items: Vec<WorkItem>, target: usize) -> Vec<WorkItem> {
             // Flush previous shader — check if we should stop after it
             if !shader_batch.is_empty() {
                 committed += shader_batch.len();
-                result.extend(shader_batch.drain(..));
+                result.append(&mut shader_batch);
                 if committed >= target {
                     return result;
                 }

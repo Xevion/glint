@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { ShaderListItem } from '$lib/bindings';
+import type { AdminShader } from './+page';
 
 interface Props {
-	shader: ShaderListItem;
+	shader: AdminShader;
 }
 
 let { shader }: Props = $props();

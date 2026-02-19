@@ -28,6 +28,22 @@ export async function query<Data, Variables extends AnyVariables>(
 	return Result.ok(result.data);
 }
 
+export async function mutation<Data, Variables extends AnyVariables>(
+	client: Client,
+	document: TypedDocumentNode<Data, Variables>,
+	variables: Variables
+): Promise<Result<Data, ApiError>> {
+	const result = await client.mutation(document, variables).toPromise();
+
+	if (result.error) {
+		return Result.err(mapGraphQLError(result.error));
+	}
+	if (!result.data) {
+		return Result.err(new ApiError(ApiErrorType.ServerError, 'No data returned from GraphQL', 500));
+	}
+	return Result.ok(result.data);
+}
+
 function mapGraphQLError(error: CombinedError): ApiError {
 	const gqlError = error.graphQLErrors[0];
 	if (gqlError?.extensions?.code) {

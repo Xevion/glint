@@ -1,8 +1,9 @@
 <script lang="ts">
-import type { ExtractionStatus } from '$lib/bindings';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import * as Tooltip from '$lib/components/ui/tooltip';
 import { AlertTriangle, Check, Clock, SkipForward } from '@lucide/svelte';
+
+type ExtractionStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
 
 interface Props {
 	status: ExtractionStatus;
@@ -13,17 +14,17 @@ interface Props {
 let { status, extractedAt, error: extractionError }: Props = $props();
 
 const labels: Record<ExtractionStatus, string> = {
-	completed: 'Extracted',
-	failed: 'Failed',
-	pending: 'Pending',
-	skipped: 'Skipped'
+	COMPLETED: 'Extracted',
+	FAILED: 'Failed',
+	PENDING: 'Pending',
+	SKIPPED: 'Skipped'
 };
 
 const iconColors: Record<ExtractionStatus, string> = {
-	completed: 'text-emerald-500',
-	failed: 'text-red-500',
-	pending: 'text-amber-500',
-	skipped: 'text-muted-foreground'
+	COMPLETED: 'text-emerald-500',
+	FAILED: 'text-red-500',
+	PENDING: 'text-amber-500',
+	SKIPPED: 'text-muted-foreground'
 };
 
 let hasTooltip = $derived(!!extractedAt || !!extractionError);
@@ -31,11 +32,11 @@ let hasTooltip = $derived(!!extractedAt || !!extractionError);
 
 {#snippet content()}
 	<span class="inline-flex size-4 shrink-0 items-center justify-center">
-		{#if status === 'completed'}
+		{#if status === 'COMPLETED'}
 			<Check class="size-4 {iconColors[status]}" />
-		{:else if status === 'failed'}
+		{:else if status === 'FAILED'}
 			<AlertTriangle class="size-4 {iconColors[status]}" />
-		{:else if status === 'pending'}
+		{:else if status === 'PENDING'}
 			<Clock class="size-4 {iconColors[status]}" />
 		{:else}
 			<SkipForward class="size-4 {iconColors[status]}" />

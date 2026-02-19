@@ -282,6 +282,9 @@ pub struct CaptureRunItemWithContext {
     pub shader_slug: String,
     pub shader_version: String,
     pub scene_name: String,
+    // Capture image data (from joined captures table)
+    pub image_path: Option<String>,
+    pub thumbhash: Option<String>,
 }
 
 /// Freshness status of a capture relative to current versions and newer captures

@@ -1,5 +1,6 @@
 use async_graphql::{Context, Object, Result};
 
+use crate::graphql::guard::AdminGuard;
 use crate::graphql::types::background::BackgroundNode;
 use crate::repo::BackgroundRepo;
 use crate::state::AppState;
@@ -17,6 +18,7 @@ impl BackgroundQuery {
     }
 
     /// List all backgrounds including disabled (admin only).
+    #[graphql(guard = "AdminGuard")]
     async fn all_backgrounds(&self, ctx: &Context<'_>) -> Result<Vec<BackgroundNode>> {
         let state = ctx.data_unchecked::<AppState>();
         let backgrounds = BackgroundRepo::list_all(state.db()).await?;

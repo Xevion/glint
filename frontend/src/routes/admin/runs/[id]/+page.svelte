@@ -1,7 +1,7 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
-import type { CaptureRun, CaptureRunItemWithContext } from '$lib/bindings';
 import { AdminBreadcrumb } from '$lib/components/admin';
+import CaptureImage from '$lib/components/CaptureImage.svelte';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import * as Table from '$lib/components/ui/table';
@@ -9,13 +9,14 @@ import { formatDuration } from '$lib/utils/format';
 import { statusColorFallback, statusColors } from '$lib/utils/status';
 import { ExternalLink } from '@lucide/svelte';
 import type { PageData } from './$types';
+import type { AdminCaptureRunData, AdminCaptureRunItem } from './queries';
 
 interface Props {
 	data: PageData;
 }
 let { data }: Props = $props();
-let run: CaptureRun = $derived(data.run);
-let items: CaptureRunItemWithContext[] = $derived(data.items);
+let run: AdminCaptureRunData = $derived(data.run);
+let items: AdminCaptureRunItem[] = $derived(run.items);
 let refreshing = $state(false);
 let expandedItem = $state<string | null>(null);
 
@@ -35,11 +36,16 @@ async function refresh() {
 	refreshing = false;
 }
 
+// Map GraphQL enum values (RUNNING, COMPLETED, etc.) to the snake_case keys used by statusColors
+function normalizeStatus(status: string): string {
+	return status.toLowerCase().replace(/_/g, '_');
+}
+
 const statCards = $derived([
-	{ label: 'Total', value: run.total_items, color: 'text-foreground' },
-	{ label: 'Completed', value: run.completed_items, color: 'text-success' },
-	{ label: 'Failed', value: run.failed_items, color: 'text-destructive' },
-	{ label: 'Skipped', value: run.skipped_items, color: 'text-muted-foreground' }
+	{ label: 'Total', value: run.totalItems, color: 'text-foreground' },
+	{ label: 'Completed', value: run.completedItems, color: 'text-success' },
+	{ label: 'Failed', value: run.failedItems, color: 'text-destructive' },
+	{ label: 'Skipped', value: run.skippedItems, color: 'text-muted-foreground' }
 ]);
 </script>
 
@@ -54,9 +60,9 @@ const statCards = $derived([
 			>
 				{#snippet trailing()}
 					<span
-						class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[run.status] ?? statusColorFallback}"
+						class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[normalizeStatus(run.status)] ?? statusColorFallback}"
 					>
-						{run.status}
+						{normalizeStatus(run.status)}
 					</span>
 				{/snippet}
 			</AdminBreadcrumb>
@@ -66,12 +72,17 @@ const statCards = $derived([
 		</div>
 		<div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-foreground">
 			<span>ID: <code class="text-xs">{run.id}</code></span>
-			{#if run.agent_id}
-				<span>Agent: {run.agent_id}</span>
+			{#if run.agentId}
+				<span>Agent: {run.agentId}</span>
 			{/if}
-			<span>Started: <TimeAgo timestamp={run.started_at} /></span>
-			{#if run.completed_at}
-				<span>Duration: {formatDuration(run)}</span>
+			<span>Started: <TimeAgo timestamp={run.startedAt} /></span>
+			{#if run.completedAt}
+				<span
+					>Duration: {formatDuration({
+						started_at: run.startedAt,
+						completed_at: run.completedAt
+					})}</span
+				>
 			{/if}
 		</div>
 	</div>
@@ -99,85 +110,98 @@ const statCards = $derived([
 	<!-- Items Table -->
 	<Table.Root class="border">
 		<Table.Header>
-				<Table.Row class="bg-muted/50">
-					<Table.Head class="px-4 py-2">Status</Table.Head>
-					<Table.Head class="px-4 py-2">Shader</Table.Head>
-					<Table.Head class="px-4 py-2">Scene</Table.Head>
-					<Table.Head class="px-4 py-2">Profile</Table.Head>
-					<Table.Head class="px-4 py-2">Duration</Table.Head>
-					<Table.Head class="px-4 py-2">Error</Table.Head>
-					<Table.Head class="px-4 py-2">Capture</Table.Head>
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
-				{#each items as item (item.id)}
-					<Table.Row
-						class="border-b transition-colors hover:bg-muted/50 {item.status === 'failed'
-							? 'cursor-pointer'
-							: ''}"
-						onclick={() => item.status === 'failed' && toggleExpand(item.id)}
-					>
-						<Table.Cell class="px-4 py-2">
-							<span
-class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
-								item.status
-							] ?? statusColorFallback}"
+			<Table.Row class="bg-muted/50">
+				<Table.Head class="w-20 px-4 py-2">Preview</Table.Head>
+				<Table.Head class="px-4 py-2">Status</Table.Head>
+				<Table.Head class="px-4 py-2">Shader</Table.Head>
+				<Table.Head class="px-4 py-2">Scene</Table.Head>
+				<Table.Head class="px-4 py-2">Duration</Table.Head>
+				<Table.Head class="px-4 py-2">Error</Table.Head>
+			</Table.Row>
+		</Table.Header>
+		<Table.Body>
+			{#each items as item (item.id)}
+				<Table.Row
+					class="relative border-b transition-colors hover:bg-muted/50 {item.captureId ? 'cursor-pointer' : ''} {item.status === 'FAILED' ? 'cursor-pointer' : ''}"
+					onclick={() => item.status === 'FAILED' && toggleExpand(item.id)}
+				>
+					<Table.Cell class="px-4 py-2">
+						{#if item.captureId}
+							<a
+								href="/admin/captures/{item.captureId}"
+								class="absolute inset-0 z-0"
+								tabindex="-1"
+								aria-hidden="true"
+							></a>
+						{/if}
+						{#if item.imagePath ?? item.thumbhash}
+							<CaptureImage
+								src={item.imagePath}
+								thumbhash={item.thumbhash}
+								preset="thumbnail"
+								alt="Capture preview"
+								class="h-full w-full object-cover"
+								containerClass="h-12 w-20 rounded"
+							/>
+						{:else}
+							<div
+								class="flex h-12 w-20 items-center justify-center rounded bg-muted text-xs text-muted-foreground"
 							>
-								{item.status}
-							</span>
-						</Table.Cell>
-						<Table.Cell class="px-4 py-2">
-							<div>
-								<a
-									href="/shaders/{item.shader_slug}"
-									class="font-medium text-primary hover:underline"
-								>
-									{item.shader_name}
-								</a>
-								<div class="text-xs text-muted-foreground">{item.shader_version}</div>
+								N/A
+							</div>
+						{/if}
+					</Table.Cell>
+					<Table.Cell class="px-4 py-2">
+						<span
+							class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[normalizeStatus(item.status)] ?? statusColorFallback}"
+						>
+							{normalizeStatus(item.status)}
+						</span>
+					</Table.Cell>
+					<Table.Cell class="px-4 py-2">
+						<div>
+							<a
+								href="/shaders/{item.shaderSlug}"
+								class="relative z-10 font-medium text-primary hover:underline"
+							>
+								{item.shaderName}
+							</a>
+							<div class="text-xs text-muted-foreground">
+								{item.shaderVersion}
+								{#if item.profileDisplayName}
+									&middot; {item.profileDisplayName}
+								{/if}
+							</div>
+						</div>
+					</Table.Cell>
+					<Table.Cell class="px-4 py-2">{item.sceneName}</Table.Cell>
+					<Table.Cell class="px-4 py-2">{formatMs(item.durationMs)}</Table.Cell>
+					<Table.Cell class="max-w-sm px-4 py-2" title={item.errorMessage ?? ''}>
+						<span class="line-clamp-2">{item.errorMessage ?? '\u2014'}</span>
+					</Table.Cell>
+				</Table.Row>
+				{#if expandedItem === item.id && item.status === 'FAILED'}
+					<Table.Row>
+						<Table.Cell colspan={6} class="bg-muted/30 px-4 py-3">
+							<div class="space-y-2">
+								{#if item.errorMessage}
+									<div>
+										<span class="text-xs font-medium text-muted-foreground">Error:</span>
+										<p class="text-sm">{item.errorMessage}</p>
+									</div>
+								{/if}
+								{#if item.errorLog}
+									<div>
+										<span class="text-xs font-medium text-muted-foreground">Log:</span>
+										<pre
+											class="mt-1 max-h-64 overflow-auto rounded bg-muted p-3 text-xs">{item.errorLog}</pre>
+									</div>
+								{/if}
 							</div>
 						</Table.Cell>
-						<Table.Cell class="px-4 py-2">{item.scene_name}</Table.Cell>
-						<Table.Cell class="px-4 py-2">{item.profile_display_name ?? '\u2014'}</Table.Cell>
-						<Table.Cell class="px-4 py-2">{formatMs(item.duration_ms)}</Table.Cell>
-					<Table.Cell class="max-w-sm px-4 py-2" title={item.error_message ?? ''}>
-						<span class="line-clamp-2">{item.error_message ?? '\u2014'}</span>
-					</Table.Cell>
-						<Table.Cell class="px-4 py-2">
-							{#if item.capture_id}
-							<a
-								href="/admin/captures/{item.capture_id}"
-								class="text-xs text-primary hover:underline"
-							>
-								View
-							</a>
-							{:else}
-								&mdash;
-							{/if}
-						</Table.Cell>
 					</Table.Row>
-					{#if expandedItem === item.id && item.status === 'failed'}
-						<Table.Row>
-							<Table.Cell colspan={7} class="bg-muted/30 px-4 py-3">
-								<div class="space-y-2">
-									{#if item.error_message}
-										<div>
-											<span class="text-xs font-medium text-muted-foreground">Error:</span>
-											<p class="text-sm">{item.error_message}</p>
-										</div>
-									{/if}
-									{#if item.error_log}
-										<div>
-											<span class="text-xs font-medium text-muted-foreground">Log:</span>
-											<pre
-												class="mt-1 max-h-64 overflow-auto rounded bg-muted p-3 text-xs">{item.error_log}</pre>
-										</div>
-									{/if}
-								</div>
-							</Table.Cell>
-						</Table.Row>
-					{/if}
-				{/each}
-			</Table.Body>
+				{/if}
+			{/each}
+		</Table.Body>
 	</Table.Root>
 </div>

@@ -1,6 +1,5 @@
 package com.xevion.glint.ui
 
-import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.scene.ParticleMode
 import com.xevion.glint.scene.SceneFormatting
@@ -32,8 +31,6 @@ import net.minecraft.network.chat.Component as McComponent
  */
 class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
     companion object {
-        private val log = Loggers.Ui.get()
-
         private const val SLIDER_WIDTH = 180
 
         private const val TIME_MIN = 0.0

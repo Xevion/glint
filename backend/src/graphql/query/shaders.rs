@@ -1,8 +1,11 @@
 use async_graphql::{Context, Object, Result};
 
 use crate::error::AppError;
+use crate::graphql::guard::AdminGuard;
 use crate::graphql::types::connection::decode_cursor;
-use crate::graphql::types::shader::{ShaderConnection, ShaderNode, TrendingShaderNode};
+use crate::graphql::types::shader::{
+    AdminShaderList, ShaderConnection, ShaderNode, TrendingShaderNode,
+};
 use crate::models::Page;
 use crate::repo::{ShaderRepo, SlugRedirectRepo};
 use crate::services::shader::ShaderService;
@@ -102,5 +105,43 @@ impl ShaderQuery {
         };
         let result = ShaderService::list_trending(state.db(), days, &page).await?;
         Ok(result.into_iter().map(Into::into).collect())
+    }
+
+    /// Paginated list of all shaders including disabled (admin only).
+    #[graphql(guard = "AdminGuard")]
+    async fn admin_shaders(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(default = 1)] page: i32,
+        #[graphql(default = 50)] page_size: i32,
+        search: Option<String>,
+    ) -> Result<AdminShaderList> {
+        let state = ctx.data_unchecked::<AppState>();
+
+        let page_size = page_size.clamp(1, 250) as u32;
+        let page_num = page.max(1) as u32;
+        let p = Page {
+            page: page_num,
+            page_size,
+            offset: (page_num - 1) as u64 * page_size as u64,
+        };
+
+        let (shaders, total) =
+            ShaderRepo::list_paginated(state.db(), &p, search.as_deref(), None, false).await?;
+
+        Ok(AdminShaderList {
+            items: shaders.into_iter().map(Into::into).collect(),
+            total,
+            page: page_num as i32,
+            page_size: page_size as i32,
+        })
+    }
+
+    /// Get a single shader by ID for admin detail view.
+    #[graphql(guard = "AdminGuard")]
+    async fn admin_shader(&self, ctx: &Context<'_>, id: String) -> Result<Option<ShaderNode>> {
+        let state = ctx.data_unchecked::<AppState>();
+        let shader = ShaderRepo::find_by_id(state.db(), &id).await?;
+        Ok(shader.map(Into::into))
     }
 }

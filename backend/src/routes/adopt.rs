@@ -1,16 +1,11 @@
-use axum::{
-    Json, Router,
-    extract::{Path, State},
-    http::StatusCode,
-    routing::post,
-};
+use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
 use tracing::instrument;
 
 use crate::{
     auth::AdminUser,
-    error::{AppError, AppResult, OptionNotFoundExt},
+    error::{AppError, AppResult},
     models::{
-        AdoptPreviewResponse, AdoptShaderRequest, LinkShaderRequest, Shader, ShaderSearchRequest,
+        AdoptPreviewResponse, AdoptShaderRequest, Shader, ShaderSearchRequest,
         ShaderSearchResponse, ShaderSearchResult, ShaderSearchSort,
     },
     platform::{self, Platform},
@@ -24,8 +19,6 @@ pub fn router() -> Router<AppState> {
         .route("/adopt/preview", post(adopt_preview))
         .route("/adopt", post(adopt))
         .route("/search", post(search_platforms))
-        .route("/{id}/link", post(link_platform))
-        .route("/{id}/sync", post(sync_shader))
 }
 
 /// POST /api/shaders/search - Search or browse both platforms for shaders (admin)
@@ -205,36 +198,4 @@ async fn adopt(
 
     let shader = PlatformService::adopt_shader(&state, &platform_ref).await?;
     Ok((StatusCode::CREATED, Json(shader)))
-}
-
-/// POST /api/shaders/{id}/link
-#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
-async fn link_platform(
-    _admin: AdminUser,
-    State(state): State<AppState>,
-    Path(shader_id): Path<String>,
-    Json(request): Json<LinkShaderRequest>,
-) -> AppResult<Json<Shader>> {
-    let shader = ShaderRepo::find_by_id(state.db(), &shader_id)
-        .await?
-        .or_not_found("Shader", &shader_id)?;
-    let platform_ref = platform::parse_platform_url(&request.url)
-        .ok_or_else(|| AppError::BadRequest("Invalid or unsupported platform URL".into()))?;
-
-    let shader = PlatformService::link_platform(&state, &shader, &platform_ref).await?;
-    Ok(Json(shader))
-}
-
-/// POST /api/shaders/{id}/sync
-#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
-async fn sync_shader(
-    _admin: AdminUser,
-    State(state): State<AppState>,
-    Path(shader_id): Path<String>,
-) -> AppResult<Json<Shader>> {
-    let shader = ShaderRepo::find_by_id(state.db(), &shader_id)
-        .await?
-        .or_not_found("Shader", &shader_id)?;
-    let shader = PlatformService::sync_shader(&state, &shader).await?;
-    Ok(Json(shader))
 }

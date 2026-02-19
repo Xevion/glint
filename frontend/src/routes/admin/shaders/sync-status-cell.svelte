@@ -1,18 +1,18 @@
 <script lang="ts">
-import type { ShaderListItem } from '$lib/bindings';
+import type { AdminShader } from './+page';
 
 interface Props {
-	shader: ShaderListItem;
+	shader: AdminShader;
 }
 
 let { shader }: Props = $props();
 
-function getSyncStatus(s: ShaderListItem): { label: string; class: string } {
-	const hasLink = !!s.modrinth_id || !!s.curseforge_id;
+function getSyncStatus(s: AdminShader): { label: string; class: string } {
+	const hasLink = !!s.modrinthId || !!s.curseforgeId;
 	if (!hasLink) return { label: 'No link', class: 'text-muted-foreground' };
-	if (!s.last_synced_at) return { label: 'Never', class: 'text-warning' };
+	if (!s.lastSyncedAt) return { label: 'Never', class: 'text-warning' };
 
-	const days = (Date.now() - new Date(s.last_synced_at).getTime()) / (1000 * 60 * 60 * 24);
+	const days = (Date.now() - new Date(s.lastSyncedAt).getTime()) / (1000 * 60 * 60 * 24);
 	if (days > 7) return { label: `${Math.floor(days)}d`, class: 'text-destructive' };
 	if (days > 1) return { label: `${Math.floor(days)}d`, class: 'text-warning' };
 	if (days * 24 > 1) return { label: `${Math.floor(days * 24)}h`, class: 'text-success' };

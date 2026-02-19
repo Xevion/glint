@@ -352,12 +352,15 @@ impl CaptureRunRepo {
                 s.name as shader_name,
                 s.slug as shader_slug,
                 sv.version as shader_version,
-                sc.name as scene_name
+                sc.name as scene_name,
+                c.image_path as "image_path?",
+                c.thumbhash as "thumbhash?"
             FROM capture_run_items cri
             JOIN shader_versions sv ON cri.shader_version_id = sv.id
             JOIN shaders s ON sv.shader_id = s.id
             JOIN scenes sc ON cri.scene_id = sc.id
             LEFT JOIN shader_version_profiles svp ON cri.profile_id = svp.id
+            LEFT JOIN captures c ON cri.capture_id = c.id
             WHERE cri.run_id = $1
             ORDER BY cri.started_at ASC NULLS LAST
             "#,

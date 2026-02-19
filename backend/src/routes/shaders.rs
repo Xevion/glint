@@ -6,9 +6,8 @@ use crate::{
     id::{self, ShaderVersionId, ShaderVersionProfileId},
     middleware::client_ip::ClientIp,
     models::{
-        CaptureStatus, CaptureWithContext, CreateShaderRequest, CreateShaderVersionRequest,
-        PageQuery, Paginated, Shader, ShaderListItem, ShaderVersion, ShaderVersionProfile,
-        ShaderWithCaptures, UpdateShaderRequest,
+        CaptureStatus, CaptureWithContext, CreateShaderRequest, PageQuery, Paginated, Shader,
+        ShaderListItem, ShaderVersionProfile, ShaderWithCaptures,
     },
     repo::{
         CaptureRepo, ExtractionRepo, ShaderAuthorRepo, ShaderRepo, ShaderVersionRepo,
@@ -23,7 +22,7 @@ use axum::{
     extract::{ConnectInfo, Path, Query, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Redirect, Response},
-    routing::{get, post},
+    routing::get,
 };
 use custom_debug_derive::Debug as CustomDebug;
 use serde::Deserialize;
@@ -34,12 +33,8 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_shaders).post(create_shader))
         .route("/trending", get(trending_shaders))
-        .route(
-            "/{id}",
-            get(get_shader).put(update_shader).delete(delete_shader),
-        )
+        .route("/{id}", get(get_shader))
         .route("/{id}/captures", get(list_shader_captures))
-        .route("/{id}/versions", post(create_shader_version))
         .route(
             "/{id}/versions/{version_id}/profiles",
             get(list_version_profiles),
@@ -387,24 +382,6 @@ async fn create_shader(
     Ok((StatusCode::CREATED, Json(shader)))
 }
 
-/// POST /api/shaders/{id}/versions - Create a new shader version (admin)
-#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
-async fn create_shader_version(
-    _admin: AdminUser,
-    State(state): State<AppState>,
-    Path(shader_id): Path<String>,
-    Json(request): Json<CreateShaderVersionRequest>,
-) -> AppResult<(StatusCode, Json<ShaderVersion>)> {
-    if !ShaderRepo::exists_by_id(state.db(), &shader_id).await? {
-        return Err(AppError::NotFound("Shader not found".into()));
-    }
-
-    let id = id::generate_id();
-    let version = ShaderVersionRepo::create(state.db(), &id, &shader_id, &request).await?;
-
-    Ok((StatusCode::CREATED, Json(version)))
-}
-
 /// GET /api/shaders/{id}/versions/{version_id}/profiles - List profiles for a shader version (public)
 ///
 /// Lightweight endpoint for the mod capture orchestrator to fetch profiles without
@@ -416,42 +393,6 @@ async fn list_version_profiles(
 ) -> AppResult<Json<Vec<ShaderVersionProfile>>> {
     let profiles = ExtractionRepo::list_profiles_by_version(state.db(), &version_id).await?;
     Ok(Json(profiles))
-}
-
-/// PUT /api/shaders/{id} - Update shader metadata (admin)
-#[instrument(skip(state, _admin, request), fields(user_id = _admin.user.id))]
-async fn update_shader(
-    _admin: AdminUser,
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-    Json(request): Json<UpdateShaderRequest>,
-) -> AppResult<Json<Shader>> {
-    let old = ShaderRepo::get(state.db(), &id).await?;
-
-    // If slug is being changed, record the old one as a redirect
-    if let Some(ref new_slug) = request.slug {
-        if old.slug != *new_slug {
-            SlugRedirectRepo::upsert(state.db(), "shader", &old.slug, &old.id.0).await?;
-            // Clear any existing redirect for the new slug so it's not stale
-            SlugRedirectRepo::delete_by_old_slug(state.db(), "shader", new_slug).await?;
-        }
-    }
-    let shader = ShaderRepo::update(state.db(), &old.id.0, &request).await?;
-    Ok(Json(shader))
-}
-
-/// DELETE /api/shaders/{id} - Delete a shader (admin)
-#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
-async fn delete_shader(
-    _admin: AdminUser,
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> AppResult<StatusCode> {
-    let deleted = ShaderRepo::delete(state.db(), &id).await?;
-    if !deleted {
-        return Err(AppError::NotFound("Shader not found".into()));
-    }
-    Ok(StatusCode::NO_CONTENT)
 }
 
 #[cfg(test)]

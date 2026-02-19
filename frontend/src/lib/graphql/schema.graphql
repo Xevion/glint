@@ -1,3 +1,13 @@
+"""
+Admin-facing paginated shader list.
+"""
+type AdminShaderList {
+	items: [ShaderNode!]!
+	total: Int!
+	page: Int!
+	pageSize: Int!
+}
+
 scalar BackgroundId
 
 type BackgroundNode {
@@ -65,6 +75,65 @@ type CaptureNode {
 
 scalar CaptureRunId
 
+"""
+A single item within a capture run, with denormalized context.
+"""
+type CaptureRunItemNode {
+	id: String!
+	runId: CaptureRunId!
+	shaderVersionId: ShaderVersionId!
+	sceneId: SceneId!
+	profileId: ShaderVersionProfileId
+	profileName: String
+	profileDisplayName: String
+	presetId: ScenePresetId
+	status: CaptureRunItemStatusEnum!
+	captureId: CaptureId
+	errorMessage: String
+	errorLog: String
+	durationMs: Int
+	startedAt: DateTime
+	completedAt: DateTime
+	shaderName: String!
+	shaderSlug: String!
+	shaderVersion: String!
+	sceneName: String!
+	imagePath: String
+	thumbhash: String
+}
+
+enum CaptureRunItemStatusEnum {
+	PENDING
+	RUNNING
+	COMPLETED
+	FAILED
+	SKIPPED
+}
+
+"""
+A capture run with aggregated item counts.
+"""
+type CaptureRunNode {
+	id: CaptureRunId!
+	agentId: String
+	startedAt: DateTime!
+	completedAt: DateTime
+	status: CaptureRunStatusEnum!
+	totalItems: Int!
+	completedItems: Int!
+	failedItems: Int!
+	skippedItems: Int!
+	items: [CaptureRunItemNode!]!
+}
+
+enum CaptureRunStatusEnum {
+	RUNNING
+	COMPLETED
+	PARTIAL
+	FAILED
+	TIMED_OUT
+}
+
 enum CaptureStatusEnum {
 	UPLOADING
 	COMPLETED
@@ -105,6 +174,16 @@ type CategoryNode {
 	slug: String!
 	name: String!
 	description: String
+}
+
+"""
+Input for creating a shader version.
+"""
+input CreateShaderVersionInput {
+	version: String!
+	modrinthVersionId: String
+	downloadUrl: String
+	fileHash: String
 }
 
 """
@@ -158,6 +237,32 @@ type FeaturedSideNode {
 A scalar that can represent any JSON value.
 """
 scalar JSON
+
+"""
+Root mutation type — merges all domain mutation types.
+"""
+type MutationRoot {
+	"""
+	Update shader metadata.
+	"""
+	updateShader(id: ID!, input: UpdateShaderInput!): ShaderNode!
+	"""
+	Delete a shader.
+	"""
+	deleteShader(id: ID!): Boolean!
+	"""
+	Sync shader metadata from upstream platform.
+	"""
+	syncShader(id: ID!): ShaderNode!
+	"""
+	Link an additional platform (Modrinth or CurseForge) to a shader.
+	"""
+	linkShaderPlatform(id: ID!, url: String!): ShaderNode!
+	"""
+	Create a new version for a shader.
+	"""
+	createShaderVersion(shaderId: ID!, input: CreateShaderVersionInput!): ShaderVersionNode!
+}
 
 """
 Relay-style page info.
@@ -256,6 +361,14 @@ type QueryRoot {
 		first: Int! = 20
 	): [TrendingShaderNode!]!
 	"""
+	Paginated list of all shaders including disabled (admin only).
+	"""
+	adminShaders(page: Int! = 1, pageSize: Int! = 50, search: String): AdminShaderList!
+	"""
+	Get a single shader by ID for admin detail view.
+	"""
+	adminShader(id: String!): ShaderNode
+	"""
 	Paginated list of completed captures (public).
 	"""
 	captures(
@@ -289,6 +402,15 @@ type QueryRoot {
 	List all backgrounds including disabled (admin only).
 	"""
 	allBackgrounds: [BackgroundNode!]!
+	"""
+	Get a capture run by ID with all items (admin only).
+	"""
+	adminCaptureRun(
+		"""
+		Capture run ID
+		"""
+		id: String!
+	): CaptureRunNode
 }
 
 """
@@ -615,6 +737,22 @@ type TrendingShaderNode {
 }
 
 """
+Input for updating a shader.
+"""
+input UpdateShaderInput {
+	name: String
+	description: String
+	modrinthId: String
+	curseforgeId: String
+	websiteUrl: String
+	captureEnabled: Boolean
+	"""
+	Set to a version ID to pin, empty string to clear, omit to leave unchanged.
+	"""
+	preferredVersionId: String
+}
+
+"""
 Directs the executor to include this field or fragment only when the `if` argument is true.
 """
 directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
@@ -628,5 +766,6 @@ Provides a scalar specification URL for specifying the behavior of custom scalar
 directive @specifiedBy(url: String!) on SCALAR
 schema {
 	query: QueryRoot
+	mutation: MutationRoot
 	subscription: SubscriptionRoot
 }

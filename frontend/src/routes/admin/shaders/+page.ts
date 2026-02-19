@@ -1,13 +1,45 @@
-import { createApiClient } from '$lib/api';
-import type { ShaderListItem } from '$lib/bindings';
+import { createGraphQLClient, graphql, query, type ResultOf } from '$lib/graphql';
 import type { PageLoad } from './$types';
 
+const AdminShadersQuery = graphql(`
+	query AdminShaders {
+		adminShaders(pageSize: 250) {
+			items {
+				id
+				name
+				slug
+				description
+				modrinthId
+				curseforgeId
+				websiteUrl
+				iconUrl
+				lastSyncedAt
+				createdAt
+				captureEnabled
+				versionCount
+				extractionSummary {
+					completed
+					failed
+					pending
+					skipped
+					total
+				}
+			}
+			total
+			page
+			pageSize
+		}
+	}
+`);
+
+export type AdminShader = ResultOf<typeof AdminShadersQuery>['adminShaders']['items'][number];
+
 export const load: PageLoad = async ({ fetch }) => {
-	const api = createApiClient(fetch);
-	const result = await api.admin.listShaders({ pageSize: 250 });
+	const client = createGraphQLClient(fetch);
+	const result = await query(client, AdminShadersQuery, {});
 
 	return result.match({
-		Ok: (paginated) => ({ shaders: paginated.items, error: null as string | null }),
-		Err: (err) => ({ shaders: [] as ShaderListItem[], error: err.message })
+		Ok: (data) => ({ shaders: data.adminShaders.items, error: null as string | null }),
+		Err: (err) => ({ shaders: [] as AdminShader[], error: err.message })
 	});
 };

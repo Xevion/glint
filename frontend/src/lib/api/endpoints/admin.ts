@@ -6,16 +6,13 @@ import type {
 	Scene,
 	SceneWithVersion,
 	SceneListAdmin,
-	Shader,
 	ShaderListItem,
-	ShaderWithCaptures,
 	StorageAuditResult,
 	StorageBucket,
 	StorageCleanupResult,
 	StorageStats,
 	UpdateSceneMetadataRequest,
 	ScenePreset,
-	UpdateShaderRequest,
 	User,
 	UserWithSessions,
 	WorkItem
@@ -56,28 +53,6 @@ export class AdminEndpoints extends ApiClient {
 		if (params?.pageSize != null) searchParams.set('page_size', String(params.pageSize));
 		const qs = searchParams.toString();
 		return this.get<Paginated<ShaderListItem>>(`/api/shaders${qs ? `?${qs}` : ''}`);
-	}
-
-	getShader(id: string): Promise<Result<ShaderWithCaptures, ApiError>> {
-		return this.get<ShaderWithCaptures>(`/api/shaders/${encodeURIComponent(id)}`);
-	}
-
-	updateShader(id: string, request: UpdateShaderRequest): Promise<Result<Shader, ApiError>> {
-		return this.put<Shader>(`/api/shaders/${encodeURIComponent(id)}`, request);
-	}
-
-	deleteShader(id: string): Promise<Result<null, ApiError>> {
-		return this.delete(`/api/shaders/${encodeURIComponent(id)}`);
-	}
-
-	syncShader(id: string): Promise<Result<Shader, ApiError>> {
-		return this.post<Shader>(`/api/shaders/${encodeURIComponent(id)}/sync`, {});
-	}
-
-	linkShaderPlatform(id: string, url: string): Promise<Result<Shader, ApiError>> {
-		return this.post<Shader>(`/api/shaders/${encodeURIComponent(id)}/link`, {
-			url
-		});
 	}
 
 	listScenes(): Promise<Result<SceneListAdmin[], ApiError>> {

@@ -1,4 +1,4 @@
-import type { ShaderListItem } from '$lib/bindings';
+import type { AdminShader } from './+page';
 import {
 	type ColumnDef,
 	DataTableColumnHeader,
@@ -12,8 +12,8 @@ import ExtractionCell from './extraction-cell.svelte';
 import ShaderNameCell from './shader-name-cell.svelte';
 import SyncStatusCell from './sync-status-cell.svelte';
 
-export const columns: ColumnDef<ShaderListItem>[] = [
-	imageColumn<ShaderListItem>('icon_url', { fallback: Sparkles }),
+export const columns: ColumnDef<AdminShader>[] = [
+	imageColumn<AdminShader>('iconUrl', { fallback: Sparkles }),
 	{
 		accessorKey: 'name',
 		size: 200,
@@ -24,24 +24,25 @@ export const columns: ColumnDef<ShaderListItem>[] = [
 		accessorKey: 'description',
 		minSize: 150,
 		header: 'Description',
-		cell: ({ row }) => renderComponent(DescriptionCell, { description: row.original.description }),
+		cell: ({ row }) =>
+			renderComponent(DescriptionCell, { description: row.original.description ?? undefined }),
 		enableSorting: false
 	},
 	{
-		accessorKey: 'last_synced_at',
+		accessorKey: 'lastSyncedAt',
 		size: 100,
 		header: ({ column }) => renderComponent(DataTableColumnHeader, { column, title: 'Sync' }),
 		cell: ({ row }) => renderComponent(SyncStatusCell, { shader: row.original })
 	},
 	{
-		accessorKey: 'version_count',
+		accessorKey: 'versionCount',
 		size: 180,
 		header: ({ column }) => renderComponent(DataTableColumnHeader, { column, title: 'Versions' }),
 		cell: ({ row }) =>
 			renderComponent(ExtractionCell, {
-				versionCount: row.original.version_count,
-				summary: row.original.extraction_summary
+				versionCount: row.original.versionCount,
+				summary: row.original.extractionSummary ?? undefined
 			})
 	},
-	timeColumn<ShaderListItem>('created_at', 'Created')
+	timeColumn<AdminShader>('createdAt', 'Created')
 ];

@@ -549,3 +549,34 @@ impl From<CursorPage<Shader>> for ShaderConnection {
         }
     }
 }
+
+/// Admin-facing paginated shader list.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct AdminShaderList {
+    pub items: Vec<ShaderNode>,
+    pub total: i64,
+    pub page: i32,
+    pub page_size: i32,
+}
+
+/// Input for updating a shader.
+#[derive(async_graphql::InputObject, Debug)]
+pub struct UpdateShaderInput {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub modrinth_id: Option<String>,
+    pub curseforge_id: Option<String>,
+    pub website_url: Option<String>,
+    pub capture_enabled: Option<bool>,
+    /// Set to a version ID to pin, empty string to clear, omit to leave unchanged.
+    pub preferred_version_id: Option<String>,
+}
+
+/// Input for creating a shader version.
+#[derive(async_graphql::InputObject, Debug)]
+pub struct CreateShaderVersionInput {
+    pub version: String,
+    pub modrinth_version_id: Option<String>,
+    pub download_url: Option<String>,
+    pub file_hash: Option<String>,
+}

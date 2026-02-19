@@ -2,6 +2,40 @@
 /* prettier-ignore */
 
 export type introspection_types = {
+	AdminShaderList: {
+		kind: 'OBJECT';
+		name: 'AdminShaderList';
+		fields: {
+			items: {
+				name: 'items';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: {
+						kind: 'LIST';
+						name: never;
+						ofType: {
+							kind: 'NON_NULL';
+							name: never;
+							ofType: { kind: 'OBJECT'; name: 'ShaderNode'; ofType: null };
+						};
+					};
+				};
+			};
+			page: {
+				name: 'page';
+				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
+			};
+			pageSize: {
+				name: 'pageSize';
+				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
+			};
+			total: {
+				name: 'total';
+				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
+			};
+		};
+	};
 	BackgroundId: unknown;
 	BackgroundNode: {
 		kind: 'OBJECT';
@@ -223,6 +257,174 @@ export type introspection_types = {
 		};
 	};
 	CaptureRunId: unknown;
+	CaptureRunItemNode: {
+		kind: 'OBJECT';
+		name: 'CaptureRunItemNode';
+		fields: {
+			captureId: { name: 'captureId'; type: { kind: 'SCALAR'; name: 'CaptureId'; ofType: null } };
+			completedAt: { name: 'completedAt'; type: { kind: 'SCALAR'; name: 'DateTime'; ofType: null } };
+			durationMs: { name: 'durationMs'; type: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
+			errorLog: { name: 'errorLog'; type: { kind: 'SCALAR'; name: 'String'; ofType: null } };
+			errorMessage: { name: 'errorMessage'; type: { kind: 'SCALAR'; name: 'String'; ofType: null } };
+			id: {
+				name: 'id';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				};
+			};
+			imagePath: { name: 'imagePath'; type: { kind: 'SCALAR'; name: 'String'; ofType: null } };
+			presetId: { name: 'presetId'; type: { kind: 'SCALAR'; name: 'ScenePresetId'; ofType: null } };
+			profileDisplayName: {
+				name: 'profileDisplayName';
+				type: { kind: 'SCALAR'; name: 'String'; ofType: null };
+			};
+			profileId: {
+				name: 'profileId';
+				type: { kind: 'SCALAR'; name: 'ShaderVersionProfileId'; ofType: null };
+			};
+			profileName: { name: 'profileName'; type: { kind: 'SCALAR'; name: 'String'; ofType: null } };
+			runId: {
+				name: 'runId';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'CaptureRunId'; ofType: null };
+				};
+			};
+			sceneId: {
+				name: 'sceneId';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'SceneId'; ofType: null };
+				};
+			};
+			sceneName: {
+				name: 'sceneName';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				};
+			};
+			shaderName: {
+				name: 'shaderName';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				};
+			};
+			shaderSlug: {
+				name: 'shaderSlug';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				};
+			};
+			shaderVersion: {
+				name: 'shaderVersion';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				};
+			};
+			shaderVersionId: {
+				name: 'shaderVersionId';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'ShaderVersionId'; ofType: null };
+				};
+			};
+			startedAt: { name: 'startedAt'; type: { kind: 'SCALAR'; name: 'DateTime'; ofType: null } };
+			status: {
+				name: 'status';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'ENUM'; name: 'CaptureRunItemStatusEnum'; ofType: null };
+				};
+			};
+			thumbhash: { name: 'thumbhash'; type: { kind: 'SCALAR'; name: 'String'; ofType: null } };
+		};
+	};
+	CaptureRunItemStatusEnum: {
+		name: 'CaptureRunItemStatusEnum';
+		enumValues: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
+	};
+	CaptureRunNode: {
+		kind: 'OBJECT';
+		name: 'CaptureRunNode';
+		fields: {
+			agentId: { name: 'agentId'; type: { kind: 'SCALAR'; name: 'String'; ofType: null } };
+			completedAt: { name: 'completedAt'; type: { kind: 'SCALAR'; name: 'DateTime'; ofType: null } };
+			completedItems: {
+				name: 'completedItems';
+				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
+			};
+			failedItems: {
+				name: 'failedItems';
+				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
+			};
+			id: {
+				name: 'id';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'CaptureRunId'; ofType: null };
+				};
+			};
+			items: {
+				name: 'items';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: {
+						kind: 'LIST';
+						name: never;
+						ofType: {
+							kind: 'NON_NULL';
+							name: never;
+							ofType: { kind: 'OBJECT'; name: 'CaptureRunItemNode'; ofType: null };
+						};
+					};
+				};
+			};
+			skippedItems: {
+				name: 'skippedItems';
+				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
+			};
+			startedAt: {
+				name: 'startedAt';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'DateTime'; ofType: null };
+				};
+			};
+			status: {
+				name: 'status';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'ENUM'; name: 'CaptureRunStatusEnum'; ofType: null };
+				};
+			};
+			totalItems: {
+				name: 'totalItems';
+				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
+			};
+		};
+	};
+	CaptureRunStatusEnum: {
+		name: 'CaptureRunStatusEnum';
+		enumValues: 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'TIMED_OUT';
+	};
 	CaptureStatusEnum: { name: 'CaptureStatusEnum'; enumValues: 'UPLOADING' | 'COMPLETED' | 'FAILED' };
 	CaptureWithContextNode: {
 		kind: 'OBJECT';
@@ -340,6 +542,33 @@ export type introspection_types = {
 				};
 			};
 		};
+	};
+	CreateShaderVersionInput: {
+		kind: 'INPUT_OBJECT';
+		name: 'CreateShaderVersionInput';
+		isOneOf: false;
+		inputFields: [
+			{
+				name: 'version';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				};
+				defaultValue: null;
+			},
+			{
+				name: 'modrinthVersionId';
+				type: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				defaultValue: null;
+			},
+			{
+				name: 'downloadUrl';
+				type: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				defaultValue: null;
+			},
+			{ name: 'fileHash'; type: { kind: 'SCALAR'; name: 'String'; ofType: null }; defaultValue: null }
+		];
 	};
 	DateTime: unknown;
 	ExtractionStatusEnum: {
@@ -470,8 +699,55 @@ export type introspection_types = {
 		};
 	};
 	Float: unknown;
+	ID: unknown;
 	Int: unknown;
 	JSON: unknown;
+	MutationRoot: {
+		kind: 'OBJECT';
+		name: 'MutationRoot';
+		fields: {
+			createShaderVersion: {
+				name: 'createShaderVersion';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'OBJECT'; name: 'ShaderVersionNode'; ofType: null };
+				};
+			};
+			deleteShader: {
+				name: 'deleteShader';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'Boolean'; ofType: null };
+				};
+			};
+			linkShaderPlatform: {
+				name: 'linkShaderPlatform';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'OBJECT'; name: 'ShaderNode'; ofType: null };
+				};
+			};
+			syncShader: {
+				name: 'syncShader';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'OBJECT'; name: 'ShaderNode'; ofType: null };
+				};
+			};
+			updateShader: {
+				name: 'updateShader';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'OBJECT'; name: 'ShaderNode'; ofType: null };
+				};
+			};
+		};
+	};
 	PageInfo: {
 		kind: 'OBJECT';
 		name: 'PageInfo';
@@ -579,6 +855,19 @@ export type introspection_types = {
 		kind: 'OBJECT';
 		name: 'QueryRoot';
 		fields: {
+			adminCaptureRun: {
+				name: 'adminCaptureRun';
+				type: { kind: 'OBJECT'; name: 'CaptureRunNode'; ofType: null };
+			};
+			adminShader: { name: 'adminShader'; type: { kind: 'OBJECT'; name: 'ShaderNode'; ofType: null } };
+			adminShaders: {
+				name: 'adminShaders';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'OBJECT'; name: 'AdminShaderList'; ofType: null };
+				};
+			};
 			allBackgrounds: {
 				name: 'allBackgrounds';
 				type: {
@@ -1546,6 +1835,44 @@ export type introspection_types = {
 			websiteUrl: { name: 'websiteUrl'; type: { kind: 'SCALAR'; name: 'String'; ofType: null } };
 		};
 	};
+	UpdateShaderInput: {
+		kind: 'INPUT_OBJECT';
+		name: 'UpdateShaderInput';
+		isOneOf: false;
+		inputFields: [
+			{ name: 'name'; type: { kind: 'SCALAR'; name: 'String'; ofType: null }; defaultValue: null },
+			{
+				name: 'description';
+				type: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				defaultValue: null;
+			},
+			{
+				name: 'modrinthId';
+				type: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				defaultValue: null;
+			},
+			{
+				name: 'curseforgeId';
+				type: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				defaultValue: null;
+			},
+			{
+				name: 'websiteUrl';
+				type: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				defaultValue: null;
+			},
+			{
+				name: 'captureEnabled';
+				type: { kind: 'SCALAR'; name: 'Boolean'; ofType: null };
+				defaultValue: null;
+			},
+			{
+				name: 'preferredVersionId';
+				type: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				defaultValue: null;
+			}
+		];
+	};
 };
 
 /** An IntrospectionQuery representation of your schema.
@@ -1559,7 +1886,7 @@ export type introspection_types = {
 export type introspection = {
 	name: never;
 	query: 'QueryRoot';
-	mutation: never;
+	mutation: 'MutationRoot';
 	subscription: 'SubscriptionRoot';
 	types: introspection_types;
 };

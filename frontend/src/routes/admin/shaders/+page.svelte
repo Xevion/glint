@@ -2,7 +2,8 @@
 import { goto, invalidateAll } from '$app/navigation';
 import { page } from '$app/state';
 import { api } from '$lib/api';
-import type { Shader, ShaderListItem, ShaderSearchResult, ShaderSearchSort } from '$lib/bindings';
+import type { Shader, ShaderSearchResult, ShaderSearchSort } from '$lib/bindings';
+import type { AdminShader } from './+page';
 import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
 import { createDataTable, DataTable, DataTablePagination } from '$lib/components/data-table';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
@@ -38,7 +39,7 @@ let shaders = $derived(data.shaders);
 let shadersError = $derived(data.error);
 
 // TanStack Table for My Shaders
-const table = createDataTable<ShaderListItem>({
+const table = createDataTable<AdminShader>({
 	get data() {
 		return shaders;
 	},
@@ -252,13 +253,13 @@ function handleShaderAdopted(shader: Shader) {
 			{:else}
 				<DataTable
 					{table}
-					getRowHref={(shader: ShaderListItem) => `/admin/shaders/${shader.id}`}
+					getRowHref={(shader: AdminShader) => `/admin/shaders/${shader.id}`}
 				>
-					{#snippet card(shader: ShaderListItem)}
+					{#snippet card(shader: AdminShader)}
 						<div class="flex gap-3">
-							{#if shader.icon_url}
+							{#if shader.iconUrl}
 								<img
-									src={shader.icon_url}
+									src={shader.iconUrl}
 									alt=""
 									class="h-10 w-10 shrink-0 rounded object-cover"
 								/>
@@ -277,7 +278,7 @@ function handleShaderAdopted(shader: Shader) {
 								{/if}
 							</div>
 							<div class="shrink-0 text-right text-xs text-muted-foreground">
-								<div>{shader.version_count} ver.</div>
+								<div>{shader.versionCount} ver.</div>
 							</div>
 						</div>
 					{/snippet}

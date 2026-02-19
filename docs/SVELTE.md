@@ -43,6 +43,53 @@ export const load: PageLoad = async ({ fetch }) => {
 - Handle errors in load functions — return fallback data, don't throw
 - Component receives data via `let { data } = $props()`
 
+### Valid exports from `+page.ts` / `+layout.ts`
+
+SvelteKit only allows these named exports from route module files:
+
+```
+load  prerender  ssr  csr  trailingSlash  config  entries  _anything
+```
+
+Exporting any other runtime value causes a **500 at runtime** — ESLint and `svelte-check` do not catch this, so it fails silently until you hit the route. This is a known tooling gap with no current automated lint rule.
+
+**Do not export queries, types, or constants from `+page.ts`:**
+
+```typescript
+// ❌ Bad — causes 500 at runtime
+export const AdminShaderQuery = graphql(`...`);
+export type AdminShaderData = ...;
+
+// ✅ Good — load is the only export
+export const load: PageLoad = async ({ fetch }) => { ... };
+```
+
+**Extract shared queries and types to a co-located file:**
+
+```
+routes/admin/shaders/[id]/
+├── +page.ts          ← only `export const load`
+├── +page.svelte
+├── queries.ts        ← GraphQL queries + derived types
+├── schema.ts         ← form schemas (zod)
+└── version-columns.ts ← table column definitions
+```
+
+```typescript
+// queries.ts
+export const AdminShaderQuery = graphql(`...`);
+export type AdminShaderData = NonNullable<ResultOf<typeof AdminShaderQuery>['adminShader']>;
+
+// +page.ts
+import { AdminShaderQuery } from './queries';
+export const load: PageLoad = async ({ params, fetch }) => { ... };
+
+// +page.svelte
+import type { AdminShaderData } from './queries';
+```
+
+`export type` is erased at compile time and will not cause a runtime error, but placing types that depend on query constants in `+page.ts` is fragile — keep them in `queries.ts` alongside the query they're derived from.
+
 ## Error Handling
 
 - **API layer**: `true-myth` Result pattern with `.match({ Ok, Err })` for exhaustive handling

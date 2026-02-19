@@ -1,17 +1,26 @@
 <script lang="ts">
-import type { CaptureWithContext } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import type { Snippet } from 'svelte';
 
+interface CaptureProps {
+	id: string;
+	image_path?: string;
+	imagePath?: string;
+	thumbhash?: string | null;
+	shader_name?: string;
+}
+
 interface Props {
-	capture: CaptureWithContext;
+	capture: CaptureProps;
 	/** Alt text for the image. Defaults to shader_name. */
 	alt?: string;
 	/** Content rendered below the image (metadata footer). */
 	children?: Snippet;
 }
 
-let { capture, alt = capture.shader_name, children }: Props = $props();
+let { capture, alt = capture.shader_name ?? '', children }: Props = $props();
+
+let captureImagePath = $derived(capture.imagePath ?? capture.image_path);
 </script>
 
 <a
@@ -19,9 +28,9 @@ let { capture, alt = capture.shader_name, children }: Props = $props();
 	class="block rounded-lg border bg-card transition-colors hover:bg-muted/50"
 >
 	<div class="overflow-hidden rounded-t-lg">
-	{#if capture.image_path}
+	{#if captureImagePath}
 		<CaptureImage
-			src={capture.image_path}
+			src={captureImagePath}
 				thumbhash={capture.thumbhash}
 				preset="card"
 				{alt}

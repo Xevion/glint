@@ -1,6 +1,7 @@
 pub mod backgrounds;
 pub mod captures;
 pub mod featured;
+pub mod runs;
 pub mod shaders;
 pub mod stats;
 
@@ -14,6 +15,7 @@ use crate::state::AppState;
 use backgrounds::BackgroundQuery;
 use captures::CaptureQuery;
 use featured::FeaturedQuery;
+use runs::RunQuery;
 use shaders::ShaderQuery;
 use stats::StatsQuery;
 
@@ -26,6 +28,7 @@ pub struct QueryRoot(
     StatsQuery,
     FeaturedQuery,
     BackgroundQuery,
+    RunQuery,
 );
 
 #[derive(Default)]
