@@ -1,14 +1,13 @@
 use async_graphql::{ComplexObject, Context, Enum, Json, Result, SimpleObject};
 use chrono::{DateTime, Utc};
 
+use crate::graphql::loaders::RequestLoaders;
 use crate::id::{ShaderId, ShaderVersionId, ShaderVersionProfileId};
 use crate::models::capture::CaptureStatus;
 use crate::models::extraction::{ExtractionStatus, ShaderVersionMetadata, ShaderVersionProfile};
 use crate::models::{ExtractionSummary, Shader, ShaderAuthor, ShaderVersion, ShaderVersionDetail};
 use crate::repo::capture::{CaptureDistinct, CaptureFilters};
-use crate::repo::{
-    CaptureRepo, CategoryRepo, ExtractionRepo, FeatureRepo, ShaderAuthorRepo, ShaderVersionRepo,
-};
+use crate::repo::{CaptureRepo, ExtractionRepo, ShaderVersionRepo};
 use crate::state::AppState;
 
 use super::capture::CaptureWithContextNode;
@@ -58,6 +57,7 @@ pub struct ShaderNode {
 #[ComplexObject]
 impl ShaderNode {
     /// All versions of this shader, ordered by publish date descending.
+    /// Not DataLoader-batched — only called on single-shader detail pages.
     async fn versions(&self, ctx: &Context<'_>) -> Result<Vec<ShaderVersionDetailNode>> {
         let state = ctx.data_unchecked::<AppState>();
         let details =
@@ -67,52 +67,69 @@ impl ShaderNode {
 
     /// Authors attributed to this shader from upstream platforms.
     async fn authors(&self, ctx: &Context<'_>) -> Result<Vec<ShaderAuthorNode>> {
-        let state = ctx.data_unchecked::<AppState>();
-        let authors = ShaderAuthorRepo::list_by_shader(state.db(), self.id.as_ref()).await?;
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
+        let authors = loaders
+            .shader_authors
+            .load_one(self.id.0.clone())
+            .await?
+            .unwrap_or_default();
         Ok(authors.into_iter().map(Into::into).collect())
     }
 
     /// Categories (style tags) associated with this shader.
     async fn categories(&self, ctx: &Context<'_>) -> Result<Vec<CategoryNode>> {
-        let state = ctx.data_unchecked::<AppState>();
-        let cats = CategoryRepo::list_for_shader(state.db(), self.id.as_ref()).await?;
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
+        let cats = loaders
+            .shader_categories
+            .load_one(self.id.0.clone())
+            .await?
+            .unwrap_or_default();
         Ok(cats.into_iter().map(Into::into).collect())
     }
 
     /// Feature tags associated with this shader.
     async fn features(&self, ctx: &Context<'_>) -> Result<Vec<FeatureNode>> {
-        let state = ctx.data_unchecked::<AppState>();
-        let feats = FeatureRepo::list_for_shader(state.db(), self.id.as_ref()).await?;
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
+        let feats = loaders
+            .shader_features
+            .load_one(self.id.0.clone())
+            .await?
+            .unwrap_or_default();
         Ok(feats.into_iter().map(Into::into).collect())
     }
 
     /// Latest version string (e.g. "1.7.2") for display purposes.
     async fn latest_version(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        let state = ctx.data_unchecked::<AppState>();
-        let versions =
-            ShaderVersionRepo::list_by_shader_with_counts(state.db(), self.id.as_ref()).await?;
-        Ok(versions.first().map(|v| v.version.version.clone()))
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
+        let version = loaders
+            .shader_latest_versions
+            .load_one(self.id.0.clone())
+            .await?;
+        Ok(version.map(|v| v.version))
     }
 
     /// Representative thumbnail image path for this shader.
     async fn image_path(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        let state = ctx.data_unchecked::<AppState>();
-        let ids = vec![self.id.0.clone()];
-        let thumbs = CaptureRepo::batch_thumbnails_for_shaders(state.db(), &ids).await?;
-        Ok(thumbs.get(self.id.as_ref()).map(|t| t.image_path.clone()))
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
+        let thumb = loaders
+            .shader_thumbnails
+            .load_one(self.id.0.clone())
+            .await?;
+        Ok(thumb.map(|t| t.image_path))
     }
 
     /// Thumbhash placeholder for the representative thumbnail.
     async fn thumbhash(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        let state = ctx.data_unchecked::<AppState>();
-        let ids = vec![self.id.0.clone()];
-        let thumbs = CaptureRepo::batch_thumbnails_for_shaders(state.db(), &ids).await?;
-        Ok(thumbs
-            .get(self.id.as_ref())
-            .and_then(|t| t.thumbhash.clone()))
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
+        let thumb = loaders
+            .shader_thumbnails
+            .load_one(self.id.0.clone())
+            .await?;
+        Ok(thumb.and_then(|t| t.thumbhash))
     }
 
     /// Total number of versions for this shader.
+    /// Not DataLoader-batched — infrequently used and requires full version list.
     async fn version_count(&self, ctx: &Context<'_>) -> Result<i64> {
         let state = ctx.data_unchecked::<AppState>();
         let versions =
@@ -122,9 +139,12 @@ impl ShaderNode {
 
     /// Extraction summary across all versions.
     async fn extraction_summary(&self, ctx: &Context<'_>) -> Result<Option<ExtractionSummaryNode>> {
-        let state = ctx.data_unchecked::<AppState>();
-        let mut summaries = ShaderVersionRepo::batch_extraction_summaries(state.db()).await?;
-        Ok(summaries.remove(&self.id).map(Into::into))
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
+        let summary = loaders
+            .shader_extraction_summaries
+            .load_one(self.id.0.clone())
+            .await?;
+        Ok(summary.map(Into::into))
     }
 
     /// Completed captures for this shader, optionally filtered by version and profile.

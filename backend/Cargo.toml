@@ -50,10 +50,9 @@ zip = { version = "8", default-features = false, features = ["deflate"] }
 custom_debug_derive = "0.6.2"
 tokio-util = { version = "0.7.18", features = ["rt"] }
 form_urlencoded = "1.2.2"
-async-graphql = { version = "7.2.1", features = ["chrono"] }
+async-graphql = { version = "7.2.1", features = ["chrono", "dataloader"] }
 async-graphql-axum = "7.2.1"
 tokio-stream = { version = "0.1.18", features = ["sync"] }
-async-stream = "0.3.6"
 
 [dev-dependencies]
 assert2 = "0.3.16"

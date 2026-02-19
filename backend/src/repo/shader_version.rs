@@ -243,6 +243,43 @@ impl ShaderVersionRepo {
             .collect())
     }
 
+    /// Get the latest version per shader for specific shader IDs.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn batch_latest_versions_for_shaders(
+        executor: impl sqlx::PgExecutor<'_>,
+        shader_ids: &[String],
+    ) -> AppResult<HashMap<ShaderId, ShaderVersion>> {
+        let versions = sqlx::query_as!(
+            ShaderVersion,
+            r#"
+            SELECT DISTINCT ON (shader_id)
+                id, shader_id, version, modrinth_version_id, curseforge_file_id,
+                download_url, file_hash, file_size,
+                game_versions as "game_versions: Json<Vec<String>>",
+                release_channel,
+                upstream_published_at, created_at, capture_failure_count, last_capture_error,
+                extraction_status AS "extraction_status!: ExtractionStatus",
+                extraction_error, extracted_at
+            FROM shader_versions
+            WHERE shader_id = ANY($1)
+            ORDER BY shader_id, upstream_published_at DESC NULLS LAST, created_at DESC
+            "#,
+            shader_ids,
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to batch fetch latest shader versions for subset")?;
+
+        debug!(
+            count = versions.len(),
+            "Batch fetched latest versions (filtered)"
+        );
+        Ok(versions
+            .into_iter()
+            .map(|v| (v.shader_id.clone(), v))
+            .collect())
+    }
+
     /// Batch-fetch extraction status summaries and version counts per shader.
     #[instrument(skip(executor), level = "debug")]
     pub async fn batch_extraction_summaries(
@@ -276,6 +313,62 @@ impl ShaderVersionRepo {
         .context("failed to batch fetch extraction summaries")?;
 
         debug!(count = rows.len(), "Batch fetched extraction summaries");
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    ShaderId(r.shader_id),
+                    crate::models::ExtractionSummary {
+                        completed: r.completed,
+                        failed: r.failed,
+                        pending: r.pending,
+                        skipped: r.skipped,
+                        total: r.total,
+                    },
+                )
+            })
+            .collect())
+    }
+
+    /// Batch-fetch extraction summaries for specific shader IDs.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn batch_extraction_summaries_for_shaders(
+        executor: impl sqlx::PgExecutor<'_>,
+        shader_ids: &[String],
+    ) -> AppResult<HashMap<ShaderId, crate::models::ExtractionSummary>> {
+        struct Row {
+            shader_id: String,
+            total: i64,
+            completed: i64,
+            failed: i64,
+            pending: i64,
+            skipped: i64,
+        }
+
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT
+                shader_id,
+                COUNT(*) AS "total!",
+                COUNT(*) FILTER (WHERE extraction_status = 'completed') AS "completed!",
+                COUNT(*) FILTER (WHERE extraction_status = 'failed') AS "failed!",
+                COUNT(*) FILTER (WHERE extraction_status = 'pending') AS "pending!",
+                COUNT(*) FILTER (WHERE extraction_status = 'skipped') AS "skipped!"
+            FROM shader_versions
+            WHERE shader_id = ANY($1)
+            GROUP BY shader_id
+            "#,
+            shader_ids,
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to batch fetch extraction summaries for subset")?;
+
+        debug!(
+            count = rows.len(),
+            "Batch fetched extraction summaries (filtered)"
+        );
         Ok(rows
             .into_iter()
             .map(|r| {

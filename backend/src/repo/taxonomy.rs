@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Context;
 use sqlx::Row;
 use tracing::{debug, instrument};
@@ -161,6 +163,41 @@ macro_rules! define_taxonomy_repo {
                     ))?;
 
                     Ok(items)
+                }
+
+                /// List taxonomy items for multiple parent entities in a single query.
+                #[instrument(skip(executor), level = "debug")]
+                pub async fn [<list_for_ $parent s>](
+                    executor: impl sqlx::PgExecutor<'_>,
+                    [<$parent _ids>]: &[String],
+                ) -> AppResult<HashMap<String, Vec<$Model>>> {
+                    let rows = sqlx::query(concat!(
+                        "SELECT j.", $parent, "_id, t.id, t.slug, t.name, t.description ",
+                        "FROM ", $table, " t ",
+                        "JOIN ", $join_table, " j ON j.", $fk, " = t.id ",
+                        "WHERE j.", $parent, "_id = ANY($1) ",
+                        "ORDER BY j.", $parent, "_id, t.name"
+                    ))
+                    .bind([<$parent _ids>])
+                    .fetch_all(executor)
+                    .await
+                    .context(concat!(
+                        "failed to list ", $table, " for ", $parent, "s (batch)"
+                    ))?;
+
+                    debug!(count = rows.len(), concat!("Listed ", $table, " (batch)"));
+                    let mut map: HashMap<String, Vec<$Model>> = HashMap::new();
+                    for r in rows {
+                        let parent_id: String = r.get(concat!($parent, "_id"));
+                        let model = $Model {
+                            id: r.get("id"),
+                            slug: r.get("slug"),
+                            name: r.get("name"),
+                            description: r.get("description"),
+                        };
+                        map.entry(parent_id).or_default().push(model);
+                    }
+                    Ok(map)
                 }
 
                 /// Link a taxonomy item to a parent entity.

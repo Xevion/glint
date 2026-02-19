@@ -415,6 +415,7 @@ type ShaderNode {
 	viewCount: Int!
 	"""
 	All versions of this shader, ordered by publish date descending.
+	Not DataLoader-batched — only called on single-shader detail pages.
 	"""
 	versions: [ShaderVersionDetailNode!]!
 	"""
@@ -443,6 +444,7 @@ type ShaderNode {
 	thumbhash: String
 	"""
 	Total number of versions for this shader.
+	Not DataLoader-batched — infrequently used and requires full version list.
 	"""
 	versionCount: Int!
 	"""

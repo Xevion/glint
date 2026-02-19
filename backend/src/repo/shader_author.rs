@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Context;
 use tracing::{debug, instrument};
 
@@ -23,6 +25,31 @@ impl ShaderAuthorRepo {
         .context(format!("failed to list authors for shader '{}'", shader_id))?;
         debug!(count = authors.len(), "Listed shader authors");
         Ok(authors)
+    }
+
+    /// List authors for multiple shaders in a single query, grouped by shader ID.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_by_shaders(
+        executor: impl sqlx::PgExecutor<'_>,
+        shader_ids: &[String],
+    ) -> AppResult<HashMap<String, Vec<ShaderAuthor>>> {
+        let authors = sqlx::query_as!(
+            ShaderAuthor,
+            "SELECT * FROM shader_authors WHERE shader_id = ANY($1) ORDER BY shader_id, name",
+            shader_ids
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to list authors for shaders")?;
+
+        debug!(count = authors.len(), "Listed shader authors (batch)");
+        let mut map: HashMap<String, Vec<ShaderAuthor>> = HashMap::new();
+        for author in authors {
+            map.entry(author.shader_id.0.clone())
+                .or_default()
+                .push(author);
+        }
+        Ok(map)
     }
 
     #[instrument(skip(executor), level = "debug")]

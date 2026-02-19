@@ -66,7 +66,7 @@ pub struct ShaderVersion {
 }
 
 /// Aggregate extraction status counts for a shader's versions
-#[derive(Debug, Serialize, TS)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct ExtractionSummary {
     pub completed: i64,

@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                shader_id,\n                COUNT(*) AS \"total!\",\n                COUNT(*) FILTER (WHERE extraction_status = 'completed') AS \"completed!\",\n                COUNT(*) FILTER (WHERE extraction_status = 'failed') AS \"failed!\",\n                COUNT(*) FILTER (WHERE extraction_status = 'pending') AS \"pending!\",\n                COUNT(*) FILTER (WHERE extraction_status = 'skipped') AS \"skipped!\"\n            FROM shader_versions\n            WHERE shader_id = ANY($1)\n            GROUP BY shader_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "total!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "completed!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "failed!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "pending!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "skipped!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "29b28acc061202226905352826336b17c630e665596629e18ca44991efa93938"
+}

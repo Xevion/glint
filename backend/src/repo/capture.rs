@@ -17,6 +17,7 @@ use crate::models::{
     CaptureWithContext, Page, StorageBucket, StorageStats,
 };
 
+#[derive(Clone)]
 pub struct ThumbnailInfo {
     pub image_path: String,
     pub thumbhash: Option<String>,
@@ -338,10 +339,6 @@ impl CaptureRepo {
     }
 
     /// List captures with context, supporting flexible filtering, pagination, and deduplication.
-    ///
-    /// Replaces the former `list_all_with_context`, `list_all_with_context_paginated`,
-    /// `list_with_context_for_scene`, `list_with_context_for_shader`, and
-    /// `list_with_context_for_shader_filtered` methods.
     ///
     /// Returns `(captures, total_count)` where `total_count` is `Some` only when
     /// `pagination` is provided.
