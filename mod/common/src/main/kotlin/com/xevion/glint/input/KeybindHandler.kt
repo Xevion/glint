@@ -4,6 +4,7 @@ import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.ui.ApiConfigWizardScreen
 import com.xevion.glint.ui.GlintMainScreen
+import com.xevion.glint.ui.SceneSetupScreen
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 
@@ -12,6 +13,7 @@ import org.lwjgl.glfw.GLFW
  *
  * Keybindings:
  * - J - Open Glint menu
+ * - K - Open Scene Setup (environment composition)
  *
  * All other actions are accessible via the Glint menu (J key).
  */
@@ -25,6 +27,11 @@ object KeybindHandler {
                 key = GLFW.GLFW_KEY_J,
                 action = { openSceneManager() },
                 description = "Open Glint menu",
+            ),
+            Keybind(
+                key = GLFW.GLFW_KEY_K,
+                action = { openSceneSetup() },
+                description = "Open Scene Setup",
             ),
         )
 
@@ -60,6 +67,13 @@ object KeybindHandler {
             log.debug("Opening Glint Hub")
             mc.setScreen(GlintMainScreen(null))
         }
+    }
+
+    private fun openSceneSetup() {
+        val mc = Minecraft.getInstance()
+        if (mc.level == null) return
+        log.debug("Opening Scene Setup")
+        mc.setScreen(SceneSetupScreen())
     }
 
     private fun isKeyPressed(glfwKey: Int): Boolean {

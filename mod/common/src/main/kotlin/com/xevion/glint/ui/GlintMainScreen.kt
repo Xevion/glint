@@ -16,6 +16,7 @@ import com.xevion.glint.ui.base.GlintDialogScreen
 import com.xevion.glint.ui.base.GlintTabbedScreen
 import com.xevion.glint.ui.base.GlintTheme
 import io.wispforest.owo.ui.component.Components
+import io.wispforest.owo.ui.component.TextBoxComponent
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
 import io.wispforest.owo.ui.core.Color
@@ -25,6 +26,7 @@ import io.wispforest.owo.ui.core.Insets
 import io.wispforest.owo.ui.core.Sizing
 import io.wispforest.owo.ui.core.VerticalAlignment
 import net.minecraft.client.gui.screens.Screen
+import org.lwjgl.glfw.GLFW
 import java.util.concurrent.CompletableFuture
 import net.minecraft.network.chat.Component as McComponent
 
@@ -164,11 +166,7 @@ class GlintMainScreen(
                         },
                     ),
             ) {
-                minecraft?.setScreen(
-                    ExportSceneDialog(parentScreen = this) {
-                        refreshScenes()
-                    },
-                )
+                minecraft?.setScreen(SceneSetupScreen())
             }
         exportBtn.active = inSingleplayer
         headerRow.child(exportBtn as Component)
@@ -410,9 +408,7 @@ class GlintMainScreen(
                     width = 65,
                     tooltip = McComponent.literal("Re-export scene from current world state"),
                 ) {
-                    minecraft?.setScreen(
-                        ExportSceneDialog(parentScreen = this) { refreshScenes() },
-                    )
+                    minecraft?.setScreen(SceneSetupScreen())
                 } as Component,
             )
         }
@@ -992,6 +988,22 @@ class GlintMainScreen(
                 minecraft?.setScreen(StatusLogScreen(this))
             } as Component,
         )
+    }
+
+    override fun keyPressed(
+        keyCode: Int,
+        scanCode: Int,
+        modifiers: Int,
+    ): Boolean {
+        // K opens Scene Setup unless a text input is focused (e.g., preset edit form)
+        if (keyCode == GLFW.GLFW_KEY_K && focused !is TextBoxComponent) {
+            val inSingleplayer = minecraft?.singleplayerServer != null
+            if (inSingleplayer) {
+                minecraft?.setScreen(SceneSetupScreen())
+            }
+            return true
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers)
     }
 
     override fun onClose() {
