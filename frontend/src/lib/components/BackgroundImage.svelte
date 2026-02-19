@@ -9,13 +9,13 @@ export interface BackgroundItem {
 	id: string;
 	imagePath: string;
 	thumbhash?: string | null;
-	themeMode: string;
 	width?: number | null;
 	height?: number | null;
 }
 
 interface Props {
-	backgrounds: BackgroundItem[];
+	lightBackgrounds: BackgroundItem[];
+	darkBackgrounds: BackgroundItem[];
 	blur?: number;
 	overlay?: boolean;
 	overlayOpacity?: number;
@@ -31,7 +31,8 @@ interface Props {
 }
 
 const {
-	backgrounds,
+	lightBackgrounds,
+	darkBackgrounds,
 	blur = 0,
 	overlay = true,
 	overlayOpacity = 0.5,
@@ -52,18 +53,10 @@ let containerEl: HTMLDivElement | undefined = $state();
 let mounted = $state(false);
 let initialAnimationDone = $state(false);
 
-// Split backgrounds by theme mode
-const lightBackgrounds = $derived(
-	backgrounds.filter((b) => b.themeMode === 'light' || b.themeMode === 'both')
-);
-const darkBackgrounds = $derived(
-	backgrounds.filter((b) => b.themeMode === 'dark' || b.themeMode === 'both')
-);
-
 // Calculate the displayed height of each wallpaper section based on scale
-// Use first background's dimensions or defaults
+// Use first available background's dimensions or defaults
 const sectionHeight = $derived.by(() => {
-	const ref = backgrounds[0];
+	const ref = lightBackgrounds[0] ?? darkBackgrounds[0];
 	const w = ref?.width ?? DEFAULT_WIDTH;
 	const h = ref?.height ?? DEFAULT_HEIGHT;
 	const displayedHeight = (viewportWidth * h) / w / scale;
@@ -150,7 +143,13 @@ onMount(() => {
 
 	// Preload all background images before showing them
 	const preloadImages = async () => {
-		const allBgs = [...new Set([...lightBackgrounds, ...darkBackgrounds])];
+		// Deduplicate by id to handle 'both'-mode backgrounds appearing in both arrays
+		const seen: Record<string, true> = {};
+		const allBgs = [...lightBackgrounds, ...darkBackgrounds].filter((bg) => {
+			if (seen[bg.id]) return false;
+			seen[bg.id] = true;
+			return true;
+		});
 		if (allBgs.length === 0) {
 			imagesLoaded = true;
 			return;

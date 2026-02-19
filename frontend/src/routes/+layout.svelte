@@ -61,7 +61,8 @@ onMount(() => {
 <Toaster richColors />
 
 <BackgroundImage
-	backgrounds={data.backgrounds}
+	lightBackgrounds={data.lightBackgrounds}
+	darkBackgrounds={data.darkBackgrounds}
 	blur={4}
 	overlayOpacity={0.7}
 	lightOverlayOpacity={0.82}
