@@ -232,6 +232,9 @@ export class ProcessGroup {
 			}
 			// Remove our signal handlers
 			this.removeSignalHandlers();
+			// Reset terminal state — killed children may leave raw mode, hidden
+			// cursor, or partial escape sequences in the output stream
+			ProcessGroup.resetTerminal();
 			process.exit(130); // 128 + SIGINT(2)
 		};
 		for (const sig of ["SIGINT", "SIGTERM"] as const) {
@@ -255,6 +258,28 @@ export class ProcessGroup {
 			process.off(signal, handler);
 		}
 		this.signalHandlers = [];
+	}
+
+	/**
+	 * Reset terminal to a sane state after killing child processes.
+	 *
+	 * Killed children may leave the terminal in raw mode, with a hidden cursor,
+	 * inside an alternate screen buffer, or mid-escape sequence. This writes
+	 * targeted reset sequences and restores line discipline via stty.
+	 */
+	static resetTerminal(): void {
+		try {
+			// Reset attributes, show cursor, leave alternate screen buffer
+			process.stdout.write("\x1b[0m\x1b[?25h\x1b[?1049l");
+		} catch {
+			// stdout may already be closed
+		}
+		try {
+			// Restore terminal line discipline (echo, cooked mode, etc.)
+			Bun.spawnSync(["stty", "sane"], { stdio: ["inherit", "ignore", "ignore"] });
+		} catch {
+			// stty may not be available
+		}
 	}
 
 	/**
@@ -324,6 +349,9 @@ export class ProcessGroup {
 
 		// Clean up signal handlers
 		this.removeSignalHandlers();
+
+		// Reset terminal state after all children are dead
+		ProcessGroup.resetTerminal();
 	}
 
 	/**
