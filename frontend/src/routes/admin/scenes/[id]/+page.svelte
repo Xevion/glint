@@ -27,6 +27,7 @@ import { Label } from '$lib/components/ui/label';
 import { StatusBadge } from '$lib/components/ui/status-badge';
 import { Textarea } from '$lib/components/ui/textarea';
 import { GripVertical, Pencil, Plus, RotateCcw, Trash2 } from '@lucide/svelte';
+import { toast } from 'svelte-sonner';
 import type { PageData } from './$types';
 
 interface Props {
@@ -50,19 +51,20 @@ const form = createAdminForm({
 			(request as Record<string, unknown>)[key] = key === 'name' ? value : value || undefined;
 		}
 		return api.admin.updateScene(source.id, request);
-	}
+	},
+	onError: (msg) => toast.error(msg)
 });
 
 const disableAction = createAdminAction({
 	action: () => api.admin.disableScene(scene.id),
 	onSuccess: () => void goto('/admin/scenes'),
-	setError: (msg) => (form.error = msg)
+	setError: (msg) => toast.error(msg)
 });
 
 const reactivateAction = createAdminAction({
 	action: () => api.admin.reactivateScene(scene.id),
 	onSuccess: () => void invalidateAll(),
-	setError: (msg) => (form.error = msg)
+	setError: (msg) => toast.error(msg)
 });
 
 let showDisableConfirm = $state(false);
@@ -257,10 +259,6 @@ function handleDragEnd() {
 			{reactivateAction.loading ? 'Reactivating...' : 'Reactivate'}
 		</Button>
 		</Alert>
-	{/if}
-
-	{#if form.error}
-		<Alert variant="destructive">{form.error}</Alert>
 	{/if}
 
 	<!-- Edit Section -->

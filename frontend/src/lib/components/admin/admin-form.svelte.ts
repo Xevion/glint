@@ -17,6 +17,8 @@ interface AdminFormConfig<T> {
 	onSave: (changes: Record<string, string>, source: T) => Promise<Result<unknown, ApiError>>;
 	/** Called after successful save. Defaults to `invalidateAll()`. */
 	onSuccess?: () => void;
+	/** Called when the save fails. When provided, errors go here instead of `form.error`. */
+	onError?: (message: string) => void;
 }
 
 /**
@@ -95,7 +97,11 @@ export function createAdminForm<T>(config: AdminFormConfig<T>) {
 					}
 				},
 				Err: (err) => {
-					error = err.message;
+					if (config.onError) {
+						config.onError(err.message);
+					} else {
+						error = err.message;
+					}
 				}
 			});
 		} finally {

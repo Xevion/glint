@@ -13,7 +13,7 @@ async fn test_work_items_empty_when_no_scenes(pool: sqlx::PgPool) {
     seed_shader(&pool, "sh1", "cool-shader", "Cool Shader").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -27,7 +27,7 @@ async fn test_work_items_only_vanilla_when_no_custom_shaders(pool: sqlx::PgPool)
     // 1 scene, only the vanilla shader from migration 001
     setup_basic_scene(&pool).await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -46,7 +46,7 @@ async fn test_work_items_basic_matrix_expansion(pool: sqlx::PgPool) {
     seed_shader(&pool, "sh2", "shader-b", "Shader B").await;
     seed_shader_version(&pool, "shv2", "sh2", "1.0.0").await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -67,7 +67,7 @@ async fn test_work_items_inactive_scenes_excluded(pool: sqlx::PgPool) {
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -90,7 +90,7 @@ async fn test_work_items_version_with_profiles_expands_per_profile(pool: sqlx::P
     seed_profile(&pool, "p2", "shv1", "Medium", 1).await;
     seed_profile(&pool, "p3", "shv1", "High", 2).await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -125,7 +125,7 @@ async fn test_work_items_version_without_profiles_has_null_profile_id(pool: sqlx
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -150,7 +150,7 @@ async fn test_work_items_mixed_profile_and_no_profile_shaders(pool: sqlx::PgPool
     seed_shader(&pool, "sh2", "shader-b", "Shader B").await;
     seed_shader_version(&pool, "shv2", "sh2", "1.0.0").await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -213,7 +213,7 @@ async fn test_work_items_excludes_targets_with_fresh_captures(pool: sqlx::PgPool
     )
     .await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -254,7 +254,7 @@ async fn test_work_items_includes_targets_with_stale_captures(pool: sqlx::PgPool
     // Add a new scene version → old capture is now stale
     seed_scene_version(&pool, "sv-new", "sc1").await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -290,7 +290,7 @@ async fn test_work_items_force_includes_fresh_captures(pool: sqlx::PgPool) {
     .await;
 
     // force=false → excluded
-    let items_no_force = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items_no_force = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
     let custom_no_force: Vec<_> = items_no_force
@@ -300,7 +300,7 @@ async fn test_work_items_force_includes_fresh_captures(pool: sqlx::PgPool) {
     assert!(custom_no_force.is_empty());
 
     // force=true → included
-    let items_force = WorkRepo::get_work_items(&pool, 100, true, None, None)
+    let items_force = WorkRepo::get_work_items(&pool, 100, true, None, None, None)
         .await
         .expect("get_work_items");
     let custom_force: Vec<_> = items_force
@@ -334,7 +334,7 @@ async fn test_work_items_null_profile_fresh_capture_excludes_correctly(pool: sql
     )
     .await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -355,7 +355,7 @@ async fn test_work_items_excludes_versions_at_failure_cap(pool: sqlx::PgPool) {
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version_with_failures(&pool, "shv1", "sh1", "1.0.0", 3).await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -375,7 +375,7 @@ async fn test_work_items_includes_versions_below_failure_cap(pool: sqlx::PgPool)
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version_with_failures(&pool, "shv1", "sh1", "1.0.0", 2).await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -396,7 +396,7 @@ async fn test_work_items_force_includes_failed_versions(pool: sqlx::PgPool) {
     seed_shader_version_with_failures(&pool, "shv1", "sh1", "1.0.0", 5).await;
 
     // force=false → excluded
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
     let custom_items: Vec<_> = items
@@ -406,7 +406,7 @@ async fn test_work_items_force_includes_failed_versions(pool: sqlx::PgPool) {
     assert!(custom_items.is_empty());
 
     // force=true → included
-    let items = WorkRepo::get_work_items(&pool, 100, true, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, true, None, None, None)
         .await
         .expect("get_work_items");
     let custom_items: Vec<_> = items
@@ -427,9 +427,10 @@ async fn test_work_items_shaders_filter_single_slug(pool: sqlx::PgPool) {
     seed_shader(&pool, "sh2", "shader-b", "Shader B").await;
     seed_shader_version(&pool, "shv2", "sh2", "1.0.0").await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, Some("shader-a".to_string()), None)
-        .await
-        .expect("get_work_items");
+    let items =
+        WorkRepo::get_work_items(&pool, 100, false, Some("shader-a".to_string()), None, None)
+            .await
+            .expect("get_work_items");
 
     // Only shader-a, vanilla excluded by filter
     assert!(items.len() == 1);
@@ -449,10 +450,16 @@ async fn test_work_items_shaders_filter_comma_separated(pool: sqlx::PgPool) {
     seed_shader(&pool, "sh3", "slug-c", "Shader C").await;
     seed_shader_version(&pool, "shv3", "sh3", "1.0.0").await;
 
-    let items =
-        WorkRepo::get_work_items(&pool, 100, false, Some("slug-a,slug-b".to_string()), None)
-            .await
-            .expect("get_work_items");
+    let items = WorkRepo::get_work_items(
+        &pool,
+        100,
+        false,
+        Some("slug-a,slug-b".to_string()),
+        None,
+        None,
+    )
+    .await
+    .expect("get_work_items");
 
     // Only slug-a and slug-b
     assert!(items.len() == 2);
@@ -471,9 +478,10 @@ async fn test_work_items_scenes_filter_single_slug(pool: sqlx::PgPool) {
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, Some("scene-a".to_string()))
-        .await
-        .expect("get_work_items");
+    let items =
+        WorkRepo::get_work_items(&pool, 100, false, None, Some("scene-a".to_string()), None)
+            .await
+            .expect("get_work_items");
 
     // shader-a × scene-a + vanilla × scene-a = 2
     assert!(items.len() == 2);
@@ -499,6 +507,7 @@ async fn test_work_items_both_filters_combined(pool: sqlx::PgPool) {
         false,
         Some("shader-a".to_string()),
         Some("scene-b".to_string()),
+        None,
     )
     .await
     .expect("get_work_items");
@@ -543,6 +552,7 @@ async fn test_work_items_uncaptured_versions_first(pool: sqlx::PgPool) {
         false,
         Some("shader-a,shader-b".to_string()),
         None,
+        None,
     )
     .await
     .expect("get_work_items");
@@ -566,7 +576,7 @@ async fn test_work_items_higher_downloads_first(pool: sqlx::PgPool) {
     seed_shader_with_downloads(&pool, "sh3", "shader-c", "Shader C", 2000).await;
     seed_shader_version(&pool, "shv3", "sh3", "1.0.0").await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -611,6 +621,7 @@ async fn test_work_items_alphabetical_tiebreaker(pool: sqlx::PgPool) {
         false,
         Some("alpha-shader,beta-shader".to_string()),
         None,
+        None,
     )
     .await
     .expect("get_work_items");
@@ -640,21 +651,21 @@ async fn test_work_items_shader_limit_truncates(pool: sqlx::PgPool) {
     // Total: (2 custom + vanilla) × 2 scenes = 6
 
     // shader_limit=1 selects only the top shader → 1 shader × 2 scenes = 2
-    let items = WorkRepo::get_work_items(&pool, 1, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 1, false, None, None, None)
         .await
         .expect("get_work_items");
 
     assert!(items.len() == 2);
 
     // shader_limit=2 selects top 2 shaders → 2 × 2 = 4
-    let items = WorkRepo::get_work_items(&pool, 2, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 2, false, None, None, None)
         .await
         .expect("get_work_items");
 
     assert!(items.len() == 4);
 
     // shader_limit=100 selects all 3 shaders → 3 × 2 = 6
-    let items = WorkRepo::get_work_items(&pool, 100, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 100, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -670,7 +681,7 @@ async fn test_work_items_limit_zero_returns_empty(pool: sqlx::PgPool) {
     seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
-    let items = WorkRepo::get_work_items(&pool, 0, false, None, None)
+    let items = WorkRepo::get_work_items(&pool, 0, false, None, None, None)
         .await
         .expect("get_work_items");
 
@@ -687,9 +698,10 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
     // Initially no profiles → 1 item for custom shader
-    let items = WorkRepo::get_work_items(&pool, 100, false, Some("shader-a".to_string()), None)
-        .await
-        .expect("get_work_items");
+    let items =
+        WorkRepo::get_work_items(&pool, 100, false, Some("shader-a".to_string()), None, None)
+            .await
+            .expect("get_work_items");
     assert!(items.len() == 1);
     check!(items[0].shader.profile_id.is_none());
     check!(items[0].shader.profile_name.is_none());
@@ -698,9 +710,10 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
     seed_profile(&pool, "p1", "shv1", "Low", 0).await;
     seed_profile(&pool, "p2", "shv1", "High", 1).await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, Some("shader-a".to_string()), None)
-        .await
-        .expect("get_work_items");
+    let items =
+        WorkRepo::get_work_items(&pool, 100, false, Some("shader-a".to_string()), None, None)
+            .await
+            .expect("get_work_items");
     assert!(items.len() == 2);
     for item in &items {
         check!(item.shader.profile_id.is_some());
@@ -733,13 +746,156 @@ async fn test_fresh_capture_for_one_profile_does_not_exclude_other(pool: sqlx::P
     )
     .await;
 
-    let items = WorkRepo::get_work_items(&pool, 100, false, Some("shader-a".to_string()), None)
-        .await
-        .expect("get_work_items");
+    let items =
+        WorkRepo::get_work_items(&pool, 100, false, Some("shader-a".to_string()), None, None)
+            .await
+            .expect("get_work_items");
 
     // Profile A excluded (fresh capture), Profile B still needed
     assert!(items.len() == 1);
     let_assert!(Some(profile_id) = &items[0].shader.profile_id);
     check!(profile_id.as_ref() == "p-b");
     check!(items[0].shader.profile_name.as_deref() == Some("Profile B"));
+}
+
+// -- Budget (target_items) tests --
+
+#[sqlx::test]
+async fn test_budget_single_shader_exceeding_target_included_whole(pool: sqlx::PgPool) {
+    apply_views(&pool).await.expect("views");
+
+    // 1 shader × 3 scenes (each with a preset) = 3 items, target=1
+    seed_scene(&pool, "sc1", "scene-a", "Scene A", true).await;
+    seed_scene_version(&pool, "sv1", "sc1").await;
+    seed_scene_preset(&pool, "sp1", "sc1", "Default", "default", 6000).await;
+    seed_scene(&pool, "sc2", "scene-b", "Scene B", true).await;
+    seed_scene_version(&pool, "sv2", "sc2").await;
+    seed_scene_preset(&pool, "sp2", "sc2", "Default", "default-b", 6000).await;
+    seed_scene(&pool, "sc3", "scene-c", "Scene C", true).await;
+    seed_scene_version(&pool, "sv3", "sc3").await;
+    seed_scene_preset(&pool, "sp3", "sc3", "Default", "default-c", 6000).await;
+
+    seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
+    seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
+
+    // target=1 but the shader has 3 items — must still return all 3
+    let items = WorkRepo::get_work_items(
+        &pool,
+        100,
+        false,
+        Some("shader-a".to_string()),
+        None,
+        Some(1),
+    )
+    .await
+    .expect("get_work_items");
+
+    assert!(items.len() == 3);
+    for item in &items {
+        check!(item.shader.slug == "shader-a");
+    }
+}
+
+#[sqlx::test]
+async fn test_budget_stops_after_first_shader_crossing_target(pool: sqlx::PgPool) {
+    apply_views(&pool).await.expect("views");
+
+    // 3 shaders × 2 scenes = 6 items total; each shader has 2 items.
+    // target=2 → after shader 1 (2 items committed) we stop.
+    setup_two_scenes(&pool).await;
+
+    seed_shader_with_downloads(&pool, "sh1", "shader-a", "Shader A", 300).await;
+    seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
+    seed_shader_with_downloads(&pool, "sh2", "shader-b", "Shader B", 200).await;
+    seed_shader_version(&pool, "shv2", "sh2", "1.0.0").await;
+    seed_shader_with_downloads(&pool, "sh3", "shader-c", "Shader C", 100).await;
+    seed_shader_version(&pool, "shv3", "sh3", "1.0.0").await;
+
+    let items = WorkRepo::get_work_items(
+        &pool,
+        100,
+        false,
+        Some("shader-a,shader-b,shader-c".to_string()),
+        None,
+        Some(2),
+    )
+    .await
+    .expect("get_work_items");
+
+    // Only shader-a (highest priority, 2 items) should be included
+    assert!(items.len() == 2);
+    for item in &items {
+        check!(item.shader.slug == "shader-a");
+    }
+}
+
+#[sqlx::test]
+async fn test_budget_accumulates_until_target(pool: sqlx::PgPool) {
+    apply_views(&pool).await.expect("views");
+
+    // 3 shaders × 1 scene = 3 items total (1 item each).
+    // target=2 → after shader 1 (1 item, not yet at target), shader 2 (2 items, reached) → stop.
+    setup_basic_scene(&pool).await;
+
+    seed_shader_with_downloads(&pool, "sh1", "shader-a", "Shader A", 300).await;
+    seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
+    seed_shader_with_downloads(&pool, "sh2", "shader-b", "Shader B", 200).await;
+    seed_shader_version(&pool, "shv2", "sh2", "1.0.0").await;
+    seed_shader_with_downloads(&pool, "sh3", "shader-c", "Shader C", 100).await;
+    seed_shader_version(&pool, "shv3", "sh3", "1.0.0").await;
+
+    let items = WorkRepo::get_work_items(
+        &pool,
+        100,
+        false,
+        Some("shader-a,shader-b,shader-c".to_string()),
+        None,
+        Some(2),
+    )
+    .await
+    .expect("get_work_items");
+
+    // shader-a (1 item) + shader-b (1 item) = 2, hits target → stop before shader-c
+    assert!(items.len() == 2);
+    let slugs: Vec<&str> = items.iter().map(|i| i.shader.slug.as_str()).collect();
+    check!(slugs.contains(&"shader-a"));
+    check!(slugs.contains(&"shader-b"));
+    check!(!slugs.contains(&"shader-c"));
+}
+
+#[sqlx::test]
+async fn test_budget_large_target_returns_all(pool: sqlx::PgPool) {
+    apply_views(&pool).await.expect("views");
+
+    setup_two_scenes(&pool).await;
+
+    seed_shader(&pool, "sh1", "shader-a", "Shader A").await;
+    seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
+    seed_shader(&pool, "sh2", "shader-b", "Shader B").await;
+    seed_shader_version(&pool, "shv2", "sh2", "1.0.0").await;
+
+    // target=9999 should not truncate anything; same as None
+    let items_capped = WorkRepo::get_work_items(
+        &pool,
+        100,
+        false,
+        Some("shader-a,shader-b".to_string()),
+        None,
+        Some(9999),
+    )
+    .await
+    .expect("get_work_items capped");
+
+    let items_uncapped = WorkRepo::get_work_items(
+        &pool,
+        100,
+        false,
+        Some("shader-a,shader-b".to_string()),
+        None,
+        None,
+    )
+    .await
+    .expect("get_work_items uncapped");
+
+    assert!(items_capped.len() == items_uncapped.len());
 }

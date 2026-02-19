@@ -14,6 +14,45 @@ use crate::repo::work_ordering;
 /// even when shader_limit would produce more.
 const MAX_ITEMS: i64 = 5000;
 
+/// Greedily accumulate complete shaders until `target` items are committed.
+///
+/// Iterates `items` in their existing priority order. Shaders are always
+/// included whole (all scenes/profiles for a `version_id`). Stops adding
+/// shaders once the running total first reaches or exceeds `target`.
+/// Always includes at least one full shader even when it alone exceeds the budget.
+fn trim_to_budget(items: Vec<WorkItem>, target: usize) -> Vec<WorkItem> {
+    if items.is_empty() || target == 0 {
+        return items;
+    }
+
+    let mut result = Vec::new();
+    let mut shader_batch: Vec<WorkItem> = Vec::new();
+    let mut current_version: Option<ShaderVersionId> = None;
+    let mut committed = 0usize;
+
+    for item in items {
+        let version_id = item.shader.version_id.clone();
+
+        if current_version.as_ref() != Some(&version_id) {
+            // Flush previous shader — check if we should stop after it
+            if !shader_batch.is_empty() {
+                committed += shader_batch.len();
+                result.extend(shader_batch.drain(..));
+                if committed >= target {
+                    return result;
+                }
+            }
+            current_version = Some(version_id);
+        }
+
+        shader_batch.push(item);
+    }
+
+    // Always flush the last shader (guarantees at least 1 complete shader)
+    result.extend(shader_batch);
+    result
+}
+
 pub struct WorkRepo;
 
 impl WorkRepo {
@@ -39,6 +78,7 @@ impl WorkRepo {
         force: bool,
         shaders_filter: Option<String>,
         scenes_filter: Option<String>,
+        target_items: Option<i64>,
     ) -> AppResult<Vec<WorkItem>> {
         let mut tx = pool.begin().await.context("failed to begin transaction")?;
 
@@ -168,6 +208,12 @@ impl WorkRepo {
         tx.commit().await.context("failed to commit transaction")?;
 
         let items: Vec<WorkItem> = items.into_iter().map(WorkItem::from).collect();
+
+        let items = if let Some(target) = target_items {
+            trim_to_budget(items, target as usize)
+        } else {
+            items
+        };
 
         // Post-process: spatial clustering + nearest-neighbor scene ordering
         let ordered = work_ordering::optimize_execution_order(items);

@@ -4,11 +4,11 @@ import { api } from '$lib/api';
 import type { UserWithSessions } from '$lib/bindings';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminBreadcrumb } from '$lib/components/admin';
-import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
 import { Trash2 } from '@lucide/svelte';
+import { toast } from 'svelte-sonner';
 import type { PageData } from './$types';
 
 interface Props {
@@ -17,7 +17,6 @@ interface Props {
 let { data }: Props = $props();
 let user: UserWithSessions = $derived(data.user);
 
-let error = $state<string | null>(null);
 let showDeleteSessionsConfirm = $state(false);
 let deletingSessionToken = $state<string | null>(null);
 
@@ -37,36 +36,27 @@ function avatarUrl(size: number): string | null {
 }
 
 async function handleRoleChange(newRole: string) {
-	error = null;
 	const result = await api.admin.updateUserRole(user.id, newRole);
 	result.match({
 		Ok: () => void invalidateAll(),
-		Err: (err) => {
-			error = err.message;
-		}
+		Err: (err) => toast.error(err.message)
 	});
 }
 
 async function confirmDeleteAllSessions() {
-	error = null;
 	const result = await api.admin.deleteUserSessions(user.id);
 	result.match({
 		Ok: () => void invalidateAll(),
-		Err: (err) => {
-			error = err.message;
-		}
+		Err: (err) => toast.error(err.message)
 	});
 }
 
 async function deleteSession(tokenPrefix: string) {
-	error = null;
 	deletingSessionToken = tokenPrefix;
 	const result = await api.admin.deleteSession(user.id, tokenPrefix);
 	result.match({
 		Ok: () => void invalidateAll(),
-		Err: (err) => {
-			error = err.message;
-		}
+		Err: (err) => toast.error(err.message)
 	});
 	deletingSessionToken = null;
 }
@@ -106,10 +96,6 @@ async function deleteSession(tokenPrefix: string) {
 			<code class="text-xs text-foreground">{user.discord_id}</code>
 		</div>
 	</div>
-
-	{#if error}
-		<Alert variant="destructive">{error}</Alert>
-	{/if}
 
 	<!-- User Info -->
 	<div class="rounded-lg border bg-card p-4">

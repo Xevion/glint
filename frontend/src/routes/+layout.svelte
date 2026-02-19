@@ -14,6 +14,7 @@ import Sidebar from '$lib/components/Sidebar.svelte';
 import { initNavigation } from '$lib/stores/navigation.svelte';
 import { themeStore } from '$lib/stores/theme.svelte';
 import { telemetry } from '$lib/telemetry';
+import { Toaster } from 'svelte-sonner';
 import type { LayoutData } from './$types';
 import './layout.css';
 
@@ -57,6 +58,7 @@ onMount(() => {
 
 <BrandIconSprite />
 <ConnectivityBanner />
+<Toaster richColors />
 
 <BackgroundImage
 	backgrounds={data.backgrounds}

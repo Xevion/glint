@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use crate::{
     auth::{AdminUser, MaybeAuthUser},
-    error::{AppError, AppResult, OptionNotFoundExt},
+    error::{AppError, AppResult},
     id::{self, ShaderVersionId, ShaderVersionProfileId},
     middleware::client_ip::ClientIp,
     models::{
@@ -426,18 +426,17 @@ async fn update_shader(
     Path(id): Path<String>,
     Json(request): Json<UpdateShaderRequest>,
 ) -> AppResult<Json<Shader>> {
+    let old = ShaderRepo::get(state.db(), &id).await?;
+
     // If slug is being changed, record the old one as a redirect
     if let Some(ref new_slug) = request.slug {
-        let old = ShaderRepo::find_by_id(state.db(), &id)
-            .await?
-            .or_not_found("Shader", &id)?;
         if old.slug != *new_slug {
             SlugRedirectRepo::upsert(state.db(), "shader", &old.slug, &old.id.0).await?;
             // Clear any existing redirect for the new slug so it's not stale
             SlugRedirectRepo::delete_by_old_slug(state.db(), "shader", new_slug).await?;
         }
     }
-    let shader = ShaderRepo::update(state.db(), &id, &request).await?;
+    let shader = ShaderRepo::update(state.db(), &old.id.0, &request).await?;
     Ok(Json(shader))
 }
 

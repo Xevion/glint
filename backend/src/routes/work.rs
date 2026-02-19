@@ -27,6 +27,12 @@ pub struct WorkQuery {
     /// and will prevent future reservation/locking logic from triggering.
     #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
     pub dry_run: Option<bool>,
+    /// Target number of work items to return. Shaders are added whole until this
+    /// budget is met or exceeded, so the actual count may be slightly higher.
+    /// Always includes at least one complete shader.
+    /// Defaults to 100. Pass a large value (e.g. 9999) to disable the cap.
+    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
+    pub target_items: Option<i64>,
 }
 
 pub fn router() -> Router<AppState> {
@@ -42,6 +48,7 @@ async fn get_work(
     let shader_limit = query.shader_limit.unwrap_or(10).min(100);
     let force = query.force.unwrap_or(false);
     let dry_run = query.dry_run.unwrap_or(false);
+    let target_items = query.target_items.map(|t| t.max(0)).or(Some(100));
 
     // "!" and "+" are wildcard sentinels meaning "all" — normalize to None
     let shaders_filter: Option<String> = query.shaders.filter(|s| !matches!(s.as_str(), "!" | "+"));
@@ -53,6 +60,7 @@ async fn get_work(
         force,
         shaders_filter,
         scenes_filter,
+        target_items,
     )
     .await?;
 

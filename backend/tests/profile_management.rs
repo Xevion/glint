@@ -536,7 +536,7 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
     seed_shader_version(&pool, "shv1", "sh1", "1.0.0").await;
 
     // Work items before profiles: custom shader gets 1 item (NULL profile)
-    let items_before = glint::repo::WorkRepo::get_work_items(&pool, 100, true, None, None)
+    let items_before = glint::repo::WorkRepo::get_work_items(&pool, 100, true, None, None, None)
         .await
         .expect("get work items before");
     let custom_before: Vec<_> = items_before
@@ -553,7 +553,7 @@ async fn test_adding_profiles_changes_work_items(pool: sqlx::PgPool) {
         .expect("persist extraction");
 
     // Work items after profiles: custom shader gets 2 items (one per profile)
-    let items_after = glint::repo::WorkRepo::get_work_items(&pool, 100, true, None, None)
+    let items_after = glint::repo::WorkRepo::get_work_items(&pool, 100, true, None, None, None)
         .await
         .expect("get work items after");
     let custom_after: Vec<_> = items_after

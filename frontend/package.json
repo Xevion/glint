@@ -108,6 +108,7 @@
 		"satori": "^0.19.2",
 		"sharp": "^0.34.5",
 		"svelte-relative-time": "^0.0.6",
+		"svelte-sonner": "^1.0.7",
 		"sveltekit-superforms": "^2.29.1",
 		"thumbhash": "^0.1.1",
 		"true-myth": "^9.3.1",

@@ -7,7 +7,6 @@ import Lightbox from '$lib/components/Lightbox.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { AdminBreadcrumb, AdminCaptureCard, createAdminAction } from '$lib/components/admin';
 import { ItemGrid } from '$lib/components/item-grid';
-import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Tabs from '$lib/components/ui/tabs';
@@ -15,6 +14,7 @@ import { formatBytes } from '$lib/utils/format';
 import { preloadImage } from '$lib/utils/image';
 import { freshnessColors, statusColorFallback, statusColors } from '$lib/utils/status';
 import { Trash2 } from '@lucide/svelte';
+import { toast } from 'svelte-sonner';
 import type { PageData } from './$types';
 
 interface Props {
@@ -23,14 +23,13 @@ interface Props {
 let { data }: Props = $props();
 let capture: CaptureDetail = $derived(data.capture);
 
-let error = $state<string | null>(null);
 let showDeleteConfirm = $state(false);
 let lightboxOpen = $state(false);
 
 const deleteAction = createAdminAction({
 	action: () => api.admin.deleteCapture(capture.id),
 	onSuccess: () => void goto('/admin/captures'),
-	setError: (msg) => (error = msg)
+	setError: (msg) => toast.error(msg)
 });
 
 // Build breadcrumb segments
@@ -149,10 +148,6 @@ function formatMs(value?: number): string {
 			<Trash2 class="h-4 w-4" />
 		</Button>
 	</header>
-
-	{#if error}
-		<Alert variant="destructive">{error}</Alert>
-	{/if}
 
 	<!-- Image + Metadata Split -->
 	<div class="grid gap-6 lg:grid-cols-[3fr_2fr]">

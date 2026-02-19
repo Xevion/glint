@@ -48,6 +48,7 @@ import * as Select from '$lib/components/ui/select';
 import { Switch } from '$lib/components/ui/switch';
 import { superForm } from 'sveltekit-superforms';
 import { zod4Client } from 'sveltekit-superforms/adapters';
+import { toast } from 'svelte-sonner';
 import { shaderFormSchema } from './schema.js';
 import type { PageData } from './$types';
 import { createVersionColumns } from './version-columns.js';
@@ -95,23 +96,30 @@ function humanize(key: string): string {
 const superform = superForm(data.form, {
 	validators: zod4Client(shaderFormSchema),
 	invalidateAll: 'force',
-	resetForm: false
+	resetForm: false,
+	onUpdated({ form }) {
+		if (form.message) {
+			const msg = String(form.message);
+			if (msg.toLowerCase().includes('success')) {
+				toast.success(msg);
+			} else {
+				toast.error(msg);
+			}
+		}
+	}
 });
-const { form: formData, enhance, message, tainted, submitting } = superform;
+const { form: formData, enhance, tainted, submitting } = superform;
 
 let isDirty = $derived($tainted != null && Object.values($tainted).some(Boolean));
 
 // ── Non-form actions (delete, sync, link) ───────────────────
-let actionError = $state<string | null>(null);
-
 const deleteAction = createAdminAction({
 	action: () => api.admin.deleteShader(shader.id),
 	onSuccess: () => void goto('/admin/shaders'),
-	setError: (msg) => (actionError = msg)
+	setError: (msg) => toast.error(msg)
 });
 
 let syncing = $state(false);
-let syncSuccess = $state(false);
 let showDeleteConfirm = $state(false);
 let linkDialogOpen = $state(false);
 let linkUrl = $state('');
@@ -141,20 +149,15 @@ let syncStatus = $derived.by<'never' | 'fresh' | 'stale' | 'very-stale'>(() => {
 
 async function handleSync() {
 	syncing = true;
-	actionError = null;
-	syncSuccess = false;
 
 	try {
 		const result = await api.admin.syncShader(shader.id);
 		result.match({
 			Ok: () => {
-				syncSuccess = true;
+				toast.success('Shader synced successfully from upstream.');
 				void invalidateAll();
-				setTimeout(() => (syncSuccess = false), 3000);
 			},
-			Err: (err) => {
-				actionError = err.message;
-			}
+			Err: (err) => toast.error(err.message)
 		});
 	} finally {
 		syncing = false;
@@ -232,21 +235,6 @@ function handleLinkKeydown(e: KeyboardEvent) {
             {/if}
         {/snippet}
     </AdminBreadcrumb>
-
-    {#if actionError}
-        <Alert variant="destructive">{actionError}</Alert>
-    {/if}
-
-    {#if $message}
-        {@const msg = String($message)}
-        <Alert variant={msg.includes('successfully') ? 'default' : 'destructive'}>
-            {msg}
-        </Alert>
-    {/if}
-
-    {#if syncSuccess}
-        <Alert>Shader synced successfully from upstream.</Alert>
-    {/if}
 
     <FolderCard.Root value="sync">
         {#snippet tabs()}
@@ -500,9 +488,9 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                         <!-- eslint-disable @typescript-eslint/no-unsafe-member-access -- formsnap control props -->
                                         <Select.Root
                                             type="single"
-                                            value={$formData.preferred_version_id ?? '__clear__'}
+                                            value={$formData.preferred_version_id ?? ''}
                                             onValueChange={(v: string) => {
-                                                $formData.preferred_version_id = v === '__clear__' ? null : v;
+                                                $formData.preferred_version_id = v === '' ? null : v;
                                             }}
                                             name={props.name as string}
                                         >
@@ -517,7 +505,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                                 {/if}
                                             </Select.Trigger>
                                             <Select.Content>
-                                                <Select.Item value="__clear__">
+                                                <Select.Item value="">
                                                     <span class="flex items-center gap-2">
                                                         <PinOff class="h-3.5 w-3.5 text-muted-foreground" />
                                                         Auto (latest version)
