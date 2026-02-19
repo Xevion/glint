@@ -40,7 +40,6 @@ export const load: PageLoad = async ({ fetch, url }) => {
 		error: string | null;
 	}>({
 		Ok: (data) => ({
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-return -- gql.tada fragment types unresolvable by eslint
 			shaders: data.shaders.edges.map((e) => e.node as ShaderCardShader),
 			total: data.shaders.totalCount,
 			hasNextPage: data.shaders.pageInfo.hasNextPage,

@@ -2,7 +2,7 @@
 import { resolve } from '$app/paths';
 import type { SceneCapture } from './+page';
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
-import CaptureGallery from '$lib/components/CaptureGallery.svelte';
+import CaptureGallery, { type CaptureGalleryItem } from '$lib/components/CaptureGallery.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
@@ -240,7 +240,6 @@ const ogDescription = $derived.by(() => {
 			</div>
 
 	<!-- Captures Grid -->
-	<!-- eslint-disable @typescript-eslint/no-unsafe-member-access -- GraphQL type resolution in callbacks -->
 	<CaptureGallery
 		captures={visibleCaptures}
 		title="Shader Renders"
@@ -254,7 +253,7 @@ const ogDescription = $derived.by(() => {
 		loading={false}
 		onLoadMore={loadMoreCaptures}
 	>
-		{#snippet overlay(capture)}
+		{#snippet overlay(capture: CaptureGalleryItem)}
 			{@const c = visibleCaptures.find(v => v.id === capture.id)}
 			{#if c}
 				<CaptureBadges
@@ -265,7 +264,6 @@ const ogDescription = $derived.by(() => {
 			{/if}
 		{/snippet}
 		</CaptureGallery>
-		<!-- eslint-enable @typescript-eslint/no-unsafe-member-access -->
 		</div>
 	{/key}
 {/if}

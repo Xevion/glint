@@ -152,7 +152,6 @@ const ogImage = $derived(featuredPairs[0]?.right.imagePath ?? null);
 				</a>
 			</div>
 
-		<!-- eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access -- gql.tada fragment types unresolvable in Svelte templates -->
 		<ItemGrid items={featuredShaders} key={(s: ShaderCardShader) => s.id} size="medium">
 			{#snippet card(shader: ShaderCardShader)}
 				<ShaderCard {shader} />

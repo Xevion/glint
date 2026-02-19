@@ -1,10 +1,16 @@
-import type { ColumnDef, RowData } from '@tanstack/table-core';
+import type { ColumnDef, HeaderContext, RowData } from '@tanstack/table-core';
 import type { Component } from 'svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import ImageCell from './cells/image-cell.svelte';
 import ImageFallbackCell from './cells/image-fallback-cell.svelte';
 import DataTableColumnHeader from './data-table-column-header.svelte';
 import { renderComponent } from './render-helpers.js';
+
+/** Builds a sortable header callback for DataTableColumnHeader. */
+function sortableHeaderDef<TData extends RowData>(title: string) {
+	return (ctx: HeaderContext<TData, unknown>) =>
+		renderComponent(DataTableColumnHeader, { column: ctx.column, title });
+}
 
 /**
  * Creates a basic text column with an optional sortable header.
@@ -31,9 +37,7 @@ export function textColumn<TData extends RowData>(
 		accessorKey,
 		...(size != null && { size }),
 		...(minSize != null && { minSize }),
-		header: sortable
-			? ({ column }) => renderComponent(DataTableColumnHeader, { column, title: header })
-			: header,
+		header: sortable ? sortableHeaderDef(header) : header,
 		enableSorting: sortable
 	};
 }
@@ -55,8 +59,8 @@ export function timeColumn<TData extends RowData>(
 	return {
 		accessorKey,
 		size: 120,
-		header: ({ column }) => renderComponent(DataTableColumnHeader, { column, title: header }),
-		cell: ({ row }) => {
+		header: sortableHeaderDef<TData>(header),
+		cell: ({ row }: { row: { getValue: <T>(key: string) => T } }) => {
 			const value = row.getValue<string | undefined>(accessorKey);
 			if (!value) return '-';
 			return renderComponent(TimeAgo, { timestamp: value });
@@ -93,24 +97,26 @@ export function imageColumn<TData extends RowData>(
 	const sizeClass = size === 'md' ? 'h-12 w-12' : 'h-8 w-8';
 	const roundedClass = rounded === 'full' ? 'rounded-full' : 'rounded';
 
+	const cellDef = ({ row }: { row: { getValue: <T>(key: string) => T } }) => {
+		const url = row.getValue<string | undefined>(accessorKey);
+		if (url) {
+			return renderComponent(ImageCell, { url, sizeClass, roundedClass });
+		}
+		if (opts.fallback) {
+			return renderComponent(ImageFallbackCell, {
+				icon: opts.fallback,
+				sizeClass,
+				roundedClass
+			});
+		}
+		return '';
+	};
+
 	return {
 		accessorKey,
 		header,
 		size: size === 'md' ? 64 : 48,
 		enableSorting: false,
-		cell: ({ row }) => {
-			const url = row.getValue<string | undefined>(accessorKey);
-			if (url) {
-				return renderComponent(ImageCell, { url, sizeClass, roundedClass });
-			}
-			if (opts.fallback) {
-				return renderComponent(ImageFallbackCell, {
-					icon: opts.fallback,
-					sizeClass,
-					roundedClass
-				});
-			}
-			return '';
-		}
+		cell: cellDef
 	};
 }

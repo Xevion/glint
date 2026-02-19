@@ -254,7 +254,6 @@ export const load: PageLoad = async ({ params, fetch, url }) => {
 
 	// Similar shaders
 	const listResult = await query(client, SimilarShadersQuery, { first: 30 });
-	/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access -- gql.tada fragment types unresolvable by eslint */
 	const similarShaders: ShaderCardShader[] = listResult.match({
 		Ok: (data) =>
 			(data.shaders.edges.map((e) => e.node) as ShaderCardShader[]).filter(
@@ -262,7 +261,6 @@ export const load: PageLoad = async ({ params, fetch, url }) => {
 			),
 		Err: () => []
 	});
-	/* eslint-enable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access */
 
 	return { shader, capturesData, similarShaders };
 };

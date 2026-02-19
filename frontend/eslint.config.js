@@ -5,6 +5,7 @@ import svelte from 'eslint-plugin-svelte';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import svelteConfig from './svelte.config.js';
+import * as customParser from '@xevion/ts-eslint-extra';
 
 const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
@@ -29,12 +30,12 @@ export default tseslint.config(
 	...tseslint.configs.stylisticTypeChecked,
 	// Svelte recommended
 	...svelte.configs.recommended,
-	// Global settings: environments + type-aware parser
+	// Global settings: environments + shared rules
 	{
 		languageOptions: {
 			globals: { ...globals.browser, ...globals.node },
 			parserOptions: {
-				projectService: true,
+				project: './tsconfig.json',
 				tsconfigRootDir: import.meta.dirname,
 				extraFileExtensions: ['.svelte']
 			}
@@ -53,12 +54,20 @@ export default tseslint.config(
 			]
 		}
 	},
-	// Svelte files: parser config + rule overrides
+	// TS files: use custom parser to resolve .svelte named exports
+	{
+		files: ['**/*.ts'],
+		languageOptions: {
+			parser: customParser
+		}
+	},
+	// Svelte files: svelte-eslint-parser (from svelte.configs.recommended) as
+	// outer parser, with custom parser for script blocks to resolve .svelte exports
 	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
 		languageOptions: {
 			parserOptions: {
-				parser: tseslint.parser,
+				parser: customParser,
 				svelteConfig
 			}
 		},

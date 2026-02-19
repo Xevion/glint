@@ -48,7 +48,6 @@ function changePageSize(size: number) {
 	void goto(url.toString(), { keepFocus: true });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- tv() return type unresolvable in svelte files
 const paginationBtnClass: string = buttonVariants({ variant: 'outline', size: 'sm' });
 
 function setFilter(key: string, value: string) {

@@ -74,12 +74,14 @@
 		"tw-animate-css": "latest",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.54.0",
+		"@xevion/ts-eslint-extra": "^0.10.0",
 		"vite": "^7.3.1",
 		"vite-plugin-devtools-json": "^1.0.0",
 		"vitest": "^4.0.18"
 	},
 	"overrides": {
-		"cookie": "^0.7.0"
+		"cookie": "^0.7.0",
+		"minimatch": ">=10.2.1"
 	},
 	"dependencies": {
 		"@fontsource/geist-sans": "^5.2.5",

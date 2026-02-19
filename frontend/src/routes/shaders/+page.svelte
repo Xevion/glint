@@ -64,11 +64,9 @@ async function loadMore() {
 	});
 	result.match({
 		Ok: (d) => {
-			/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- gql.tada fragment types unresolvable */
 			const newShaders = d.shaders.edges.map((e) => e.node as ShaderCardShader);
 			const existingIds = new Set(allShaders.map((s) => s.id));
 			allShaders = [...allShaders, ...newShaders.filter((s) => !existingIds.has(s.id))];
-			/* eslint-enable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 			endCursor = d.shaders.pageInfo.endCursor ?? null;
 			hasNextPage = d.shaders.pageInfo.hasNextPage;
 		},
@@ -109,7 +107,6 @@ const hasError = $derived(!!data.error);
 const hasFilters = $derived(data.q !== '');
 
 // OG image: use the most popular shader's capture image
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- gql.tada fragment types
 const ogImage = $derived(allShaders[0]?.imagePath ?? null);
 </script>
 
@@ -197,7 +194,6 @@ const ogImage = $derived(allShaders[0]?.imagePath ?? null);
 			</Button>
 		</div>
 	{:else}
-		<!-- eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment -- gql.tada fragment types unresolvable in Svelte templates -->
 		<ItemGrid
 			items={allShaders}
 			key={(s: ShaderCardShader) => s.id}
