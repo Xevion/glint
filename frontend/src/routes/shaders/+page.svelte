@@ -7,6 +7,7 @@ import Meta from '$lib/components/Meta.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
+import { NativeSelect } from '$lib/components/ui/native-select';
 import { createGraphQLClient, query } from '$lib/graphql';
 import { AlertTriangle, ChevronRight, Search, X } from '@lucide/svelte';
 import { goto, invalidateAll } from '$app/navigation';
@@ -158,16 +159,15 @@ const ogImage = $derived(allShaders[0]?.imagePath ?? null);
 		</div>
 
 		<!-- Sort -->
-		<select
+		<NativeSelect
 			value={data.sort}
 			onchange={(e: Event) => setSort((e.target as HTMLSelectElement).value)}
 			disabled={hasError}
-			class="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
 		>
 			<option value="popular">Popular</option>
 			<option value="updated">Recent</option>
 			<option value="name">A-Z</option>
-		</select>
+		</NativeSelect>
 
 		<!-- Spacer pushes view toggle to the right -->
 		<div class="flex-1"></div>

@@ -7,8 +7,9 @@ import { AdminBreadcrumb } from '$lib/components/admin';
 import { DataTable, createDataTable } from '$lib/components/data-table';
 import { Alert } from '$lib/components/ui/alert';
 import { buttonVariants } from '$lib/components/ui/button';
+import { NativeSelect } from '$lib/components/ui/native-select';
 import { formatBytes } from '$lib/utils/format';
-import { freshnessColors, statusColorFallback, statusColors } from '$lib/utils/status';
+import { StatusBadge } from '$lib/components/ui/status-badge';
 import type { PageData } from './$types';
 import { columns } from './columns.js';
 
@@ -69,37 +70,25 @@ function setFilter(key: string, value: string) {
 
 	<!-- Filter bar -->
 	<div class="flex flex-wrap items-center gap-3">
-		<select
-			class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-			value={data.filters.shader ?? ''}
-			onchange={(e) => setFilter('shader', e.currentTarget.value)}
-		>
+		<NativeSelect size="sm" value={data.filters.shader ?? ''} onchange={(e) => setFilter('shader', e.currentTarget.value)}>
 			<option value="">All shaders</option>
 			{#each shaders as s (s.id)}
 				<option value={s.slug}>{s.name}</option>
 			{/each}
-		</select>
+		</NativeSelect>
 
-		<select
-			class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-			value={data.filters.scene ?? ''}
-			onchange={(e) => setFilter('scene', e.currentTarget.value)}
-		>
+		<NativeSelect size="sm" value={data.filters.scene ?? ''} onchange={(e) => setFilter('scene', e.currentTarget.value)}>
 			<option value="">All scenes</option>
 			{#each scenes as s (s.id)}
 				<option value={s.id}>{s.name}</option>
 			{/each}
-		</select>
+		</NativeSelect>
 
-		<select
-			class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-			value={data.filters.status ?? ''}
-			onchange={(e) => setFilter('status', e.currentTarget.value)}
-		>
+		<NativeSelect size="sm" value={data.filters.status ?? ''} onchange={(e) => setFilter('status', e.currentTarget.value)}>
 			<option value="">All statuses</option>
 			<option value="completed">Completed</option>
 			<option value="failed">Failed</option>
-		</select>
+		</NativeSelect>
 
 		{#if data.filters.runId}
 			<span class="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs">
@@ -146,11 +135,7 @@ function setFilter(key: string, value: string) {
 							{/if}
 						</div>
 						<div class="mt-1 flex items-center gap-2">
-							<span
-								class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[capture.freshness]}"
-							>
-								{capture.freshness}
-							</span>
+							<StatusBadge status={capture.freshness}>{capture.freshness}</StatusBadge>
 							{#if capture.resolution_width && capture.resolution_height}
 								<span class="text-xs text-muted-foreground">
 									{capture.resolution_width}x{capture.resolution_height}
@@ -165,11 +150,7 @@ function setFilter(key: string, value: string) {
 					</div>
 					{#if capture.run_id && capture.run_status}
 						<div class="shrink-0">
-							<span
-								class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[capture.run_status] ?? statusColorFallback}"
-							>
-								{capture.run_status}
-							</span>
+							<StatusBadge status={capture.run_status}>{capture.run_status}</StatusBadge>
 						</div>
 					{/if}
 				</div>
@@ -214,15 +195,11 @@ function setFilter(key: string, value: string) {
 					</span>
 				{/if}
 			</div>
-			<select
-				class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-				value={pageSize}
-				onchange={(e) => changePageSize(Number(e.currentTarget.value))}
-			>
+			<NativeSelect size="sm" value={pageSize} onchange={(e) => changePageSize(Number(e.currentTarget.value))}>
 				<option value={25}>25 per page</option>
 				<option value={50}>50 per page</option>
 				<option value={100}>100 per page</option>
-			</select>
+			</NativeSelect>
 		</div>
 	{/if}
 </div>

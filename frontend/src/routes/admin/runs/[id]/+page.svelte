@@ -6,7 +6,7 @@ import RefreshButton from '$lib/components/RefreshButton.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import * as Table from '$lib/components/ui/table';
 import { formatDuration } from '$lib/utils/format';
-import { statusColorFallback, statusColors } from '$lib/utils/status';
+import { StatusBadge, type StatusBadgeStatus } from '$lib/components/ui/status-badge';
 import { ExternalLink } from '@lucide/svelte';
 import type { PageData } from './$types';
 import type { AdminCaptureRunData, AdminCaptureRunItem } from './queries';
@@ -36,9 +36,9 @@ async function refresh() {
 	refreshing = false;
 }
 
-// Map GraphQL enum values (RUNNING, COMPLETED, etc.) to the snake_case keys used by statusColors
-function normalizeStatus(status: string): string {
-	return status.toLowerCase().replace(/_/g, '_');
+// Map GraphQL enum values (RUNNING, COMPLETED, etc.) to the snake_case keys used by StatusBadge
+function normalizeStatus(status: string): StatusBadgeStatus {
+	return status.toLowerCase().replace(/_/g, '_') as NonNullable<StatusBadgeStatus>;
 }
 
 const statCards = $derived([
@@ -59,11 +59,7 @@ const statCards = $derived([
 				segments={[{ label: 'Runs', href: '/admin/runs' }, { label: 'Capture Run' }]}
 			>
 				{#snippet trailing()}
-					<span
-						class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[normalizeStatus(run.status)] ?? statusColorFallback}"
-					>
-						{normalizeStatus(run.status)}
-					</span>
+					<StatusBadge status={normalizeStatus(run.status)} class="ml-2">{normalizeStatus(run.status)}</StatusBadge>
 				{/snippet}
 			</AdminBreadcrumb>
 			<div class="ml-auto">
@@ -152,11 +148,7 @@ const statCards = $derived([
 						{/if}
 					</Table.Cell>
 					<Table.Cell class="px-4 py-2">
-						<span
-							class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[normalizeStatus(item.status)] ?? statusColorFallback}"
-						>
-							{normalizeStatus(item.status)}
-						</span>
+						<StatusBadge status={normalizeStatus(item.status)}>{normalizeStatus(item.status)}</StatusBadge>
 					</Table.Cell>
 					<Table.Cell class="px-4 py-2">
 						<div>

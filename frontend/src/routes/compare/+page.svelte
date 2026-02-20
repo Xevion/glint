@@ -11,6 +11,7 @@ import {
 	type ShaderDisplayInfo
 } from '$lib/components/compare';
 import { Button } from '$lib/components/ui/button';
+import { NativeSelect } from '$lib/components/ui/native-select';
 import { imageUrl } from '$lib/utils/image';
 import { ArrowLeftRight, Columns3, SplitSquareHorizontal, ToggleLeft } from '@lucide/svelte';
 import { fade, fly } from 'svelte/transition';
@@ -114,8 +115,7 @@ const ogDescription = $derived.by(() => {
 		<!-- Scene selector + mode selector -->
 		<div in:fly={{ y: 10, duration: 400, delay: 50 }} class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 			{#if data.scenes.length > 0}
-			<select
-				class="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+			<NativeSelect
 				value={data.selectedSceneSlug}
 				onchange={(e) => selectScene(e.currentTarget.value)}
 			>
@@ -124,7 +124,7 @@ const ogDescription = $derived.by(() => {
 							{scene.name} ({scene.captureCount})
 						</option>
 					{/each}
-				</select>
+				</NativeSelect>
 			{/if}
 
 			<div class="flex flex-wrap gap-2">

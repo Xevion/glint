@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { CaptureRunStatus } from '$lib/bindings';
-import { statusColorFallback, statusColors } from '$lib/utils/status';
+import { StatusBadge } from '$lib/components/ui/status-badge';
 
 interface Props {
 	status: CaptureRunStatus;
@@ -9,8 +9,4 @@ interface Props {
 let { status }: Props = $props();
 </script>
 
-<span
-	class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[status] ?? statusColorFallback}"
->
-	{status}
-</span>
+<StatusBadge {status}>{status}</StatusBadge>

@@ -1,3 +1,28 @@
+<script lang="ts" module>
+import { graphql, type ResultOf } from '$lib/graphql';
+
+/** Shared fragment for scene card fields — used by browse and home queries. */
+export const SceneCardFragment = graphql(`
+	fragment SceneCardFields on SceneNode @_unmask {
+		slug
+		name
+		description
+		dimension
+		imagePath
+		thumbhash
+		captureCount
+		version {
+			timeOfDayTicks
+			weather
+			biome
+		}
+	}
+`);
+
+/** Type derived from the SceneCardFields fragment via gql.tada. */
+export type SceneCardScene = ResultOf<typeof SceneCardFragment>;
+</script>
+
 <script lang="ts">
 import { resolve } from '$app/paths';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
@@ -11,23 +36,6 @@ import {
 	getWeatherDisplayName
 } from '$lib/utils/display';
 import { ArrowRight, Sun } from '@lucide/svelte';
-
-export interface SceneCardVersion {
-	timeOfDayTicks: number;
-	weather: string;
-	biome?: string | null;
-}
-
-export interface SceneCardScene {
-	slug: string;
-	name: string;
-	description?: string | null;
-	dimension: string;
-	imagePath?: string | null;
-	thumbhash?: string | null;
-	captureCount: number;
-	version: SceneCardVersion | null;
-}
 
 interface Props {
 	scene: SceneCardScene;

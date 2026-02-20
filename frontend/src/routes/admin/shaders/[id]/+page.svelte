@@ -21,7 +21,7 @@ import * as Dialog from '$lib/components/ui/dialog';
 import * as Form from '$lib/components/ui/form';
 import { Input } from '$lib/components/ui/input';
 import { Textarea } from '$lib/components/ui/textarea';
-import { freshnessColors } from '$lib/utils/status';
+import { StatusBadge, type StatusBadgeStatus } from '$lib/components/ui/status-badge';
 import {
 	AlertTriangle,
 	ChevronDown,
@@ -1191,13 +1191,8 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                             {capture.sceneName ?? capture.sceneId}
                                         </div>
                                         {#if capture.freshness !== "FRESH"}
-                                            <span
-                                                class="rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[
-                                                    capture.freshness.toLowerCase() as keyof typeof freshnessColors
-                                                ]}"
-                                            >
-                                                {capture.freshness.toLowerCase()}
-                                            </span>
+                                            {@const freshness = capture.freshness.toLowerCase() as StatusBadgeStatus}
+                                            <StatusBadge status={freshness} class="px-1.5 text-[10px]">{capture.freshness.toLowerCase()}</StatusBadge>
                                         {/if}
                                     </div>
                                     <div class="text-xs text-muted-foreground">

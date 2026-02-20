@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { CaptureWithContext } from '$lib/bindings';
-import { statusColorFallback, statusColors } from '$lib/utils/status';
+import { StatusBadge } from '$lib/components/ui/status-badge';
 
 interface Props {
 	capture: CaptureWithContext;
@@ -14,11 +14,7 @@ let { capture }: Props = $props();
 		href="/admin/runs/{capture.run_id}"
 		class="relative z-10 inline-flex items-center gap-1"
 	>
-		<span
-			class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[capture.run_status ?? ''] ?? statusColorFallback}"
-		>
-			{capture.run_status ?? '?'}
-		</span>
+		<StatusBadge status={capture.run_status ?? 'inactive'}>{capture.run_status ?? '?'}</StatusBadge>
 	</a>
 {:else}
 	<span class="text-muted-foreground">&mdash;</span>

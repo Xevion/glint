@@ -12,7 +12,7 @@ import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Tabs from '$lib/components/ui/tabs';
 import { formatBytes } from '$lib/utils/format';
 import { preloadImage } from '$lib/utils/image';
-import { freshnessColors, statusColorFallback, statusColors } from '$lib/utils/status';
+import { StatusBadge } from '$lib/components/ui/status-badge';
 import { Trash2 } from '@lucide/svelte';
 import { toast } from 'svelte-sonner';
 import type { PageData } from './$types';
@@ -129,19 +129,9 @@ function formatMs(value?: number): string {
 		<AdminBreadcrumb segments={breadcrumbs}>
 			{#snippet trailing()}
 				{#if capture.status !== 'completed'}
-					<span
-						class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {statusColors[
-							capture.status
-						] ?? statusColorFallback}"
-					>
-						{capture.status}
-					</span>
+					<StatusBadge status={capture.status} class="ml-2">{capture.status}</StatusBadge>
 				{/if}
-				<span
-					class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[capture.freshness]}"
-				>
-					{capture.freshness}
-				</span>
+				<StatusBadge status={capture.freshness} class="ml-2">{capture.freshness}</StatusBadge>
 			{/snippet}
 		</AdminBreadcrumb>
 		<Button
@@ -257,9 +247,7 @@ function formatMs(value?: number): string {
 
 				<dt class="text-muted-foreground">Freshness</dt>
 				<dd>
-					<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[capture.freshness]}">
-						{capture.freshness}
-					</span>
+					<StatusBadge status={capture.freshness}>{capture.freshness}</StatusBadge>
 				</dd>
 
 				{#if capture.run_id}
@@ -272,13 +260,7 @@ function formatMs(value?: number): string {
 								{capture.run_id}
 							</a>
 							{#if capture.run_status}
-								<span
-									class="ml-1 inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium {statusColors[
-										capture.run_status
-									] ?? statusColorFallback}"
-								>
-									{capture.run_status}
-								</span>
+								<StatusBadge status={capture.run_status} class="ml-1">{capture.run_status}</StatusBadge>
 							{/if}
 						</dd>
 					{/if}
@@ -432,9 +414,7 @@ function formatMs(value?: number): string {
 						{/if}
 					</div>
 					{#if c.freshness !== 'fresh'}
-							<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[c.freshness]}">
-									{c.freshness}
-								</span>
+								<StatusBadge status={c.freshness} class="px-1.5 text-[10px]">{c.freshness}</StatusBadge>
 							{/if}
 						</div>
 						{#if c.captured_at}

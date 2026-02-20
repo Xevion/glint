@@ -10,7 +10,6 @@ import type {
 } from '$lib/bindings';
 import { ItemGrid } from '$lib/components/item-grid';
 import { formatMoonPhase, formatTimeTicks } from '$lib/utils/display';
-import { freshnessColors } from '$lib/utils/status';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import {
 	AdminBreadcrumb,
@@ -500,9 +499,7 @@ const WEATHER_OPTIONS = [
 									<div class="flex items-center justify-between">
 										<div class="text-sm font-medium">{capture.shader_name}</div>
 										{#if capture.freshness !== 'fresh'}
-											<span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium {freshnessColors[capture.freshness]}">
-												{capture.freshness}
-											</span>
+											<StatusBadge status={capture.freshness} class="px-1.5 text-[10px]">{capture.freshness}</StatusBadge>
 										{/if}
 									</div>
 									<div class="text-xs text-muted-foreground">

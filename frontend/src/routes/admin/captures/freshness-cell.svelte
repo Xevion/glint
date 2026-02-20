@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { CaptureWithContext } from '$lib/bindings';
-import { freshnessColors } from '$lib/utils/status';
+import { StatusBadge } from '$lib/components/ui/status-badge';
 
 interface Props {
 	capture: CaptureWithContext;
@@ -9,8 +9,4 @@ interface Props {
 let { capture }: Props = $props();
 </script>
 
-<span
-	class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {freshnessColors[capture.freshness]}"
->
-	{capture.freshness}
-</span>
+<StatusBadge status={capture.freshness}>{capture.freshness}</StatusBadge>
