@@ -61,10 +61,12 @@ class GlintMainScreen(
         refreshMasterContent()
         refreshDetailPanel()
 
-        if (!scenesTab.hasScenes() && currentTab == Tab.SCENES) {
-            scenesTab.refreshScenes()
+        if (currentTab == Tab.SCENES) {
+            scenesTab.onTabActivated(tickCount)
         }
     }
+
+    private var tickCount: Long = 0
 
     private fun switchTab(tab: Tab) {
         if (currentTab == tab) return
@@ -72,6 +74,18 @@ class GlintMainScreen(
         rebuildTabBar()
         refreshMasterContent()
         refreshDetailPanel()
+
+        if (tab == Tab.SCENES) {
+            scenesTab.onTabActivated(tickCount)
+        }
+    }
+
+    override fun tick() {
+        super.tick()
+        tickCount++
+        if (currentTab == Tab.SCENES) {
+            scenesTab.tick(tickCount)
+        }
     }
 
     override fun buildTabBar(tabs: FlowLayout) {

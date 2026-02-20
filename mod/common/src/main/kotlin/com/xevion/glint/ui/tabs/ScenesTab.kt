@@ -57,6 +57,59 @@ class ScenesTab(
     private var editingPresetSlug: String? = null
     private var addingPreset = false
 
+    // Auto-refresh tracking
+
+    /** Fingerprint of the API config at the time of last refresh */
+    private var lastConfigFingerprint: String = ""
+
+    /** Tick count when scenes were last refreshed */
+    private var lastRefreshTick: Long = 0
+
+    /** Current refresh interval in ticks, doubles after each periodic refresh (cap at 5min) */
+    private var refreshIntervalTicks: Long = INITIAL_REFRESH_INTERVAL
+
+    companion object {
+        /** 30 seconds at 20 TPS */
+        private const val INITIAL_REFRESH_INTERVAL: Long = 30 * 20
+
+        /** 5 minutes at 20 TPS */
+        private const val MAX_REFRESH_INTERVAL: Long = 5 * 60 * 20
+    }
+
+    /** Compute a fingerprint that changes when API connection details change. */
+    private fun configFingerprint(): String {
+        val config = ApiConfig.load()
+        return "${config.apiUrl}|${config.enabled}|${config.validated}"
+    }
+
+    /**
+     * Called when this tab becomes visible. Refreshes if config changed
+     * or enough time has passed since the last refresh.
+     */
+    fun onTabActivated(currentTick: Long) {
+        val fingerprint = configFingerprint()
+        if (fingerprint != lastConfigFingerprint) {
+            // Config changed — reset backoff and refresh immediately
+            refreshIntervalTicks = INITIAL_REFRESH_INTERVAL
+            refreshScenes()
+            lastConfigFingerprint = fingerprint
+            lastRefreshTick = currentTick
+        }
+    }
+
+    /**
+     * Called every tick while this tab is active.
+     * Triggers periodic refresh with exponential backoff.
+     */
+    fun tick(currentTick: Long) {
+        if (currentTick - lastRefreshTick >= refreshIntervalTicks) {
+            refreshScenes()
+            lastRefreshTick = currentTick
+            // Exponential backoff: double the interval, cap at max
+            refreshIntervalTicks = (refreshIntervalTicks * 2).coerceAtMost(MAX_REFRESH_INTERVAL)
+        }
+    }
+
     override fun buildMaster(master: FlowLayout) {
         val headerRow = Containers.horizontalFlow(Sizing.fill(100), Sizing.content())
         headerRow.gap(GlintTheme.GAP_SM)
@@ -573,6 +626,13 @@ class ScenesTab(
 
     fun refreshScenes() {
         LocalSceneStore.clearCache()
+        val config = ApiConfig.load()
+
+        // Clear stale sync data when API is not configured
+        if (!config.isValid()) {
+            syncStatuses = emptyMap()
+        }
+
         val index = LocalSceneStore.loadIndex()
 
         // Build entries from local scenes first, all with UNKNOWN status
@@ -610,7 +670,6 @@ class ScenesTab(
         sceneEntries = localEntries + remoteOnlyEntries
 
         // Kick off async reconciliation against the backend
-        val config = ApiConfig.load()
         if (config.isValid()) {
             SceneSyncManager.reconcile(config).thenAccept { result ->
                 when (result) {

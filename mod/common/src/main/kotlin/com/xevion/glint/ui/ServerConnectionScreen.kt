@@ -68,9 +68,14 @@ class ServerConnectionScreen(
 
         urlInput = Components.textBox(Sizing.fixed(300))
         urlInput.setMaxLength(256)
-        urlInput.setSuggestion("http://localhost:8080")
+        // Only allow characters valid in URLs (no whitespace)
+        urlInput.setFilter { text -> text.none { it.isWhitespace() } }
         urlInput.text(initialUrl)
-        urlInput.onChanged().subscribe { validateUrl() }
+        urlInput.setSuggestion(if (initialUrl.isEmpty()) "http://localhost:8080" else "")
+        urlInput.onChanged().subscribe {
+            urlInput.setSuggestion(if (urlInput.value.isEmpty()) "http://localhost:8080" else "")
+            validateUrl()
+        }
         inputSection.child(urlInput as Component)
 
         content.child(inputSection)
