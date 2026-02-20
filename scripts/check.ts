@@ -183,19 +183,18 @@ const rustSrcMtime = Math.max(
 	}
 }
 
-// Regenerate GraphQL schema + gql-tada output if Rust sources are newer.
+// Always regenerate GraphQL schema + gql-tada output and content-compare.
+// Mtime-based staleness is unreliable (e.g. async-graphql SDL format changes,
+// dependency updates) — always regenerate to guarantee local matches CI.
 {
 	const SCHEMA_PATH = 'frontend/src/lib/graphql/schema.graphql';
 	const GQL_ENV_PATH = 'frontend/src/lib/graphql/graphql-env.d.ts';
 
-	const schemaMtime = existsSync(SCHEMA_PATH) ? statSync(SCHEMA_PATH).mtimeMs : 0;
-	const schemaStale = schemaMtime === 0 || rustSrcMtime > schemaMtime;
-
-	if (schemaStale) {
+	{
 		const t = Date.now();
-		process.stdout.write(
-			c('1;36', '→ Regenerating GraphQL schema (Rust sources changed)...') + '\n'
-		);
+		const existingSchema = existsSync(SCHEMA_PATH) ? readFileSync(SCHEMA_PATH) : null;
+
+		process.stdout.write(c('1;36', '→ Verifying GraphQL schema...') + '\n');
 		const result = runPiped(['cargo', 'test', '--test', 'graphql_schema', '--quiet'], {
 			cwd: 'backend',
 		});
@@ -205,21 +204,18 @@ const rustSrcMtime = Math.max(
 			if (result.stderr) process.stderr.write(result.stderr);
 			process.exit(1);
 		}
-		process.stdout.write(c('32', '✓ graphql schema') + ` (${elapsed(t)}s)\n`);
-	} else {
-		process.stdout.write(c('2', '· graphql schema up-to-date, skipped') + '\n');
+
+		const newSchema = readFileSync(SCHEMA_PATH);
+		const changed = !existingSchema || Buffer.compare(existingSchema, newSchema) !== 0;
+		const detail = changed ? ', updated' : '';
+		process.stdout.write(c('32', '✓ graphql schema') + ` (${elapsed(t)}s${detail})\n`);
 	}
 
-	// Regenerate gql-tada introspection output if schema is newer than the env file
-	const gqlEnvMtime = existsSync(GQL_ENV_PATH) ? statSync(GQL_ENV_PATH).mtimeMs : 0;
-	const newSchemaMtime = existsSync(SCHEMA_PATH) ? statSync(SCHEMA_PATH).mtimeMs : 0;
-	const gqlEnvStale = gqlEnvMtime === 0 || newSchemaMtime > gqlEnvMtime;
-
-	if (gqlEnvStale) {
+	{
 		const t = Date.now();
-		process.stdout.write(
-			c('1;36', '→ Regenerating gql-tada introspection output...') + '\n'
-		);
+		const existingGqlEnv = existsSync(GQL_ENV_PATH) ? readFileSync(GQL_ENV_PATH) : null;
+
+		process.stdout.write(c('1;36', '→ Verifying gql-tada introspection output...') + '\n');
 		const result = runPiped(['bunx', 'gql-tada', 'generate', 'output'], {
 			cwd: 'frontend',
 		});
@@ -229,9 +225,11 @@ const rustSrcMtime = Math.max(
 			if (result.stderr) process.stderr.write(result.stderr);
 			process.exit(1);
 		}
-		process.stdout.write(c('32', '✓ gql-tada') + ` (${elapsed(t)}s)\n`);
-	} else {
-		process.stdout.write(c('2', '· gql-tada output up-to-date, skipped') + '\n');
+
+		const newGqlEnv = readFileSync(GQL_ENV_PATH);
+		const changed = !existingGqlEnv || Buffer.compare(existingGqlEnv, newGqlEnv) !== 0;
+		const detail = changed ? ', updated' : '';
+		process.stdout.write(c('32', '✓ gql-tada') + ` (${elapsed(t)}s${detail})\n`);
 	}
 }
 

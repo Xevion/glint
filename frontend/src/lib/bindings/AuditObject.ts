@@ -3,7 +3,7 @@
 /**
  * A single object found in R2 during audit
  */
-export type AuditObject = { key: string, size: number, last_modified: number, 
+export type AuditObject = { key: string, size: number, last_modified: string, 
 /**
  * The R2 key prefix (e.g. "captures", "packages", "_uploads")
  */

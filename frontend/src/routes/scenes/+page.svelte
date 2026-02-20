@@ -9,7 +9,7 @@ import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
 import { AlertTriangle, Camera, ChevronRight, Search } from '@lucide/svelte';
-import { formatTimeTicks } from '$lib/utils/display';
+import { formatTimeTicks } from '$lib/utils/format';
 import { fade, fly } from 'svelte/transition';
 import type { PageData } from './$types';
 

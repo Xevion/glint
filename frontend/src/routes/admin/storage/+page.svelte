@@ -12,7 +12,7 @@ import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
 import * as Checkbox from '$lib/components/ui/checkbox';
 import * as Collapsible from '$lib/components/ui/collapsible';
-import { formatBytes } from '$lib/utils/format';
+import { formatBytes, formatCount, formatDatetime } from '$lib/utils/format';
 import { ChevronDown, ChevronRight, Loader2, Search, Trash2 } from '@lucide/svelte';
 
 import type { PageData } from './$types';
@@ -135,10 +135,6 @@ async function runCleanup() {
 	await runAudit();
 }
 
-function formatDate(epochSeconds: number): string {
-	return new Date(epochSeconds * 1000).toLocaleString();
-}
-
 interface DeletableCategory {
 	id: string;
 	label: string;
@@ -196,7 +192,7 @@ let categories = $derived.by((): Category[] => {
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<p class="text-sm text-muted-foreground">Captures</p>
-				<p class="text-2xl font-semibold">{data.stats.capture_count.toLocaleString()}</p>
+				<p class="text-2xl font-semibold">{formatCount(data.stats.capture_count)}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<p class="text-sm text-muted-foreground">Avg Size</p>
@@ -204,7 +200,7 @@ let categories = $derived.by((): Category[] => {
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<p class="text-sm text-muted-foreground">Missing</p>
-				<p class="text-2xl font-semibold">{data.stats.missing_count.toLocaleString()}</p>
+				<p class="text-2xl font-semibold">{formatCount(data.stats.missing_count)}</p>
 			</div>
 		</div>
 	{/if}
@@ -256,11 +252,11 @@ let categories = $derived.by((): Category[] => {
 
 		{#if auditResult}
 			<p class="mb-4 text-sm text-muted-foreground">
-				Found {auditResult.summary.total_r2_objects.toLocaleString()} objects
+				Found {formatCount(auditResult.summary.total_r2_objects)} objects
 				({formatBytes(auditResult.summary.total_r2_bytes)}) in R2,
-				{auditResult.summary.total_db_references.toLocaleString()} DB references.
+				{formatCount(auditResult.summary.total_db_references)} DB references.
 				{#if deletableCount > 0}
-					{deletableCount.toLocaleString()} deletable objects found.
+					{formatCount(deletableCount)} deletable objects found.
 				{:else}
 					No issues found.
 				{/if}
@@ -312,7 +308,7 @@ let categories = $derived.by((): Category[] => {
 														</td>
 														<td class="max-w-md truncate px-3 py-2 font-mono text-xs">{obj.key}</td>
 														<td class="whitespace-nowrap px-3 py-2">{formatBytes(obj.size)}</td>
-														<td class="whitespace-nowrap px-3 py-2">{formatDate(obj.last_modified)}</td>
+														<td class="whitespace-nowrap px-3 py-2">{formatDatetime(obj.last_modified)}</td>
 													</tr>
 												{/each}
 											</tbody>

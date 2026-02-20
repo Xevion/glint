@@ -4,7 +4,7 @@ import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import { DataTable, DataTablePagination, createDataTable } from '$lib/components/data-table';
 import { DataList } from '$lib/components/data-list';
 import { StatusBadge } from '$lib/components/ui/status-badge';
-import { formatDuration } from '$lib/utils/format';
+import { formatElapsedDuration } from '$lib/utils/format';
 import type { PageData } from './$types';
 import { columns } from './columns.js';
 
@@ -75,7 +75,7 @@ const table = createDataTable<CaptureRun>({
 							{/if}
 						</div>
 						<div class="shrink-0 text-right text-xs text-muted-foreground">
-							{formatDuration(run)}
+							{formatElapsedDuration(run)}
 						</div>
 					</div>
 				{/snippet}

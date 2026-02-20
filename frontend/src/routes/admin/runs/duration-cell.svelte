@@ -1,5 +1,5 @@
 <script lang="ts">
-import { formatDuration } from '$lib/utils/format';
+import { formatElapsedDuration } from '$lib/utils/format';
 
 interface Props {
 	started_at: string;
@@ -9,4 +9,4 @@ interface Props {
 let { started_at, completed_at }: Props = $props();
 </script>
 
-{formatDuration({ started_at, completed_at })}
+{formatElapsedDuration({ started_at, completed_at })}

@@ -13,7 +13,7 @@ import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
 import * as Tabs from '$lib/components/ui/tabs';
 import { cn } from '$lib/utils';
-import { formatNumber } from '$lib/utils/display';
+import { formatNumber } from '$lib/utils/format';
 import { withRetry } from '$lib/utils/retry';
 import {
 	CircleAlert,

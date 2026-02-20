@@ -6,6 +6,7 @@ import { Badge } from '$lib/components/ui/badge';
 import * as Table from '$lib/components/ui/table';
 import * as Tabs from '$lib/components/ui/tabs';
 import * as Tooltip from '$lib/components/ui/tooltip';
+import { formatDatetime, formatRelativeTime } from '$lib/utils/format';
 import { Activity, Grid3x3 } from '@lucide/svelte';
 
 import type { PageData } from './$types';
@@ -108,22 +109,8 @@ const STALE_REASON_LABELS: Record<StaleReason, string> = {
 	preset_edited: 'Preset edited'
 };
 
-function relativeTime(iso: string): string {
-	const ms = Date.now() - new Date(iso).getTime();
-	const seconds = Math.floor(ms / 1000);
-	if (seconds < 60) return 'just now';
-	const minutes = Math.floor(seconds / 60);
-	if (minutes < 60) return `${minutes}m ago`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}h ago`;
-	const days = Math.floor(hours / 24);
-	if (days < 30) return `${days}d ago`;
-	const months = Math.floor(days / 30);
-	return `${months}mo ago`;
-}
-
 function targetDetail(t: CaptureTargetHealth): string {
-	const age = t.last_capture_at ? relativeTime(t.last_capture_at) : null;
+	const age = t.last_capture_at ? formatRelativeTime(t.last_capture_at) : null;
 	switch (t.status) {
 		case 'stale': {
 			const reason = t.stale_reason ? STALE_REASON_LABELS[t.stale_reason] : 'Stale';
@@ -158,17 +145,6 @@ let selectedTargets = $derived.by(() => {
 	if (!selectedCell) return [];
 	return targetsByCell.get(`${selectedCell.shaderSlug}:${selectedCell.sceneSlug}`) ?? [];
 });
-
-function formatTime(iso: string | null | undefined): string {
-	if (!iso) return 'Never';
-	const d = new Date(iso);
-	return d.toLocaleDateString('en-US', {
-		month: 'short',
-		day: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit'
-	});
-}
 </script>
 
 <svelte:head><title>Health - Glint</title></svelte:head>
@@ -298,7 +274,7 @@ function formatTime(iso: string | null | undefined): string {
 										</div>
 										<div class="mt-1 text-xs text-muted-foreground">
 											{#if target.last_capture_at}
-												Last: {formatTime(target.last_capture_at)}
+												Last: {formatDatetime(target.last_capture_at)}
 											{:else}
 												No captures
 											{/if}

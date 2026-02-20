@@ -34,7 +34,7 @@ import {
 	getBiomeDisplayName,
 	getDimensionDisplayName,
 	getWeatherDisplayName
-} from '$lib/utils/display';
+} from '$lib/utils/format';
 import { ArrowRight, Sun } from '@lucide/svelte';
 
 interface Props {

@@ -50,6 +50,7 @@ import type {
 	ShaderProfile,
 	ShaderMetadata
 } from './queries';
+import { ageMs, formatCount } from '$lib/utils/format';
 import { createVersionColumns } from './version-columns.js';
 
 const UpdateShaderMutation = graphql(`
@@ -187,21 +188,14 @@ let linking = $state(false);
 let hasLinkedPlatform = $derived(!!shader.modrinthId || !!shader.curseforgeId);
 let canLinkMorePlatforms = $derived(!shader.modrinthId || !shader.curseforgeId);
 
-/** Compute sync staleness: how old the last sync is */
-let syncAge = $derived.by(() => {
-	if (!shader.lastSyncedAt) return null;
-	const ms = Date.now() - new Date(shader.lastSyncedAt).getTime();
-	return {
-		hours: ms / (1000 * 60 * 60),
-		days: ms / (1000 * 60 * 60 * 24)
-	};
-});
+let syncAgeMs = $derived(shader.lastSyncedAt ? ageMs(shader.lastSyncedAt) : null);
 
 let syncStatus = $derived.by<'never' | 'fresh' | 'stale' | 'very-stale'>(() => {
 	if (!hasLinkedPlatform) return 'never';
-	if (!syncAge) return 'never';
-	if (syncAge.days > 7) return 'very-stale';
-	if (syncAge.days > 1) return 'stale';
+	if (syncAgeMs == null) return 'never';
+	const days = syncAgeMs / (1000 * 60 * 60 * 24);
+	if (days > 7) return 'very-stale';
+	if (days > 1) return 'stale';
 	return 'fresh';
 });
 
@@ -703,7 +697,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                     {/if}
                     {#if shader.upstreamDownloads}
                         <DetailField label="Upstream Downloads">
-                            {shader.upstreamDownloads.toLocaleString()}
+                            {formatCount(shader.upstreamDownloads)}
                         </DetailField>
                     {/if}
                     {#if shader.upstreamUpdatedAt}

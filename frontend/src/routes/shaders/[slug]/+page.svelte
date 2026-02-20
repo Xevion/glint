@@ -11,7 +11,7 @@ import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import BrandIcon from '$lib/components/icons/BrandIcon.svelte';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import * as Select from '$lib/components/ui/select';
-import { formatNumber, formatVersion, getCurseforgeUrl, getModrinthUrl } from '$lib/utils/display';
+import { formatNumber, formatVersion, getCurseforgeUrl, getModrinthUrl } from '$lib/utils/format';
 import { imageUrl } from '$lib/utils/image';
 import { themeStore } from '$lib/stores/theme.svelte';
 import { createGraphQLClient, query } from '$lib/graphql';

@@ -14,8 +14,7 @@ pub struct StorageStats {
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
 pub struct StorageBucket {
-    #[serde(with = "chrono::serde::ts_seconds")]
-    #[ts(type = "number")]
+    #[ts(type = "string")]
     pub date: DateTime<Utc>,
     pub cumulative_bytes: i64,
     pub cumulative_count: i64,
@@ -30,8 +29,7 @@ pub struct StorageBucket {
 pub struct AuditObject {
     pub key: String,
     pub size: i64,
-    #[serde(with = "chrono::serde::ts_seconds")]
-    #[ts(type = "number")]
+    #[ts(type = "string")]
     pub last_modified: DateTime<Utc>,
     /// The R2 key prefix (e.g. "captures", "packages", "_uploads")
     pub prefix: String,

@@ -5,7 +5,7 @@ import CaptureImage from '$lib/components/CaptureImage.svelte';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import * as Table from '$lib/components/ui/table';
-import { formatDuration } from '$lib/utils/format';
+import { formatDuration, formatElapsedDuration } from '$lib/utils/format';
 import { StatusBadge, type StatusBadgeStatus } from '$lib/components/ui/status-badge';
 import { ExternalLink } from '@lucide/svelte';
 import type { PageData } from './$types';
@@ -19,12 +19,6 @@ let run: AdminCaptureRunData = $derived(data.run);
 let items: AdminCaptureRunItem[] = $derived(run.items);
 let refreshing = $state(false);
 let expandedItem = $state<string | null>(null);
-
-function formatMs(ms: number | null | undefined): string {
-	if (ms == null) return '\u2014';
-	if (ms < 1000) return `${ms}ms`;
-	return `${(ms / 1000).toFixed(1)}s`;
-}
 
 function toggleExpand(id: string) {
 	expandedItem = expandedItem === id ? null : id;
@@ -74,10 +68,10 @@ const statCards = $derived([
 			<span>Started: <TimeAgo timestamp={run.startedAt} /></span>
 			{#if run.completedAt}
 				<span
-					>Duration: {formatDuration({
-						started_at: run.startedAt,
-						completed_at: run.completedAt
-					})}</span
+				>Duration: {formatElapsedDuration({
+					started_at: run.startedAt,
+					completed_at: run.completedAt
+				})}</span
 				>
 			{/if}
 		</div>
@@ -167,7 +161,7 @@ const statCards = $derived([
 						</div>
 					</Table.Cell>
 					<Table.Cell class="px-4 py-2">{item.sceneName}</Table.Cell>
-					<Table.Cell class="px-4 py-2">{formatMs(item.durationMs)}</Table.Cell>
+					<Table.Cell class="px-4 py-2">{item.durationMs != null ? formatDuration(item.durationMs) : '\u2014'}</Table.Cell>
 					<Table.Cell class="max-w-sm px-4 py-2" title={item.errorMessage ?? ''}>
 						<span class="line-clamp-2">{item.errorMessage ?? '\u2014'}</span>
 					</Table.Cell>

@@ -6,7 +6,7 @@ import { Button } from '$lib/components/ui/button';
 import * as Dialog from '$lib/components/ui/dialog';
 import { Input } from '$lib/components/ui/input';
 import { Label } from '$lib/components/ui/label';
-import { formatNumber } from '$lib/utils/display';
+import { formatNumber } from '$lib/utils/format';
 import { ArrowLeft, Check, CircleAlert, Download, Info, LoaderCircle } from '@lucide/svelte';
 import type { Snippet } from 'svelte';
 

@@ -37,7 +37,7 @@ import { resolve } from '$app/paths';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import { cn } from '$lib/utils';
-import { formatVersion, getCurseforgeUrl, getModrinthUrl } from '$lib/utils/display';
+import { formatVersion, getCurseforgeUrl, getModrinthUrl } from '$lib/utils/format';
 import { ExternalLink } from '@lucide/svelte';
 import BrandIcon from './icons/BrandIcon.svelte';
 

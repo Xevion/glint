@@ -7,7 +7,7 @@ import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
 
-import { formatMoonPhase, formatTimeTicks } from '$lib/utils/display';
+import { formatMoonPhase, formatPercent, formatTimeTicks } from '$lib/utils/format';
 import { fly } from 'svelte/transition';
 import type { PageData } from './$types';
 
@@ -69,8 +69,8 @@ const weatherLabel = $derived.by(() => {
 	const v = scene.version;
 	if (!v) return null;
 	if (v.weather === 'clear') return 'Clear';
-	if (v.weather === 'rain') return `Rain (${Math.round(v.weatherIntensity * 100)}%)`;
-	if (v.weather === 'thunder') return `Thunder (${Math.round(v.weatherIntensity * 100)}%)`;
+	if (v.weather === 'rain') return `Rain (${formatPercent(v.weatherIntensity, 0)})`;
+	if (v.weather === 'thunder') return `Thunder (${formatPercent(v.weatherIntensity, 0)})`;
 	return v.weather;
 });
 

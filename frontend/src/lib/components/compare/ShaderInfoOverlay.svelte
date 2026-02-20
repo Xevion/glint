@@ -1,5 +1,5 @@
 <script lang="ts">
-import { formatVersion } from '$lib/utils/display';
+import { formatVersion } from '$lib/utils/format';
 import { onMount } from 'svelte';
 import { fade } from 'svelte/transition';
 import { LUMINANCE } from './constants';

@@ -9,7 +9,7 @@ import type {
 	UpdateSceneMetadataRequest
 } from '$lib/bindings';
 import { ItemGrid } from '$lib/components/item-grid';
-import { formatMoonPhase, formatTimeTicks } from '$lib/utils/display';
+import { formatDecimal, formatMoonPhase, formatTimeTicks } from '$lib/utils/format';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import CaptureCard from '$lib/components/CaptureCard.svelte';
@@ -392,8 +392,8 @@ const WEATHER_OPTIONS = [
 											{/if}
 										</div>
 										<div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-											<span>{formatTimeTicks(preset.time_of_day_ticks)}</span>
-											<span class="capitalize">{preset.weather}{preset.weather_intensity > 0 ? ` (${preset.weather_intensity.toFixed(2)})` : ''}</span>
+<span>{formatTimeTicks(preset.time_of_day_ticks)}</span>
+										<span class="capitalize">{preset.weather}{preset.weather_intensity > 0 ? ` (${formatDecimal(preset.weather_intensity)})` : ''}</span>
 											{#if preset.moon_phase != null}
 												<span>{formatMoonPhase(preset.moon_phase)}</span>
 											{/if}
@@ -432,12 +432,12 @@ const WEATHER_OPTIONS = [
 				</DetailField>
 				<DetailField label="Position">
 					<code class="text-xs">
-						{scene.version.x.toFixed(1)}, {scene.version.y.toFixed(1)}, {scene.version.z.toFixed(1)}
+						{formatDecimal(scene.version.x, 1)}, {formatDecimal(scene.version.y, 1)}, {formatDecimal(scene.version.z, 1)}
 					</code>
 				</DetailField>
 				<DetailField label="Camera">
 					<code class="text-xs">
-						Yaw: {scene.version.yaw.toFixed(1)}, Pitch: {scene.version.pitch.toFixed(1)}
+						Yaw: {formatDecimal(scene.version.yaw, 1)}, Pitch: {formatDecimal(scene.version.pitch, 1)}
 					</code>
 				</DetailField>
 				<DetailField label="Dimension">
@@ -448,10 +448,10 @@ const WEATHER_OPTIONS = [
 				</DetailField>
 				<DetailField label="Weather">
 					<span class="capitalize">{scene.version.weather}</span>
-					{#if scene.version.weather_intensity > 0}
-						<span class="text-muted-foreground">
-							(intensity: {scene.version.weather_intensity.toFixed(2)})
-						</span>
+				{#if scene.version.weather_intensity > 0}
+					<span class="text-muted-foreground">
+						(intensity: {formatDecimal(scene.version.weather_intensity)})
+					</span>
 					{/if}
 				</DetailField>
 				{#if scene.version.biome}

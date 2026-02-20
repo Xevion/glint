@@ -10,7 +10,7 @@ import RefreshButton from '$lib/components/RefreshButton.svelte';
 import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Button } from '$lib/components/ui/button';
-import { formatBytes, formatDatetime } from '$lib/utils/format';
+import { formatBytes, formatDatetime, toDate } from '$lib/utils/format';
 import {
 	Activity,
 	ArrowRight,
@@ -55,12 +55,12 @@ let storageGrowth = $derived(data.storageGrowth);
 let chartData = $derived(
 	storageGrowth.map(
 		(b: {
-			date: number;
+			date: string;
 			cumulative_bytes: number;
 			cumulative_count: number;
 			bucket_bytes: number;
 		}) => ({
-			date: new Date(b.date * 1000),
+			date: toDate(b.date),
 			bytes: b.cumulative_bytes,
 			count: b.cumulative_count,
 			bucketBytes: b.bucket_bytes

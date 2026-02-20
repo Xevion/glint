@@ -12,7 +12,7 @@ import { ItemGrid } from '$lib/components/item-grid';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Tabs from '$lib/components/ui/tabs';
-import { formatBytes } from '$lib/utils/format';
+import { formatBytes, formatDecimal, formatMetric, formatPercent } from '$lib/utils/format';
 import { preloadImage } from '$lib/utils/image';
 import { StatusBadge } from '$lib/components/ui/status-badge';
 import { Trash2 } from '@lucide/svelte';
@@ -111,16 +111,6 @@ let viewAllHref = $derived.by(() => {
 			return null;
 	}
 });
-
-function formatFps(value?: number): string {
-	if (value == null) return '\u2014';
-	return value.toFixed(1);
-}
-
-function formatMs(value?: number): string {
-	if (value == null) return '\u2014';
-	return `${value.toFixed(2)}ms`;
-}
 </script>
 
 <svelte:head><title>Capture Details - Glint</title></svelte:head>
@@ -287,20 +277,20 @@ function formatMs(value?: number): string {
 						{#if capture.avg_fps != null || capture.min_fps != null || capture.max_fps != null}
 							<dt class="text-muted-foreground">FPS</dt>
 							<dd>
-								{formatFps(capture.avg_fps)} avg
-								<span class="text-muted-foreground">
-									({formatFps(capture.min_fps)}&ndash;{formatFps(capture.max_fps)})
-								</span>
+							{formatDecimal(capture.avg_fps, 1)} avg
+							<span class="text-muted-foreground">
+								({formatDecimal(capture.min_fps, 1)}&ndash;{formatDecimal(capture.max_fps, 1)})
+							</span>
 							</dd>
 						{/if}
 
 						{#if capture.frame_time_avg != null || capture.frame_time_p99 != null}
 							<dt class="text-muted-foreground">Frame time</dt>
 							<dd>
-								{formatMs(capture.frame_time_avg)} avg
-								<span class="text-muted-foreground">
-									(p99: {formatMs(capture.frame_time_p99)})
-								</span>
+							{formatMetric(capture.frame_time_avg, 'ms')} avg
+							<span class="text-muted-foreground">
+								(p99: {formatMetric(capture.frame_time_p99, 'ms')})
+							</span>
 							</dd>
 						{/if}
 
@@ -332,7 +322,7 @@ function formatMs(value?: number): string {
 					<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
 						<dt class="text-muted-foreground">Luminance</dt>
 						<dd>
-							<div>{analysis.luminance.mean.toFixed(2)} mean</div>
+							<div>{formatDecimal(analysis.luminance.mean)} mean</div>
 							<div class="mt-1 flex items-end gap-0.5" style="height: 24px;">
 								{#each analysis.luminance.histogram as bin, i (i)}
 									<div
@@ -344,7 +334,7 @@ function formatMs(value?: number): string {
 						</dd>
 
 						<dt class="text-muted-foreground">Edge density</dt>
-						<dd>{analysis.edge_density.toFixed(4)}</dd>
+						<dd>{formatDecimal(analysis.edge_density, 4)}</dd>
 					</dl>
 
 					<div class="mt-3">
@@ -353,7 +343,7 @@ function formatMs(value?: number): string {
 						{#each analysis.dominant_colors as color (color.hex)}
 							<div
 								style="background-color: {color.hex}; flex-basis: {color.weight * 100}%;"
-								title="{color.hex} ({(color.weight * 100).toFixed(1)}%)"
+								title="{color.hex} ({formatPercent(color.weight)})"
 							></div>
 						{/each}
 						</div>

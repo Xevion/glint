@@ -9,7 +9,7 @@ pub type DbTransaction<'a> = sqlx::Transaction<'a, Postgres>;
 /// Apply all view definitions from views.sql.
 /// Uses CREATE OR REPLACE VIEW so this is idempotent.
 pub async fn apply_views(pool: &DbPool) -> anyhow::Result<()> {
-    let views_sql = include_str!("../../views.sql");
+    let views_sql = include_str!("../views.sql");
     sqlx::raw_sql(views_sql).execute(pool).await?;
     debug!("Database views applied");
     Ok(())

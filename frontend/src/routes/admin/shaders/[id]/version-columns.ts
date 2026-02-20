@@ -1,5 +1,5 @@
 import { type ColumnDef, DataTableColumnHeader, renderComponent } from '$lib/components/data-table';
-import { formatGameVersions } from '$lib/utils/display';
+import { formatGameVersions } from '$lib/utils/format';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import VersionExtractionCell from './version-extraction-cell.svelte';
 import VersionFileCell from './version-file-cell.svelte';

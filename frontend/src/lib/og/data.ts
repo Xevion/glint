@@ -1,5 +1,5 @@
 import { createApiClient } from '$lib/api';
-import { formatNumber, formatVersion } from '$lib/utils/display';
+import { formatNumber, formatVersion } from '$lib/utils/format';
 import { rawImageUrl } from '$lib/utils/image';
 import type { TextOverlayProps } from './text';
 

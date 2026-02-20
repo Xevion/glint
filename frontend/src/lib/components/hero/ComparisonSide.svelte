@@ -1,7 +1,7 @@
 <script lang="ts">
 import { browser } from '$app/environment';
 import { resolve } from '$app/paths';
-import { formatVersion } from '$lib/utils/display';
+import { formatVersion } from '$lib/utils/format';
 import { imageSrcset, imageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { ImageOff } from '@lucide/svelte';

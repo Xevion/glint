@@ -4,6 +4,7 @@ import { dev } from '$app/environment';
 import { Button } from '$lib/components/ui/button';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import { cn } from '$lib/utils';
+import { formatTime } from '$lib/utils/format';
 import { ChevronDown, Clipboard, Check } from '@lucide/svelte';
 
 interface Props {
@@ -48,7 +49,7 @@ let bodyText = $derived(message ?? description);
 let metadataItems = $derived.by(() => {
 	const items: { label: string; value: string }[] = [];
 	if (code) items.push({ label: 'Code', value: code });
-	if (timestamp) items.push({ label: 'Time', value: new Date(timestamp).toLocaleTimeString() });
+	if (timestamp) items.push({ label: 'Time', value: formatTime(timestamp) });
 	if (requestId) items.push({ label: 'Request', value: requestId });
 	return items;
 });
