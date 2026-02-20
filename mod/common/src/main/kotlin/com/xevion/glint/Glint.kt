@@ -128,9 +128,10 @@ object Glint {
                 UrlValidation.testConnection(config.apiUrl, token = config.accessToken)
             }.thenAccept { result ->
                 result
-                    .onSuccess {
-                        log.info("API connection validated successfully")
-                        val updatedConfig = config.copy(validated = true)
+                    .onSuccess { testResult ->
+                        log.info("API connection validated successfully") { "resolved_url" to testResult.resolvedUrl }
+                        // Persist the resolved URL in case redirects changed it (e.g. http→https)
+                        val updatedConfig = config.copy(apiUrl = testResult.resolvedUrl, validated = true)
                         ApiConfig.save(updatedConfig)
                     }.onFailure { error ->
                         log.warn("API connection validation failed") { "error" to error.message }

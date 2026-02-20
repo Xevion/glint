@@ -261,9 +261,9 @@ class ConfigTab(
                 host.client?.execute {
                     connectionTesting = false
                     result
-                        .onSuccess {
+                        .onSuccess { testResult ->
                             connectionTestResult = "Success (${latency}ms)"
-                            StatusLog.info("Connection test passed (${latency}ms)")
+                            StatusLog.info("Connection test passed (${latency}ms) → ${testResult.resolvedUrl}")
                         }.onFailure { error ->
                             connectionTestResult = "Failed: ${error.message}"
                             StatusLog.error("Connection test failed: ${error.message}")

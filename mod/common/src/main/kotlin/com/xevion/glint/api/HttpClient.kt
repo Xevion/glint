@@ -8,6 +8,12 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.charset.StandardCharsets
 
+/** HTTP status codes that indicate a redirect. */
+private val REDIRECT_CODES = setOf(301, 302, 307, 308)
+
+/** Maximum number of redirects to follow before giving up. */
+private const val MAX_REDIRECTS = 5
+
 /** Shared Json configuration for all Glint API communication. */
 val GlintJson: Json =
     Json {
@@ -60,11 +66,10 @@ class HttpClient(
         builder: RequestBuilder,
         serializer: KSerializer<T>,
     ): Result<T> {
-        val url = if (builder.fullUrl != null) builder.fullUrl!! else "$baseUrl${builder.path}"
+        val startUrl = if (builder.fullUrl != null) builder.fullUrl!! else "$baseUrl${builder.path}"
 
         return try {
-            val connection = openConnection(url, builder)
-            writeBody(connection, builder)
+            val (connection, _) = executeWithRedirects(startUrl, builder)
 
             val responseCode = connection.responseCode
             val statusHandler = builder.statusHandlers[responseCode]
@@ -92,11 +97,10 @@ class HttpClient(
     }
 
     fun executeUnitRequest(builder: RequestBuilder): Result<Unit> {
-        val url = if (builder.fullUrl != null) builder.fullUrl!! else "$baseUrl${builder.path}"
+        val startUrl = if (builder.fullUrl != null) builder.fullUrl!! else "$baseUrl${builder.path}"
 
         return try {
-            val connection = openConnection(url, builder)
-            writeBody(connection, builder)
+            val (connection, _) = executeWithRedirects(startUrl, builder)
 
             val responseCode = connection.responseCode
             val statusHandler = builder.statusHandlers[responseCode]
@@ -118,12 +122,48 @@ class HttpClient(
         }
     }
 
+    /**
+     * Opens a connection and follows redirects (including cross-protocol http↔https
+     * redirects that [HttpURLConnection] refuses to follow automatically).
+     *
+     * Returns the final connection and the URL it resolved to.
+     */
+    private fun executeWithRedirects(
+        url: String,
+        builder: RequestBuilder,
+    ): Pair<HttpURLConnection, String> {
+        var currentUrl = url
+        var redirectCount = 0
+
+        while (true) {
+            val connection = openConnection(currentUrl, builder)
+            writeBody(connection, builder)
+
+            val code = connection.responseCode
+            if (code !in REDIRECT_CODES) {
+                return Pair(connection, currentUrl)
+            }
+
+            val location =
+                connection.getHeaderField("Location")
+                    ?: return Pair(connection, currentUrl)
+
+            currentUrl = URI(currentUrl).resolve(location).toString()
+
+            redirectCount++
+            if (redirectCount > MAX_REDIRECTS) {
+                return Pair(connection, currentUrl)
+            }
+        }
+    }
+
     private fun openConnection(
         url: String,
         builder: RequestBuilder,
     ): HttpURLConnection {
         val connection = URI(url).toURL().openConnection() as HttpURLConnection
         connection.requestMethod = builder.method.name
+        connection.instanceFollowRedirects = false
         connection.connectTimeout = builder.connectTimeoutOverride ?: connectTimeout
         connection.readTimeout = builder.readTimeoutOverride ?: readTimeout
 

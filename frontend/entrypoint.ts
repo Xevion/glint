@@ -36,11 +36,16 @@ function log(level: LogLevel, message: string, fields?: Record<string, unknown>)
 	}
 }
 
+// Resolve the public origin once — both the Axum backend (for device auth
+// verification URLs) and SvelteKit (for CSRF / SSR) need this value.
+const ORIGIN = process.env.ORIGIN ?? `http://localhost:${PORT}`;
+
 // Build shared env for both subprocesses — ensures LOG_JSON and LOG_LEVEL
 // are propagated even if the parent env didn't have them explicitly set.
 const sharedEnv: Record<string, string | undefined> = {
 	...process.env,
-	LOG_JSON
+	LOG_JSON,
+	ORIGIN
 };
 if (LOG_LEVEL) {
 	sharedEnv.LOG_LEVEL = LOG_LEVEL;
@@ -87,7 +92,6 @@ const bunProc = spawn({
 		...sharedEnv,
 		PORT,
 		HOST: '0.0.0.0',
-		ORIGIN: process.env.ORIGIN ?? `http://localhost:${PORT}`,
 		BACKEND_URL: `http://localhost:${BACKEND_PORT}`
 	},
 	stdout: 'inherit',

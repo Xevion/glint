@@ -45,11 +45,10 @@ pub fn unmetered_router() -> Router<AppState> {
 async fn authorize(State(state): State<AppState>) -> AppResult<Json<DeviceAuthResponse>> {
     let code = DeviceCodeRepo::create(state.db()).await?;
 
-    // Build verification URLs from explicit frontend_url, falling back to first CORS origin
-    let base_url = state
-        .config()
-        .frontend_url
-        .clone()
+    // Build verification URLs from the ORIGIN env var (canonical frontend URL),
+    // falling back to the first CORS origin for local dev.
+    let base_url = std::env::var("ORIGIN")
+        .ok()
         .or_else(|| state.config().cors_origins.first().cloned())
         .unwrap_or_else(|| "http://localhost:5173".to_string());
 

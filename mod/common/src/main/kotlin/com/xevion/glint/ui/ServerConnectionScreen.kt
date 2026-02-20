@@ -185,14 +185,14 @@ class ServerConnectionScreen(
                 minecraft?.execute {
                     testingConnection = false
                     result
-                        .onSuccess { message ->
-                            connectionTestResult = message
+                        .onSuccess { testResult ->
+                            connectionTestResult = testResult.message
                             connectionTestError = null
-                            log.info("Connection test successful") { "url" to normalizedUrl }
+                            log.info("Connection test successful") { "url" to testResult.resolvedUrl }
                             updateFeedback()
 
-                            // Automatically proceed to world selection after ~1 second
-                            validatedUrl = normalizedUrl
+                            // Use the resolved URL (may differ from input after redirects)
+                            validatedUrl = testResult.resolvedUrl
                             proceedCountdown = 20 // ~1 second at 20 TPS
                         }.onFailure { error ->
                             connectionTestResult = null
