@@ -292,11 +292,11 @@ type QueryRoot {
 		"""
 		Number of items to return (max 100)
 		"""
-		first: Int! = 20
+		first: Int! = 20,
 		"""
 		Cursor from a previous page's endCursor
 		"""
-		after: String
+		after: String,
 		"""
 		Filter inactive scenes: EXCLUDE (default, active only), INCLUDE (all, admin), ONLY (inactive only, admin)
 		"""
@@ -313,7 +313,7 @@ type QueryRoot {
 	): SceneNode
 	"""
 	Paginated list of shaders with cursor pagination.
-
+	
 	Use `visibility` to control which shaders are returned:
 	- `EXCLUDE` (default): only shaders with completed captures (public).
 	- `INCLUDE`: all shaders including disabled/uncaptured (requires admin).
@@ -323,19 +323,19 @@ type QueryRoot {
 		"""
 		Number of items to return (max 100)
 		"""
-		first: Int! = 20
+		first: Int! = 20,
 		"""
 		Cursor from a previous page's endCursor
 		"""
-		after: String
+		after: String,
 		"""
 		Search by name
 		"""
-		search: String
+		search: String,
 		"""
 		Sort: popular, name, or default (recent)
 		"""
-		sort: String
+		sort: String,
 		"""
 		Filter hidden items: EXCLUDE (default, public), INCLUDE (all, admin), ONLY (hidden only, admin)
 		"""
@@ -343,7 +343,7 @@ type QueryRoot {
 	): ShaderConnection!
 	"""
 	Get a shader by ID or slug with full detail.
-
+	
 	Returns a `ShaderNode` whose nested fields (versions, authors) are
 	resolved on demand via `ComplexObject` resolvers.
 	"""
@@ -360,7 +360,7 @@ type QueryRoot {
 		"""
 		Number of days to consider (1-90)
 		"""
-		days: Int! = 7
+		days: Int! = 7,
 		"""
 		Number of items to return (max 100)
 		"""
@@ -373,7 +373,7 @@ type QueryRoot {
 		"""
 		Number of items to return (max 100)
 		"""
-		first: Int! = 20
+		first: Int! = 20,
 		"""
 		Cursor from a previous page's endCursor
 		"""
@@ -575,7 +575,7 @@ type ShaderNode {
 	extractionSummary: ExtractionSummaryNode
 	"""
 	Completed captures for this shader, optionally filtered by version and profile.
-
+	
 	Returns one capture per scene (deduplication via `CaptureDistinct::PerScene`),
 	matching the behavior of the REST shader detail endpoint.
 	"""
@@ -583,7 +583,7 @@ type ShaderNode {
 		"""
 		Filter to a specific shader version. Defaults to the preferred or latest version.
 		"""
-		versionId: String
+		versionId: String,
 		"""
 		Filter to a specific profile within the version.
 		"""
@@ -591,7 +591,7 @@ type ShaderNode {
 	): [CaptureWithContextNode!]!
 	"""
 	Profiles for this shader, optionally filtered to a specific version.
-
+	
 	Defaults to the preferred or latest version's profiles when no `version_id` is given.
 	"""
 	profiles(
@@ -602,7 +602,7 @@ type ShaderNode {
 	): [ShaderVersionProfileNode!]!
 	"""
 	Extracted metadata for this shader, optionally for a specific version.
-
+	
 	Defaults to the preferred or latest version's metadata when no `version_id` is given.
 	"""
 	metadata(

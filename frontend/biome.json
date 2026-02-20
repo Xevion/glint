@@ -7,7 +7,14 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"ignore": ["dist/", "node_modules/", ".svelte-kit/", "src/lib/bindings/"]
+		"ignore": [
+			"dist/",
+			"node_modules/",
+			".svelte-kit/",
+			"src/lib/bindings/",
+			"src/lib/graphql/graphql-env.d.ts",
+			"src/lib/graphql/schema.graphql"
+		]
 	},
 	"formatter": {
 		"enabled": true,
