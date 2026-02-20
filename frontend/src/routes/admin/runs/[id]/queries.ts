@@ -1,6 +1,6 @@
 import { graphql, type ResultOf } from '$lib/graphql';
 
-export const CaptureRunItemFragment = graphql(`
+const CaptureRunItemFragment = graphql(`
 	fragment CaptureRunItemFields on CaptureRunItemNode @_unmask {
 		id
 		runId

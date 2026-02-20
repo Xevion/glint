@@ -1,12 +1,12 @@
 // Shared icon SVG paths and viewBox definitions
 
-export interface IconPath {
+interface IconPath {
 	d: string;
 	fillRule?: 'evenodd' | 'nonzero';
 	clipRule?: 'evenodd' | 'nonzero';
 }
 
-export interface IconDefinition {
+interface IconDefinition {
 	viewBox: string;
 	paths: IconPath[];
 	hoverColor: string;

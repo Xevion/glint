@@ -1,30 +1,4 @@
 /**
- * Generate a deterministic number from a string (for consistent random-like selection).
- * Useful for selecting wallpapers or other assets based on entity IDs.
- */
-export function hashStringToNumber(str: string): number {
-	let hash = 0;
-	for (let i = 0; i < str.length; i++) {
-		hash = (hash << 5) - hash + str.charCodeAt(i);
-		hash = hash & hash; // Convert to 32-bit integer
-	}
-	return Math.abs(hash);
-}
-
-/**
- * Escape HTML special characters to prevent XSS attacks.
- * Use this when rendering user-provided or dynamic content in HTML strings.
- */
-export function escapeHtml(str: string): string {
-	return str
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#039;');
-}
-
-/**
  * Format a number with K/M suffixes for compact display.
  * Returns '0' if null/undefined.
  */
@@ -33,23 +7,6 @@ export function formatNumber(num: number | null | undefined): string {
 	if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
 	if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
 	return num.toString();
-}
-
-/**
- * Format an ISO date string to localized short format.
- * Returns 'Unknown' if null/undefined/invalid.
- */
-export function formatDate(date: string | null | undefined): string {
-	if (!date) return 'Unknown';
-	try {
-		return new Date(date).toLocaleDateString(undefined, {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric'
-		});
-	} catch {
-		return 'Unknown';
-	}
 }
 
 /**
@@ -156,7 +113,7 @@ const MOON_PHASES: { emoji: string; name: string }[] = [
 /**
  * Get moon phase display info (emoji + name) for a Minecraft moon phase value (0-7).
  */
-export function getMoonPhaseDisplay(phase: number): { emoji: string; name: string } {
+function getMoonPhaseDisplay(phase: number): { emoji: string; name: string } {
 	return MOON_PHASES[phase] ?? { emoji: '🌕', name: 'Unknown' };
 }
 

@@ -9,7 +9,7 @@ use crate::{
     cache::SessionCache,
     config::Config,
     db::{DbPool, DbTransaction},
-    error::{AppError, AppResult},
+    error::AppResult,
     graphql::events::DomainEvent,
     platform::{curseforge::CurseForgeClient, modrinth::ModrinthClient},
 };
@@ -43,7 +43,6 @@ pub struct AppStateInner {
 }
 
 impl AppState {
-    #[allow(clippy::too_many_arguments)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: DbPool,
@@ -124,23 +123,6 @@ impl AppState {
         if let Some(analytics) = self.analytics() {
             analytics.track(event_name, distinct_id, properties);
         }
-    }
-
-    /// Report an error to PostHog analytics and return it for handler use.
-    /// Use in handlers: `return Err(state.track_err(error, "handler_name"))`
-    pub fn track_err(&self, error: AppError, handler: &str) -> AppError {
-        let (status, code) = error.status_and_code();
-        self.track(
-            "api_error",
-            "system",
-            serde_json::json!({
-                "handler": handler,
-                "status": status.as_u16(),
-                "code": code,
-                "message": error.to_string(),
-            }),
-        );
-        error
     }
 
     pub async fn begin_tx(&self) -> AppResult<DbTransaction<'_>> {

@@ -5,7 +5,7 @@ import type { TextOverlayProps } from './text';
 
 export type OgType = 'shader' | 'scene' | 'home' | 'shaders' | 'scenes' | 'compare';
 
-export interface OgImageData {
+interface OgImageData {
 	/** URL of the screenshot to use as background (null = text-only) */
 	imageUrl: string | null;
 	/** Text overlay props */

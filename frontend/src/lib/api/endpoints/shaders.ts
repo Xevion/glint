@@ -8,7 +8,7 @@ import type { Result } from 'true-myth';
 import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
 
-export interface GetShaderParams {
+interface GetShaderParams {
 	versionId?: string;
 	profileId?: string;
 }

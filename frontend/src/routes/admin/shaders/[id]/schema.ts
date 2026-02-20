@@ -9,5 +9,3 @@ export const shaderFormSchema = z.object({
 	capture_enabled: z.boolean().default(true),
 	preferred_version_id: z.string().nullable().default(null)
 });
-
-export type ShaderFormSchema = typeof shaderFormSchema;

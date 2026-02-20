@@ -3,7 +3,7 @@
  * Each ManagedTimer holds at most one active timeout at a time.
  */
 
-export interface ManagedTimer {
+interface ManagedTimer {
 	/** Schedule a callback after `ms` milliseconds. Cancels any pending timeout. */
 	set: (callback: () => void, ms: number) => void;
 	/** Cancel the pending timeout if any. */
@@ -13,7 +13,7 @@ export interface ManagedTimer {
 }
 
 /** Create a managed timer. Call `clear()` on component destroy to prevent leaks. */
-export function createTimer(): ManagedTimer {
+function createTimer(): ManagedTimer {
 	let id: ReturnType<typeof setTimeout> | null = null;
 
 	function set(callback: () => void, ms: number) {

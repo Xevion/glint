@@ -1,6 +1,6 @@
 import { beforeNavigate, onNavigate } from '$app/navigation';
 
-export type NavDirection = 'left' | 'right';
+type NavDirection = 'left' | 'right';
 
 /**
  * Path used for navbar label expansion. Deferred during view transitions so

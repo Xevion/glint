@@ -109,8 +109,6 @@ type FieldTransform = Box<dyn Fn(&str) -> Cow<'_, str> + Send + Sync>;
 
 /// Rule for transforming a named field in pretty output.
 enum FieldRule {
-    /// Omit the field entirely from display.
-    Hide,
     /// Apply a custom transform to the field's formatted value.
     Transform(FieldTransform),
 }
@@ -127,12 +125,6 @@ struct CompactFields {
 impl CompactFields {
     fn new() -> Self {
         Self { rules: vec![] }
-    }
-
-    #[allow(dead_code)]
-    fn hide(mut self, field: &'static str) -> Self {
-        self.rules.push((field, FieldRule::Hide));
-        self
     }
 
     fn transform(
@@ -173,7 +165,6 @@ impl Visit for CompactVisitor<'_, '_> {
         let rule = self.rules.iter().find(|(n, _)| *n == name).map(|(_, r)| r);
 
         self.result = match rule {
-            Some(FieldRule::Hide) => return,
             Some(FieldRule::Transform(f)) => {
                 let formatted = format!("{:?}", value);
                 let transformed = f(&formatted);
@@ -408,29 +399,6 @@ fn default_level() -> &'static str {
     }
 }
 
-/// Initialize logging with the compact formatter.
-///
-/// Uses `RUST_LOG` environment variable for filtering, with a fallback default.
-///
-/// # Arguments
-/// * `default_filter` - Filter used if `RUST_LOG` is not set (e.g., `"info,sqlx=warn"`)
-pub fn init(default_filter: &str) {
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_filter));
-
-    init_with_filter(filter);
-}
-
-/// Initialize logging with the compact formatter, returning an error if already initialized.
-///
-/// This is useful in tests or when multiple init attempts may occur.
-pub fn try_init(default_filter: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_filter));
-
-    try_init_with_filter(filter)
-}
-
 /// Initialize logging with verbosity level support.
 ///
 /// Determines log level from (in priority order):
@@ -507,31 +475,5 @@ fn init_with_filter(filter: EnvFilter) {
                     .fmt_fields(compact_fields()),
             )
             .init();
-    }
-}
-
-/// Like `init_with_filter` but returns an error instead of panicking if already initialized.
-fn try_init_with_filter(filter: EnvFilter) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let use_json = should_use_json();
-
-    if use_json {
-        Ok(tracing_subscriber::registry()
-            .with(filter)
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .event_format(JsonFormatter)
-                    .fmt_fields(tracing_subscriber::fmt::format::DefaultFields::new())
-                    .with_ansi(false),
-            )
-            .try_init()?)
-    } else {
-        Ok(tracing_subscriber::registry()
-            .with(filter)
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .event_format(CompactFormatter)
-                    .fmt_fields(compact_fields()),
-            )
-            .try_init()?)
     }
 }

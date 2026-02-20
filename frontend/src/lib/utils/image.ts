@@ -1,6 +1,6 @@
 import { env } from '$env/dynamic/public';
 
-export interface ImageTransformOptions {
+interface ImageTransformOptions {
 	width?: number;
 	height?: number;
 	quality?: number;
@@ -8,7 +8,7 @@ export interface ImageTransformOptions {
 	format?: 'auto' | 'avif' | 'webp' | 'jpeg';
 }
 
-export const IMAGE_WIDTHS = [160, 320, 640, 960, 1280, 1920] as const;
+const IMAGE_WIDTHS = [160, 320, 640, 960, 1280, 1920] as const;
 
 export const IMAGE_PRESETS = {
 	thumbnail: {
@@ -32,7 +32,7 @@ export const IMAGE_PRESETS = {
 	full: { sizes: '100vw', quality: 90, format: 'auto' }
 } as const satisfies Record<string, ImagePresetConfig>;
 
-export interface ImagePresetConfig {
+interface ImagePresetConfig {
 	sizes: string;
 	quality?: number;
 	fit?: ImageTransformOptions['fit'];
@@ -164,22 +164,6 @@ function presetToTransformOptions(preset: ImagePreset): ImageTransformOptions {
 		quality: config.quality,
 		fit: config.fit,
 		format: config.format
-	};
-}
-
-interface ImageSourceLike {
-	image_path?: string | null;
-	thumbhash?: string | null;
-}
-
-export function resolveImageSource(source: string | ImageSourceLike): {
-	src: string | null;
-	thumbhash: string | null;
-} {
-	if (typeof source === 'string') return { src: source, thumbhash: null };
-	return {
-		src: source.image_path ?? null,
-		thumbhash: source.thumbhash ?? null
 	};
 }
 

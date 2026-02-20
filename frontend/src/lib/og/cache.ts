@@ -10,7 +10,7 @@ const DEFAULT_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
  * Simple LRU cache for generated OG images.
  * Bounded by entry count and TTL.
  */
-export class OgImageCache {
+class OgImageCache {
 	private cache = new Map<string, CacheEntry>();
 	private maxEntries: number;
 	private maxAgeMs: number;
@@ -51,7 +51,7 @@ export class OgImageCache {
  * Singleflight gate — deduplicates concurrent requests for the same key.
  * If a generation is already in-flight, subsequent requests await the same promise.
  */
-export class Singleflight<T = Uint8Array> {
+class Singleflight<T = Uint8Array> {
 	private inflight = new Map<string, Promise<T>>();
 
 	/**

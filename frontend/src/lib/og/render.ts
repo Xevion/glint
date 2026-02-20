@@ -20,7 +20,7 @@ const GRADIENT_SVG = `<svg width="${OG_WIDTH}" height="${OG_HEIGHT}" xmlns="http
 
 const gradientBuffer = Buffer.from(GRADIENT_SVG);
 
-export interface OgRenderOptions {
+interface OgRenderOptions {
 	/** Raw image bytes for the background screenshot */
 	imageBuffer: Buffer;
 	/** Text overlay props */

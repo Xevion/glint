@@ -48,4 +48,4 @@ export const api = createApiClient();
 
 // Re-export types for convenience
 export type * from '$lib/bindings';
-export { ApiError, ApiErrorType } from './errors';
+export { ApiErrorType } from './errors';

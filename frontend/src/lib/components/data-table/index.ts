@@ -1,5 +1,5 @@
 // Core table creation
-export { createDataTable, type DataTableOptions } from './create-table.svelte.js';
+export { createDataTable } from './create-table.svelte.js';
 export { createSvelteTable } from './svelte-table.svelte.js';
 
 // Rendering utilities
@@ -15,4 +15,4 @@ export { default as DataTableColumnHeader } from './data-table-column-header.sve
 export { textColumn, timeColumn, imageColumn } from './columns.js';
 
 // Re-export commonly used TanStack types for convenience
-export type { ColumnDef, SortingState, ColumnFiltersState } from '@tanstack/table-core';
+export type { ColumnDef } from '@tanstack/table-core';

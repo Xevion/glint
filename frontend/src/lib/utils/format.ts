@@ -10,23 +10,6 @@ export function formatBytes(bytes: number, decimals = 2): string {
 }
 
 /**
- * Create a stateful axis tick formatter that deduplicates date labels.
- * Shows "Jan 15" for the first tick of each day, then "4 PM", "8 PM" for
- * subsequent same-day ticks. Resets when a new day is encountered.
- */
-export function createAxisDateFormatter(): (date: Date) => string {
-	let lastDay = '';
-	return (date: Date) => {
-		const day = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-		if (day !== lastDay) {
-			lastDay = day;
-			return day;
-		}
-		return date.toLocaleTimeString(undefined, { hour: 'numeric' });
-	};
-}
-
-/**
  * Format a Date with time for tooltip display (e.g., "Jan 15, 2:00 PM").
  */
 export function formatDatetime(date: Date): string {
