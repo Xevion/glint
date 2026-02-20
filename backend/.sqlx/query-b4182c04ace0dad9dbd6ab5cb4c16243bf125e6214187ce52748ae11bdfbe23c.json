@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                (SELECT COUNT(*) FROM shaders) AS \"shader_count!\",\n                (SELECT COUNT(*) FROM scenes WHERE active = TRUE) AS \"scene_count!\",\n                (SELECT COUNT(*) FROM captures WHERE status = 'completed') AS \"capture_count!\",\n                (SELECT COUNT(*) FROM users) AS \"user_count!\",\n                (SELECT COUNT(*) FROM capture_runs) AS \"run_count!\",\n                (SELECT MAX(captured_at) FROM captures WHERE status = 'completed') AS latest_capture_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "scene_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "capture_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "user_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "run_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "latest_capture_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "b4182c04ace0dad9dbd6ab5cb4c16243bf125e6214187ce52748ae11bdfbe23c"
+}

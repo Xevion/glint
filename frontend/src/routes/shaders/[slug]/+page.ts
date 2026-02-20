@@ -18,34 +18,46 @@ export const _ShaderDetailQuery = graphql(`
       upstreamDownloads
       viewCount
       preferredVersionId
-      versions {
-        version {
-          id
-          version
+      versions(first: 100) {
+        edges {
+          node {
+            version {
+              id
+              version
+            }
+            captureCount
+          }
         }
-        captureCount
       }
       authors {
         name
         url
       }
-      captures(versionId: $versionId, profileId: $profileId) {
-        id
-        imagePath
-        thumbhash
-        sceneName
-        profileDisplayName
-        shaderVersion
-        shaderName
+      captures(first: 100, versionId: $versionId, profileId: $profileId) {
+        edges {
+          node {
+            id
+            imagePath
+            thumbhash
+            sceneName
+            profileDisplayName
+            shaderVersion
+            shaderName
+          }
+        }
       }
-      profiles(versionId: $versionId) {
-        id
-        shaderVersionId
-        name
-        label
-        displayName
-        description
-        sortOrder
+      profiles(first: 100, versionId: $versionId) {
+        edges {
+          node {
+            id
+            shaderVersionId
+            name
+            label
+            displayName
+            description
+            sortOrder
+          }
+        }
       }
       metadata(versionId: $versionId) {
         shaderVersionId
@@ -78,9 +90,9 @@ const SimilarShadersQuery = graphql(
 );
 
 type GqlShaderDetail = NonNullable<ResultOf<typeof _ShaderDetailQuery>['shader']>;
-type GqlCapture = GqlShaderDetail['captures'][number];
-type GqlVersion = GqlShaderDetail['versions'][number];
-type GqlProfile = GqlShaderDetail['profiles'][number];
+type GqlCapture = GqlShaderDetail['captures']['edges'][number]['node'];
+type GqlVersion = GqlShaderDetail['versions']['edges'][number]['node'];
+type GqlProfile = GqlShaderDetail['profiles']['edges'][number]['node'];
 type GqlMetadata = NonNullable<GqlShaderDetail['metadata']>;
 
 export interface ShaderDetail {
@@ -185,9 +197,9 @@ export function _toShaderDetail(s: GqlShaderDetail): ShaderDetail {
 		viewCount: s.viewCount,
 		preferredVersionId: s.preferredVersionId,
 		authors: deduplicateAuthors(s.authors),
-		versions: s.versions.map(mapVersion),
-		captures: s.captures,
-		profiles: s.profiles,
+		versions: s.versions.edges.map((e) => mapVersion(e.node)),
+		captures: s.captures.edges.map((e) => e.node),
+		profiles: s.profiles.edges.map((e) => e.node),
 		metadata: s.metadata ? mapMetadata(s.metadata) : undefined
 	};
 }
@@ -240,12 +252,12 @@ export const load: PageLoad = async ({ params, fetch, url, depends }) => {
 
 	// If the latest version has no captures but an older one does, re-fetch
 	// with the correct versionId so SSR data matches the version the UI selects.
-	if (shaderData.captures.length === 0 && !versionIdParam) {
-		const versionWithCaptures = shaderData.versions.find((v) => v.captureCount > 0);
+	if (shaderData.captures.edges.length === 0 && !versionIdParam) {
+		const versionWithCaptures = shaderData.versions.edges.find((e) => e.node.captureCount > 0);
 		if (versionWithCaptures) {
 			const refetchResult = await query(client, _ShaderDetailQuery, {
 				id: params.slug,
-				versionId: versionWithCaptures.version.id,
+				versionId: versionWithCaptures.node.version.id,
 				profileId: profileIdParam
 			});
 			refetchResult.match({

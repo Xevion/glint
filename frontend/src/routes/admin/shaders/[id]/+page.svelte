@@ -91,9 +91,9 @@ interface Props {
 }
 let { data }: Props = $props();
 let shader: ShaderDetailData = $derived(data.shader);
-let versions: ShaderVersionDetail[] = $derived(data.shader.versions);
-let captures: ShaderCapture[] = $derived(data.shader.captures);
-let profiles: ShaderProfile[] = $derived(data.shader.profiles);
+let versions: ShaderVersionDetail[] = $derived(data.shader.versions.edges.map((e) => e.node));
+let captures: ShaderCapture[] = $derived(data.shader.captures.edges.map((e) => e.node));
+let profiles: ShaderProfile[] = $derived(data.shader.profiles.edges.map((e) => e.node));
 let metadata: ShaderMetadata | null = $derived(data.shader.metadata);
 
 /** The effective (latest) version — matches what the backend returns profiles/metadata for */

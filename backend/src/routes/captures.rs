@@ -13,9 +13,7 @@ use crate::{
     auth::AdminUser,
     error::{AppError, AppResult, OptionNotFoundExt},
     id::{CaptureRunId, SceneId},
-    models::{
-        CaptureDetail, CaptureListItem, CaptureStatus, CaptureWithContext, PageQuery, Paginated,
-    },
+    models::{CaptureDetail, CaptureStatus, CaptureWithContext, PageQuery, Paginated},
     repo::{
         CaptureRepo, SceneRepo,
         capture::{CaptureDistinct, CaptureFilters},
@@ -39,21 +37,9 @@ pub struct CaptureListParams {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/", get(list_captures_public))
         .route("/all", get(list_captures_all))
         .route("/{id}", get(get_capture_public).delete(delete_capture))
         .route("/{id}/details", get(get_capture_details))
-}
-
-/// GET /api/captures - Paginated list of completed captures (public)
-#[instrument(skip(state))]
-async fn list_captures_public(
-    State(state): State<AppState>,
-    Query(params): Query<PageQuery>,
-) -> AppResult<Json<Paginated<CaptureListItem>>> {
-    let p = params.normalize();
-    let (items, total) = CaptureRepo::list_items(state.db(), &p).await?;
-    Ok(Json(Paginated::new(items, total, &p)))
 }
 
 /// GET /api/captures/all - List all captures with context, paginated (admin)

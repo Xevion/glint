@@ -172,6 +172,17 @@ impl From<CursorPage<CaptureListItem>> for CaptureConnection {
     }
 }
 
+impl CursorEncodable for CaptureWithContext {
+    fn encode_cursor(&self) -> String {
+        encode_cursor(
+            self.id.as_ref(),
+            self.captured_at
+                .map(|dt| dt.timestamp_millis())
+                .unwrap_or(0),
+        )
+    }
+}
+
 /// Relay-style edge for captures with context.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct CaptureWithContextEdge {
@@ -185,4 +196,18 @@ pub struct CaptureWithContextConnection {
     pub edges: Vec<CaptureWithContextEdge>,
     pub page_info: PageInfo,
     pub total_count: i64,
+}
+
+impl From<CursorPage<CaptureWithContext>> for CaptureWithContextConnection {
+    fn from(page: CursorPage<CaptureWithContext>) -> Self {
+        let (edges, page_info, total_count) = page.into_connection(CaptureWithContextNode::from);
+        CaptureWithContextConnection {
+            edges: edges
+                .into_iter()
+                .map(|(cursor, node)| CaptureWithContextEdge { cursor, node })
+                .collect(),
+            page_info,
+            total_count,
+        }
+    }
 }

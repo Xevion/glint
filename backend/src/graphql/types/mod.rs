@@ -1,5 +1,6 @@
 pub mod background;
 pub mod capture;
+pub mod capture_health;
 pub mod common;
 pub mod connection;
 pub mod featured;
@@ -8,6 +9,7 @@ pub mod run;
 pub mod scene;
 pub mod shader;
 pub mod stats;
+pub mod storage;
 pub mod taxonomy;
 pub mod user;
 pub mod version;

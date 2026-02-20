@@ -1,4 +1,4 @@
-import { createApiClient } from '$lib/api';
+import { createGraphQLClient, graphql, query } from '$lib/graphql';
 import { formatNumber, formatVersion } from '$lib/utils/format';
 import { rawImageUrl } from '$lib/utils/image';
 import type { TextOverlayProps } from './text';
@@ -14,6 +14,72 @@ interface OgImageData {
 	fallback?: boolean;
 }
 
+// Focused OG queries — request only the fields needed for image generation.
+
+const OgShaderQuery = graphql(`
+	query OgShader($id: String!) {
+		shader(id: $id) {
+			name
+			upstreamDownloads
+			latestVersion
+			captures(first: 1) {
+				edges {
+					node {
+						imagePath
+						shaderAuthor
+						profileDisplayName
+					}
+				}
+			}
+		}
+	}
+`);
+
+const OgSceneQuery = graphql(`
+	query OgScene($id: String!) {
+		scene(id: $id) {
+			name
+			imagePath
+			captureCount
+		}
+	}
+`);
+
+const OgHomeQuery = graphql(`
+	query OgHome($featuredCount: Int!) {
+		featured(count: $featuredCount) {
+			right {
+				imagePath
+			}
+		}
+	}
+`);
+
+const OgShadersListQuery = graphql(`
+	query OgShadersList {
+		shaders(first: 1) {
+			edges {
+				node {
+					imagePath
+				}
+			}
+		}
+	}
+`);
+
+const OgScenesListQuery = graphql(`
+	query OgScenesList {
+		scenes(first: 100) {
+			edges {
+				node {
+					imagePath
+				}
+			}
+			totalCount
+		}
+	}
+`);
+
 /**
  * Fetch the data needed to render an OG image for the given type and params.
  *
@@ -24,21 +90,21 @@ export async function fetchOgData(
 	params: string,
 	fetchFn: typeof fetch
 ): Promise<OgImageData> {
-	const api = createApiClient(fetchFn);
+	const client = createGraphQLClient(fetchFn);
 
 	switch (type) {
 		case 'shader':
-			return fetchShaderOgData(api, params);
+			return fetchShaderOgData(client, params);
 		case 'scene':
-			return fetchSceneOgData(api, params);
+			return fetchSceneOgData(client, params);
 		case 'home':
-			return fetchHomeOgData(api);
+			return fetchHomeOgData(client);
 		case 'shaders':
-			return fetchShadersListOgData(api);
+			return fetchShadersListOgData(client);
 		case 'scenes':
-			return fetchScenesListOgData(api);
+			return fetchScenesListOgData(client);
 		case 'compare':
-			return fetchCompareOgData(api, params);
+			return fetchCompareOgData(client, params);
 		default: {
 			const _exhaustive: never = type;
 			throw new Error(`Unknown OG type: ${String(_exhaustive)}`);
@@ -46,12 +112,12 @@ export async function fetchOgData(
 	}
 }
 
-type ApiClient = ReturnType<typeof createApiClient>;
+type GqlClient = ReturnType<typeof createGraphQLClient>;
 
-async function fetchShaderOgData(api: ApiClient, slug: string): Promise<OgImageData> {
-	const result = await api.shaders.getShader(slug);
+async function fetchShaderOgData(client: GqlClient, slug: string): Promise<OgImageData> {
+	const result = await query(client, OgShaderQuery, { id: slug });
 
-	if (result.isErr) {
+	if (result.isErr || !result.value.shader) {
 		return {
 			imageUrl: null,
 			text: { title: 'Shader Not Found' },
@@ -59,30 +125,29 @@ async function fetchShaderOgData(api: ApiClient, slug: string): Promise<OgImageD
 		};
 	}
 
-	const shader = result.value;
-	const heroCapture = shader.captures[0];
-	const latestVersion = shader.versions[0];
+	const shader = result.value.shader;
+	const heroCapture = shader.captures.edges[0]?.node;
 
 	const metaParts: string[] = [];
-	if (heroCapture?.shader_author) metaParts.push(`by ${heroCapture.shader_author}`);
-	if (shader.upstream_downloads)
-		metaParts.push(`${formatNumber(shader.upstream_downloads)} downloads`);
-	if (heroCapture?.profile_display_name) metaParts.push(heroCapture.profile_display_name);
+	if (heroCapture?.shaderAuthor) metaParts.push(`by ${heroCapture.shaderAuthor}`);
+	if (shader.upstreamDownloads)
+		metaParts.push(`${formatNumber(shader.upstreamDownloads)} downloads`);
+	if (heroCapture?.profileDisplayName) metaParts.push(heroCapture.profileDisplayName);
 
 	return {
-		imageUrl: rawImageUrl(heroCapture?.image_path),
+		imageUrl: rawImageUrl(heroCapture?.imagePath),
 		text: {
 			title: shader.name,
-			subtitle: latestVersion ? formatVersion(latestVersion.version) : undefined,
+			subtitle: shader.latestVersion ? formatVersion(shader.latestVersion) : undefined,
 			meta: metaParts.length > 0 ? metaParts.join(' \u00b7 ') : undefined
 		}
 	};
 }
 
-async function fetchSceneOgData(api: ApiClient, slug: string): Promise<OgImageData> {
-	const result = await api.scenes.getBySlug(slug);
+async function fetchSceneOgData(client: GqlClient, slug: string): Promise<OgImageData> {
+	const result = await query(client, OgSceneQuery, { id: slug });
 
-	if (result.isErr || result.value.length === 0) {
+	if (result.isErr || !result.value.scene) {
 		return {
 			imageUrl: null,
 			text: { title: 'Scene Not Found' },
@@ -90,27 +155,27 @@ async function fetchSceneOgData(api: ApiClient, slug: string): Promise<OgImageDa
 		};
 	}
 
-	const scene = result.value[0];
-	const firstCapture = scene.captures[0];
-	const captureCount = scene.captures.length;
+	const scene = result.value.scene;
 
 	return {
-		imageUrl: rawImageUrl(firstCapture?.image_path),
+		imageUrl: rawImageUrl(scene.imagePath),
 		text: {
 			title: scene.name,
 			meta:
-				captureCount > 0
-					? `${captureCount} shader screenshot${captureCount !== 1 ? 's' : ''}`
+				scene.captureCount > 0
+					? `${scene.captureCount} shader screenshot${scene.captureCount !== 1 ? 's' : ''}`
 					: undefined
 		}
 	};
 }
 
-async function fetchHomeOgData(api: ApiClient): Promise<OgImageData> {
-	const result = await api.featured.list();
+async function fetchHomeOgData(client: GqlClient): Promise<OgImageData> {
+	const result = await query(client, OgHomeQuery, { featuredCount: 6 });
 
 	const imageUrl =
-		result.isOk && result.value.length > 0 ? rawImageUrl(result.value[0]?.right.image_path) : null;
+		result.isOk && result.value.featured.length > 0
+			? rawImageUrl(result.value.featured[0]?.right.imagePath)
+			: null;
 
 	return {
 		imageUrl,
@@ -122,12 +187,12 @@ async function fetchHomeOgData(api: ApiClient): Promise<OgImageData> {
 	};
 }
 
-async function fetchShadersListOgData(api: ApiClient): Promise<OgImageData> {
-	const result = await api.shaders.list({ pageSize: 1 });
+async function fetchShadersListOgData(client: GqlClient): Promise<OgImageData> {
+	const result = await query(client, OgShadersListQuery, {});
 
 	const imageUrl =
-		result.isOk && result.value.items.length > 0
-			? rawImageUrl(result.value.items[0]?.image_path)
+		result.isOk && result.value.shaders.edges.length > 0
+			? rawImageUrl(result.value.shaders.edges[0]?.node.imagePath)
 			: null;
 
 	return {
@@ -139,23 +204,31 @@ async function fetchShadersListOgData(api: ApiClient): Promise<OgImageData> {
 	};
 }
 
-async function fetchScenesListOgData(api: ApiClient): Promise<OgImageData> {
-	const result = await api.scenes.list();
+async function fetchScenesListOgData(client: GqlClient): Promise<OgImageData> {
+	const result = await query(client, OgScenesListQuery, {});
 
-	const firstWithImage = result.isOk ? result.value.find((s) => s.image_path != null) : undefined;
+	if (result.isErr) {
+		return {
+			imageUrl: null,
+			text: {
+				title: 'Scenes',
+				meta: 'Minecraft test scenes for shader comparison'
+			}
+		};
+	}
+
+	const firstWithImage = result.value.scenes.edges.find((e) => e.node.imagePath != null);
 
 	return {
-		imageUrl: rawImageUrl(firstWithImage?.image_path),
+		imageUrl: rawImageUrl(firstWithImage?.node.imagePath),
 		text: {
 			title: 'Scenes',
-			meta: result.isOk
-				? `${result.value.length} test scenes for shader comparison`
-				: 'Minecraft test scenes for shader comparison'
+			meta: `${result.value.scenes.totalCount} test scenes for shader comparison`
 		}
 	};
 }
 
-async function fetchCompareOgData(api: ApiClient, sceneSlug: string): Promise<OgImageData> {
+async function fetchCompareOgData(client: GqlClient, sceneSlug: string): Promise<OgImageData> {
 	if (!sceneSlug) {
 		return {
 			imageUrl: null,
@@ -166,9 +239,9 @@ async function fetchCompareOgData(api: ApiClient, sceneSlug: string): Promise<Og
 		};
 	}
 
-	const result = await api.scenes.getBySlug(sceneSlug);
+	const result = await query(client, OgSceneQuery, { id: sceneSlug });
 
-	if (result.isErr || result.value.length === 0) {
+	if (result.isErr || !result.value.scene) {
 		return {
 			imageUrl: null,
 			text: {
@@ -179,15 +252,14 @@ async function fetchCompareOgData(api: ApiClient, sceneSlug: string): Promise<Og
 		};
 	}
 
-	const scene = result.value[0];
-	const firstCapture = scene.captures[0];
+	const scene = result.value.scene;
 
 	return {
-		imageUrl: rawImageUrl(firstCapture?.image_path),
+		imageUrl: rawImageUrl(scene.imagePath),
 		text: {
 			title: 'Compare Shaders',
 			subtitle: scene.name,
-			meta: scene.captures.length > 0 ? `${scene.captures.length} shaders to compare` : undefined
+			meta: scene.captureCount > 0 ? `${scene.captureCount} shaders to compare` : undefined
 		}
 	};
 }

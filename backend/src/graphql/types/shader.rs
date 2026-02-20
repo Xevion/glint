@@ -10,8 +10,10 @@ use crate::repo::capture::{CaptureDistinct, CaptureFilters};
 use crate::repo::{CaptureRepo, ExtractionRepo, ShaderVersionRepo};
 use crate::state::AppState;
 
-use super::capture::CaptureWithContextNode;
-use super::connection::{CursorEncodable, CursorPage, PageInfo, encode_cursor};
+use super::capture::CaptureWithContextConnection;
+use super::connection::{
+    CursorEncodable, CursorPage, PageInfo, decode_cursor_for_query, encode_cursor,
+};
 use super::taxonomy::{CategoryNode, FeatureNode};
 
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
@@ -56,15 +58,42 @@ pub struct ShaderNode {
     pub capture_enabled: bool,
 }
 
+/// Resolve the "effective" version for a shader.
+/// Cascade: explicit version_id → shader's preferred_version_id → fallback_latest.
+pub(crate) fn resolve_effective_version_sync(
+    preferred_version_id: Option<&str>,
+    explicit_version_id: Option<String>,
+    fallback_latest: Option<ShaderVersionId>,
+) -> Option<ShaderVersionId> {
+    if let Some(vid) = explicit_version_id {
+        return Some(ShaderVersionId::from(vid));
+    }
+    if let Some(pvid) = preferred_version_id {
+        return Some(ShaderVersionId::from(pvid.to_owned()));
+    }
+    fallback_latest
+}
+
 #[ComplexObject]
 impl ShaderNode {
     /// All versions of this shader, ordered by publish date descending.
     /// Not DataLoader-batched — only called on single-shader detail pages.
-    async fn versions(&self, ctx: &Context<'_>) -> Result<Vec<ShaderVersionDetailNode>> {
+    async fn versions(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(default = 20, desc = "Number of items to return.")] first: i32,
+        #[graphql(desc = "Cursor to paginate after.")] after: Option<String>,
+    ) -> Result<ShaderVersionDetailConnection> {
         let state = ctx.data_unchecked::<AppState>();
-        let details =
-            ShaderVersionRepo::list_by_shader_with_counts(state.db(), self.id.as_ref()).await?;
-        Ok(details.into_iter().map(Into::into).collect())
+        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let page = ShaderVersionRepo::list_by_shader_cursor(
+            state.db(),
+            self.id.as_ref(),
+            first,
+            decoded_after,
+        )
+        .await?;
+        Ok(page.into())
     }
 
     /// Authors attributed to this shader from upstream platforms.
@@ -131,12 +160,13 @@ impl ShaderNode {
     }
 
     /// Total number of versions for this shader.
-    /// Not DataLoader-batched — infrequently used and requires full version list.
     async fn version_count(&self, ctx: &Context<'_>) -> Result<i64> {
-        let state = ctx.data_unchecked::<AppState>();
-        let versions =
-            ShaderVersionRepo::list_by_shader_with_counts(state.db(), self.id.as_ref()).await?;
-        Ok(versions.len() as i64)
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
+        let count = loaders
+            .shader_version_counts
+            .load_one(self.id.0.clone())
+            .await?;
+        Ok(count.unwrap_or(0))
     }
 
     /// Extraction summary across all versions.
@@ -163,23 +193,22 @@ impl ShaderNode {
         #[graphql(desc = "Filter to a specific profile within the version.")] profile_id: Option<
             String,
         >,
-    ) -> Result<Vec<CaptureWithContextNode>> {
+        #[graphql(default = 20, desc = "Number of items to return.")] first: i32,
+        #[graphql(desc = "Cursor to paginate after.")] after: Option<String>,
+    ) -> Result<CaptureWithContextConnection> {
         let state = ctx.data_unchecked::<AppState>();
         let db = state.db();
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
 
-        // Default to preferred version (if set), otherwise latest
-        let effective_version_id = match version_id {
-            Some(vid) => Some(ShaderVersionId::from(vid)),
-            None => {
-                if let Some(ref pvid) = self.preferred_version_id {
-                    Some(ShaderVersionId::from(pvid.clone()))
-                } else {
-                    let versions =
-                        ShaderVersionRepo::list_by_shader_with_counts(db, self.id.as_ref()).await?;
-                    versions.first().map(|v| v.version.id.clone())
-                }
-            }
-        };
+        let fallback = loaders
+            .shader_latest_version_ids
+            .load_one(self.id.0.clone())
+            .await?;
+        let effective_version_id = resolve_effective_version_sync(
+            self.preferred_version_id.as_deref(),
+            version_id,
+            fallback,
+        );
 
         let filters = CaptureFilters {
             shader_id: Some(self.id.clone()),
@@ -190,10 +219,17 @@ impl ShaderNode {
             ..Default::default()
         };
 
-        let (captures, _) =
-            CaptureRepo::list_with_context(db, &filters, None, CaptureDistinct::PerScene).await?;
+        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let page = CaptureRepo::list_with_context_cursor(
+            db,
+            &filters,
+            first,
+            decoded_after,
+            CaptureDistinct::PerScene,
+        )
+        .await?;
 
-        Ok(captures.into_iter().map(Into::into).collect())
+        Ok(page.into())
     }
 
     /// Profiles for this shader, optionally filtered to a specific version.
@@ -206,30 +242,45 @@ impl ShaderNode {
             desc = "Filter to a specific shader version. Defaults to the preferred or latest version."
         )]
         version_id: Option<String>,
-    ) -> Result<Vec<ShaderVersionProfileNode>> {
+        #[graphql(default = 20, desc = "Number of items to return.")] first: i32,
+        #[graphql(desc = "Cursor to paginate after.")] after: Option<String>,
+    ) -> Result<ShaderVersionProfileConnection> {
         let state = ctx.data_unchecked::<AppState>();
         let db = state.db();
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
 
-        let effective_version_id = match version_id {
-            Some(vid) => Some(ShaderVersionId::from(vid)),
-            None => {
-                if let Some(ref pvid) = self.preferred_version_id {
-                    Some(ShaderVersionId::from(pvid.clone()))
-                } else {
-                    let versions =
-                        ShaderVersionRepo::list_by_shader_with_counts(db, self.id.as_ref()).await?;
-                    versions.first().map(|v| v.version.id.clone())
-                }
-            }
-        };
+        let fallback = loaders
+            .shader_latest_version_ids
+            .load_one(self.id.0.clone())
+            .await?;
+        let effective_version_id = resolve_effective_version_sync(
+            self.preferred_version_id.as_deref(),
+            version_id,
+            fallback,
+        );
 
-        let profiles = if let Some(ref vid) = effective_version_id {
-            ExtractionRepo::list_profiles_by_version(db, vid.as_ref()).await?
+        if let Some(ref vid) = effective_version_id {
+            let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+            let page = ExtractionRepo::list_profiles_by_version_cursor(
+                db,
+                vid.as_ref(),
+                first,
+                decoded_after,
+            )
+            .await?;
+            Ok(page.into())
         } else {
-            vec![]
-        };
-
-        Ok(profiles.into_iter().map(Into::into).collect())
+            Ok(ShaderVersionProfileConnection {
+                edges: vec![],
+                page_info: PageInfo {
+                    has_next_page: false,
+                    has_previous_page: false,
+                    start_cursor: None,
+                    end_cursor: None,
+                },
+                total_count: 0,
+            })
+        }
     }
 
     /// Extracted metadata for this shader, optionally for a specific version.
@@ -245,19 +296,17 @@ impl ShaderNode {
     ) -> Result<Option<ShaderVersionMetadataNode>> {
         let state = ctx.data_unchecked::<AppState>();
         let db = state.db();
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
 
-        let effective_version_id = match version_id {
-            Some(vid) => Some(ShaderVersionId::from(vid)),
-            None => {
-                if let Some(ref pvid) = self.preferred_version_id {
-                    Some(ShaderVersionId::from(pvid.clone()))
-                } else {
-                    let versions =
-                        ShaderVersionRepo::list_by_shader_with_counts(db, self.id.as_ref()).await?;
-                    versions.first().map(|v| v.version.id.clone())
-                }
-            }
-        };
+        let fallback = loaders
+            .shader_latest_version_ids
+            .load_one(self.id.0.clone())
+            .await?;
+        let effective_version_id = resolve_effective_version_sync(
+            self.preferred_version_id.as_deref(),
+            version_id,
+            fallback,
+        );
 
         let metadata = if let Some(ref vid) = effective_version_id {
             ExtractionRepo::get_metadata_by_version(db, vid.as_ref()).await?
@@ -433,6 +482,21 @@ impl From<ShaderVersionProfile> for ShaderVersionProfileNode {
     }
 }
 
+impl CursorEncodable for ShaderVersionDetail {
+    fn encode_cursor(&self) -> String {
+        encode_cursor(
+            self.version.id.as_ref(),
+            self.version.created_at.timestamp_millis(),
+        )
+    }
+}
+
+impl CursorEncodable for ShaderVersionProfile {
+    fn encode_cursor(&self) -> String {
+        encode_cursor(self.id.as_ref(), self.created_at.timestamp_millis())
+    }
+}
+
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ShaderVersionMetadataNode {
     pub shader_version_id: ShaderVersionId,
@@ -543,6 +607,64 @@ impl From<CursorPage<Shader>> for ShaderConnection {
             edges: edges
                 .into_iter()
                 .map(|(cursor, node)| ShaderEdge { cursor, node })
+                .collect(),
+            page_info,
+            total_count,
+        }
+    }
+}
+
+/// Relay-style edge for shader version details.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ShaderVersionDetailEdge {
+    pub cursor: String,
+    pub node: ShaderVersionDetailNode,
+}
+
+/// Relay-style connection for shader version details.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ShaderVersionDetailConnection {
+    pub edges: Vec<ShaderVersionDetailEdge>,
+    pub page_info: PageInfo,
+    pub total_count: i64,
+}
+
+impl From<CursorPage<ShaderVersionDetail>> for ShaderVersionDetailConnection {
+    fn from(page: CursorPage<ShaderVersionDetail>) -> Self {
+        let (edges, page_info, total_count) = page.into_connection(ShaderVersionDetailNode::from);
+        ShaderVersionDetailConnection {
+            edges: edges
+                .into_iter()
+                .map(|(cursor, node)| ShaderVersionDetailEdge { cursor, node })
+                .collect(),
+            page_info,
+            total_count,
+        }
+    }
+}
+
+/// Relay-style edge for shader version profiles.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ShaderVersionProfileEdge {
+    pub cursor: String,
+    pub node: ShaderVersionProfileNode,
+}
+
+/// Relay-style connection for shader version profiles.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ShaderVersionProfileConnection {
+    pub edges: Vec<ShaderVersionProfileEdge>,
+    pub page_info: PageInfo,
+    pub total_count: i64,
+}
+
+impl From<CursorPage<ShaderVersionProfile>> for ShaderVersionProfileConnection {
+    fn from(page: CursorPage<ShaderVersionProfile>) -> Self {
+        let (edges, page_info, total_count) = page.into_connection(ShaderVersionProfileNode::from);
+        ShaderVersionProfileConnection {
+            edges: edges
+                .into_iter()
+                .map(|(cursor, node)| ShaderVersionProfileEdge { cursor, node })
                 .collect(),
             page_info,
             total_count,

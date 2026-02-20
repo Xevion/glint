@@ -2,13 +2,8 @@ import { getApiUrl } from './config';
 import { AdminEndpoints } from './endpoints/admin';
 import { AdoptEndpoints } from './endpoints/adopt';
 import { BackgroundEndpoints } from './endpoints/backgrounds';
-import { CaptureEndpoints } from './endpoints/captures';
 import { DeviceEndpoints } from './endpoints/device';
-import { FeaturedEndpoints } from './endpoints/featured';
 import { RunEndpoints } from './endpoints/runs';
-import { SceneEndpoints } from './endpoints/scenes';
-import { ShaderEndpoints } from './endpoints/shaders';
-import { StatsEndpoints } from './endpoints/stats';
 import { UserEndpoints } from './endpoints/user';
 
 /**
@@ -27,17 +22,12 @@ import { UserEndpoints } from './endpoints/user';
 export function createApiClient(fetchFn?: typeof fetch, baseUrl?: string) {
 	const url = baseUrl ?? getApiUrl();
 	return {
-		shaders: new ShaderEndpoints(url, fetchFn),
-		scenes: new SceneEndpoints(url, fetchFn),
-		captures: new CaptureEndpoints(url, fetchFn),
 		backgrounds: new BackgroundEndpoints(url, fetchFn),
 		admin: new AdminEndpoints(url, fetchFn),
 		adopt: new AdoptEndpoints(url, fetchFn),
 		device: new DeviceEndpoints(url, fetchFn),
 		runs: new RunEndpoints(url, fetchFn),
-		featured: new FeaturedEndpoints(url, fetchFn),
-		user: new UserEndpoints(url, fetchFn),
-		stats: new StatsEndpoints(url, fetchFn)
+		user: new UserEndpoints(url, fetchFn)
 	};
 }
 

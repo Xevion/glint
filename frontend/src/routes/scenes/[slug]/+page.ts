@@ -37,17 +37,21 @@ const SceneDetailQuery = graphql(`
 				moonPhase
 				sortOrder
 			}
-			captures {
-				id
-				shaderSlug
-				shaderName
-				shaderVersion
-				shaderAuthor
-				profileDisplayName
-				imagePath
-				thumbhash
-				presetName
-				freshness
+			captures(first: 100) {
+				edges {
+					node {
+						id
+						shaderSlug
+						shaderName
+						shaderVersion
+						shaderAuthor
+						profileDisplayName
+						imagePath
+						thumbhash
+						presetName
+						freshness
+					}
+				}
 			}
 		}
 	}
@@ -56,7 +60,7 @@ const SceneDetailQuery = graphql(`
 type SceneResult = NonNullable<ResultOf<typeof SceneDetailQuery>['scene']>;
 
 /** Capture type used by the scene detail page. */
-export type SceneCapture = SceneResult['captures'][number];
+export type SceneCapture = SceneResult['captures']['edges'][number]['node'];
 
 export const load: PageLoad = async ({ params, fetch, depends }) => {
 	depends(`glint:scene:${params.slug}`);
@@ -79,7 +83,7 @@ export const load: PageLoad = async ({ params, fetch, depends }) => {
 		}
 	});
 
-	const allCaptures = sceneData.captures;
+	const allCaptures = sceneData.captures.edges.map((e) => e.node);
 
 	const scene = {
 		id: sceneData.id,

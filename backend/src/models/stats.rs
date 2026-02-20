@@ -11,6 +11,8 @@ pub struct Stats {
     pub shader_count: i64,
     pub scene_count: i64,
     pub capture_count: i64,
+    pub user_count: i64,
+    pub run_count: i64,
     #[ts(as = "Option<String>")]
     pub latest_capture_at: Option<DateTime<Utc>>,
 }

@@ -21,14 +21,18 @@ const CompareScenesQuery = graphql(`
 const CompareCapturesQuery = graphql(`
 	query CompareCaptures($id: String!) {
 		scene(id: $id) {
-			captures {
-				thumbhash
-				shaderName
-				shaderVersion
-				shaderAuthor
-				profileDisplayName
-				presetName
-				imagePath
+			captures(first: 100) {
+				edges {
+					node {
+						thumbhash
+						shaderName
+						shaderVersion
+						shaderAuthor
+						profileDisplayName
+						presetName
+						imagePath
+					}
+				}
 			}
 		}
 	}
@@ -39,7 +43,7 @@ type CompareScene = NonNullable<
 >;
 type CompareCapture = NonNullable<
 	ResultOf<typeof CompareCapturesQuery>['scene']
->['captures'][number] & { imagePath: string };
+>['captures']['edges'][number]['node'] & { imagePath: string };
 
 interface ComparePageData {
 	scenes: CompareScene[];
@@ -76,7 +80,9 @@ export const load: PageLoad = async ({ fetch, url, depends }): Promise<ComparePa
 
 	return sceneResult.match({
 		Ok: (data): ComparePageData => {
-			const captures = (data.scene?.captures ?? []).filter((c): c is CompareCapture => !!c.imagePath);
+			const captures = (data.scene?.captures.edges.map((e) => e.node) ?? []).filter(
+				(c): c is CompareCapture => !!c.imagePath
+			);
 			return {
 				scenes,
 				captures,

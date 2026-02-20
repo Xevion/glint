@@ -1,7 +1,7 @@
 use axum::{
     Json, Router,
     extract::{Path, State},
-    routing::{delete, get, post, put},
+    routing::{delete, post, put},
 };
 use serde::Deserialize;
 use tracing::{instrument, warn};
@@ -17,29 +17,10 @@ use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/", get(list_enabled))
-        .route("/all", get(list_all))
         .route("/", post(initiate_upload))
         .route("/{id}/confirm", post(confirm_upload))
         .route("/{id}", put(update_background))
         .route("/{id}", delete(delete_background))
-}
-
-/// GET /api/backgrounds — List enabled backgrounds (public, used by frontend SSR)
-#[instrument(skip(state))]
-async fn list_enabled(State(state): State<AppState>) -> AppResult<Json<Vec<Background>>> {
-    let backgrounds = BackgroundRepo::list_enabled(state.db()).await?;
-    Ok(Json(backgrounds))
-}
-
-/// GET /api/backgrounds/all — List all backgrounds including disabled (admin)
-#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
-async fn list_all(
-    _admin: AdminUser,
-    State(state): State<AppState>,
-) -> AppResult<Json<Vec<Background>>> {
-    let backgrounds = BackgroundRepo::list_all(state.db()).await?;
-    Ok(Json(backgrounds))
 }
 
 #[derive(Debug, Deserialize)]

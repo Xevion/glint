@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT ON (c.scene_id)\n                c.scene_id,\n                c.image_path as \"image_path!\",\n                c.thumbhash\n            FROM captures c\n            JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.status = 'completed' AND c.image_path IS NOT NULL AND sc.active = TRUE\n              AND c.scene_id = ANY($1)\n            ORDER BY c.scene_id, c.captured_at DESC NULLS LAST\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "scene_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "image_path!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "thumbhash",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "e24d6a0f6f3e9d787c5b41095f54a5563fdcacf453cbb41e8db16a56d6e647e0"
+}

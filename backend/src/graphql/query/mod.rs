@@ -4,6 +4,7 @@ pub mod featured;
 pub mod runs;
 pub mod shaders;
 pub mod stats;
+pub mod storage;
 
 use async_graphql::{Context, MergedObject, Object, Result};
 
@@ -20,6 +21,7 @@ use featured::FeaturedQuery;
 use runs::RunQuery;
 use shaders::ShaderQuery;
 use stats::StatsQuery;
+use storage::StorageQuery;
 
 /// Root query type — merges all domain query types.
 #[derive(MergedObject, Default)]
@@ -31,6 +33,7 @@ pub struct QueryRoot(
     FeaturedQuery,
     BackgroundQuery,
     RunQuery,
+    StorageQuery,
 );
 
 #[derive(Default)]

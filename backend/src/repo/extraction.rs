@@ -1,4 +1,5 @@
 use anyhow::Context;
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use sqlx::PgPool;
 use tracing::{debug, instrument};
@@ -10,6 +11,7 @@ use crate::extraction::shader_props::{
     ParsedProfile, PipelineFeatures, ProfileOption, ScreenDefinition, ScreenEntry,
     ShaderPropertiesData,
 };
+use crate::graphql::types::connection::CursorPage;
 use crate::models::extraction::{ShaderVersionMetadata, ShaderVersionProfile};
 
 pub struct ExtractionRepo;
@@ -187,6 +189,69 @@ impl ExtractionRepo {
 
         debug!(count = profiles.len(), "Listed profiles by version");
         Ok(profiles)
+    }
+
+    /// Cursor-paginated list of profiles for a shader version, ordered by sort_order.
+    /// Keyset cursor on `(created_at, id)`.
+    #[instrument(skip(pool), level = "debug")]
+    pub async fn list_profiles_by_version_cursor(
+        pool: &PgPool,
+        version_id: &str,
+        first: i32,
+        after: Option<(DateTime<Utc>, String)>,
+    ) -> AppResult<CursorPage<ShaderVersionProfile>> {
+        use sqlx::QueryBuilder;
+
+        let limit = first.clamp(1, 100) as i64;
+
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
+            "SELECT id, shader_version_id, name, label, display_name, description, options, sort_order, created_at \
+             FROM shader_version_profiles WHERE shader_version_id = ",
+        );
+        qb.push_bind(version_id);
+
+        if let Some((ref cursor_ts, ref cursor_id)) = after {
+            qb.push(" AND (created_at, id) < (");
+            qb.push_bind(*cursor_ts);
+            qb.push(", ");
+            qb.push_bind(cursor_id.as_str());
+            qb.push(")");
+        }
+
+        qb.push(" ORDER BY sort_order ASC, created_at DESC, id DESC LIMIT ");
+        qb.push_bind(limit + 1);
+
+        let rows: Vec<ShaderVersionProfile> = qb.build_query_as().fetch_all(pool).await.context(
+            format!("failed to list profiles cursor for version '{version_id}'"),
+        )?;
+
+        let has_next_page = rows.len() as i64 > limit;
+        let items: Vec<ShaderVersionProfile> = rows.into_iter().take(limit as usize).collect();
+
+        let mut cqb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
+            "SELECT COUNT(*) FROM shader_version_profiles WHERE shader_version_id = ",
+        );
+        cqb.push_bind(version_id);
+
+        let total_count: i64 = cqb
+            .build_query_scalar::<Option<i64>>()
+            .fetch_one(pool)
+            .await
+            .context(format!(
+                "failed to count profiles for version '{version_id}'"
+            ))?
+            .unwrap_or(0);
+
+        debug!(
+            total_count,
+            has_next_page, "Listed profiles by version (cursor)"
+        );
+        Ok(CursorPage {
+            items,
+            has_next_page,
+            has_previous_page: after.is_some(),
+            total_count,
+        })
     }
 
     /// Reset extraction status to 'pending' for a shader version,

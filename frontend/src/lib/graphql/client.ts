@@ -9,7 +9,26 @@ export function createGraphQLClient(fetchFn: typeof fetch = fetch): Client {
 	return new Client({
 		url: '/api/graphql',
 		fetch: fetchFn,
-		exchanges: [cacheExchange({}), fetchExchange]
+		exchanges: [
+			cacheExchange({
+				keys: {
+					// Value objects without independent identity — always embedded in parents.
+					ShaderAuthorNode: () => null,
+					ShaderVersionDetailNode: () => null,
+					ShaderVersionMetadataNode: () => null,
+					ExtractionSummaryNode: () => null,
+					FeaturedPairNode: () => null,
+					FeaturedSideNode: () => null,
+					StatsNode: () => null,
+					PageInfo: () => null,
+					CaptureCompletedEvent: () => null,
+					CaptureHealthNode: () => null,
+					StorageStatsNode: () => null,
+					StorageBucketNode: () => null
+				}
+			}),
+			fetchExchange
+		]
 	});
 }
 

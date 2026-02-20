@@ -4,14 +4,6 @@ import { ApiClient } from '../client';
 import type { ApiError } from '../errors';
 
 export class BackgroundEndpoints extends ApiClient {
-	list(): Promise<Result<Background[], ApiError>> {
-		return this.get<Background[]>('/api/backgrounds');
-	}
-
-	listAll(): Promise<Result<Background[], ApiError>> {
-		return this.get<Background[]>('/api/backgrounds/all');
-	}
-
 	initiateUpload(
 		filename: string,
 		contentType?: string

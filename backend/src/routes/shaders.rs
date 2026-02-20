@@ -32,7 +32,6 @@ use tracing::{info, instrument, warn};
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_shaders).post(create_shader))
-        .route("/trending", get(trending_shaders))
         .route("/{id}", get(get_shader))
         .route("/{id}/captures", get(list_shader_captures))
         .route(
@@ -335,32 +334,6 @@ async fn get_shader(
         })),
         etag,
     })
-}
-
-#[derive(CustomDebug, Deserialize)]
-struct TrendingQuery {
-    /// Number of days to consider (default: 7)
-    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
-    days: Option<u32>,
-    #[serde(flatten)]
-    page: PageQuery,
-}
-
-/// GET /api/shaders/trending - Get trending shaders by recent view count (public)
-#[instrument(skip(state))]
-async fn trending_shaders(
-    State(state): State<AppState>,
-    Query(query): Query<TrendingQuery>,
-) -> AppResult<Response> {
-    let days = query.days.unwrap_or(7).clamp(1, 90);
-    let p = query.page.normalize();
-    let result = ShaderService::list_trending(state.db(), days, &p).await?;
-    let mut response = Json(result).into_response();
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("public, max-age=300, s-maxage=300, stale-while-revalidate=600"),
-    );
-    Ok(response)
 }
 
 /// POST /api/shaders - Create a new shader (admin)

@@ -1,77 +1,108 @@
 import { createApiClient } from '$lib/api';
-import type {
-	CaptureHealthSummary,
-	CaptureWithContext,
-	StorageBucket,
-	StorageStats
-} from '$lib/bindings';
+import { createGraphQLClient, graphql, query, type ResultOf } from '$lib/graphql';
 import type { PageLoad } from './$types';
+
+const AdminDashboardQuery = graphql(`
+	query AdminDashboard($recentCount: Int!) {
+		stats {
+			shaderCount
+			sceneCount
+			captureCount
+			userCount
+			runCount
+		}
+		recentCaptures(count: $recentCount) {
+			id
+			imagePath
+			thumbhash
+			shaderName
+			sceneName
+			shaderVersion
+			profileDisplayName
+			resolutionWidth
+			resolutionHeight
+			fileSizeBytes
+			capturedAt
+		}
+		captureHealth {
+			completed
+			missing
+			stale
+			failed
+		}
+	}
+`);
+
+const AdminStorageQuery = graphql(`
+	query AdminStorage($days: Int!, $intervalHours: Int!) {
+		storageStats {
+			totalBytes
+			captureCount
+			avgBytes
+			missingCount
+		}
+		storageGrowth(days: $days, intervalHours: $intervalHours) {
+			date
+			cumulativeBytes
+			cumulativeCount
+			bucketBytes
+		}
+	}
+`);
+
+export type RecentCapture = ResultOf<typeof AdminDashboardQuery>['recentCaptures'][number];
+export type CaptureHealthData = NonNullable<ResultOf<typeof AdminDashboardQuery>['captureHealth']>;
+export type StorageStatsData = NonNullable<ResultOf<typeof AdminStorageQuery>['storageStats']>;
+export type StorageBucketData = ResultOf<typeof AdminStorageQuery>['storageGrowth'][number];
 
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('glint:admin:dashboard');
+	const client = createGraphQLClient(fetch);
 	const api = createApiClient(fetch);
 
-	const [
-		shadersRes,
-		scenesRes,
-		capturesRes,
-		usersRes,
-		healthRes,
-		runsRes,
-		captureHealthRes,
-		storageStatsRes,
-		storageGrowthRes
-	] = await Promise.all([
-		api.shaders.list(),
-		api.scenes.list(),
-		api.admin.listCaptures(),
-		api.admin.listUsers(),
-		api.admin.health(),
-		api.runs.list(),
-		api.admin.captureHealth(),
-		api.admin.storageStats(),
-		api.admin.storageGrowth()
+	const [dashboardRes, storageRes, healthRes] = await Promise.all([
+		query(client, AdminDashboardQuery, { recentCount: 5 }),
+		query(client, AdminStorageQuery, { days: 90, intervalHours: 1 }),
+		api.admin.health()
 	]);
 
 	const errors: Record<string, string> = {};
 
-	const shaderCount = shadersRes.match({
-		Ok: (v) => v.total,
+	const dashboard = dashboardRes.match({
+		Ok: (data) => ({
+			shaderCount: data.stats.shaderCount,
+			sceneCount: data.stats.sceneCount,
+			captureCount: data.stats.captureCount,
+			userCount: data.stats.userCount,
+			runCount: data.stats.runCount,
+			recentCaptures: data.recentCaptures,
+			captureHealth: data.captureHealth
+		}),
 		Err: (e) => {
-			errors.shaders = e.message;
-			return 0;
+			errors.dashboard = e.message;
+			return {
+				shaderCount: 0,
+				sceneCount: 0,
+				captureCount: 0,
+				userCount: 0,
+				runCount: 0,
+				recentCaptures: [] as RecentCapture[],
+				captureHealth: null as CaptureHealthData | null
+			};
 		}
 	});
 
-	const sceneCount = scenesRes.match({
-		Ok: (v) => v.length,
+	const storage = storageRes.match({
+		Ok: (data) => ({
+			storageStats: data.storageStats,
+			storageGrowth: data.storageGrowth
+		}),
 		Err: (e) => {
-			errors.scenes = e.message;
-			return 0;
-		}
-	});
-
-	const { captureCount, recentCaptures } = capturesRes.match({
-		Ok: (v) => ({ captureCount: v.total, recentCaptures: v.items.slice(0, 5) }),
-		Err: (e) => {
-			errors.captures = e.message;
-			return { captureCount: 0, recentCaptures: [] as CaptureWithContext[] };
-		}
-	});
-
-	const userCount = usersRes.match({
-		Ok: (v) => v.length,
-		Err: (e) => {
-			errors.users = e.message;
-			return 0;
-		}
-	});
-
-	const runCount = runsRes.match({
-		Ok: (v) => v.length,
-		Err: (e) => {
-			errors.runs = e.message;
-			return 0;
+			errors.storage = e.message;
+			return {
+				storageStats: null as StorageStatsData | null,
+				storageGrowth: [] as StorageBucketData[]
+			};
 		}
 	});
 
@@ -83,38 +114,10 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 		}
 	});
 
-	const captureHealth = captureHealthRes.match({
-		Ok: (v) => v.summary,
-		Err: () => null as CaptureHealthSummary | null
-	});
-
-	const storageStats = storageStatsRes.match({
-		Ok: (v) => v,
-		Err: (e) => {
-			errors.storage = e.message;
-			return null as StorageStats | null;
-		}
-	});
-
-	const storageGrowth = storageGrowthRes.match({
-		Ok: (v) => v,
-		Err: (e) => {
-			errors.storageGrowth = e.message;
-			return [] as StorageBucket[];
-		}
-	});
-
 	return {
-		shaderCount,
-		sceneCount,
-		captureCount,
-		userCount,
-		runCount,
-		recentCaptures,
+		...dashboard,
+		...storage,
 		healthStatus,
-		captureHealth,
-		storageStats,
-		storageGrowth,
 		errors
 	};
 };

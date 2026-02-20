@@ -45,6 +45,17 @@ enum CaptureFreshnessEnum {
 	SUPERSEDED
 }
 
+"""
+Aggregate capture health summary — target matrix completion status.
+"""
+type CaptureHealthNode {
+	totalTargets: Int!
+	completed: Int!
+	missing: Int!
+	stale: Int!
+	failed: Int!
+}
+
 scalar CaptureId
 
 """
@@ -131,6 +142,23 @@ enum CaptureStatusEnum {
 	UPLOADING
 	COMPLETED
 	FAILED
+}
+
+"""
+Relay-style connection for captures with context.
+"""
+type CaptureWithContextConnection {
+	edges: [CaptureWithContextEdge!]!
+	pageInfo: PageInfo!
+	totalCount: Int!
+}
+
+"""
+Relay-style edge for captures with context.
+"""
+type CaptureWithContextEdge {
+	cursor: String!
+	node: CaptureWithContextNode!
 }
 
 """
@@ -380,6 +408,19 @@ type QueryRoot {
 		after: String
 	): CaptureConnection!
 	"""
+	Capture health summary — target matrix completion status (admin).
+	"""
+	captureHealth: CaptureHealthNode!
+	"""
+	Recent completed captures with full context (admin).
+	"""
+	recentCaptures(
+		"""
+		Number of recent captures to return
+		"""
+		count: Int! = 5
+	): [CaptureWithContextNode!]!
+	"""
 	Aggregate counts for the index page.
 	"""
 	stats: StatsNode!
@@ -409,6 +450,23 @@ type QueryRoot {
 		"""
 		id: String!
 	): CaptureRunNode
+	"""
+	Storage statistics — total bytes, counts, averages (admin).
+	"""
+	storageStats: StorageStatsNode!
+	"""
+	Storage growth time series (admin).
+	"""
+	storageGrowth(
+		"""
+		Number of days to look back
+		"""
+		days: Int! = 90,
+		"""
+		Interval in hours for each bucket
+		"""
+		intervalHours: Int! = 1
+	): [StorageBucketNode!]!
 }
 
 """
@@ -464,7 +522,20 @@ type SceneNode {
 	"""
 	Completed captures for this scene, one per shader (deduplicated).
 	"""
-	captures: [CaptureWithContextNode!]!
+	captures(
+		"""
+		Number of items to return.
+		"""
+		first: Int! = 20,
+		"""
+		Cursor to paginate after.
+		"""
+		after: String
+	): CaptureWithContextConnection!
+	"""
+	Tags associated with this scene.
+	"""
+	tags: [TagNode!]!
 }
 
 scalar ScenePresetId
@@ -539,7 +610,16 @@ type ShaderNode {
 	All versions of this shader, ordered by publish date descending.
 	Not DataLoader-batched — only called on single-shader detail pages.
 	"""
-	versions: [ShaderVersionDetailNode!]!
+	versions(
+		"""
+		Number of items to return.
+		"""
+		first: Int! = 20,
+		"""
+		Cursor to paginate after.
+		"""
+		after: String
+	): ShaderVersionDetailConnection!
 	"""
 	Authors attributed to this shader from upstream platforms.
 	"""
@@ -566,7 +646,6 @@ type ShaderNode {
 	thumbhash: String
 	"""
 	Total number of versions for this shader.
-	Not DataLoader-batched — infrequently used and requires full version list.
 	"""
 	versionCount: Int!
 	"""
@@ -587,8 +666,16 @@ type ShaderNode {
 		"""
 		Filter to a specific profile within the version.
 		"""
-		profileId: String
-	): [CaptureWithContextNode!]!
+		profileId: String,
+		"""
+		Number of items to return.
+		"""
+		first: Int! = 20,
+		"""
+		Cursor to paginate after.
+		"""
+		after: String
+	): CaptureWithContextConnection!
 	"""
 	Profiles for this shader, optionally filtered to a specific version.
 	
@@ -598,8 +685,16 @@ type ShaderNode {
 		"""
 		Filter to a specific shader version. Defaults to the preferred or latest version.
 		"""
-		versionId: String
-	): [ShaderVersionProfileNode!]!
+		versionId: String,
+		"""
+		Number of items to return.
+		"""
+		first: Int! = 20,
+		"""
+		Cursor to paginate after.
+		"""
+		after: String
+	): ShaderVersionProfileConnection!
 	"""
 	Extracted metadata for this shader, optionally for a specific version.
 	
@@ -611,6 +706,23 @@ type ShaderNode {
 		"""
 		versionId: String
 	): ShaderVersionMetadataNode
+}
+
+"""
+Relay-style connection for shader version details.
+"""
+type ShaderVersionDetailConnection {
+	edges: [ShaderVersionDetailEdge!]!
+	pageInfo: PageInfo!
+	totalCount: Int!
+}
+
+"""
+Relay-style edge for shader version details.
+"""
+type ShaderVersionDetailEdge {
+	cursor: String!
+	node: ShaderVersionDetailNode!
 }
 
 """
@@ -673,6 +785,23 @@ type ShaderVersionNode {
 	extractedAt: DateTime
 }
 
+"""
+Relay-style connection for shader version profiles.
+"""
+type ShaderVersionProfileConnection {
+	edges: [ShaderVersionProfileEdge!]!
+	pageInfo: PageInfo!
+	totalCount: Int!
+}
+
+"""
+Relay-style edge for shader version profiles.
+"""
+type ShaderVersionProfileEdge {
+	cursor: String!
+	node: ShaderVersionProfileNode!
+}
+
 scalar ShaderVersionProfileId
 
 type ShaderVersionProfileNode {
@@ -694,7 +823,29 @@ type StatsNode {
 	shaderCount: Int!
 	sceneCount: Int!
 	captureCount: Int!
+	userCount: Int!
+	runCount: Int!
 	latestCaptureAt: DateTime
+}
+
+"""
+A single time-series bucket for storage growth.
+"""
+type StorageBucketNode {
+	date: DateTime!
+	cumulativeBytes: Int!
+	cumulativeCount: Int!
+	bucketBytes: Int!
+}
+
+"""
+Aggregate storage statistics for completed captures.
+"""
+type StorageStatsNode {
+	totalBytes: Int!
+	captureCount: Int!
+	avgBytes: Int!
+	missingCount: Int!
 }
 
 type SubscriptionRoot {
@@ -702,6 +853,13 @@ type SubscriptionRoot {
 	Stream of newly completed captures.
 	"""
 	captureCompleted: CaptureCompletedEvent!
+}
+
+type TagNode {
+	id: Int!
+	slug: String!
+	name: String!
+	description: String
 }
 
 enum ThemeModeEnum {

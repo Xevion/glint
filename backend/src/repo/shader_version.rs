@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
+use chrono::{DateTime, Utc};
 use sqlx::types::Json;
 use tracing::{debug, instrument};
 
+use crate::db::DbPool;
 use crate::error::{AppResult, OptionNotFoundExt};
+use crate::graphql::types::connection::CursorPage;
 use crate::id::{ShaderId, ShaderVersionId};
 use crate::models::extraction::ExtractionStatus;
 use crate::models::{CreateShaderVersionRequest, ShaderVersion, ShaderVersionDetail};
@@ -122,6 +125,132 @@ impl ShaderVersionRepo {
                 capture_count: r.capture_count,
             })
             .collect())
+    }
+
+    /// Cursor-paginated list of shader versions with capture counts.
+    /// Ordered by `upstream_published_at DESC NULLS LAST, created_at DESC, id DESC`.
+    /// Keyset cursor on `(created_at, id)`.
+    #[instrument(skip(db), level = "debug")]
+    pub async fn list_by_shader_cursor(
+        db: &DbPool,
+        shader_id: &str,
+        first: i32,
+        after: Option<(DateTime<Utc>, String)>,
+    ) -> AppResult<CursorPage<ShaderVersionDetail>> {
+        use sqlx::QueryBuilder;
+
+        let limit = first.clamp(1, 100) as i64;
+
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
+            r#"SELECT
+                sv.id, sv.shader_id, sv.version, sv.modrinth_version_id, sv.curseforge_file_id,
+                sv.download_url, sv.file_hash, sv.file_size,
+                sv.game_versions, sv.release_channel,
+                sv.upstream_published_at, sv.created_at, sv.capture_failure_count, sv.last_capture_error,
+                sv.extraction_status, sv.extraction_error, sv.extracted_at,
+                COUNT(c.id) FILTER (WHERE c.status = 'completed') AS capture_count
+            FROM shader_versions sv
+            LEFT JOIN captures c ON c.shader_version_id = sv.id
+            WHERE sv.shader_id = "#,
+        );
+        qb.push_bind(shader_id);
+
+        if let Some((ref cursor_ts, ref cursor_id)) = after {
+            qb.push(" AND (sv.created_at, sv.id) < (");
+            qb.push_bind(*cursor_ts);
+            qb.push(", ");
+            qb.push_bind(cursor_id.as_str());
+            qb.push(")");
+        }
+
+        qb.push(
+            " GROUP BY sv.id ORDER BY sv.upstream_published_at DESC NULLS LAST, sv.created_at DESC, sv.id DESC LIMIT ",
+        );
+        qb.push_bind(limit + 1);
+
+        let rows: Vec<ShaderVersionWithCount> = qb.build_query_as().fetch_all(db).await.context(
+            format!("failed to list versions cursor for shader '{shader_id}'"),
+        )?;
+
+        let has_next_page = rows.len() as i64 > limit;
+        let items: Vec<ShaderVersionDetail> = rows
+            .into_iter()
+            .take(limit as usize)
+            .map(|r| ShaderVersionDetail {
+                version: ShaderVersion {
+                    id: ShaderVersionId(r.id),
+                    shader_id: ShaderId(r.shader_id),
+                    version: r.version,
+                    modrinth_version_id: r.modrinth_version_id,
+                    curseforge_file_id: r.curseforge_file_id,
+                    download_url: r.download_url,
+                    file_hash: r.file_hash,
+                    file_size: r.file_size,
+                    game_versions: r.game_versions,
+                    release_channel: r.release_channel,
+                    upstream_published_at: r.upstream_published_at,
+                    created_at: r.created_at,
+                    capture_failure_count: r.capture_failure_count,
+                    last_capture_error: r.last_capture_error,
+                    extraction_status: r.extraction_status,
+                    extraction_error: r.extraction_error,
+                    extracted_at: r.extracted_at,
+                },
+                capture_count: r.capture_count,
+            })
+            .collect();
+
+        // Count query (same filters, no cursor/limit)
+        let mut cqb: QueryBuilder<'_, sqlx::Postgres> =
+            QueryBuilder::new("SELECT COUNT(*) FROM shader_versions WHERE shader_id = ");
+        cqb.push_bind(shader_id);
+
+        let total_count: i64 = cqb
+            .build_query_scalar::<Option<i64>>()
+            .fetch_one(db)
+            .await
+            .context(format!("failed to count versions for shader '{shader_id}'"))?
+            .unwrap_or(0);
+
+        debug!(
+            total_count,
+            has_next_page, "Listed shader versions (cursor)"
+        );
+        Ok(CursorPage {
+            items,
+            has_next_page,
+            has_previous_page: after.is_some(),
+            total_count,
+        })
+    }
+
+    /// Batch load version counts per shader
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn batch_version_counts(
+        executor: impl sqlx::PgExecutor<'_>,
+        shader_ids: &[String],
+    ) -> AppResult<HashMap<String, i64>> {
+        struct Row {
+            shader_id: String,
+            count: i64,
+        }
+
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT shader_id, COUNT(*) AS "count!"
+            FROM shader_versions
+            WHERE shader_id = ANY($1)
+            GROUP BY shader_id
+            "#,
+            shader_ids,
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to batch fetch version counts")?;
+
+        debug!(count = rows.len(), "Batch fetched version counts");
+        Ok(rows.into_iter().map(|r| (r.shader_id, r.count)).collect())
     }
 
     #[instrument(skip(executor), level = "debug")]

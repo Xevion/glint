@@ -21,27 +21,31 @@ export const ShaderDetailQuery = graphql(`
 			viewCount
 			preferredVersionId
 			captureEnabled
-			versions {
-				version {
-					id
-					shaderId
-					version
-					modrinthVersionId
-					curseforgeFileId
-					downloadUrl
-					fileHash
-					fileSize
-					gameVersions
-					releaseChannel
-					upstreamPublishedAt
-					createdAt
-					captureFailureCount
-					lastCaptureError
-					extractionStatus
-					extractionError
-					extractedAt
+			versions(first: 100) {
+				edges {
+					node {
+						version {
+							id
+							shaderId
+							version
+							modrinthVersionId
+							curseforgeFileId
+							downloadUrl
+							fileHash
+							fileSize
+							gameVersions
+							releaseChannel
+							upstreamPublishedAt
+							createdAt
+							captureFailureCount
+							lastCaptureError
+							extractionStatus
+							extractionError
+							extractedAt
+						}
+						captureCount
+					}
 				}
-				captureCount
 			}
 			authors {
 				id
@@ -50,26 +54,34 @@ export const ShaderDetailQuery = graphql(`
 				url
 				platform
 			}
-			captures {
-				id
-				sceneName
-				sceneId
-				shaderVersion
-				profileDisplayName
-				imagePath
-				thumbhash
-				freshness
+			captures(first: 100) {
+				edges {
+					node {
+						id
+						sceneName
+						sceneId
+						shaderVersion
+						profileDisplayName
+						imagePath
+						thumbhash
+						freshness
+					}
+				}
 			}
-			profiles {
-				id
-				shaderVersionId
-				name
-				label
-				displayName
-				description
-				options
-				sortOrder
-				createdAt
+			profiles(first: 100) {
+				edges {
+					node {
+						id
+						shaderVersionId
+						name
+						label
+						displayName
+						description
+						options
+						sortOrder
+						createdAt
+					}
+				}
 			}
 			metadata {
 				shaderVersionId
@@ -87,7 +99,7 @@ export const ShaderDetailQuery = graphql(`
 `);
 
 export type ShaderDetailData = NonNullable<ResultOf<typeof ShaderDetailQuery>['shader']>;
-export type ShaderVersionDetail = ShaderDetailData['versions'][number];
-export type ShaderCapture = ShaderDetailData['captures'][number];
-export type ShaderProfile = ShaderDetailData['profiles'][number];
+export type ShaderVersionDetail = ShaderDetailData['versions']['edges'][number]['node'];
+export type ShaderCapture = ShaderDetailData['captures']['edges'][number]['node'];
+export type ShaderProfile = ShaderDetailData['profiles']['edges'][number]['node'];
 export type ShaderMetadata = NonNullable<ShaderDetailData['metadata']>;

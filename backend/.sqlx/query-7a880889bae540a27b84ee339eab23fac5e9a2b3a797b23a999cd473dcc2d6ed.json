@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT c.scene_id, COUNT(*) as \"count!\"\n            FROM captures c\n            JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.status = 'completed' AND sc.active = TRUE\n              AND c.scene_id = ANY($1)\n            GROUP BY c.scene_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "scene_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "7a880889bae540a27b84ee339eab23fac5e9a2b3a797b23a999cd473dcc2d6ed"
+}

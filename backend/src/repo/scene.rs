@@ -666,6 +666,35 @@ impl ScenePresetRepo {
         Ok(presets)
     }
 
+    /// Batch load presets for multiple scenes
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_by_scenes(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_ids: &[String],
+    ) -> AppResult<HashMap<String, Vec<ScenePreset>>> {
+        let presets = sqlx::query_as!(
+            ScenePreset,
+            r#"
+            SELECT * FROM scene_presets
+            WHERE scene_id = ANY($1)
+            ORDER BY scene_id, sort_order ASC, name ASC
+            "#,
+            scene_ids
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to batch list presets for scenes")?;
+
+        debug!(count = presets.len(), "Batch listed scene presets");
+        let mut map: HashMap<String, Vec<ScenePreset>> = HashMap::new();
+        for preset in presets {
+            map.entry(preset.scene_id.0.clone())
+                .or_default()
+                .push(preset);
+        }
+        Ok(map)
+    }
+
     /// Find a single preset by ID
     #[instrument(skip(executor), level = "debug")]
     pub async fn find_by_id(

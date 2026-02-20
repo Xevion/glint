@@ -17,6 +17,8 @@ impl StatsRepo {
                 (SELECT COUNT(*) FROM shaders) AS "shader_count!",
                 (SELECT COUNT(*) FROM scenes WHERE active = TRUE) AS "scene_count!",
                 (SELECT COUNT(*) FROM captures WHERE status = 'completed') AS "capture_count!",
+                (SELECT COUNT(*) FROM users) AS "user_count!",
+                (SELECT COUNT(*) FROM capture_runs) AS "run_count!",
                 (SELECT MAX(captured_at) FROM captures WHERE status = 'completed') AS latest_capture_at
             "#,
         )

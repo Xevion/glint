@@ -1,6 +1,6 @@
 <script lang="ts">
 import { invalidate } from '$app/navigation';
-import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
+import type { CaptureHealthData, RecentCapture } from './+page';
 import { useSubscription } from '$lib/graphql';
 import { CaptureCompletedSubscription } from '$lib/graphql/subscriptions/captures';
 import CaptureCard from '$lib/components/CaptureCard.svelte';
@@ -47,23 +47,23 @@ let sceneCount: number = $derived(data.sceneCount);
 let captureCount: number = $derived(data.captureCount);
 let userCount: number = $derived(data.userCount);
 let runCount: number = $derived(data.runCount);
-let recentCaptures: CaptureWithContext[] = $derived(data.recentCaptures);
+let recentCaptures: RecentCapture[] = $derived(data.recentCaptures);
 let healthStatus: 'ok' | 'error' = $derived(data.healthStatus);
-let captureHealth: CaptureHealthSummary | null = $derived(data.captureHealth);
+let captureHealth: CaptureHealthData | null = $derived(data.captureHealth);
 let storageStats = $derived(data.storageStats);
 let storageGrowth = $derived(data.storageGrowth);
 let chartData = $derived(
 	storageGrowth.map(
 		(b: {
 			date: string;
-			cumulative_bytes: number;
-			cumulative_count: number;
-			bucket_bytes: number;
+			cumulativeBytes: number;
+			cumulativeCount: number;
+			bucketBytes: number;
 		}) => ({
 			date: toDate(b.date),
-			bytes: b.cumulative_bytes,
-			count: b.cumulative_count,
-			bucketBytes: b.bucket_bytes
+			bytes: b.cumulativeBytes,
+			count: b.cumulativeCount,
+			bucketBytes: b.bucketBytes
 		})
 	)
 );
@@ -241,19 +241,19 @@ $effect(() => {
 			</div>
 			<div class="grid grid-cols-4 gap-4 text-sm">
 				<div>
-					<div class="text-2xl font-bold">{formatBytes(storageStats.total_bytes)}</div>
+					<div class="text-2xl font-bold">{formatBytes(storageStats.totalBytes)}</div>
 					<div class="text-muted-foreground">Total</div>
 				</div>
 				<div>
-					<div class="text-2xl font-bold">{storageStats.capture_count}</div>
+					<div class="text-2xl font-bold">{storageStats.captureCount}</div>
 					<div class="text-muted-foreground">Tracked</div>
 				</div>
 				<div>
-					<div class="text-2xl font-bold">{formatBytes(storageStats.avg_bytes)}</div>
+					<div class="text-2xl font-bold">{formatBytes(storageStats.avgBytes)}</div>
 					<div class="text-muted-foreground">Average</div>
 				</div>
 				<div>
-					<div class="text-2xl font-bold">{storageStats.missing_count}</div>
+					<div class="text-2xl font-bold">{storageStats.missingCount}</div>
 					<div class="text-muted-foreground">Missing</div>
 				</div>
 			</div>
@@ -370,31 +370,31 @@ $effect(() => {
 			{#if recentCaptures.length === 0}
 				<p class="text-sm text-muted-foreground">No captures yet</p>
 			{:else}
-			<ItemGrid items={recentCaptures} key={(c: CaptureWithContext) => c.id} size="small">
-			{#snippet card(capture: CaptureWithContext)}
+			<ItemGrid items={recentCaptures} key={(c: RecentCapture) => c.id} size="small">
+			{#snippet card(capture: RecentCapture)}
 				<CaptureCard {capture}>
 					<div class="space-y-1 p-3">
 						<div class="flex items-center justify-between gap-2">
-							<span class="truncate font-medium text-sm">{capture.shader_name}</span>
-							{#if capture.scene_name}
-								<span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{capture.scene_name}</span>
+							<span class="truncate font-medium text-sm">{capture.shaderName}</span>
+							{#if capture.sceneName}
+								<span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{capture.sceneName}</span>
 							{/if}
 						</div>
 						<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-							<span>{capture.shader_version}</span>
-					{#if capture.profile_display_name}
-						<span>&middot; {capture.profile_display_name}</span>
+							<span>{capture.shaderVersion}</span>
+					{#if capture.profileDisplayName}
+						<span>&middot; {capture.profileDisplayName}</span>
 						{/if}
-							{#if capture.resolution_width && capture.resolution_height}
-								<span>&middot; {capture.resolution_width}&times;{capture.resolution_height}</span>
+							{#if capture.resolutionWidth && capture.resolutionHeight}
+								<span>&middot; {capture.resolutionWidth}&times;{capture.resolutionHeight}</span>
 							{/if}
-							{#if capture.file_size_bytes}
-								<span>&middot; {formatBytes(capture.file_size_bytes)}</span>
+							{#if capture.fileSizeBytes}
+								<span>&middot; {formatBytes(capture.fileSizeBytes)}</span>
 							{/if}
 						</div>
-						{#if capture.captured_at}
+						{#if capture.capturedAt}
 							<div class="text-xs text-muted-foreground">
-								<TimeAgo timestamp={capture.captured_at} />
+								<TimeAgo timestamp={capture.capturedAt} />
 							</div>
 						{/if}
 					</div>

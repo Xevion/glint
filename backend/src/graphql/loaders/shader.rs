@@ -4,6 +4,7 @@ use std::sync::Arc;
 use async_graphql::dataloader::Loader;
 use sqlx::PgPool;
 
+use crate::id::ShaderVersionId;
 use crate::models::{Category, ExtractionSummary, Feature, ShaderAuthor, ShaderVersion};
 use crate::repo::{
     CaptureRepo, CategoryRepo, FeatureRepo, ShaderAuthorRepo, ShaderVersionRepo, ThumbnailInfo,
@@ -137,5 +138,49 @@ impl Loader<String> for ShaderExtractionSummaryLoader {
             .map_err(|e| Arc::new(sqlx::Error::Protocol(e.to_string())))?;
 
         Ok(map.into_iter().map(|(k, v)| (k.0, v)).collect())
+    }
+}
+
+pub struct ShaderLatestVersionIdLoader {
+    pool: PgPool,
+}
+
+impl ShaderLatestVersionIdLoader {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+impl Loader<String> for ShaderLatestVersionIdLoader {
+    type Value = ShaderVersionId;
+    type Error = Arc<sqlx::Error>;
+
+    async fn load(&self, keys: &[String]) -> Result<HashMap<String, Self::Value>, Self::Error> {
+        let map = ShaderVersionRepo::batch_latest_versions_for_shaders(&self.pool, keys)
+            .await
+            .map_err(|e| Arc::new(sqlx::Error::Protocol(e.to_string())))?;
+
+        Ok(map.into_iter().map(|(k, v)| (k.0, v.id)).collect())
+    }
+}
+
+pub struct ShaderVersionCountLoader {
+    pool: PgPool,
+}
+
+impl ShaderVersionCountLoader {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+impl Loader<String> for ShaderVersionCountLoader {
+    type Value = i64;
+    type Error = Arc<sqlx::Error>;
+
+    async fn load(&self, keys: &[String]) -> Result<HashMap<String, Self::Value>, Self::Error> {
+        ShaderVersionRepo::batch_version_counts(&self.pool, keys)
+            .await
+            .map_err(|e| Arc::new(sqlx::Error::Protocol(e.to_string())))
     }
 }

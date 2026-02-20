@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT shader_id, COUNT(*) AS \"count!\"\n            FROM shader_versions\n            WHERE shader_id = ANY($1)\n            GROUP BY shader_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "6a5f28550c53668cf12f92d609336390a363ba1999c2d8e8400359ff9e24548d"
+}

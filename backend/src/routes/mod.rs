@@ -6,13 +6,11 @@ mod captures;
 pub mod csp_report;
 mod device;
 mod extraction;
-mod featured;
 mod runs;
 mod scene_uploads;
 mod scenes;
 mod shaders;
 mod sitemap;
-mod stats;
 mod storage;
 mod user;
 mod users;
@@ -62,14 +60,11 @@ fn api_router(
     };
 
     // Cache directives applied per-subrouter. Endpoints that set their own
-    // Cache-Control header (ETag detail endpoints, trending) are not overridden
-    // by the layer — it only injects headers on responses that lack them.
+    // Cache-Control header (ETag detail endpoints) are not overridden by the
+    // layer — it only injects headers on responses that lack them.
     let cache_short =
         CacheControlLayer::new("public, max-age=60, s-maxage=60, stale-while-revalidate=300");
     let cache_backgrounds =
-        CacheControlLayer::new("public, max-age=300, s-maxage=300, stale-while-revalidate=600");
-    let cache_featured = CacheControlLayer::new("public, max-age=60, s-maxage=30");
-    let cache_stats =
         CacheControlLayer::new("public, max-age=300, s-maxage=300, stale-while-revalidate=600");
     let no_store = CacheControlLayer::new("no-store");
 
@@ -108,7 +103,6 @@ fn api_router(
                 .layer(make_layer(&rl.agent, "agent")),
         )
         .nest("/captures", captures::router().layer(cache_short))
-        .nest("/stats", stats::router().layer(cache_stats))
         .nest("/users", users::router())
         .nest(
             "/work",
@@ -116,7 +110,6 @@ fn api_router(
                 .layer(no_store)
                 .layer(make_layer(&rl.agent, "agent")),
         )
-        .nest("/featured", featured::router().layer(cache_featured))
         .nest("/admin/capture-health", capture_health::router())
         .nest("/admin/shaders", extraction::router())
         .nest("/admin/storage", storage::router())

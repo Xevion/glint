@@ -3,4 +3,4 @@
 /**
  * Lightweight aggregate statistics for the index page.
  */
-export type Stats = { shader_count: number, scene_count: number, capture_count: number, latest_capture_at?: string, };
+export type Stats = { shader_count: number, scene_count: number, capture_count: number, user_count: number, run_count: number, latest_capture_at?: string, };

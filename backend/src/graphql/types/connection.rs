@@ -1,6 +1,7 @@
 use async_graphql::SimpleObject;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
@@ -78,4 +79,13 @@ pub fn decode_cursor(cursor: &str) -> AppResult<(String, i64)> {
     let payload: CursorPayload = serde_json::from_slice(&bytes)
         .map_err(|_| AppError::BadRequest("Invalid cursor format".into()))?;
     Ok((payload.id, payload.ts))
+}
+
+/// Decode a cursor and convert the timestamp to a `DateTime<Utc>`.
+/// Returns `(datetime, id)` ready for keyset pagination queries.
+pub fn decode_cursor_for_query(cursor: &str) -> AppResult<(DateTime<Utc>, String)> {
+    let (id, ts) = decode_cursor(cursor)?;
+    let dt = DateTime::from_timestamp_millis(ts)
+        .ok_or_else(|| AppError::BadRequest("Invalid cursor timestamp".into()))?;
+    Ok((dt, id))
 }

@@ -696,6 +696,191 @@ impl CaptureRepo {
         Ok((items, count))
     }
 
+    /// Cursor-paginated list of captures with context, supporting flexible filtering and deduplication.
+    /// Ordered by `captured_at DESC NULLS LAST, id DESC`.
+    /// Keyset cursor on `(captured_at, id)`.
+    #[instrument(skip(db, filters), level = "debug")]
+    pub async fn list_with_context_cursor(
+        db: &DbPool,
+        filters: &CaptureFilters,
+        first: i32,
+        after: Option<(DateTime<Utc>, String)>,
+        distinct: CaptureDistinct,
+    ) -> AppResult<CursorPage<CaptureWithContext>> {
+        use sqlx::QueryBuilder;
+
+        let limit = first.clamp(1, 100) as i64;
+
+        let select_cols = r#"
+            id, scene_id, shader_slug, shader_name, shader_version,
+            profile_id, profile_name, profile_display_name,
+            image_path, thumbhash, captured_at,
+            resolution_width, resolution_height, file_size_bytes,
+            run_id, run_status, shader_author, scene_name, scene_slug,
+            preset_id, preset_name, preset_slug, freshness"#;
+
+        // Helper closure to push shared WHERE filters
+        let push_filters = |qb: &mut QueryBuilder<'_, sqlx::Postgres>| {
+            if let Some(ref sid) = filters.shader_id {
+                qb.push(" AND shader_id = ");
+                qb.push_bind(sid.as_ref().to_owned());
+            }
+            if let Some(ref slug) = filters.shader_slug {
+                qb.push(" AND shader_slug = ");
+                qb.push_bind(slug.clone());
+            }
+            if let Some(ref scid) = filters.scene_id {
+                qb.push(" AND scene_id = ");
+                qb.push_bind(scid.as_ref().to_owned());
+            }
+            if let Some(ref vid) = filters.version_id {
+                qb.push(" AND shader_version_id = ");
+                qb.push_bind(vid.as_ref().to_owned());
+            }
+            if let Some(ref pid) = filters.profile_id {
+                qb.push(" AND profile_id = ");
+                qb.push_bind(pid.clone());
+            }
+            if let Some(status) = filters.status {
+                qb.push(" AND capture_status = ");
+                qb.push_bind(status.as_str().to_owned());
+            }
+            if let Some(ref rid) = filters.run_id {
+                qb.push(" AND run_id = ");
+                qb.push_bind(rid.as_ref().to_owned());
+            }
+            if let Some(active) = filters.scene_active {
+                qb.push(" AND scene_active = ");
+                qb.push_bind(active);
+            }
+        };
+
+        let items: Vec<CaptureWithContext> = match distinct {
+            CaptureDistinct::None => {
+                let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new("SELECT ");
+                qb.push(select_cols);
+                qb.push(" FROM capture_contexts WHERE TRUE");
+                push_filters(&mut qb);
+
+                if let Some((ref cursor_ts, ref cursor_id)) = after {
+                    qb.push(" AND (captured_at, id) < (");
+                    qb.push_bind(*cursor_ts);
+                    qb.push(", ");
+                    qb.push_bind(cursor_id.as_str());
+                    qb.push(")");
+                }
+
+                qb.push(" ORDER BY captured_at DESC NULLS LAST, id DESC LIMIT ");
+                qb.push_bind(limit + 1);
+
+                qb.build_query_as()
+                    .fetch_all(db)
+                    .await
+                    .context("failed to list captures with context cursor")?
+            }
+            CaptureDistinct::PerShader => {
+                // Subquery: DISTINCT ON (shader_id) with filters + cursor/limit,
+                // then outer query re-orders.
+                let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new("SELECT ");
+                qb.push(select_cols);
+                qb.push(" FROM (SELECT DISTINCT ON (shader_id) *");
+                qb.push(" FROM capture_contexts WHERE TRUE");
+                push_filters(&mut qb);
+                qb.push(" ORDER BY shader_id, captured_at DESC NULLS LAST) sub WHERE TRUE");
+
+                if let Some((ref cursor_ts, ref cursor_id)) = after {
+                    qb.push(" AND (captured_at, id) < (");
+                    qb.push_bind(*cursor_ts);
+                    qb.push(", ");
+                    qb.push_bind(cursor_id.as_str());
+                    qb.push(")");
+                }
+
+                qb.push(" ORDER BY captured_at DESC NULLS LAST, id DESC LIMIT ");
+                qb.push_bind(limit + 1);
+
+                qb.build_query_as()
+                    .fetch_all(db)
+                    .await
+                    .context("failed to list captures with context cursor (per-shader)")?
+            }
+            CaptureDistinct::PerScene => {
+                let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new("SELECT ");
+                qb.push(select_cols);
+                qb.push(" FROM (SELECT DISTINCT ON (scene_id) *");
+                qb.push(" FROM capture_contexts WHERE TRUE");
+                push_filters(&mut qb);
+                qb.push(" ORDER BY scene_id, captured_at DESC NULLS LAST) sub WHERE TRUE");
+
+                if let Some((ref cursor_ts, ref cursor_id)) = after {
+                    qb.push(" AND (captured_at, id) < (");
+                    qb.push_bind(*cursor_ts);
+                    qb.push(", ");
+                    qb.push_bind(cursor_id.as_str());
+                    qb.push(")");
+                }
+
+                qb.push(" ORDER BY captured_at DESC NULLS LAST, id DESC LIMIT ");
+                qb.push_bind(limit + 1);
+
+                qb.build_query_as()
+                    .fetch_all(db)
+                    .await
+                    .context("failed to list captures with context cursor (per-scene)")?
+            }
+        };
+
+        let has_next_page = items.len() as i64 > limit;
+        let items: Vec<CaptureWithContext> = items.into_iter().take(limit as usize).collect();
+
+        // Count query (same filters + distinct, no cursor/limit)
+        let total_count: i64 = match distinct {
+            CaptureDistinct::None => {
+                let mut cqb: QueryBuilder<'_, sqlx::Postgres> =
+                    QueryBuilder::new("SELECT COUNT(*) FROM capture_contexts WHERE TRUE");
+                push_filters(&mut cqb);
+                cqb.build_query_scalar::<Option<i64>>()
+                    .fetch_one(db)
+                    .await
+                    .context("failed to count captures with context cursor")?
+                    .unwrap_or(0)
+            }
+            CaptureDistinct::PerShader => {
+                let mut cqb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
+                    "SELECT COUNT(DISTINCT shader_id) FROM capture_contexts WHERE TRUE",
+                );
+                push_filters(&mut cqb);
+                cqb.build_query_scalar::<Option<i64>>()
+                    .fetch_one(db)
+                    .await
+                    .context("failed to count captures with context cursor (per-shader)")?
+                    .unwrap_or(0)
+            }
+            CaptureDistinct::PerScene => {
+                let mut cqb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
+                    "SELECT COUNT(DISTINCT scene_id) FROM capture_contexts WHERE TRUE",
+                );
+                push_filters(&mut cqb);
+                cqb.build_query_scalar::<Option<i64>>()
+                    .fetch_one(db)
+                    .await
+                    .context("failed to count captures with context cursor (per-scene)")?
+                    .unwrap_or(0)
+            }
+        };
+
+        debug!(
+            total_count,
+            has_next_page, "Listed captures with context (cursor)"
+        );
+        Ok(CursorPage {
+            items,
+            has_next_page,
+            has_previous_page: after.is_some(),
+            total_count,
+        })
+    }
+
     /// Insert a new capture (append-only — no upsert)
     #[instrument(skip(executor), level = "debug")]
     #[allow(clippy::too_many_arguments)]
@@ -1258,6 +1443,79 @@ impl CaptureRepo {
         .fetch_all(executor)
         .await
         .context("failed to batch count captures by scene")?;
+
+        Ok(rows.into_iter().map(|r| (r.scene_id, r.count)).collect())
+    }
+
+    /// Batch-fetch thumbnails for specific scenes (DataLoader-compatible).
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn batch_thumbnails_for_scenes(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_ids: &[String],
+    ) -> AppResult<HashMap<String, ThumbnailInfo>> {
+        struct Row {
+            scene_id: String,
+            image_path: String,
+            thumbhash: Option<String>,
+        }
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT DISTINCT ON (c.scene_id)
+                c.scene_id,
+                c.image_path as "image_path!",
+                c.thumbhash
+            FROM captures c
+            JOIN scenes sc ON c.scene_id = sc.id
+            WHERE c.status = 'completed' AND c.image_path IS NOT NULL AND sc.active = TRUE
+              AND c.scene_id = ANY($1)
+            ORDER BY c.scene_id, c.captured_at DESC NULLS LAST
+            "#,
+            scene_ids
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to batch fetch scene thumbnails by ids")?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    r.scene_id,
+                    ThumbnailInfo {
+                        image_path: r.image_path,
+                        thumbhash: r.thumbhash,
+                    },
+                )
+            })
+            .collect())
+    }
+
+    /// Batch count completed captures for specific scenes (DataLoader-compatible).
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn batch_count_for_scenes(
+        executor: impl sqlx::PgExecutor<'_>,
+        scene_ids: &[String],
+    ) -> AppResult<HashMap<String, i64>> {
+        struct Row {
+            scene_id: String,
+            count: i64,
+        }
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT c.scene_id, COUNT(*) as "count!"
+            FROM captures c
+            JOIN scenes sc ON c.scene_id = sc.id
+            WHERE c.status = 'completed' AND sc.active = TRUE
+              AND c.scene_id = ANY($1)
+            GROUP BY c.scene_id
+            "#,
+            scene_ids
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to batch count captures by scene ids")?;
 
         Ok(rows.into_iter().map(|r| (r.scene_id, r.count)).collect())
     }
