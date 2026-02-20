@@ -48,7 +48,8 @@ interface ComparePageData {
 	error: string | null;
 }
 
-export const load: PageLoad = async ({ fetch, url }): Promise<ComparePageData> => {
+export const load: PageLoad = async ({ fetch, url, depends }): Promise<ComparePageData> => {
+	depends('glint:scenes');
 	const client = createGraphQLClient(fetch);
 	const sceneSlug = url.searchParams.get('scene') ?? undefined;
 

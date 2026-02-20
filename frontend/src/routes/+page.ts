@@ -43,10 +43,17 @@ const HomePageQuery = graphql(
 	[ShaderCardFragment]
 );
 
-export const load: PageLoad = async ({ fetch }) => {
+export const load: PageLoad = async ({ fetch, depends }) => {
+	depends('glint:stats');
+	depends('glint:shaders');
 	const client = createGraphQLClient(fetch);
 
-	const result = await query(client, HomePageQuery, { shaderCount: 6, featuredCount: 6 });
+	const result = await query(
+		client,
+		HomePageQuery,
+		{ shaderCount: 6, featuredCount: 6 },
+		{ requestPolicy: 'cache-and-network' }
+	);
 
 	return result.match({
 		Ok: (data) => ({

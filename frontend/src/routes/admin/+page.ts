@@ -7,7 +7,8 @@ import type {
 } from '$lib/bindings';
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ fetch }) => {
+export const load: PageLoad = async ({ fetch, depends }) => {
+	depends('glint:admin:dashboard');
 	const api = createApiClient(fetch);
 
 	const [

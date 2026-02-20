@@ -1,4 +1,5 @@
-import { Client, cacheExchange, fetchExchange, type AnyVariables } from '@urql/core';
+import { Client, fetchExchange, type AnyVariables, type RequestPolicy } from '@urql/core';
+import { cacheExchange } from '@urql/exchange-graphcache';
 import type { TypedDocumentNode } from '@graphql-typed-document-node/core';
 import { Result } from 'true-myth';
 import { ApiError, ApiErrorType } from '$lib/api/errors';
@@ -8,16 +9,19 @@ export function createGraphQLClient(fetchFn: typeof fetch = fetch): Client {
 	return new Client({
 		url: '/api/graphql',
 		fetch: fetchFn,
-		exchanges: [cacheExchange, fetchExchange]
+		exchanges: [cacheExchange({}), fetchExchange]
 	});
 }
 
 export async function query<Data, Variables extends AnyVariables>(
 	client: Client,
 	document: TypedDocumentNode<Data, Variables>,
-	variables: Variables
+	variables: Variables,
+	options?: { requestPolicy?: RequestPolicy }
 ): Promise<Result<Data, ApiError>> {
-	const result = await client.query(document, variables).toPromise();
+	const result = await client
+		.query(document, variables, { requestPolicy: options?.requestPolicy })
+		.toPromise();
 
 	if (result.error) {
 		return Result.err(mapGraphQLError(result.error));

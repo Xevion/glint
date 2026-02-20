@@ -34,9 +34,10 @@ const AdminShadersQuery = graphql(`
 
 export type AdminShader = ResultOf<typeof AdminShadersQuery>['adminShaders']['items'][number];
 
-export const load: PageLoad = async ({ fetch }) => {
+export const load: PageLoad = async ({ fetch, depends }) => {
+	depends('glint:shaders');
 	const client = createGraphQLClient(fetch);
-	const result = await query(client, AdminShadersQuery, {});
+	const result = await query(client, AdminShadersQuery, {}, { requestPolicy: 'cache-and-network' });
 
 	return result.match({
 		Ok: (data) => ({ shaders: data.adminShaders.items, error: null as string | null }),

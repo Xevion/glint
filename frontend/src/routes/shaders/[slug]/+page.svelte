@@ -557,67 +557,69 @@ const ogDescription = $derived.by(() => {
 		{/if}
 
 		<!-- Similar Shaders -->
-		{#if data.similarShaders.length > 0}
-			<SectionBoundary title="Similar shaders">
-				<div class="mt-10">
-					<h2 class="mb-4 text-lg font-semibold text-foreground">
-						Similar Shaders
-					</h2>
+		{#await data.similarShaders then similarShaders}
+			{#if similarShaders.length > 0}
+				<SectionBoundary title="Similar shaders">
+					<div class="mt-10">
+						<h2 class="mb-4 text-lg font-semibold text-foreground">
+							Similar Shaders
+						</h2>
 
-				<!-- Mobile: compact rows -->
-				<ItemGrid items={data.similarShaders.slice(0, 6)} key={(s: ShaderCardShader) => s.id} mode="row" class="md:hidden">
-					{#snippet row(shader: ShaderCardShader)}
-							<CompactRow
-							name={shader.name}
-							subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
-							image={shader.imagePath}
-							thumbhash={shader.thumbhash}
-							href={resolve('/shaders/[slug]', { slug: shader.slug })}
-							>
-								{#snippet metadata()}
-									{#if shader.categories && shader.categories.length > 0}
-										<div class="flex gap-1">
-											{#each shader.categories.slice(0, 3) as category (category)}
-												<span class="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-													{category.name}
-												</span>
-											{/each}
-										</div>
-									{/if}
-								{/snippet}
-								{#snippet trailing()}
-									<ChevronRight class="h-4 w-4 text-muted-foreground" />
-								{/snippet}
-							</CompactRow>
-						{/snippet}
-					</ItemGrid>
-
-				<!-- Desktop: horizontal scroll carousel -->
-				<div class="hidden md:block">
-					<OverlayScrollbarsComponent
-						element="div"
-						options={{ overflow: { y: 'hidden' }, scrollbars: { theme: themeStore.isDark ? 'os-theme-light' : 'os-theme-dark', autoHide: 'leave', autoHideDelay: 300 } }}
-						class="os-subtle"
-						defer
-					>
-						<div class="flex gap-4 pb-3">
-							{#each data.similarShaders as shader (shader.id)}
-								<div class="w-44 shrink-0">
-							<MiniCard
+					<!-- Mobile: compact rows -->
+					<ItemGrid items={similarShaders.slice(0, 6)} key={(s: ShaderCardShader) => s.id} mode="row" class="md:hidden">
+						{#snippet row(shader: ShaderCardShader)}
+								<CompactRow
 								name={shader.name}
 								subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
 								image={shader.imagePath}
 								thumbhash={shader.thumbhash}
 								href={resolve('/shaders/[slug]', { slug: shader.slug })}
-								/>
-								</div>
-							{/each}
-						</div>
-					</OverlayScrollbarsComponent>
-				</div>
-				</div>
-			</SectionBoundary>
-		{/if}
+								>
+									{#snippet metadata()}
+										{#if shader.categories && shader.categories.length > 0}
+											<div class="flex gap-1">
+												{#each shader.categories.slice(0, 3) as category (category)}
+													<span class="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+														{category.name}
+													</span>
+												{/each}
+											</div>
+										{/if}
+									{/snippet}
+									{#snippet trailing()}
+										<ChevronRight class="h-4 w-4 text-muted-foreground" />
+									{/snippet}
+								</CompactRow>
+							{/snippet}
+						</ItemGrid>
+
+					<!-- Desktop: horizontal scroll carousel -->
+					<div class="hidden md:block">
+						<OverlayScrollbarsComponent
+							element="div"
+							options={{ overflow: { y: 'hidden' }, scrollbars: { theme: themeStore.isDark ? 'os-theme-light' : 'os-theme-dark', autoHide: 'leave', autoHideDelay: 300 } }}
+							class="os-subtle"
+							defer
+						>
+							<div class="flex gap-4 pb-3">
+								{#each similarShaders as shader (shader.id)}
+									<div class="w-44 shrink-0">
+								<MiniCard
+									name={shader.name}
+									subtitle={shader.authors[0]?.name ? `by ${shader.authors[0].name}` : undefined}
+									image={shader.imagePath}
+									thumbhash={shader.thumbhash}
+									href={resolve('/shaders/[slug]', { slug: shader.slug })}
+									/>
+									</div>
+								{/each}
+							</div>
+						</OverlayScrollbarsComponent>
+					</div>
+					</div>
+				</SectionBoundary>
+			{/if}
+		{/await}
 	</div>
 {/key}
 

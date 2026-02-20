@@ -1,5 +1,5 @@
 <script lang="ts">
-import { invalidateAll } from '$app/navigation';
+import { invalidate } from '$app/navigation';
 import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
 import { useSubscription } from '$lib/graphql';
 import { CaptureCompletedSubscription } from '$lib/graphql/subscriptions/captures';
@@ -103,7 +103,11 @@ const statCards = $derived<StatCard[]>([
 
 async function refresh() {
 	refreshing = true;
-	await Promise.all([invalidateAll(), new Promise((r) => setTimeout(r, 300))]);
+	await Promise.all([
+		invalidate('glint:admin:dashboard'),
+		invalidate('glint:stats'),
+		new Promise((r) => setTimeout(r, 300))
+	]);
 	lastRefreshed = new Date();
 	refreshing = false;
 }

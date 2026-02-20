@@ -1,5 +1,5 @@
 <script lang="ts">
-import { goto, invalidateAll } from '$app/navigation';
+import { goto, invalidate } from '$app/navigation';
 import { untrack } from 'svelte';
 import { createGraphQLClient, graphql, mutation } from '$lib/graphql';
 import { createDataTable, DataTable } from '$lib/components/data-table';
@@ -159,7 +159,10 @@ const superform = superForm(
 				result.match({
 					Ok: () => {
 						toast.success('Shader updated');
-						void invalidateAll();
+						void Promise.all([
+							invalidate(`glint:admin:shader:${shader.id}`),
+							invalidate('glint:shaders')
+						]);
 					},
 					Err: (err) => toast.error(err.message)
 				});
@@ -214,7 +217,7 @@ async function handleSync() {
 		result.match({
 			Ok: () => {
 				toast.success('Shader synced successfully from upstream.');
-				void invalidateAll();
+				void Promise.all([invalidate(`glint:admin:shader:${shader.id}`), invalidate('glint:shaders')]);
 			},
 			Err: (err) => toast.error(err.message)
 		});
@@ -249,7 +252,7 @@ async function handleLink() {
 				linkDialogOpen = false;
 				linkUrl = '';
 				linkError = null;
-				void invalidateAll();
+				void invalidate(`glint:admin:shader:${shader.id}`);
 			},
 			Err: (err) => {
 				if (err.statusCode === 409) {

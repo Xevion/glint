@@ -23,7 +23,8 @@ const AdminBackgroundsQuery = graphql(`
 
 export type AdminBackground = ResultOf<typeof AdminBackgroundsQuery>['allBackgrounds'][number];
 
-export const load: PageLoad = async ({ fetch }) => {
+export const load: PageLoad = async ({ fetch, depends }) => {
+	depends('glint:admin:backgrounds');
 	const client = createGraphQLClient(fetch);
 	const result = await query(client, AdminBackgroundsQuery, {});
 

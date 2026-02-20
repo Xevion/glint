@@ -22,13 +22,19 @@ export const _BrowseShadersQuery = graphql(
 	[ShaderCardFragment]
 );
 
-export const load: PageLoad = async ({ fetch, url }) => {
+export const load: PageLoad = async ({ fetch, url, depends }) => {
+	depends('glint:shaders');
 	const client = createGraphQLClient(fetch);
 
 	const q = url.searchParams.get('q') ?? undefined;
 	const sort = url.searchParams.get('sort') ?? undefined;
 
-	const result = await query(client, _BrowseShadersQuery, { first: 24, search: q, sort });
+	const result = await query(
+		client,
+		_BrowseShadersQuery,
+		{ first: 24, search: q, sort },
+		{ requestPolicy: 'cache-and-network' }
+	);
 
 	return result.match<{
 		shaders: ShaderCardShader[];

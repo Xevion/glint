@@ -194,17 +194,34 @@ export function _toShaderDetail(s: GqlShaderDetail): ShaderDetail {
 
 const CAPTURES_PAGE_SIZE = 24;
 
-export const load: PageLoad = async ({ params, fetch, url }) => {
+export const load: PageLoad = async ({ params, fetch, url, depends }) => {
+	depends(`glint:shader:${params.slug}`);
 	const client = createGraphQLClient(fetch);
+
+	// Fire immediately (non-awaited) so SvelteKit streams it in parallel
+	const similarShaders = query(client, SimilarShadersQuery, { first: 30 }).then((result) =>
+		result.match({
+			Ok: (data) =>
+				(data.shaders.edges.map((e) => e.node) as ShaderCardShader[]).filter(
+					(s) => s.slug !== params.slug
+				),
+			Err: () => [] as ShaderCardShader[]
+		})
+	);
 
 	const versionIdParam = url.searchParams.get('version_id') ?? undefined;
 	const profileIdParam = url.searchParams.get('profile_id') ?? undefined;
 
-	const result = await query(client, _ShaderDetailQuery, {
-		id: params.slug,
-		versionId: versionIdParam,
-		profileId: profileIdParam
-	});
+	const result = await query(
+		client,
+		_ShaderDetailQuery,
+		{
+			id: params.slug,
+			versionId: versionIdParam,
+			profileId: profileIdParam
+		},
+		{ requestPolicy: 'cache-and-network' }
+	);
 
 	let shaderData = result.match({
 		Ok: (data) => {
@@ -254,16 +271,6 @@ export const load: PageLoad = async ({ params, fetch, url }) => {
 		page: 1,
 		pageSize: CAPTURES_PAGE_SIZE
 	};
-
-	// Similar shaders
-	const listResult = await query(client, SimilarShadersQuery, { first: 30 });
-	const similarShaders: ShaderCardShader[] = listResult.match({
-		Ok: (data) =>
-			(data.shaders.edges.map((e) => e.node) as ShaderCardShader[]).filter(
-				(s) => s.slug !== params.slug
-			),
-		Err: () => []
-	});
 
 	return { shader, capturesData, similarShaders };
 };

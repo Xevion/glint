@@ -3,7 +3,8 @@ import { createGraphQLClient, query } from '$lib/graphql';
 import type { PageLoad } from './$types';
 import { AdminCaptureRunQuery } from './queries';
 
-export const load: PageLoad = async ({ params, fetch }) => {
+export const load: PageLoad = async ({ params, fetch, depends }) => {
+	depends(`glint:admin:run:${params.id}`);
 	const client = createGraphQLClient(fetch);
 	const result = await query(client, AdminCaptureRunQuery, { id: params.id });
 

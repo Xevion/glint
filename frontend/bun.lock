@@ -11,6 +11,7 @@
         "@resvg/resvg-js": "^2.6.2",
         "@tanstack/table-core": "^8.21.3",
         "@urql/core": "^6.0.1",
+        "@urql/exchange-graphcache": "^9.0.0",
         "@xevion/satori-html": "^0.4.1",
         "class-variance-authority": "^0.7.1",
         "d3-scale": "^4.0.2",
@@ -676,6 +677,8 @@
     "@typescript-eslint/visitor-keys": ["@typescript-eslint/visitor-keys@8.55.0", "", { "dependencies": { "@typescript-eslint/types": "8.55.0", "eslint-visitor-keys": "^4.2.1" } }, "sha512-AxNRwEie8Nn4eFS1FzDMJWIISMGoXMb037sgCBJ3UR6o0fQTzr2tqN9WT+DkWJPhIdQCfV7T6D387566VtnCJA=="],
 
     "@urql/core": ["@urql/core@6.0.1", "", { "dependencies": { "@0no-co/graphql.web": "^1.0.13", "wonka": "^6.3.2" } }, "sha512-FZDiQk6jxbj5hixf2rEPv0jI+IZz0EqqGW8mJBEug68/zHTtT+f34guZDmyjJZyiWbj0vL165LoMr/TkeDHaug=="],
+
+    "@urql/exchange-graphcache": ["@urql/exchange-graphcache@9.0.0", "", { "dependencies": { "@0no-co/graphql.web": "^1.0.13", "@urql/core": "^6.0.1", "wonka": "^6.3.2" } }, "sha512-5ACktvMFdnD5JC6DaSUrlj345c1JIUi7PwgvmnkwVOWsCRt/Vo9946UaG+sg69ku8seESMBK4xkeI41M39Dd5A=="],
 
     "@valibot/to-json-schema": ["@valibot/to-json-schema@1.5.0", "", { "peerDependencies": { "valibot": "^1.2.0" } }, "sha512-GE7DmSr1C2UCWPiV0upRH6mv0cCPsqYGs819fb6srCS1tWhyXrkGGe+zxUiwzn/L1BOfADH4sNjY/YHCuP8phQ=="],
 

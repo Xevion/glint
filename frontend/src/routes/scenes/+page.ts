@@ -29,7 +29,8 @@ export type BrowseScene = NonNullable<
 	ResultOf<typeof ScenesQuery>['scenes']['edges'][number]['node']
 >;
 
-export const load: PageLoad = async ({ fetch }) => {
+export const load: PageLoad = async ({ fetch, depends }) => {
+	depends('glint:scenes');
 	const client = createGraphQLClient(fetch);
 	const result = await query(client, ScenesQuery, { first: 100 });
 

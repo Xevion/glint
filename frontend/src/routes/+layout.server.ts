@@ -57,7 +57,9 @@ function splitBackgrounds(backgrounds: GqlBackground[]): {
 	};
 }
 
-export const load: LayoutServerLoad = async ({ fetch }) => {
+export const load: LayoutServerLoad = async ({ fetch, depends }) => {
+	depends('glint:user');
+	depends('glint:backgrounds');
 	const api = createApiClient(fetch);
 	const client = createGraphQLClient(fetch);
 	const [userResult, bgResult] = await Promise.all([
