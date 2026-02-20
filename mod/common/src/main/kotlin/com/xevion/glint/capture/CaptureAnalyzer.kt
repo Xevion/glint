@@ -76,8 +76,6 @@ object CaptureAnalyzer {
         )
     }
 
-    // -- Downsampling --
-
     private data class DownsampleResult(
         val pixels: IntArray,
         val width: Int,
@@ -127,8 +125,6 @@ object CaptureAnalyzer {
         return DownsampleResult(result, outW, outH)
     }
 
-    // -- Luminance --
-
     private fun computeLuminance(
         pixels: IntArray,
         width: Int,
@@ -155,8 +151,6 @@ object CaptureAnalyzer {
 
         return LuminanceData(mean = mean, histogram = histogram)
     }
-
-    // -- Edge density (Sobel) --
 
     private fun computeEdgeDensity(
         pixels: IntArray,
@@ -198,8 +192,6 @@ object CaptureAnalyzer {
         val interiorPixels = (width - 2) * (height - 2)
         return if (interiorPixels > 0) edgeCount.toDouble() / interiorPixels else 0.0
     }
-
-    // -- Dominant colors (mean-shift in CIELAB) --
 
     private fun computeDominantColors(
         pixels: IntArray,
@@ -343,8 +335,6 @@ object CaptureAnalyzer {
                 )
             }
     }
-
-    // -- Color space conversion: sRGB ↔ Linear RGB ↔ XYZ (D65) ↔ CIELAB --
 
     private fun srgbToLinear(c: Double): Double = if (c <= 0.04045) c / 12.92 else ((c + 0.055) / 1.055).pow(2.4)
 

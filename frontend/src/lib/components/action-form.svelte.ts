@@ -18,7 +18,7 @@ interface AdminActionConfig {
  *
  * @example
  * ```ts
- * const deleteAction = createAdminAction({
+ * const deleteAction = createAction({
  *   action: () => api.admin.deleteShader(shader.id),
  *   onSuccess: () => void goto('/admin/shaders'),
  *   setError: (msg) => (form.error = msg),
@@ -27,7 +27,7 @@ interface AdminActionConfig {
  * // Template: onclick={deleteAction.execute}
  * ```
  */
-export function createAdminAction(config: AdminActionConfig) {
+export function createAction(config: AdminActionConfig) {
 	let loading = $state(false);
 
 	async function execute() {

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { invalidateAll } from '$app/navigation';
-import { AdminBreadcrumb } from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
@@ -55,13 +55,13 @@ const statCards = $derived([
 	<!-- Header -->
 	<div class="space-y-2">
 		<div class="flex items-center gap-2">
-			<AdminBreadcrumb
+			<Breadcrumb
 				segments={[{ label: 'Runs', href: '/admin/runs' }, { label: 'Capture Run' }]}
 			>
 				{#snippet trailing()}
 					<StatusBadge status={normalizeStatus(run.status)} class="ml-2">{normalizeStatus(run.status)}</StatusBadge>
 				{/snippet}
-			</AdminBreadcrumb>
+			</Breadcrumb>
 			<div class="ml-auto">
 				<RefreshButton {refreshing} onclick={refresh} />
 			</div>

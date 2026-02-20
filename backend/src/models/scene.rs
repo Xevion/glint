@@ -103,18 +103,6 @@ pub struct SceneWithCaptures {
     pub captures: Vec<CaptureWithContext>,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Serialize, TS)]
-#[ts(export, optional_fields)]
-pub struct SceneListAdmin {
-    #[serde(flatten)]
-    pub scene: Scene,
-    pub version: SceneVersion,
-    pub image_path: Option<String>,
-    pub thumbhash: Option<String>,
-    pub capture_count: i64,
-}
-
 fn validate_finite(value: f64) -> Result<(), ValidationError> {
     if value.is_finite() {
         Ok(())

@@ -169,8 +169,6 @@ class GlintMainScreen(
         minecraft?.setScreen(lastScreen)
     }
 
-    // -- Public accessors for tab classes --
-
     /** Exposes the Minecraft client instance for tab classes. */
     val client: Minecraft? get() = minecraft
 

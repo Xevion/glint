@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { CaptureRun } from '$lib/bindings';
-import { AdminBreadcrumb } from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import { DataTable, DataTablePagination, createDataTable } from '$lib/components/data-table';
 import { DataList } from '$lib/components/data-list';
 import { StatusBadge } from '$lib/components/ui/status-badge';
@@ -26,7 +26,7 @@ const table = createDataTable<CaptureRun>({
 <svelte:head><title>Runs - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<AdminBreadcrumb segments={[{ label: 'Capture Runs' }]} />
+	<Breadcrumb segments={[{ label: 'Capture Runs' }]} />
 
 	<DataList items={runs} error={data.error} emptyMessage="No capture runs yet.">
 		{#snippet content()}

@@ -137,7 +137,6 @@ pub fn validate_capture(
 mod tests {
     use super::*;
 
-    // -- Helper: build minimal WebP VP8 (lossy) header --
     fn make_vp8_header(width: u16, height: u16) -> Vec<u8> {
         let mut buf = vec![0u8; 30];
         buf[0..4].copy_from_slice(b"RIFF");
@@ -151,7 +150,6 @@ mod tests {
         buf
     }
 
-    // -- Helper: build minimal WebP VP8L (lossless) header --
     fn make_vp8l_header(width: u32, height: u32) -> Vec<u8> {
         let mut buf = vec![0u8; 25];
         buf[0..4].copy_from_slice(b"RIFF");
@@ -166,7 +164,6 @@ mod tests {
         buf
     }
 
-    // -- Helper: build minimal WebP VP8X (extended) header --
     fn make_vp8x_header(width: u32, height: u32) -> Vec<u8> {
         let mut buf = vec![0u8; 30];
         buf[0..4].copy_from_slice(b"RIFF");
@@ -185,7 +182,6 @@ mod tests {
         buf
     }
 
-    // -- Helper: build minimal PNG header with IHDR --
     fn make_png_header(width: u32, height: u32) -> Vec<u8> {
         let mut buf = vec![0u8; 24];
         // PNG signature
@@ -201,8 +197,6 @@ mod tests {
         buf[20..24].copy_from_slice(&height.to_be_bytes());
         buf
     }
-
-    // ---- detect_format tests ----
 
     #[test]
     fn test_detect_format_webp() {
@@ -227,8 +221,6 @@ mod tests {
         assert!(detect_format(&garbage).is_err());
     }
 
-    // ---- parse_dimensions: WebP VP8 (lossy) ----
-
     #[test]
     fn test_parse_dimensions_vp8() {
         let header = make_vp8_header(3840, 2160);
@@ -248,8 +240,6 @@ mod tests {
         let header = make_vp8_header(100, 100);
         assert!(parse_dimensions(&header[..20], ImageFormat::WebP).is_err());
     }
-
-    // ---- parse_dimensions: WebP VP8L (lossless) ----
 
     #[test]
     fn test_parse_dimensions_vp8l() {
@@ -272,8 +262,6 @@ mod tests {
         assert!(parse_dimensions(&header[..20], ImageFormat::WebP).is_err());
     }
 
-    // ---- parse_dimensions: WebP VP8X (extended) ----
-
     #[test]
     fn test_parse_dimensions_vp8x() {
         let header = make_vp8x_header(3840, 2160);
@@ -294,8 +282,6 @@ mod tests {
         assert!(parse_dimensions(&header[..20], ImageFormat::WebP).is_err());
     }
 
-    // ---- parse_dimensions: PNG ----
-
     #[test]
     fn test_parse_dimensions_png() {
         let header = make_png_header(3840, 2160);
@@ -308,8 +294,6 @@ mod tests {
         let header = make_png_header(100, 100);
         assert!(parse_dimensions(&header[..16], ImageFormat::Png).is_err());
     }
-
-    // ---- validate_capture integration ----
 
     #[test]
     fn test_validate_capture_webp_vp8_ok() {

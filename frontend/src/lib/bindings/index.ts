@@ -47,7 +47,6 @@ export type { PendingSceneUploadId } from "./PendingSceneUploadId";
 export type { Role } from "./Role";
 export type { Scene } from "./Scene";
 export type { SceneId } from "./SceneId";
-export type { SceneListAdmin } from "./SceneListAdmin";
 export type { SceneListItem } from "./SceneListItem";
 export type { ScenePreset } from "./ScenePreset";
 export type { ScenePresetId } from "./ScenePresetId";

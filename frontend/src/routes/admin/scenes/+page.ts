@@ -1,13 +1,37 @@
-import { createApiClient } from '$lib/api';
-import type { SceneListAdmin } from '$lib/bindings';
+import { createGraphQLClient, graphql, query, type ResultOf } from '$lib/graphql';
 import type { PageLoad } from './$types';
 
+const ScenesQuery = graphql(`
+	query AdminScenesList {
+		scenes(first: 250, visibility: INCLUDE) {
+			edges {
+				node {
+					id
+					name
+					slug
+					description
+					active
+					imagePath
+					thumbhash
+					createdAt
+				}
+			}
+			totalCount
+		}
+	}
+`);
+
+export type AdminScene = ResultOf<typeof ScenesQuery>['scenes']['edges'][number]['node'];
+
 export const load: PageLoad = async ({ fetch }) => {
-	const api = createApiClient(fetch);
-	const result = await api.admin.listScenes();
+	const client = createGraphQLClient(fetch);
+	const result = await query(client, ScenesQuery, {}, { requestPolicy: 'cache-and-network' });
 
 	return result.match({
-		Ok: (scenes) => ({ scenes, error: null as string | null }),
-		Err: (err) => ({ scenes: [] as SceneListAdmin[], error: err.message })
+		Ok: (data) => ({
+			scenes: data.scenes.edges.map((e) => e.node),
+			error: null as string | null
+		}),
+		Err: (err) => ({ scenes: [] as AdminScene[], error: err.message })
 	});
 };

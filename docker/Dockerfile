@@ -5,7 +5,6 @@
 #   docker build -t glint-capture:latest -f docker/Dockerfile .
 #   docker run --rm --gpus all -e NVIDIA_DRIVER_CAPABILITIES=all glint-capture:latest
 
-# ── Stage 1: Build the Glint mod ──────────────────────────────────────────────
 FROM eclipse-temurin:21-jdk-noble AS mod-build
 
 WORKDIR /build
@@ -39,7 +38,6 @@ RUN ./gradlew :fabric:remapJar --no-daemon \
     && echo "=== Selecting remapped JAR (no -dev-shadow, no -sources) ===" \
     && ls fabric/build/libs/*.jar | grep -v dev-shadow | grep -v sources
 
-# ── Stage 2: Assemble Minecraft + Fabric runtime ─────────────────────────────
 FROM python:3.12-slim AS mc-runtime
 
 # portablemc needs Python; Bun handles everything else (HTTP, JSON, zip, file I/O)
@@ -58,7 +56,6 @@ ENV MC_DIR=/minecraft
 
 RUN bun /setup-runtime.ts
 
-# ── Stage 3: Final runtime image ─────────────────────────────────────────────
 FROM nvidia/opengl:1.2-glvnd-runtime-ubuntu22.04
 
 # Install runtime dependencies

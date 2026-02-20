@@ -246,7 +246,7 @@ Design components that might navigate to accept an `href` prop and render an `<a
 ### Reference implementations
 
 - `CompactRow` (`$lib/components/item-grid/compact-row.svelte`) — renders `<a>`, `<button>`, or `<div>` based on props
-- `AdminCaptureCard` (`$lib/components/admin/AdminCaptureCard.svelte`) — entire card wrapped in `<a>`
+- `CaptureCard` (`$lib/components/admin/CaptureCard.svelte`) — entire card wrapped in `<a>`
 - `DataTable` (`$lib/components/data-table/data-table.svelte`) — `getRowHref` for row-level navigation
 - `ShaderCard` (`$lib/components/ShaderCard.svelte`) — stretched-link pattern for cards with nested interactive elements
 
@@ -372,10 +372,10 @@ Detail pages use `createAdminForm()` from `$lib/components/admin/admin-form.svel
 
 ## Admin Navigation
 
-Admin pages use `AdminBreadcrumb` (not the deleted `AdminPageHeader`/`AdminDetailHeader`):
+Admin pages use `Breadcrumb` (not the deleted `AdminPageHeader`/`AdminDetailHeader`):
 
 ```svelte
-<AdminBreadcrumb segments={[
+<Breadcrumb segments={[
     { label: 'Shaders', href: '/admin/shaders' },
     { label: shader.name },
 ]} />

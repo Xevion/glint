@@ -7,7 +7,7 @@ import type { AdminShader } from './+page';
 import AdoptShaderDialog from '$lib/components/AdoptShaderDialog.svelte';
 import { createDataTable, DataTable, DataTablePagination } from '$lib/components/data-table';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminBreadcrumb } from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { Input } from '$lib/components/ui/input';
@@ -221,7 +221,7 @@ function handleShaderAdopted(shader: Shader) {
 <svelte:head><title>Shaders - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<AdminBreadcrumb segments={[{ label: 'Shaders' }]} />
+	<Breadcrumb segments={[{ label: 'Shaders' }]} />
 
 	<Tabs.Root value={activeTab} onValueChange={handleTabChange}>
 		<Tabs.List>

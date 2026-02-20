@@ -38,9 +38,9 @@ pub use pagination::{Page, PageBody, PageQuery, Paginated};
 pub use scene::{
     Camera, CompleteUploadRequest, CompleteUploadResponse, CreatePresetRequest, CreateSceneRequest,
     InitiateNewSceneUploadRequest, InitiateVersionUploadRequest, PendingSceneUpload, Position,
-    ReorderPresetsRequest, Scene, SceneListAdmin, SceneListItem, ScenePreset, SceneVersion,
-    SceneWithCaptures, SceneWithVersion, UpdatePresetRequest, UpdateSceneMetadataRequest,
-    UpdateSceneRequest, UploadInitiatedResponse,
+    ReorderPresetsRequest, Scene, SceneListItem, ScenePreset, SceneVersion, SceneWithCaptures,
+    SceneWithVersion, UpdatePresetRequest, UpdateSceneMetadataRequest, UpdateSceneRequest,
+    UploadInitiatedResponse,
 };
 pub use shader::{
     CreateShaderRequest, CreateShaderVersionRequest, ExtractionSummary, Shader, ShaderAdopted,

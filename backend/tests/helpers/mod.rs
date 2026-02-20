@@ -9,13 +9,9 @@
 use chrono::{DateTime, TimeZone, Utc};
 use sqlx::PgPool;
 
-// -- Constants for the vanilla shader seeded by migration 001 --
-
 pub const VANILLA_SHADER_ID: &str = "vanilla";
 pub const VANILLA_SHADER_SLUG: &str = "vanilla";
 pub const VANILLA_VERSION_ID: &str = "vanilla-1.21.4";
-
-// -- Scene helpers --
 
 pub async fn seed_scene(pool: &PgPool, id: &str, slug: &str, name: &str, active: bool) {
     sqlx::query("INSERT INTO scenes (id, name, slug, active) VALUES ($1, $2, $3, $4)")
@@ -39,8 +35,6 @@ pub async fn seed_scene_version(pool: &PgPool, id: &str, scene_id: &str) {
     .await
     .expect("seed_scene_version");
 }
-
-// -- Shader helpers --
 
 pub async fn seed_shader(pool: &PgPool, id: &str, slug: &str, name: &str) {
     sqlx::query("INSERT INTO shaders (id, name, slug) VALUES ($1, $2, $3)")
@@ -119,8 +113,6 @@ pub async fn seed_shader_version_with_published_at(
     .expect("seed_shader_version_with_published_at");
 }
 
-// -- Profile helpers --
-
 pub async fn seed_profile(pool: &PgPool, id: &str, version_id: &str, name: &str, sort_order: i32) {
     sqlx::query(
         "INSERT INTO shader_version_profiles (id, shader_version_id, name, display_name, options, sort_order) \
@@ -134,8 +126,6 @@ pub async fn seed_profile(pool: &PgPool, id: &str, version_id: &str, name: &str,
     .await
     .expect("seed_profile");
 }
-
-// -- Capture helpers --
 
 /// Insert a minimal capture. `status` should be 'completed', 'uploading', 'failed', etc.
 pub async fn seed_capture(
@@ -195,8 +185,6 @@ pub async fn seed_capture_full(
     .expect("seed_capture_full");
 }
 
-// -- Scene preset helpers --
-
 pub async fn seed_scene_preset(
     pool: &PgPool,
     id: &str,
@@ -221,8 +209,6 @@ pub async fn seed_scene_preset(
     .await
     .expect("seed_scene_preset");
 }
-
-// -- Composite helpers --
 
 /// Create a minimal scene + scene_version + scene_preset.
 /// Returns (scene_id, scene_version_id, preset_id).

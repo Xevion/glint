@@ -1,5 +1,6 @@
 pub mod background;
 pub mod capture;
+pub mod common;
 pub mod connection;
 pub mod featured;
 pub mod preset;

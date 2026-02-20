@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { User } from '$lib/bindings';
-import { AdminBreadcrumb } from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import { DataTable, DataTablePagination, createDataTable } from '$lib/components/data-table';
 import { DataList } from '$lib/components/data-list';
 import type { PageData } from './$types';
@@ -30,7 +30,7 @@ const roleColors: Record<string, string> = {
 <svelte:head><title>Users - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<AdminBreadcrumb segments={[{ label: 'Users' }]} />
+	<Breadcrumb segments={[{ label: 'Users' }]} />
 
 	<DataList items={users} error={data.error} emptyMessage="No users yet.">
 		{#snippet content()}

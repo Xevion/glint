@@ -207,8 +207,6 @@ class LinearOrchestrator {
 
     val isRunning: Boolean get() = state != State.Idle
 
-    // -- State handlers --
-
     private fun handlePlanning() {
         if (workItems.isEmpty()) {
             finishWithError("No work items")
@@ -618,8 +616,6 @@ class LinearOrchestrator {
         cleanup()
     }
 
-    // -- Navigation --
-
     /**
      * Determines what state to enter for the current work item based on
      * what has changed since the last item (scene, preset, or shader).
@@ -661,8 +657,6 @@ class LinearOrchestrator {
         }
         advanceToNextItem()
     }
-
-    // -- Environment application --
 
     /**
      * Applies the effective environment for a work item.
@@ -736,8 +730,6 @@ class LinearOrchestrator {
         }
     }
 
-    // -- Render settings --
-
     /**
      * Applies standardized render settings for captures.
      * Called once after the staging world is ready.
@@ -801,8 +793,6 @@ class LinearOrchestrator {
         }
     }
 
-    // -- Shader helpers --
-
     private fun buildShaderMetadata(shader: ShaderSpec): com.xevion.glint.capture.ShaderMetadata? {
         if (shader.filename == null) return null
         val info = parseShaderPackName(shader.filename)
@@ -839,8 +829,6 @@ class LinearOrchestrator {
         val version: String,
     )
 
-    // -- Capture filename --
-
     private fun buildCaptureFilename(
         item: WorkItem,
         shader: ShaderSpec,
@@ -858,8 +846,6 @@ class LinearOrchestrator {
     }
 
     private fun sanitize(input: String): String = input.lowercase().replace(Regex("[^a-z0-9._-]"), "-")
-
-    // -- Session directory --
 
     private fun createSessionDirectory(): Boolean {
         val mc = Minecraft.getInstance()
@@ -891,8 +877,6 @@ class LinearOrchestrator {
         }
     }
 
-    // -- Manifest --
-
     private fun writeManifest(partial: Boolean) {
         val currentSessionDir = sessionDir ?: return
         val manifestName = if (partial) "manifest_partial.json" else "manifest.json"
@@ -918,8 +902,6 @@ class LinearOrchestrator {
             log.error(e, "Failed to serialize manifest")
         }
     }
-
-    // -- Error + cleanup --
 
     private fun finishWithError(reason: String) {
         log.error("Orchestration failed") { "reason" to reason }
@@ -978,8 +960,6 @@ class LinearOrchestrator {
         pendingCapture = null
         stagingWorld.reset()
     }
-
-    // -- Helpers --
 
     private fun currentWorkItem(): WorkItem? = workItems.getOrNull(currentItemIndex)
 

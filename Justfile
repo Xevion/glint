@@ -2,8 +2,6 @@
 
 set positional-arguments := true
 
-# === Aliases ===
-
 # Core development
 alias c := check
 alias d := dev
@@ -16,12 +14,8 @@ alias dm := dev-mod
 alias sm := smoke
 alias lf := loom-fix
 
-# === Default ===
-
 default:
     @just --list
-
-# === Core Development ===
 
 # Validate all code (parallel checks, auto-fix formatting when safe)
 check *flags:
@@ -57,16 +51,9 @@ build:
     cargo build --manifest-path backend/Cargo.toml --release
     cd mod && ./gradlew build --quiet
 
-# === Frontend ===
-
 # Run bun commands in frontend (e.g., `just bun run test`)
 bun *args:
     cd frontend && bun {{args}}
-
-# === Backend ===
-# (Use `just dev -b` for backend dev server)
-
-# === Mod Development ===
 
 # Run Minecraft client (Fabric by default)
 dev-mod platform="fabric":
@@ -94,8 +81,6 @@ loom-fix:
 # Run any command in mod directory (e.g., `just mod ./gradlew clean`)
 mod *args:
     cd mod && {{args}}
-
-# === Database ===
 
 # Manage development services (PostgreSQL + MinIO via docker compose)
 # Commands: start (default), reset, rm
@@ -140,8 +125,6 @@ migrate-create name:
 db-seed:
     cargo run --manifest-path backend/Cargo.toml --quiet -- seed
 
-# === R2 / S3 ===
-
 # Run aws s3 commands against the R2 bucket.
 # Usage: just r2 ls worlds/ | just r2 cp R2/worlds/a.zip R2/worlds/b.zip
 # Shorthand: R2 or R2/ expands to s3://<bucket> or s3://<bucket>/
@@ -169,8 +152,6 @@ r2 *args:
 # Alias: just s3 → just r2
 alias s3 := r2
 
-# === Utilities ===
-
 # Regenerate TypeScript bindings from Rust types + GraphQL schema
 bindings:
     cd backend && cargo test export_bindings --quiet
@@ -191,8 +172,6 @@ mcjar +args='':
     set -euo pipefail
     exec bun ./scripts/mcjar.ts "$@"
 
-# === Docker (Web Server) ===
-
 # Build the web server Docker image
 web-build *flags:
     docker build -t glint-web:latest {{flags}} .
@@ -210,8 +189,6 @@ web-run *flags:
         --env-file backend/.env \
         {{flags}} \
         glint-web:latest
-
-# === Docker (Headless Capture) ===
 
 # Build the headless capture Docker image
 capture-build *flags:

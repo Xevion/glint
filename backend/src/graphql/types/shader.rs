@@ -550,15 +550,6 @@ impl From<CursorPage<Shader>> for ShaderConnection {
     }
 }
 
-/// Admin-facing paginated shader list.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct AdminShaderList {
-    pub items: Vec<ShaderNode>,
-    pub total: i64,
-    pub page: i32,
-    pub page_size: i32,
-}
-
 /// Input for updating a shader.
 #[derive(async_graphql::InputObject, Debug)]
 pub struct UpdateShaderInput {

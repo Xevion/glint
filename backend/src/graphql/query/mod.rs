@@ -7,6 +7,8 @@ pub mod stats;
 
 use async_graphql::{Context, MergedObject, Object, Result};
 
+use crate::graphql::guard::require_admin_for_visibility;
+use crate::graphql::types::common::Visibility;
 use crate::graphql::types::connection::decode_cursor;
 use crate::graphql::types::scene::{SceneConnection, SceneNode};
 use crate::repo::SceneRepo;
@@ -36,13 +38,19 @@ pub struct SceneQuery;
 
 #[Object]
 impl SceneQuery {
-    /// List active scenes with cursor-based pagination.
+    /// List scenes with cursor-based pagination.
     async fn scenes(
         &self,
         ctx: &Context<'_>,
         #[graphql(default = 20, desc = "Number of items to return (max 100)")] first: i32,
         #[graphql(desc = "Cursor from a previous page's endCursor")] after: Option<String>,
+        #[graphql(
+            default_with = "Visibility::Exclude",
+            desc = "Filter inactive scenes: EXCLUDE (default, active only), INCLUDE (all, admin), ONLY (inactive only, admin)"
+        )]
+        visibility: Visibility,
     ) -> Result<SceneConnection> {
+        require_admin_for_visibility(ctx, visibility)?;
         let state = ctx.data_unchecked::<AppState>();
 
         let decoded_after = after
@@ -56,7 +64,7 @@ impl SceneQuery {
             })
             .transpose()?;
 
-        let page = SceneRepo::list_active_cursor(state.db(), first, decoded_after).await?;
+        let page = SceneRepo::list_cursor(state.db(), first, decoded_after, visibility).await?;
         Ok(page.into())
     }
 

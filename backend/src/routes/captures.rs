@@ -24,7 +24,7 @@ use crate::{
 };
 
 #[derive(CustomDebug, Deserialize)]
-pub struct AdminCaptureListParams {
+pub struct CaptureListParams {
     #[serde(flatten)]
     pub page: PageQuery,
     #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
@@ -61,7 +61,7 @@ async fn list_captures_public(
 async fn list_captures_all(
     _admin: AdminUser,
     State(state): State<AppState>,
-    Query(params): Query<AdminCaptureListParams>,
+    Query(params): Query<CaptureListParams>,
 ) -> AppResult<Json<Paginated<CaptureWithContext>>> {
     let p = params.page.normalize();
 
@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn serde_urlencoded_flatten_with_display_from_str() {
         let qs = "page=1&page_size=50";
-        let params: AdminCaptureListParams = serde_urlencoded::from_str(qs)
+        let params: CaptureListParams = serde_urlencoded::from_str(qs)
             .expect("DisplayFromStr should fix flatten with serde_urlencoded");
         assert_eq!(params.page.page, Some(1));
         assert_eq!(params.page.page_size, Some(50));
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn serde_urlencoded_flatten_with_filters() {
         let qs = "page=2&page_size=25&shader=bsl&status=completed";
-        let params: AdminCaptureListParams =
+        let params: CaptureListParams =
             serde_urlencoded::from_str(qs).expect("DisplayFromStr should fix flatten with filters");
         assert_eq!(params.page.page, Some(2));
         assert_eq!(params.page.page_size, Some(25));

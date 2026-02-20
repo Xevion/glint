@@ -11,12 +11,10 @@ import type {
 import { ItemGrid } from '$lib/components/item-grid';
 import { formatMoonPhase, formatTimeTicks } from '$lib/utils/display';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import {
-	AdminBreadcrumb,
-	AdminCaptureCard,
-	AdminDetailField,
-	createAdminAction
-} from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+import CaptureCard from '$lib/components/CaptureCard.svelte';
+import DetailField from '$lib/components/DetailField.svelte';
+import { createAction } from '$lib/components/action-form.svelte';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
@@ -43,7 +41,6 @@ let captures: CaptureWithContext[] = $derived(data.captures);
 let captureCount: number = $derived(data.captureCount);
 let presets: ScenePreset[] = $derived(data.presets);
 
-// ── Scene Edit Form (superforms SPA) ────────────────────────
 const initialScene = untrack(() => scene);
 const sceneSuperform = superForm(
 	defaults(
@@ -84,7 +81,6 @@ const {
 } = sceneSuperform;
 let sceneIsDirty = $derived($sceneTainted != null && Object.values($sceneTainted).some(Boolean));
 
-// ── Create Preset Form (superforms SPA) ─────────────────────
 let showCreatePreset = $state(false);
 
 const createPresetSuperform = superForm(
@@ -132,7 +128,6 @@ const {
 	enhance: createEnhance
 } = createPresetSuperform;
 
-// ── Edit Preset Form (superforms SPA) ───────────────────────
 let editingPreset = $state<ScenePreset | null>(null);
 
 const editPresetSuperform = superForm(
@@ -196,22 +191,20 @@ function startEdit(preset: ScenePreset) {
 	$editFormData.moon_phase = preset.moon_phase ?? undefined;
 }
 
-// ── Non-form actions ────────────────────────────────────────
-const disableAction = createAdminAction({
+const disableAction = createAction({
 	action: () => api.admin.disableScene(scene.id),
 	onSuccess: () => void goto('/admin/scenes'),
-	setError: (msg) => toast.error(msg)
+	setError: (msg: string) => toast.error(msg)
 });
 
-const reactivateAction = createAdminAction({
+const reactivateAction = createAction({
 	action: () => api.admin.reactivateScene(scene.id),
 	onSuccess: () => void invalidateAll(),
-	setError: (msg) => toast.error(msg)
+	setError: (msg: string) => toast.error(msg)
 });
 
 let showDisableConfirm = $state(false);
 
-// ── Delete Preset ───────────────────────────────────────────
 let deletingPreset = $state<ScenePreset | null>(null);
 let showDeletePresetConfirm = $state(false);
 
@@ -232,7 +225,6 @@ async function handleDeletePreset() {
 	});
 }
 
-// ── Drag-to-Reorder ─────────────────────────────────────────
 let dragIndex = $state<number | null>(null);
 let dragOverIndex = $state<number | null>(null);
 
@@ -284,13 +276,13 @@ const WEATHER_OPTIONS = [
 
 <div class="space-y-6">
 	<!-- Header -->
-	<AdminBreadcrumb
+	<Breadcrumb
 		segments={[{ label: 'Scenes', href: '/admin/scenes' }, { label: scene.name }]}
 	>
 		{#snippet trailing()}
 			<StatusBadge class="ml-2" status={scene.active ? 'active' : 'inactive'}>{scene.active ? 'Active' : 'Inactive'}</StatusBadge>
 		{/snippet}
-	</AdminBreadcrumb>
+	</Breadcrumb>
 
 	{#if !scene.active}
 		<Alert variant="warning" class="flex items-center justify-between">
@@ -432,49 +424,49 @@ const WEATHER_OPTIONS = [
 		<!-- Tab 2: Details -->
 		<FolderCard.Content value="details">
 			<dl class="space-y-2 text-sm">
-				<AdminDetailField label="ID">
+				<DetailField label="ID">
 					<code class="text-xs">{scene.id}</code>
-				</AdminDetailField>
-				<AdminDetailField label="Slug">
+				</DetailField>
+				<DetailField label="Slug">
 					{scene.slug}
-				</AdminDetailField>
-				<AdminDetailField label="Position">
+				</DetailField>
+				<DetailField label="Position">
 					<code class="text-xs">
 						{scene.version.x.toFixed(1)}, {scene.version.y.toFixed(1)}, {scene.version.z.toFixed(1)}
 					</code>
-				</AdminDetailField>
-				<AdminDetailField label="Camera">
+				</DetailField>
+				<DetailField label="Camera">
 					<code class="text-xs">
 						Yaw: {scene.version.yaw.toFixed(1)}, Pitch: {scene.version.pitch.toFixed(1)}
 					</code>
-				</AdminDetailField>
-				<AdminDetailField label="Dimension">
+				</DetailField>
+				<DetailField label="Dimension">
 					{scene.dimension}
-				</AdminDetailField>
-				<AdminDetailField label="Time of Day">
+				</DetailField>
+				<DetailField label="Time of Day">
 					{formatTimeTicks(scene.version.time_of_day_ticks)}
-				</AdminDetailField>
-				<AdminDetailField label="Weather">
+				</DetailField>
+				<DetailField label="Weather">
 					<span class="capitalize">{scene.version.weather}</span>
 					{#if scene.version.weather_intensity > 0}
 						<span class="text-muted-foreground">
 							(intensity: {scene.version.weather_intensity.toFixed(2)})
 						</span>
 					{/if}
-				</AdminDetailField>
+				</DetailField>
 				{#if scene.version.biome}
-					<AdminDetailField label="Biome">
+					<DetailField label="Biome">
 						{scene.version.biome}
-					</AdminDetailField>
+					</DetailField>
 				{/if}
 				{#if scene.version.moon_phase != null}
-					<AdminDetailField label="Moon Phase">
+					<DetailField label="Moon Phase">
 						{formatMoonPhase(scene.version.moon_phase)}
-					</AdminDetailField>
+					</DetailField>
 				{/if}
-				<AdminDetailField label="Created">
+				<DetailField label="Created">
 					<TimeAgo timestamp={scene.created_at} />
-				</AdminDetailField>
+				</DetailField>
 			</dl>
 		</FolderCard.Content>
 
@@ -494,7 +486,7 @@ const WEATHER_OPTIONS = [
 					</div>
 					<ItemGrid items={captures} key={(c: CaptureWithContext) => c.id} size="small">
 						{#snippet card(capture: CaptureWithContext)}
-							<AdminCaptureCard {capture}>
+							<CaptureCard {capture}>
 								<div class="p-2">
 									<div class="flex items-center justify-between">
 										<div class="text-sm font-medium">{capture.shader_name}</div>
@@ -512,7 +504,7 @@ const WEATHER_OPTIONS = [
 										{/if}
 									</div>
 								</div>
-							</AdminCaptureCard>
+							</CaptureCard>
 						{/snippet}
 					</ItemGrid>
 				</div>

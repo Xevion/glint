@@ -110,8 +110,6 @@ class AutonomousRunner(
 
     val isRunning: Boolean get() = state != State.Done
 
-    // -- FetchingWork --
-
     private fun fetchWork() {
         state = State.FetchingWork
         pending =
@@ -151,8 +149,6 @@ class AutonomousRunner(
                 shutdown()
             }
     }
-
-    // -- CreatingRun --
 
     private fun startCreatingRun(workItems: List<WorkItem>) {
         state = State.CreatingRun
@@ -239,8 +235,6 @@ class AutonomousRunner(
         pending = PendingOp.PrepareAssets(CompletableFuture.supplyAsync { assetPreparer.prepareAll(workItems) })
     }
 
-    // -- PreparingAssets --
-
     private fun tickPreparingAssets() {
         val op = pending as? PendingOp.PrepareAssets ?: return
         if (!op.future.isDone) return
@@ -309,8 +303,6 @@ class AutonomousRunner(
         }
     }
 
-    // -- Capturing --
-
     private fun tickCapturing() {
         if (!SessionRegistry.isOrchestrationActive()) {
             log.info("Orchestration complete")
@@ -319,8 +311,6 @@ class AutonomousRunner(
             startFinalizingRun()
         }
     }
-
-    // -- FinalizingRun --
 
     private fun startFinalizingRun() {
         state = State.FinalizingRun
@@ -367,8 +357,6 @@ class AutonomousRunner(
 
         fetchWork()
     }
-
-    // -- Helpers --
 
     private fun shutdown() {
         runUploader?.drainAndShutdown(60.seconds)

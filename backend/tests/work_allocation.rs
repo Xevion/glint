@@ -758,8 +758,6 @@ async fn test_fresh_capture_for_one_profile_does_not_exclude_other(pool: sqlx::P
     check!(items[0].shader.profile_name.as_deref() == Some("Profile B"));
 }
 
-// -- Budget (target_items) tests --
-
 #[sqlx::test]
 async fn test_budget_single_shader_exceeding_target_included_whole(pool: sqlx::PgPool) {
     apply_views(&pool).await.expect("views");

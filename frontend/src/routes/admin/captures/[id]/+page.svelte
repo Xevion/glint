@@ -5,7 +5,9 @@ import type { CaptureDetail, CaptureWithContext } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminBreadcrumb, AdminCaptureCard, createAdminAction } from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+import CaptureCard from '$lib/components/CaptureCard.svelte';
+import { createAction } from '$lib/components/action-form.svelte';
 import { ItemGrid } from '$lib/components/item-grid';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
@@ -32,10 +34,10 @@ let histogramMax = $derived.by(() => {
 let showDeleteConfirm = $state(false);
 let lightboxOpen = $state(false);
 
-const deleteAction = createAdminAction({
+const deleteAction = createAction({
 	action: () => api.admin.deleteCapture(capture.id),
 	onSuccess: () => void goto('/admin/captures'),
-	setError: (msg) => toast.error(msg)
+	setError: (msg: string) => toast.error(msg)
 });
 
 // Build breadcrumb segments
@@ -126,14 +128,14 @@ function formatMs(value?: number): string {
 <div class="space-y-6">
 	<!-- Breadcrumb Header -->
 	<header class="flex items-center justify-between">
-		<AdminBreadcrumb segments={breadcrumbs}>
+		<Breadcrumb segments={breadcrumbs}>
 			{#snippet trailing()}
 				{#if capture.status !== 'completed'}
 					<StatusBadge status={capture.status} class="ml-2">{capture.status}</StatusBadge>
 				{/if}
 				<StatusBadge status={capture.freshness} class="ml-2">{capture.freshness}</StatusBadge>
 			{/snippet}
-		</AdminBreadcrumb>
+		</Breadcrumb>
 		<Button
 			variant="destructive"
 			size="icon"
@@ -404,7 +406,7 @@ function formatMs(value?: number): string {
 			<Tabs.Content value="shader-scene">
 				<ItemGrid items={capture.same_shader_scene} key={(c: CaptureWithContext) => c.id} size="small">
 			{#snippet card(c: CaptureWithContext)}
-				<AdminCaptureCard capture={c} alt="{c.shader_name} {c.shader_version}">
+				<CaptureCard capture={c} alt="{c.shader_name} {c.shader_version}">
 					<div class="p-2">
 						<div class="flex items-center justify-between">
 							<div class="text-sm font-medium">
@@ -423,7 +425,7 @@ function formatMs(value?: number): string {
 							</div>
 						{/if}
 					</div>
-				</AdminCaptureCard>
+				</CaptureCard>
 			{/snippet}
 			</ItemGrid>
 		</Tabs.Content>
@@ -433,7 +435,7 @@ function formatMs(value?: number): string {
 			<Tabs.Content value="scene">
 				<ItemGrid items={capture.same_scene} key={(c: CaptureWithContext) => c.id} size="small">
 				{#snippet card(c: CaptureWithContext)}
-					<AdminCaptureCard capture={c} alt="{c.shader_name} in {c.scene_name ?? 'scene'}">
+					<CaptureCard capture={c} alt="{c.shader_name} in {c.scene_name ?? 'scene'}">
 						<div class="p-2">
 							<div class="text-sm font-medium">{c.shader_name}</div>
 						<div class="text-xs text-muted-foreground">
@@ -443,7 +445,7 @@ function formatMs(value?: number): string {
 							{/if}
 						</div>
 						</div>
-					</AdminCaptureCard>
+					</CaptureCard>
 				{/snippet}
 				</ItemGrid>
 			</Tabs.Content>
@@ -453,7 +455,7 @@ function formatMs(value?: number): string {
 			<Tabs.Content value="run">
 				<ItemGrid items={capture.same_run} key={(c: CaptureWithContext) => c.id} size="small">
 				{#snippet card(c: CaptureWithContext)}
-					<AdminCaptureCard capture={c} alt="{c.shader_name} - {c.scene_name ?? 'scene'}">
+					<CaptureCard capture={c} alt="{c.shader_name} - {c.scene_name ?? 'scene'}">
 						<div class="p-2">
 							<div class="text-sm font-medium">{c.shader_name}</div>
 						<div class="text-xs text-muted-foreground">
@@ -463,7 +465,7 @@ function formatMs(value?: number): string {
 							{/if}
 						</div>
 						</div>
-					</AdminCaptureCard>
+					</CaptureCard>
 				{/snippet}
 				</ItemGrid>
 			</Tabs.Content>

@@ -52,8 +52,6 @@ export function createSvelteTable<TData extends RowData>(options: TableOptions<T
 	return table;
 }
 
-// -- Proxy-based object merging (preserves getter semantics) --
-
 type MaybeThunk<T extends object> = T | (() => T | null | undefined);
 type Intersection<T extends readonly unknown[]> = (T extends [infer H, ...infer R]
 	? H & Intersection<R>

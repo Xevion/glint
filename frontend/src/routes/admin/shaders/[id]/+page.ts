@@ -1,19 +1,19 @@
 import { ApiErrorType, pageError } from '$lib/api/errors';
 import { createGraphQLClient, query } from '$lib/graphql';
 import type { PageLoad } from './$types';
-import { AdminShaderQuery } from './queries';
+import { ShaderDetailQuery } from './queries';
 
 export const load: PageLoad = async ({ params, fetch, depends }) => {
 	depends(`glint:admin:shader:${params.id}`);
 	const client = createGraphQLClient(fetch);
-	const result = await query(client, AdminShaderQuery, { id: params.id });
+	const result = await query(client, ShaderDetailQuery, { id: params.id });
 
 	return result.match({
 		Ok: (data) => {
-			if (!data.adminShader) {
+			if (!data.shader) {
 				pageError(404, 'Shader not found');
 			}
-			return { shader: data.adminShader };
+			return { shader: data.shader };
 		},
 		Err: (err) => {
 			if (err.type === ApiErrorType.NotFound) pageError(404, 'Shader not found');

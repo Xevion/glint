@@ -4,11 +4,11 @@ import TimeAgo from '$lib/components/TimeAgo.svelte';
 import VersionExtractionCell from './version-extraction-cell.svelte';
 import VersionFileCell from './version-file-cell.svelte';
 import VersionNameCell from './version-name-cell.svelte';
-import type { AdminShaderVersion } from './queries';
+import type { ShaderVersionDetail } from './queries';
 
 export function createVersionColumns(
 	latestVersionId: string | undefined
-): ColumnDef<AdminShaderVersion>[] {
+): ColumnDef<ShaderVersionDetail>[] {
 	return [
 		{
 			id: 'version',

@@ -52,8 +52,6 @@ class StabilizationDetector {
             }
         } ?: false
 
-    // -- Phase handlers --
-
     private fun tickServerGeneration(): Boolean {
         if (ChunkForceLoader.isGenerationComplete()) {
             advancePhase(Phase.ChunkReceipt)
@@ -181,8 +179,6 @@ class StabilizationDetector {
 
         return false
     }
-
-    // -- Helpers --
 
     private fun advancePhase(next: Phase) {
         log.info("Stabilization phase: $phase → $next") {

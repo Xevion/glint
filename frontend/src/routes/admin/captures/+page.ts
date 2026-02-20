@@ -1,13 +1,31 @@
 import { createApiClient } from '$lib/api';
-import type { CaptureWithContext, SceneListItem, ShaderListItem } from '$lib/bindings';
+import type { CaptureWithContext, ShaderListItem } from '$lib/bindings';
+import { createGraphQLClient, graphql, query } from '$lib/graphql';
 import { pick } from '$lib/utils';
 import type { PageLoad } from './$types';
 
 type FilterOption = Pick<ShaderListItem, 'id' | 'slug' | 'name'>;
-type SceneFilterOption = Pick<SceneListItem, 'id' | 'name'>;
+interface SceneFilterOption {
+	id: string;
+	name: string;
+}
+
+const SceneFiltersQuery = graphql(`
+	query CaptureSceneFilters {
+		scenes(first: 250, visibility: INCLUDE) {
+			edges {
+				node {
+					id
+					name
+				}
+			}
+		}
+	}
+`);
 
 export const load: PageLoad = async ({ fetch, url }) => {
 	const api = createApiClient(fetch);
+	const gql = createGraphQLClient(fetch);
 
 	const page = Number(url.searchParams.get('page') ?? '1');
 	const pageSize = Number(url.searchParams.get('pageSize') ?? '50');
@@ -19,7 +37,7 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	const [result, shadersRes, scenesRes] = await Promise.all([
 		api.admin.listCaptures({ page, pageSize, shader, scene, status, runId }),
 		api.admin.listShaders(),
-		api.admin.listScenes()
+		query(gql, SceneFiltersQuery, {})
 	]);
 
 	const shaders: FilterOption[] = shadersRes.match({
@@ -28,7 +46,7 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	});
 
 	const scenes: SceneFilterOption[] = scenesRes.match({
-		Ok: (v) => v.map((s) => pick(s, ['id', 'name'])),
+		Ok: (data) => data.scenes.edges.map((e) => ({ id: e.node.id, name: e.node.name })),
 		Err: () => []
 	});
 

@@ -17,9 +17,8 @@ use crate::{
     id::ScenePresetId,
     models::{
         CaptureStatus, CaptureWithContext, CreatePresetRequest, CreateSceneRequest, PageQuery,
-        Paginated, ReorderPresetsRequest, Scene, SceneListAdmin, SceneListItem, ScenePreset,
-        SceneWithCaptures, SceneWithVersion, UpdatePresetRequest, UpdateSceneMetadataRequest,
-        UpdateSceneRequest,
+        Paginated, ReorderPresetsRequest, Scene, SceneListItem, ScenePreset, SceneWithCaptures,
+        SceneWithVersion, UpdatePresetRequest, UpdateSceneMetadataRequest, UpdateSceneRequest,
     },
     repo::{
         CaptureRepo, ScenePresetRepo, SceneRepo, SceneVersionRepo, SlugRedirectRepo, TagRepo,
@@ -109,7 +108,7 @@ async fn list_scenes_public(State(state): State<AppState>) -> AppResult<Json<Vec
 async fn list_scenes_all(
     _admin: AdminUser,
     State(state): State<AppState>,
-) -> AppResult<Json<Vec<SceneListAdmin>>> {
+) -> AppResult<Json<Vec<SceneListItem>>> {
     let scenes = SceneRepo::list_all(state.db()).await?;
     Ok(Json(scenes))
 }

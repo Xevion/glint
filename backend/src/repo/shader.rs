@@ -6,6 +6,7 @@ use tracing::{debug, instrument, warn};
 
 use crate::db::DbPool;
 use crate::error::{AppResult, OptionNotFoundExt, SqlxResultExt};
+use crate::graphql::types::common::Visibility;
 use crate::graphql::types::connection::CursorPage;
 use crate::id::ShaderId;
 use crate::models::{CreateShaderRequest, Page, Shader, ShaderAdopted, UpdateShaderRequest};
@@ -114,8 +115,11 @@ impl ShaderRepo {
     }
 
     /// Cursor-based paginated list of shaders.
-    /// Only returns shaders with at least one completed capture (public listing).
-    /// Ordered by created_at DESC, id DESC for stable cursor ordering.
+    ///
+    /// Visibility controls which shaders are included:
+    /// - `Exclude` (default): only shaders with completed captures from active scenes
+    /// - `Include`: all shaders regardless of capture status
+    /// - `Only`: only shaders WITHOUT completed captures (hidden/uncaptured)
     #[instrument(skip(db), level = "debug")]
     pub async fn list_cursor(
         db: &DbPool,
@@ -123,6 +127,7 @@ impl ShaderRepo {
         after: Option<(DateTime<Utc>, String)>,
         search: Option<&str>,
         sort: Option<&str>,
+        visibility: Visibility,
     ) -> AppResult<CursorPage<Shader>> {
         use sqlx::QueryBuilder;
 
@@ -137,13 +142,7 @@ impl ShaderRepo {
             )
         });
 
-        // --- data query ---
-        let mut qb: QueryBuilder<'_, sqlx::Postgres> =
-            QueryBuilder::new("SELECT s.* FROM shaders s WHERE TRUE");
-
-        // Only shaders with completed captures from active scenes
-        qb.push(
-            " AND EXISTS (
+        let captures_subquery = " EXISTS (
                  SELECT 1 FROM captures c
                  JOIN shader_versions sv ON c.shader_version_id = sv.id
                  JOIN scenes sc ON c.scene_id = sc.id
@@ -151,8 +150,22 @@ impl ShaderRepo {
                    AND c.status = 'completed'
                    AND c.image_path IS NOT NULL
                    AND sc.active = TRUE
-             )",
-        );
+             )";
+
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> =
+            QueryBuilder::new("SELECT s.* FROM shaders s WHERE TRUE");
+
+        match visibility {
+            Visibility::Exclude => {
+                qb.push(" AND");
+                qb.push(captures_subquery);
+            }
+            Visibility::Include => { /* no filter — return everything */ }
+            Visibility::Only => {
+                qb.push(" AND NOT");
+                qb.push(captures_subquery);
+            }
+        }
 
         if let Some(ref pattern) = search_pattern {
             qb.push(" AND s.name ILIKE ");
@@ -160,35 +173,11 @@ impl ShaderRepo {
         }
 
         if let Some((ref cursor_ts, ref cursor_id)) = after {
-            let sort_value = sort.unwrap_or("created");
-            match sort_value {
-                "popular" => {
-                    // For popular sort, we need view_count in the cursor too, but
-                    // the cursor only carries (timestamp, id). Fall back to
-                    // (created_at, id) as the tiebreaker for cursor keyset.
-                    qb.push(" AND (s.created_at, s.id) < (");
-                    qb.push_bind(*cursor_ts);
-                    qb.push(", ");
-                    qb.push_bind(cursor_id.as_str());
-                    qb.push(")");
-                }
-                "name" => {
-                    // For name sort, cursor still uses (created_at, id) as the
-                    // stable tiebreaker since names aren't unique enough.
-                    qb.push(" AND (s.created_at, s.id) < (");
-                    qb.push_bind(*cursor_ts);
-                    qb.push(", ");
-                    qb.push_bind(cursor_id.as_str());
-                    qb.push(")");
-                }
-                _ => {
-                    qb.push(" AND (s.created_at, s.id) < (");
-                    qb.push_bind(*cursor_ts);
-                    qb.push(", ");
-                    qb.push_bind(cursor_id.as_str());
-                    qb.push(")");
-                }
-            }
+            qb.push(" AND (s.created_at, s.id) < (");
+            qb.push_bind(*cursor_ts);
+            qb.push(", ");
+            qb.push_bind(cursor_id.as_str());
+            qb.push(")");
         }
 
         let sort_value = sort.unwrap_or("created");
@@ -212,21 +201,20 @@ impl ShaderRepo {
         let has_next_page = items.len() as i64 > limit;
         let items: Vec<Shader> = items.into_iter().take(limit as usize).collect();
 
-        // --- count query ---
         let mut cqb: QueryBuilder<'_, sqlx::Postgres> =
             QueryBuilder::new("SELECT COUNT(*) FROM shaders s WHERE TRUE");
 
-        cqb.push(
-            " AND EXISTS (
-                 SELECT 1 FROM captures c
-                 JOIN shader_versions sv ON c.shader_version_id = sv.id
-                 JOIN scenes sc ON c.scene_id = sc.id
-                 WHERE sv.shader_id = s.id
-                   AND c.status = 'completed'
-                   AND c.image_path IS NOT NULL
-                   AND sc.active = TRUE
-             )",
-        );
+        match visibility {
+            Visibility::Exclude => {
+                cqb.push(" AND");
+                cqb.push(captures_subquery);
+            }
+            Visibility::Include => {}
+            Visibility::Only => {
+                cqb.push(" AND NOT");
+                cqb.push(captures_subquery);
+            }
+        }
 
         if let Some(ref pattern) = search_pattern {
             cqb.push(" AND s.name ILIKE ");

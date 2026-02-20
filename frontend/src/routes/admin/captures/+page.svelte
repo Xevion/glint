@@ -3,7 +3,7 @@ import { goto } from '$app/navigation';
 import { page as pageStore } from '$app/state';
 import type { CaptureWithContext } from '$lib/bindings';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
-import { AdminBreadcrumb } from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import { DataTable, createDataTable } from '$lib/components/data-table';
 import { Alert } from '$lib/components/ui/alert';
 import { buttonVariants } from '$lib/components/ui/button';
@@ -66,7 +66,7 @@ function setFilter(key: string, value: string) {
 <svelte:head><title>Captures - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<AdminBreadcrumb segments={[{ label: 'Captures' }]} />
+	<Breadcrumb segments={[{ label: 'Captures' }]} />
 
 	<!-- Filter bar -->
 	<div class="flex flex-wrap items-center gap-3">

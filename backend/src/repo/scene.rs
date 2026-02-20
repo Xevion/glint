@@ -4,12 +4,13 @@ use anyhow::Context;
 use tracing::{debug, instrument};
 
 use crate::error::{AppError, AppResult};
+use crate::graphql::types::common::Visibility;
 use crate::graphql::types::connection::CursorPage;
 use crate::id::{SceneId, SceneVersionId};
 use chrono::{DateTime, Utc};
 
 use crate::models::{
-    CreateSceneRequest, Scene, SceneListAdmin, ScenePreset, SceneVersion,
+    CreateSceneRequest, Scene, SceneListItem, ScenePreset, SceneVersion,
     UpdateSceneMetadataRequest, UpdateSceneRequest,
 };
 
@@ -47,7 +48,7 @@ struct SceneListAdminRow {
     capture_count: Option<i64>,
 }
 
-impl TryFrom<SceneListAdminRow> for SceneListAdmin {
+impl TryFrom<SceneListAdminRow> for SceneListItem {
     type Error = AppError;
 
     fn try_from(row: SceneListAdminRow) -> Result<Self, Self::Error> {
@@ -91,6 +92,7 @@ impl TryFrom<SceneListAdminRow> for SceneListAdmin {
                 created_at: row.created_at,
             },
             version,
+            tags: vec![],
             image_path: row.image_path,
             thumbhash: row.thumbhash,
             capture_count: row.capture_count.unwrap_or(0),
@@ -128,57 +130,62 @@ impl SceneRepo {
         Ok(scenes)
     }
 
-    /// Cursor-paginated list of active scenes (for GraphQL).
+    /// Cursor-paginated list of scenes (for GraphQL).
     /// Ordered by created_at DESC, id DESC.
     #[instrument(skip(pool), level = "debug")]
-    pub async fn list_active_cursor(
+    pub async fn list_cursor(
         pool: &crate::db::DbPool,
         first: i32,
         after: Option<(DateTime<Utc>, String)>,
+        visibility: Visibility,
     ) -> AppResult<CursorPage<Scene>> {
+        use sqlx::QueryBuilder;
+
         let limit = first.clamp(1, 100) as i64;
 
-        let items = if let Some((cursor_ts, cursor_id)) = &after {
-            sqlx::query_as!(
-                Scene,
-                r#"
-                SELECT * FROM scenes
-                WHERE active = TRUE
-                  AND (created_at, id) < ($1, $2)
-                ORDER BY created_at DESC, id DESC
-                LIMIT $3
-                "#,
-                cursor_ts,
-                cursor_id,
-                limit + 1,
-            )
-            .fetch_all(pool)
-            .await
-            .context("failed to list scenes (cursor)")?
-        } else {
-            sqlx::query_as!(
-                Scene,
-                r#"
-                SELECT * FROM scenes
-                WHERE active = TRUE
-                ORDER BY created_at DESC, id DESC
-                LIMIT $1
-                "#,
-                limit + 1,
-            )
-            .fetch_all(pool)
-            .await
-            .context("failed to list scenes (cursor, no after)")?
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> =
+            QueryBuilder::new("SELECT * FROM scenes WHERE TRUE");
+
+        match visibility {
+            Visibility::Exclude => qb.push(" AND active = TRUE"),
+            Visibility::Include => &mut qb, // no filter
+            Visibility::Only => qb.push(" AND active = FALSE"),
         };
+
+        if let Some((ref cursor_ts, ref cursor_id)) = after {
+            qb.push(" AND (created_at, id) < (");
+            qb.push_bind(*cursor_ts);
+            qb.push(", ");
+            qb.push_bind(cursor_id.as_str());
+            qb.push(")");
+        }
+
+        qb.push(" ORDER BY created_at DESC, id DESC LIMIT ");
+        qb.push_bind(limit + 1);
+
+        let items: Vec<Scene> = qb
+            .build_query_as()
+            .fetch_all(pool)
+            .await
+            .context("failed to list scenes (cursor)")?;
 
         let has_next_page = items.len() as i64 > limit;
         let items: Vec<Scene> = items.into_iter().take(limit as usize).collect();
 
-        let total_count = sqlx::query_scalar!("SELECT COUNT(*) FROM scenes WHERE active = TRUE")
+        let mut cqb: QueryBuilder<'_, sqlx::Postgres> =
+            QueryBuilder::new("SELECT COUNT(*) FROM scenes WHERE TRUE");
+
+        match visibility {
+            Visibility::Exclude => cqb.push(" AND active = TRUE"),
+            Visibility::Include => &mut cqb,
+            Visibility::Only => cqb.push(" AND active = FALSE"),
+        };
+
+        let total_count: i64 = cqb
+            .build_query_scalar()
             .fetch_one(pool)
             .await
-            .context("failed to count active scenes")?
-            .unwrap_or(0);
+            .context("failed to count scenes")?;
 
         Ok(CursorPage {
             items,
@@ -344,7 +351,7 @@ impl SceneRepo {
     /// Includes a preview thumbnail per scene, preferring the vanilla shader's
     /// latest capture, then falling back to the most-downloaded shader's capture.
     #[instrument(skip(executor), level = "debug")]
-    pub async fn list_all(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<SceneListAdmin>> {
+    pub async fn list_all(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<SceneListItem>> {
         let rows = sqlx::query_as!(
             SceneListAdminRow,
             r#"
@@ -411,9 +418,9 @@ impl SceneRepo {
         .await
         .context("failed to list all scenes")?;
 
-        let scenes: Vec<SceneListAdmin> = rows
+        let scenes: Vec<SceneListItem> = rows
             .into_iter()
-            .map(SceneListAdmin::try_from)
+            .map(SceneListItem::try_from)
             .collect::<Result<Vec<_>, _>>()?;
         debug!(count = scenes.len(), "Listed all scenes");
         Ok(scenes)

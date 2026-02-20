@@ -3,7 +3,7 @@ import { invalidateAll } from '$app/navigation';
 import { api } from '$lib/api';
 import type { UserWithSessions } from '$lib/bindings';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminBreadcrumb } from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
@@ -66,7 +66,7 @@ async function deleteSession(tokenPrefix: string) {
 
 <div class="space-y-6">
 	<!-- Breadcrumb -->
-	<AdminBreadcrumb
+	<Breadcrumb
 		segments={[{ label: 'Users', href: '/admin/users' }, { label: user.discord_username }]}
 	>
 		{#snippet trailing()}
@@ -74,7 +74,7 @@ async function deleteSession(tokenPrefix: string) {
 				{user.role}
 			</span>
 		{/snippet}
-	</AdminBreadcrumb>
+	</Breadcrumb>
 
 	<!-- User identity -->
 	<div class="flex items-center gap-4">

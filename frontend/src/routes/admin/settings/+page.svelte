@@ -4,7 +4,7 @@
 import { invalidateAll } from '$app/navigation';
 import { createApiClient } from '$lib/api';
 import type { ThemeMode } from '$lib/bindings';
-import { AdminBreadcrumb } from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import { Alert } from '$lib/components/ui/alert';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
@@ -33,8 +33,6 @@ const api = createApiClient();
 async function refresh() {
 	await invalidateAll();
 }
-
-// -- Upload flow --
 
 function handleDragOver(e: DragEvent) {
 	e.preventDefault();
@@ -156,8 +154,6 @@ async function computeImageMetadata(
 	});
 }
 
-// -- Toggle / Update --
-
 async function toggleEnabled(bg: AdminBackground) {
 	actionLoading = true;
 	const result = await api.backgrounds.update(bg.id, { enabled: !bg.enabled });
@@ -178,8 +174,6 @@ async function updateThemeMode(bg: AdminBackground, mode: ThemeMode) {
 	await refresh();
 }
 
-// -- Delete --
-
 function requestDelete(bg: AdminBackground) {
 	deleteTarget = bg;
 	showDeleteConfirm = true;
@@ -196,8 +190,6 @@ async function confirmDelete() {
 	actionLoading = false;
 	await refresh();
 }
-
-// -- Helpers --
 
 function getThumbnailUrl(bg: AdminBackground): string | null {
 	return imageUrl(bg.imagePath, { width: 320, quality: 70, format: 'webp' });
@@ -220,7 +212,7 @@ const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
 </script>
 
 <div class="space-y-6">
-	<AdminBreadcrumb segments={[{ label: 'Settings' }]} />
+	<Breadcrumb segments={[{ label: 'Settings' }]} />
 
 	<!-- Backgrounds Section -->
 	<section class="space-y-4">

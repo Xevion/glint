@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { CaptureTargetHealth, StaleReason, TargetHealth } from '$lib/bindings';
-import { AdminBreadcrumb } from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
 import * as Table from '$lib/components/ui/table';
@@ -174,7 +174,7 @@ function formatTime(iso: string | null | undefined): string {
 <svelte:head><title>Health - Glint</title></svelte:head>
 
 <div class="space-y-4">
-	<AdminBreadcrumb segments={[{ label: 'Capture Health' }]} />
+	<Breadcrumb segments={[{ label: 'Capture Health' }]} />
 
 	{#if health.error}
 		<Alert variant="destructive">Error: {health.error}</Alert>

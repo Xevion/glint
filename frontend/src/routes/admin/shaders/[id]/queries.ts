@@ -1,8 +1,8 @@
 import { graphql, type ResultOf } from '$lib/graphql';
 
-export const AdminShaderQuery = graphql(`
-	query AdminShader($id: String!) {
-		adminShader(id: $id) {
+export const ShaderDetailQuery = graphql(`
+	query ShaderDetail($id: String!) {
+		shader(id: $id) {
 			id
 			name
 			slug
@@ -86,8 +86,8 @@ export const AdminShaderQuery = graphql(`
 	}
 `);
 
-export type AdminShaderData = NonNullable<ResultOf<typeof AdminShaderQuery>['adminShader']>;
-export type AdminShaderVersion = AdminShaderData['versions'][number];
-export type AdminCapture = AdminShaderData['captures'][number];
-export type AdminProfile = AdminShaderData['profiles'][number];
-export type AdminMetadata = NonNullable<AdminShaderData['metadata']>;
+export type ShaderDetailData = NonNullable<ResultOf<typeof ShaderDetailQuery>['shader']>;
+export type ShaderVersionDetail = ShaderDetailData['versions'][number];
+export type ShaderCapture = ShaderDetailData['captures'][number];
+export type ShaderProfile = ShaderDetailData['profiles'][number];
+export type ShaderMetadata = NonNullable<ShaderDetailData['metadata']>;

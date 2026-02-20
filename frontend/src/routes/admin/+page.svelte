@@ -3,7 +3,7 @@ import { invalidate } from '$app/navigation';
 import type { CaptureHealthSummary, CaptureWithContext } from '$lib/bindings';
 import { useSubscription } from '$lib/graphql';
 import { CaptureCompletedSubscription } from '$lib/graphql/subscriptions/captures';
-import { AdminCaptureCard } from '$lib/components/admin';
+import CaptureCard from '$lib/components/CaptureCard.svelte';
 import { ItemGrid } from '$lib/components/item-grid';
 import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
@@ -372,7 +372,7 @@ $effect(() => {
 			{:else}
 			<ItemGrid items={recentCaptures} key={(c: CaptureWithContext) => c.id} size="small">
 			{#snippet card(capture: CaptureWithContext)}
-				<AdminCaptureCard {capture}>
+				<CaptureCard {capture}>
 					<div class="space-y-1 p-3">
 						<div class="flex items-center justify-between gap-2">
 							<span class="truncate font-medium text-sm">{capture.shader_name}</span>
@@ -398,7 +398,7 @@ $effect(() => {
 							</div>
 						{/if}
 					</div>
-				</AdminCaptureCard>
+				</CaptureCard>
 			{/snippet}
 			</ItemGrid>
 			{/if}

@@ -1,13 +1,3 @@
-"""
-Admin-facing paginated shader list.
-"""
-type AdminShaderList {
-	items: [ShaderNode!]!
-	total: Int!
-	page: Int!
-	pageSize: Int!
-}
-
 scalar BackgroundId
 
 type BackgroundNode {
@@ -296,7 +286,7 @@ Root query type — merges all domain query types.
 """
 type QueryRoot {
 	"""
-	List active scenes with cursor-based pagination.
+	List scenes with cursor-based pagination.
 	"""
 	scenes(
 		"""
@@ -307,6 +297,10 @@ type QueryRoot {
 		Cursor from a previous page's endCursor
 		"""
 		after: String
+		"""
+		Filter inactive scenes: EXCLUDE (default, active only), INCLUDE (all, admin), ONLY (inactive only, admin)
+		"""
+		visibility: Visibility! = EXCLUDE
 	): SceneConnection!
 	"""
 	Get a single scene by ID or slug.
@@ -319,6 +313,11 @@ type QueryRoot {
 	): SceneNode
 	"""
 	Paginated list of shaders with cursor pagination.
+
+	Use `visibility` to control which shaders are returned:
+	- `EXCLUDE` (default): only shaders with completed captures (public).
+	- `INCLUDE`: all shaders including disabled/uncaptured (requires admin).
+	- `ONLY`: only hidden shaders without captures (requires admin).
 	"""
 	shaders(
 		"""
@@ -337,6 +336,10 @@ type QueryRoot {
 		Sort: popular, name, or default (recent)
 		"""
 		sort: String
+		"""
+		Filter hidden items: EXCLUDE (default, public), INCLUDE (all, admin), ONLY (hidden only, admin)
+		"""
+		visibility: Visibility! = EXCLUDE
 	): ShaderConnection!
 	"""
 	Get a shader by ID or slug with full detail.
@@ -363,14 +366,6 @@ type QueryRoot {
 		"""
 		first: Int! = 20
 	): [TrendingShaderNode!]!
-	"""
-	Paginated list of all shaders including disabled (admin only).
-	"""
-	adminShaders(page: Int! = 1, pageSize: Int! = 50, search: String): AdminShaderList!
-	"""
-	Get a single shader by ID for admin detail view.
-	"""
-	adminShader(id: String!): ShaderNode
 	"""
 	Paginated list of completed captures (public).
 	"""
@@ -753,6 +748,28 @@ input UpdateShaderInput {
 	Set to a version ID to pin, empty string to clear, omit to leave unchanged.
 	"""
 	preferredVersionId: String
+}
+
+"""
+Controls whether hidden (disabled, uncaptured) items are included in query results.
+
+- `Exclude` (default): Only publicly visible items. No auth required.
+- `Include`: Visible + hidden items. Requires admin.
+- `Only`: Only hidden items. Requires admin.
+"""
+enum Visibility {
+	"""
+	Only publicly visible items (default, no auth required).
+	"""
+	EXCLUDE
+	"""
+	Both visible and hidden items (requires admin).
+	"""
+	INCLUDE
+	"""
+	Only hidden items (requires admin).
+	"""
+	ONLY
 }
 
 """

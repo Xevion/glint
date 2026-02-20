@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { SceneListAdmin } from '$lib/bindings';
+import type { AdminScene } from './+page';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import { AdminBreadcrumb } from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import { DataList } from '$lib/components/data-list';
 import { ItemGrid } from '$lib/components/item-grid';
 import * as Checkbox from '$lib/components/ui/checkbox';
@@ -13,7 +13,7 @@ interface Props {
 	data: PageData;
 }
 let { data }: Props = $props();
-let scenes: SceneListAdmin[] = $derived(data.scenes);
+let scenes: AdminScene[] = $derived(data.scenes);
 let showInactive = $state(false);
 let error = $derived(data.error);
 
@@ -24,7 +24,7 @@ const filteredScenes = $derived(showInactive ? scenes : scenes.filter((s) => s.a
 
 <div class="space-y-4">
 	<div class="flex items-center justify-between">
-		<AdminBreadcrumb segments={[{ label: 'Scenes' }]} />
+		<Breadcrumb segments={[{ label: 'Scenes' }]} />
 		<div class="flex items-center gap-3">
 			{#if showInactive && scenes.some((s) => !s.active)}
 			<span class="text-sm text-foreground">
@@ -43,17 +43,17 @@ const filteredScenes = $derived(showInactive ? scenes : scenes.filter((s) => s.a
 
 	<DataList items={filteredScenes} {error} emptyMessage={showInactive ? 'No scenes yet.' : 'No active scenes. Enable "Show inactive" to see disabled scenes.'}>
 		{#snippet content()}
-			<ItemGrid items={filteredScenes} key={(s: SceneListAdmin) => s.id} mode="row">
-				{#snippet row(scene: SceneListAdmin)}
+			<ItemGrid items={filteredScenes} key={(s: AdminScene) => s.id} mode="row">
+				{#snippet row(scene: AdminScene)}
 					<a
 						href="/admin/scenes/{scene.id}"
 						class="group flex w-full gap-4 p-4 transition-colors hover:bg-muted/50"
 					>
 						<!-- Preview thumbnail -->
 						<div class="hidden shrink-0 sm:block">
-							{#if scene.image_path ?? scene.thumbhash}
+							{#if scene.imagePath ?? scene.thumbhash}
 								<CaptureImage
-									src={scene.image_path}
+									src={scene.imagePath}
 									thumbhash={scene.thumbhash}
 									alt="{scene.name} preview"
 									preset="thumbnail"
@@ -97,7 +97,7 @@ const filteredScenes = $derived(showInactive ? scenes : scenes.filter((s) => s.a
 							<div
 								class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground/70"
 							>
-								<span>Created <TimeAgo timestamp={scene.created_at} /></span>
+								<span>Created <TimeAgo timestamp={scene.createdAt} /></span>
 							</div>
 						</div>
 					</a>

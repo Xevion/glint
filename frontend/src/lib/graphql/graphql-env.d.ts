@@ -2,40 +2,6 @@
 /* prettier-ignore */
 
 export type introspection_types = {
-	AdminShaderList: {
-		kind: 'OBJECT';
-		name: 'AdminShaderList';
-		fields: {
-			items: {
-				name: 'items';
-				type: {
-					kind: 'NON_NULL';
-					name: never;
-					ofType: {
-						kind: 'LIST';
-						name: never;
-						ofType: {
-							kind: 'NON_NULL';
-							name: never;
-							ofType: { kind: 'OBJECT'; name: 'ShaderNode'; ofType: null };
-						};
-					};
-				};
-			};
-			page: {
-				name: 'page';
-				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
-			};
-			pageSize: {
-				name: 'pageSize';
-				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
-			};
-			total: {
-				name: 'total';
-				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
-			};
-		};
-	};
 	BackgroundId: unknown;
 	BackgroundNode: {
 		kind: 'OBJECT';
@@ -874,15 +840,6 @@ export type introspection_types = {
 			adminCaptureRun: {
 				name: 'adminCaptureRun';
 				type: { kind: 'OBJECT'; name: 'CaptureRunNode'; ofType: null };
-			};
-			adminShader: { name: 'adminShader'; type: { kind: 'OBJECT'; name: 'ShaderNode'; ofType: null } };
-			adminShaders: {
-				name: 'adminShaders';
-				type: {
-					kind: 'NON_NULL';
-					name: never;
-					ofType: { kind: 'OBJECT'; name: 'AdminShaderList'; ofType: null };
-				};
 			};
 			allBackgrounds: {
 				name: 'allBackgrounds';
@@ -1889,6 +1846,7 @@ export type introspection_types = {
 			}
 		];
 	};
+	Visibility: { name: 'Visibility'; enumValues: 'EXCLUDE' | 'INCLUDE' | 'ONLY' };
 };
 
 /** An IntrospectionQuery representation of your schema.

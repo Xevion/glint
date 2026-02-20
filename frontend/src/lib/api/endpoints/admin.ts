@@ -5,7 +5,6 @@ import type {
 	Paginated,
 	Scene,
 	SceneWithVersion,
-	SceneListAdmin,
 	ShaderListItem,
 	StorageAuditResult,
 	StorageBucket,
@@ -53,10 +52,6 @@ export class AdminEndpoints extends ApiClient {
 		if (params?.pageSize != null) searchParams.set('page_size', String(params.pageSize));
 		const qs = searchParams.toString();
 		return this.get<Paginated<ShaderListItem>>(`/api/shaders${qs ? `?${qs}` : ''}`);
-	}
-
-	listScenes(): Promise<Result<SceneListAdmin[], ApiError>> {
-		return this.get<SceneListAdmin[]>('/api/scenes/all');
 	}
 
 	getScene(id: string): Promise<Result<SceneWithVersion, ApiError>> {

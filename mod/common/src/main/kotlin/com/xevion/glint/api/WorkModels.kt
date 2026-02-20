@@ -75,8 +75,6 @@ data class WorkItem(
     val scenePackage: WorkPackage? = null,
 )
 
-// -- WorkItem extensions: preset-over-scene environment overrides --
-
 /** Effective time of day: preset overrides scene. */
 val WorkItem.effectiveTimeOfDayTicks: Int
     get() = preset?.timeOfDayTicks ?: scene.timeOfDayTicks

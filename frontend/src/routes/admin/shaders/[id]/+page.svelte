@@ -5,12 +5,10 @@ import { createGraphQLClient, graphql, mutation } from '$lib/graphql';
 import { createDataTable, DataTable } from '$lib/components/data-table';
 import { ItemGrid } from '$lib/components/item-grid';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import {
-	AdminBreadcrumb,
-	AdminCaptureCard,
-	AdminDetailField,
-	createAdminAction
-} from '$lib/components/admin';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+import CaptureCard from '$lib/components/CaptureCard.svelte';
+import DetailField from '$lib/components/DetailField.svelte';
+import { createAction } from '$lib/components/action-form.svelte';
 import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
@@ -46,11 +44,11 @@ import { toast } from 'svelte-sonner';
 import { shaderFormSchema } from './schema.js';
 import type { PageData } from './$types';
 import type {
-	AdminShaderData,
-	AdminShaderVersion,
-	AdminCapture,
-	AdminProfile,
-	AdminMetadata
+	ShaderDetailData,
+	ShaderVersionDetail,
+	ShaderCapture,
+	ShaderProfile,
+	ShaderMetadata
 } from './queries';
 import { createVersionColumns } from './version-columns.js';
 
@@ -91,17 +89,17 @@ interface Props {
 	data: PageData;
 }
 let { data }: Props = $props();
-let shader: AdminShaderData = $derived(data.shader);
-let versions: AdminShaderVersion[] = $derived(data.shader.versions);
-let captures: AdminCapture[] = $derived(data.shader.captures);
-let profiles: AdminProfile[] = $derived(data.shader.profiles);
-let metadata: AdminMetadata | null = $derived(data.shader.metadata);
+let shader: ShaderDetailData = $derived(data.shader);
+let versions: ShaderVersionDetail[] = $derived(data.shader.versions);
+let captures: ShaderCapture[] = $derived(data.shader.captures);
+let profiles: ShaderProfile[] = $derived(data.shader.profiles);
+let metadata: ShaderMetadata | null = $derived(data.shader.metadata);
 
 /** The effective (latest) version — matches what the backend returns profiles/metadata for */
 let effectiveVersion = $derived(versions.length > 0 ? versions[0] : null);
 
 let versionColumns = $derived(createVersionColumns(effectiveVersion?.version.id));
-const versionTable = createDataTable<AdminShaderVersion>({
+const versionTable = createDataTable<ShaderVersionDetail>({
 	get data() {
 		return versions;
 	},
@@ -120,7 +118,6 @@ function humanize(key: string): string {
 		.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// ── Superforms (SPA mode) ──────────────────────────────────
 const client = createGraphQLClient();
 
 const initialShader = untrack(() => shader);
@@ -174,11 +171,10 @@ const { form: formData, tainted, submitting, enhance } = superform;
 
 let isDirty = $derived($tainted != null && Object.values($tainted).some(Boolean));
 
-// ── Non-form actions (delete, sync, link) ───────────────────
-const deleteAction = createAdminAction({
+const deleteAction = createAction({
 	action: () => mutation(client, DeleteShaderMutation, { id: shader.id }),
 	onSuccess: () => void goto('/admin/shaders'),
-	setError: (msg) => toast.error(msg)
+	setError: (msg: string) => toast.error(msg)
 });
 
 let syncing = $state(false);
@@ -287,7 +283,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
 
 <div class="space-y-6">
     <!-- Header -->
-    <AdminBreadcrumb
+    <Breadcrumb
         segments={[{ label: 'Shaders', href: '/admin/shaders' }, { label: shader.name }]}
     >
         {#snippet trailing()}
@@ -299,7 +295,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                 />
             {/if}
         {/snippet}
-    </AdminBreadcrumb>
+    </Breadcrumb>
 
     <FolderCard.Root value="sync">
         {#snippet tabs()}
@@ -694,33 +690,33 @@ function handleLinkKeydown(e: KeyboardEvent) {
             <div class="space-y-6">
                 <!-- Metadata -->
                 <dl class="flex flex-wrap gap-x-16 gap-y-4 text-sm">
-                    <AdminDetailField label="ID">
+                    <DetailField label="ID">
                         <code class="text-xs">{shader.id}</code>
-                    </AdminDetailField>
-                    <AdminDetailField label="Slug">
+                    </DetailField>
+                    <DetailField label="Slug">
                         {shader.slug}
-                    </AdminDetailField>
+                    </DetailField>
                     {#if shader.licenseId}
-                        <AdminDetailField label="License">
+                        <DetailField label="License">
                             {shader.licenseId}
-                        </AdminDetailField>
+                        </DetailField>
                     {/if}
                     {#if shader.upstreamDownloads}
-                        <AdminDetailField label="Upstream Downloads">
+                        <DetailField label="Upstream Downloads">
                             {shader.upstreamDownloads.toLocaleString()}
-                        </AdminDetailField>
+                        </DetailField>
                     {/if}
                     {#if shader.upstreamUpdatedAt}
-                        <AdminDetailField label="Upstream Updated">
+                        <DetailField label="Upstream Updated">
                             <TimeAgo timestamp={shader.upstreamUpdatedAt} />
-                        </AdminDetailField>
+                        </DetailField>
                     {/if}
-                    <AdminDetailField label="Created">
+                    <DetailField label="Created">
                         <TimeAgo timestamp={shader.createdAt} />
-                    </AdminDetailField>
-                    <AdminDetailField label="Updated">
+                    </DetailField>
+                    <DetailField label="Updated">
                         <TimeAgo timestamp={shader.updatedAt} />
-                    </AdminDetailField>
+                    </DetailField>
                 </dl>
 
                 <!-- Versions -->
@@ -1182,9 +1178,9 @@ function handleLinkKeydown(e: KeyboardEvent) {
                             View all
                         </a>
                     </div>
-                    <ItemGrid items={captures} key={(c: AdminCapture) => c.id} size="small">
-                        {#snippet card(capture: AdminCapture)}
-                            <AdminCaptureCard {capture} alt={capture.sceneName ?? capture.sceneId}>
+                    <ItemGrid items={captures} key={(c: ShaderCapture) => c.id} size="small">
+                        {#snippet card(capture: ShaderCapture)}
+                            <CaptureCard {capture} alt={capture.sceneName ?? capture.sceneId}>
                                 <div class="p-2">
                                     <div class="flex items-center justify-between">
                                         <div class="text-sm font-medium">
@@ -1202,7 +1198,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                         {/if}
                                     </div>
                                 </div>
-                            </AdminCaptureCard>
+                            </CaptureCard>
                         {/snippet}
                     </ItemGrid>
                 </div>
