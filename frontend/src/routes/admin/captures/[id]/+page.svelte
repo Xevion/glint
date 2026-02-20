@@ -17,6 +17,8 @@ import { preloadImage } from '$lib/utils/image';
 import { StatusBadge } from '$lib/components/ui/status-badge';
 import { Trash2 } from '@lucide/svelte';
 import { toast } from 'svelte-sonner';
+import { scaleBand } from 'd3-scale';
+import { BarChart } from 'layerchart';
 import type { PageData } from './$types';
 
 interface Props {
@@ -26,10 +28,15 @@ let { data }: Props = $props();
 let capture: CaptureDetail = $derived(data.capture);
 
 let analysis = $derived(capture.analysis);
-let histogramMax = $derived.by(() => {
-	if (!analysis) return 1;
-	return Math.max(...analysis.luminance.histogram, 0.01);
+let histogramData = $derived.by(() => {
+	if (!analysis) return [];
+	const n = analysis.luminance.histogram.length;
+	return analysis.luminance.histogram.map((value, i) => ({
+		bin: `${Math.round((i / n) * 100)}%`,
+		value
+	}));
 });
+let hoveredColorIndex = $state<number | null>(null);
 
 let showDeleteConfirm = $state(false);
 let lightboxOpen = $state(false);
@@ -138,12 +145,12 @@ let viewAllHref = $derived.by(() => {
 	</header>
 
 	<!-- Image + Metadata Split -->
-	<div class="grid gap-6 lg:grid-cols-[3fr_2fr]">
+	<div class="grid gap-6 lg:grid-cols-[1fr_auto]">
 		<!-- Hero Image -->
 		{#if capture.image_path ?? capture.thumbhash}
 			<button
 				type="button"
-				class="group relative w-full cursor-pointer overflow-hidden rounded-lg border"
+				class="group relative w-full cursor-pointer self-start overflow-hidden rounded-lg border"
 				onclick={() => (lightboxOpen = true)}
 				onmouseenter={() => preloadImage(capture.image_path, 'full')}
 				disabled={!capture.image_path}
@@ -169,9 +176,9 @@ let viewAllHref = $derived.by(() => {
 		{/if}
 
 		<!-- Metadata Sidebar -->
-		<div class="space-y-4">
+		<div class="flex flex-col gap-4">
 			<!-- Capture Info -->
-			<div class="rounded-lg border bg-card p-4">
+			<div class="flex-1 rounded-lg border bg-card p-4">
 				<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
 					<dt class="text-muted-foreground">ID</dt>
 					<dd><code class="text-xs">{capture.id}</code></dd>
@@ -312,57 +319,103 @@ let viewAllHref = $derived.by(() => {
 				</div>
 			{/if}
 
-			<!-- Analysis -->
-			{#if analysis}
-				<div class="rounded-lg border bg-card p-4">
-					<h3 class="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-						Analysis
-					</h3>
+		</div>
+	</div>
 
-					<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-						<dt class="text-muted-foreground">Luminance</dt>
-						<dd>
-							<div>{formatDecimal(analysis.luminance.mean)} mean</div>
-							<div class="mt-1 flex items-end gap-0.5" style="height: 24px;">
-								{#each analysis.luminance.histogram as bin, i (i)}
-									<div
-										class="w-3 rounded-t-sm bg-foreground"
-										style="height: {(bin / histogramMax) * 100}%; opacity: {0.9 - i * 0.1};"
-									></div>
-								{/each}
-							</div>
-						</dd>
+	<!-- Analysis -->
+	{#if analysis}
+		<div class="rounded-lg border bg-card p-4">
+			<h3 class="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+				Analysis
+			</h3>
 
-						<dt class="text-muted-foreground">Edge density</dt>
-						<dd>{formatDecimal(analysis.edge_density, 4)}</dd>
-					</dl>
+			<div class="flex flex-col gap-4 sm:flex-row">
+				<!-- Stats (left) -->
+				<div class="flex shrink-0 flex-row gap-4 sm:w-36 sm:flex-col sm:gap-3">
+					<div>
+						<div class="text-xs text-muted-foreground">Luminance mean</div>
+						<div class="mt-0.5 text-lg font-medium tabular-nums">{formatPercent(analysis.luminance.mean)}</div>
+					</div>
+					<div>
+						<div class="text-xs text-muted-foreground">Edge density</div>
+						<div class="mt-0.5 text-lg font-medium tabular-nums">{formatPercent(analysis.edge_density)}</div>
+					</div>
+				</div>
 
-					<div class="mt-3">
-						<div class="mb-1.5 text-xs text-muted-foreground">Colors</div>
-						<div class="flex h-6 overflow-hidden rounded-md">
-						{#each analysis.dominant_colors as color (color.hex)}
-							<div
-								style="background-color: {color.hex}; flex-basis: {color.weight * 100}%;"
-								title="{color.hex} ({formatPercent(color.weight)})"
-							></div>
-						{/each}
+				<!-- Charts (right, fills remaining space) -->
+				<div class="flex min-w-0 flex-1 flex-col gap-4">
+					<!-- Luminance histogram -->
+					<div>
+						<div class="mb-1 text-xs text-muted-foreground">Luminance distribution</div>
+						<div class="h-32">
+							<BarChart
+								data={histogramData}
+								x="bin"
+								xScale={scaleBand().padding(0.05)}
+								series={[{ key: 'value', label: 'Proportion', color: 'var(--muted-foreground)' }]}
+								axis="x"
+								grid={false}
+								rule
+								tooltip={{ mode: 'band' }}
+								props={{
+									bars: {
+										stroke: 'none',
+										rounded: 'top',
+										radius: 2,
+									},
+									xAxis: {
+										tickLabelProps: { class: 'text-xs fill-muted-foreground' },
+									},
+									tooltip: {
+										root: { variant: 'none', classes: { root: 'bg-popover text-popover-foreground border rounded-lg shadow-md px-3 py-2 text-sm' } },
+										item: { valueAlign: 'right', format: 'percent' },
+									},
+								}}
+								padding={{ bottom: 24, left: 0, right: 0, top: 4 }}
+							/>
 						</div>
-						<div class="mt-1.5 flex flex-wrap gap-1">
-						{#each analysis.dominant_colors as color (color.hex)}
-							<span class="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] font-mono bg-muted">
+					</div>
+
+					<!-- Dominant colors -->
+					<div>
+						<div class="mb-1.5 text-xs text-muted-foreground">Dominant colors</div>
+						<div class="flex h-6 overflow-hidden rounded-md border shadow-sm">
+							{#each analysis.dominant_colors as color, i (color.hex)}
+								<button
+									type="button"
+									class="transition-opacity"
+									style="background-color: {color.hex}; flex-basis: {color.weight * 100}%; opacity: {hoveredColorIndex != null && hoveredColorIndex !== i ? 0.4 : 1};"
+									title="{color.hex} ({formatPercent(color.weight)})"
+									onmouseenter={() => hoveredColorIndex = i}
+									onmouseleave={() => hoveredColorIndex = null}
+								></button>
+							{/each}
+						</div>
+						<div class="mt-2 flex flex-wrap gap-1.5">
+							{#each analysis.dominant_colors as color, i (color.hex)}
+								<button
+									type="button"
+									class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-mono transition-colors"
+									class:bg-muted={hoveredColorIndex !== i}
+									class:bg-accent={hoveredColorIndex === i}
+									style:border-color={hoveredColorIndex === i ? 'oklch(from var(--foreground) l c h / 0.2)' : 'transparent'}
+									onmouseenter={() => hoveredColorIndex = i}
+									onmouseleave={() => hoveredColorIndex = null}
+								>
 									<span
-										class="inline-block h-2 w-2 rounded-full"
+										class="inline-block h-3 w-3 rounded-full ring-1 ring-foreground/10"
 										style="background-color: {color.hex};"
 									></span>
 									{color.hex}
-								</span>
+									<span class="text-muted-foreground">{formatPercent(color.weight)}</span>
+								</button>
 							{/each}
 						</div>
 					</div>
 				</div>
-			{/if}
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	<!-- Related Captures -->
 	{#if hasRelatedCaptures}
