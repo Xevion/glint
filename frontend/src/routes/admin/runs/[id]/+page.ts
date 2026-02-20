@@ -13,7 +13,7 @@ export const load: PageLoad = async ({ params, fetch, depends }) => {
 			if (!data.adminCaptureRun) {
 				pageError(404, 'Run not found');
 			}
-			const run = data.adminCaptureRun!;
+			const run = data.adminCaptureRun;
 			return { run };
 		},
 		Err: (err) => {

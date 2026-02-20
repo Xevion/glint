@@ -235,6 +235,7 @@ object CaptureAnalyzer {
 
         for (seed in seeds) {
             val current = seed.copyOf()
+            @Suppress("UnusedPrivateProperty")
             for (_iter in 0 until MAX_SHIFT_ITERATIONS) {
                 var sumL = 0.0
                 var sumA = 0.0

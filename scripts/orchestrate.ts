@@ -197,16 +197,50 @@ const TERMINAL_MARKERS = [
 ];
 
 const PROGRESS_MARKERS = [
+  // Runner lifecycle
   { pattern: /Autonomous runner started/, msg: "Runner started" },
   { pattern: /Fetched work/, msg: "Work fetched" },
   { pattern: /Created capture run/, msg: "Capture run created" },
   { pattern: /Force mode:/, msg: "Force mode active" },
-  { pattern: /Starting capture/, msg: "Capture starting" },
-  { pattern: /Orchestration complete/, msg: "Capture complete" },
+  { pattern: /No work available/, msg: "No work available" },
+  // Asset preparation
+  { pattern: /Asset preparation complete/, msg: "Assets prepared" },
+  { pattern: /Downloading shader/, msg: "Downloading shader" },
+  { pattern: /Downloading scene package/, msg: "Downloading scene package" },
+  { pattern: /Scene package downloaded/, msg: "Scene package downloaded" },
+  // Staging world
+  { pattern: /Starting staging world preparation/, msg: "Preparing staging world" },
+  { pattern: /Staging world ready/, msg: "Staging world ready" },
+  { pattern: /Staging world created and loaded/, msg: "Staging world created" },
+  { pattern: /Staging world loaded/, msg: "Staging world loaded" },
+  // Scene & shader loading
+  { pattern: /Starting linear orchestration/, msg: "Orchestration starting" },
+  { pattern: /Linear capture plan ready/, msg: "Capture plan ready" },
+  { pattern: /Loading scene package/, msg: "Loading scene" },
+  { pattern: /Scene injection complete/, msg: "Scene injected" },
+  { pattern: /Loading shader/, msg: "Loading shader" },
+  { pattern: /Shader pack changed/, msg: "Shader switched" },
+  { pattern: /Shader profile changed/, msg: "Shader profile changed" },
+  { pattern: /Preset applied/, msg: "Preset applied" },
+  // Stabilization
+  { pattern: /Stabilization phase:/, msg: "Stabilizing" },
+  { pattern: /Stabilization complete/, msg: "Stabilization complete" },
+  // Capture execution
+  { pattern: /Taking capture/, msg: "Taking capture" },
+  { pattern: /Starting high-res capture/, msg: "High-res capture started" },
+  { pattern: /Capture session begun/, msg: "Capture session started" },
+  { pattern: /Capture saved/, msg: "Capture saved" },
+  { pattern: /WebP screenshot saved/, msg: "Screenshot saved" },
+  { pattern: /Generating manifest/, msg: "Generating manifest" },
+  // Upload
+  { pattern: /Uploading to R2/, msg: "Uploading" },
+  { pattern: /Upload succeeded/, msg: "Upload succeeded" },
+  { pattern: /RunUploader drained/, msg: "Uploads drained" },
   { pattern: /Capture run finalized/, msg: "Run finalized" },
+  // Completion
+  { pattern: /Orchestration complete/, msg: "Orchestration complete" },
   { pattern: /Group upload complete/, msg: "Upload complete" },
   { pattern: /Group upload failed/, msg: "Upload failed" },
-  { pattern: /No work available/, msg: "No work available" },
 ];
 
 const RUN_ERROR_MARKERS = [

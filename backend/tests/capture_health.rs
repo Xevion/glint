@@ -97,7 +97,7 @@ async fn run_items_with_context_handles_null_profile_name(pool: sqlx::PgPool) {
     .expect("insert shader_version");
 
     // Create a capture run with one item that has NULL profile_id.
-    sqlx::query("INSERT INTO capture_runs (id, status, total_items) VALUES ('run1', 'running', 1)")
+    sqlx::query("INSERT INTO capture_runs (id, status, total_items, resolution_width, resolution_height, image_format) VALUES ('run1', 'running', 1, 1920, 1080, 'webp')")
         .execute(&pool)
         .await
         .expect("insert capture_run");

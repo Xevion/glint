@@ -350,7 +350,7 @@ function formatMs(value?: number): string {
 						<dd>
 							<div>{analysis.luminance.mean.toFixed(2)} mean</div>
 							<div class="mt-1 flex items-end gap-0.5" style="height: 24px;">
-								{#each analysis.luminance.histogram as bin, i}
+								{#each analysis.luminance.histogram as bin, i (i)}
 									<div
 										class="w-3 rounded-t-sm bg-foreground"
 										style="height: {(bin / histogramMax) * 100}%; opacity: {0.9 - i * 0.1};"
@@ -366,16 +366,16 @@ function formatMs(value?: number): string {
 					<div class="mt-3">
 						<div class="mb-1.5 text-xs text-muted-foreground">Colors</div>
 						<div class="flex h-6 overflow-hidden rounded-md">
-							{#each analysis.dominant_colors as color}
-								<div
-									style="background-color: {color.hex}; flex-basis: {color.weight * 100}%;"
-									title="{color.hex} ({(color.weight * 100).toFixed(1)}%)"
-								></div>
-							{/each}
+						{#each analysis.dominant_colors as color (color.hex)}
+							<div
+								style="background-color: {color.hex}; flex-basis: {color.weight * 100}%;"
+								title="{color.hex} ({(color.weight * 100).toFixed(1)}%)"
+							></div>
+						{/each}
 						</div>
 						<div class="mt-1.5 flex flex-wrap gap-1">
-							{#each analysis.dominant_colors as color}
-								<span class="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] font-mono bg-muted">
+						{#each analysis.dominant_colors as color (color.hex)}
+							<span class="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] font-mono bg-muted">
 									<span
 										class="inline-block h-2 w-2 rounded-full"
 										style="background-color: {color.hex};"

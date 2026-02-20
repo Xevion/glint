@@ -154,7 +154,7 @@ const editPresetSuperform = superForm(
 		onUpdate({ form }) {
 			if (!form.valid || !editingPreset) return;
 			void (async () => {
-				const preset = editingPreset!;
+				const preset = editingPreset;
 				const updates: Record<string, unknown> = {};
 				if (form.data.name !== preset.name) updates.name = form.data.name;
 				if (form.data.time_of_day_ticks !== preset.time_of_day_ticks)
@@ -581,7 +581,7 @@ const WEATHER_OPTIONS = [
 
 			<Form.Field form={createPresetSuperform} name="weather">
 				<Form.Control>
-					{#snippet children({ props })}
+					{#snippet children({ props }: { props: { name: string } })}
 						<Form.Label>Weather</Form.Label>
 						<Select.Root
 							type="single"
@@ -589,7 +589,7 @@ const WEATHER_OPTIONS = [
 							onValueChange={(v: string) => {
 								$createFormData.weather = v as 'clear' | 'rain' | 'thunder' | 'snow';
 							}}
-							name={props.name as string}
+							name={props.name}
 						>
 							<Select.Trigger class="w-full">
 								<span class="capitalize">{$createFormData.weather}</span>
@@ -682,7 +682,7 @@ const WEATHER_OPTIONS = [
 
 			<Form.Field form={editPresetSuperform} name="weather">
 				<Form.Control>
-					{#snippet children({ props })}
+					{#snippet children({ props }: { props: { name: string } })}
 						<Form.Label>Weather</Form.Label>
 						<Select.Root
 							type="single"
@@ -690,7 +690,7 @@ const WEATHER_OPTIONS = [
 							onValueChange={(v: string) => {
 								$editFormData.weather = v as 'clear' | 'rain' | 'thunder' | 'snow';
 							}}
-							name={props.name as string}
+							name={props.name}
 						>
 							<Select.Trigger class="w-full">
 								<span class="capitalize">{$editFormData.weather}</span>
