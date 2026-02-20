@@ -9,6 +9,12 @@ import type {
 	UpdateSceneMetadataRequest
 } from '$lib/bindings';
 import { ItemGrid } from '$lib/components/item-grid';
+import {
+	TimeOfDaySlider,
+	WeatherToggle,
+	WeatherIntensitySlider,
+	MoonPhaseSelector
+} from '$lib/components/preset-controls';
 import { formatDecimal, formatMoonPhase, formatTimeTicks } from '$lib/utils/format';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import Breadcrumb from '$lib/components/Breadcrumb.svelte';
@@ -21,7 +27,6 @@ import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Dialog from '$lib/components/ui/dialog';
 import * as FolderCard from '$lib/components/folder-card';
 import * as Form from '$lib/components/ui/form';
-import * as Select from '$lib/components/ui/select';
 import { Input } from '$lib/components/ui/input';
 import { StatusBadge } from '$lib/components/ui/status-badge';
 import { Textarea } from '$lib/components/ui/textarea';
@@ -263,13 +268,6 @@ function handleDragEnd() {
 	dragIndex = null;
 	dragOverIndex = null;
 }
-
-const WEATHER_OPTIONS = [
-	{ value: 'clear', label: 'Clear' },
-	{ value: 'rain', label: 'Rain' },
-	{ value: 'thunder', label: 'Thunder' },
-	{ value: 'snow', label: 'Snow' }
-] as const;
 </script>
 
 <svelte:head><title>{scene.name} - Glint</title></svelte:head>
@@ -281,6 +279,7 @@ const WEATHER_OPTIONS = [
 	>
 		{#snippet trailing()}
 			<StatusBadge class="ml-2" status={scene.active ? 'active' : 'inactive'}>{scene.active ? 'Active' : 'Inactive'}</StatusBadge>
+			<span class="ml-3 text-xs text-muted-foreground">Created <TimeAgo timestamp={scene.created_at} /></span>
 		{/snippet}
 	</Breadcrumb>
 
@@ -315,19 +314,32 @@ const WEATHER_OPTIONS = [
 		{/snippet}
 
 		<FolderCard.Content value="details">
-			<div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
-				<!-- Scene Edit Form + Info -->
-				<div class="space-y-6 lg:col-span-3">
+			<div class="space-y-8">
+				<!-- Editing Section -->
+				<section class="space-y-4">
+					<h3 class="text-sm font-medium">Editing</h3>
 					<form use:sceneEnhance class="space-y-4">
-						<Form.Field form={sceneSuperform} name="name">
-							<Form.Control>
-								{#snippet children({ props })}
-									<Form.Label>Name</Form.Label>
-									<Input {...props} bind:value={$sceneFormData.name} />
-								{/snippet}
-							</Form.Control>
-							<Form.FieldErrors />
-						</Form.Field>
+						<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+							<Form.Field form={sceneSuperform} name="name">
+								<Form.Control>
+									{#snippet children({ props })}
+										<Form.Label>Name</Form.Label>
+										<Input {...props} bind:value={$sceneFormData.name} />
+									{/snippet}
+								</Form.Control>
+								<Form.FieldErrors />
+							</Form.Field>
+
+							<div class="space-y-2">
+								<label class="text-sm font-medium text-muted-foreground">Slug</label>
+								<Input value={scene.slug} disabled class="font-mono text-xs" />
+							</div>
+
+							<div class="space-y-2">
+								<label class="text-sm font-medium text-muted-foreground">ID</label>
+								<Input value={scene.id} disabled class="font-mono text-xs" />
+							</div>
+						</div>
 
 						<Form.Field form={sceneSuperform} name="description">
 							<Form.Control>
@@ -356,58 +368,78 @@ const WEATHER_OPTIONS = [
 							</Form.Button>
 						</div>
 					</form>
+				</section>
 
-					<dl class="space-y-2 text-sm">
-						<DetailField label="ID">
-							<code class="text-xs">{scene.id}</code>
-						</DetailField>
-						<DetailField label="Slug">
-							{scene.slug}
-						</DetailField>
-						<DetailField label="Position">
-							<code class="text-xs">
-								{formatDecimal(scene.version.x, 1)}, {formatDecimal(scene.version.y, 1)}, {formatDecimal(scene.version.z, 1)}
-							</code>
-						</DetailField>
-						<DetailField label="Camera">
-							<code class="text-xs">
-								Yaw: {formatDecimal(scene.version.yaw, 1)}, Pitch: {formatDecimal(scene.version.pitch, 1)}
-							</code>
-						</DetailField>
-						<DetailField label="Dimension">
-							{scene.dimension}
-						</DetailField>
-						<DetailField label="Time of Day">
-							{formatTimeTicks(scene.version.time_of_day_ticks)}
-						</DetailField>
-						<DetailField label="Weather">
-							<span class="capitalize">{scene.version.weather}</span>
-							{#if scene.version.weather_intensity > 0}
-								<span class="text-muted-foreground">
-									(intensity: {formatDecimal(scene.version.weather_intensity)})
-								</span>
-							{/if}
-						</DetailField>
-						{#if scene.version.biome}
-							<DetailField label="Biome">
-								{scene.version.biome}
-							</DetailField>
-						{/if}
-						{#if scene.version.moon_phase != null}
-							<DetailField label="Moon Phase">
-								{formatMoonPhase(scene.version.moon_phase)}
-							</DetailField>
-						{/if}
-						<DetailField label="Created">
-							<TimeAgo timestamp={scene.created_at} />
-						</DetailField>
-					</dl>
-				</div>
+				<!-- Scene Info Section -->
+				<section class="space-y-4">
+					<h3 class="text-sm font-medium">Scene Info</h3>
+					<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+						<!-- Location & Camera -->
+						<div class="space-y-3 rounded-lg border border-border p-4">
+							<h4 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Location & Camera</h4>
+							<dl class="space-y-2 text-sm">
+								<DetailField label="Position">
+									<code class="text-xs">
+										{formatDecimal(scene.version.x, 1)}, {formatDecimal(scene.version.y, 1)}, {formatDecimal(scene.version.z, 1)}
+									</code>
+								</DetailField>
+								<DetailField label="Camera">
+									<code class="text-xs">
+										Yaw: {formatDecimal(scene.version.yaw, 1)}, Pitch: {formatDecimal(scene.version.pitch, 1)}
+									</code>
+								</DetailField>
+								<DetailField label="Dimension">
+									{scene.dimension}
+								</DetailField>
+								{#if scene.version.biome}
+									<DetailField label="Biome">
+										{scene.version.biome}
+									</DetailField>
+								{/if}
+							</dl>
+						</div>
+
+						<!-- Environment -->
+						<div class="space-y-3 rounded-lg border border-border p-4">
+							<h4 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Environment</h4>
+							<dl class="space-y-2 text-sm">
+								<DetailField label="Time of Day">
+									{formatTimeTicks(scene.version.time_of_day_ticks)}
+								</DetailField>
+								<DetailField label="Weather">
+									<span class="capitalize">{scene.version.weather}</span>
+									{#if scene.version.weather_intensity > 0}
+										<span class="text-muted-foreground">
+											(intensity: {formatDecimal(scene.version.weather_intensity)})
+										</span>
+									{/if}
+								</DetailField>
+								{#if scene.version.moon_phase != null}
+									<DetailField label="Moon Phase">
+										{formatMoonPhase(scene.version.moon_phase)}
+									</DetailField>
+								{/if}
+							</dl>
+						</div>
+					</div>
+
+
+				</section>
 
 				<!-- Presets Section -->
-				<div class="space-y-2 lg:col-span-2">
-					<span class="text-sm font-medium">Presets ({presets.length})</span>
-					<div role="list" class="flex flex-col overflow-hidden rounded-lg border border-border">
+				<section class="space-y-3">
+					<h3 class="text-sm font-medium">Presets ({presets.length})</h3>
+					<div role="list" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+						<!-- Add Preset Card -->
+						<button
+							type="button"
+							onclick={() => { createPresetSuperform.reset(); showCreatePreset = true; }}
+							class="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-3 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/50 hover:text-foreground"
+						>
+							<Plus class="h-5 w-5" />
+							<span>Add preset</span>
+						</button>
+
 						{#each presets as preset, i (preset.id)}
 							<div
 								role="listitem"
@@ -416,18 +448,36 @@ const WEATHER_OPTIONS = [
 								ondragover={(e) => handleDragOver(e, i)}
 								ondrop={() => handleDrop(i)}
 								ondragend={handleDragEnd}
-								class="flex items-center gap-4 border-b border-border bg-card p-3 last:border-b-0 {dragOverIndex === i && dragIndex !== i ? 'bg-muted/50' : ''}"
+								class="flex flex-col rounded-lg border border-border bg-card transition-colors {dragOverIndex === i && dragIndex !== i ? 'border-primary/40 bg-muted/50' : ''} {dragIndex === i ? 'opacity-50' : ''}"
 							>
-								<GripVertical class="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/50" />
-								<div class="min-w-0 flex-1">
-									<div class="flex items-center gap-2">
-										<span class="text-sm font-medium">{preset.name}</span>
-										<code class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{preset.slug}</code>
+								<!-- Header row -->
+								<div class="flex items-center gap-2 border-b border-border px-3 py-2">
+									<GripVertical class="h-4 w-4 shrink-0 cursor-grab text-muted-foreground opacity-30 transition-opacity hover:opacity-70" />
+									<div class="flex min-w-0 flex-1 items-center gap-2">
+										<span class="truncate text-sm font-medium">{preset.name}</span>
 										{#if i === 0}
-											<span class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Default</span>
+											<StatusBadge status="active" class="px-1.5 text-[10px]">Default</StatusBadge>
 										{/if}
 									</div>
-									<div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+									<div class="flex shrink-0 items-center gap-0.5">
+										<Button variant="ghost" size="icon" class="h-7 w-7" onclick={() => startEdit(preset)}>
+											<Pencil class="h-3.5 w-3.5" />
+										</Button>
+										<Button
+											variant="ghost"
+											size="icon"
+											class="h-7 w-7 text-destructive/70 hover:text-destructive"
+											onclick={() => { deletingPreset = preset; showDeletePresetConfirm = true; }}
+											disabled={presets.length <= 1}
+										>
+											<Trash2 class="h-3.5 w-3.5" />
+										</Button>
+									</div>
+								</div>
+								<!-- Details -->
+								<div class="space-y-1 px-3 py-2.5">
+									<code class="text-xs text-muted-foreground">{preset.slug}</code>
+									<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
 										<span>{formatTimeTicks(preset.time_of_day_ticks)}</span>
 										<span class="capitalize">{preset.weather}{preset.weather_intensity > 0 ? ` (${formatDecimal(preset.weather_intensity)})` : ''}</span>
 										{#if preset.moon_phase != null}
@@ -435,42 +485,25 @@ const WEATHER_OPTIONS = [
 										{/if}
 									</div>
 								</div>
-								<div class="flex shrink-0 items-center gap-1">
-									<Button variant="ghost" size="icon" class="h-7 w-7" onclick={() => startEdit(preset)}>
-										<Pencil class="h-3.5 w-3.5" />
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="h-7 w-7 text-destructive/70 hover:text-destructive"
-										onclick={() => { deletingPreset = preset; showDeletePresetConfirm = true; }}
-										disabled={presets.length <= 1}
-									>
-										<Trash2 class="h-3.5 w-3.5" />
-									</Button>
-								</div>
 							</div>
 						{/each}
-						<button
-							type="button"
-							onclick={() => { createPresetSuperform.reset(); showCreatePreset = true; }}
-							class="flex items-center gap-2 border-dashed border-t border-border p-3 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-						>
-							<Plus class="h-4 w-4" />
-							Add preset
-						</button>
 					</div>
-				</div>
+				</section>
 			</div>
 		</FolderCard.Content>
 
-		<!-- Tab 3: Captures -->
+		<!-- Tab: Captures -->
 		<FolderCard.Content value="captures">
 			{#if captures.length === 0}
-				<p class="text-sm text-muted-foreground">No captures yet.</p>
+				<div class="flex flex-col items-center justify-center py-12 text-center">
+					<p class="text-sm text-muted-foreground">No captures have been taken for this scene yet.</p>
+				</div>
 			{:else}
 				<div class="space-y-3">
-					<div class="flex justify-end">
+					<div class="flex items-center justify-between">
+						<p class="text-sm text-muted-foreground">
+							Showing {captures.length} of {captureCount} captures
+						</p>
 						<a
 							href="/admin/captures?scene={scene.id}"
 							class="text-sm text-primary hover:underline"
@@ -525,98 +558,50 @@ const WEATHER_OPTIONS = [
 
 <!-- Create Preset Dialog -->
 <Dialog.Root bind:open={showCreatePreset}>
-	<Dialog.Content class="sm:max-w-md">
+	<Dialog.Content class="sm:max-w-lg">
 		<Dialog.Header>
 			<Dialog.Title>New Preset</Dialog.Title>
-			<Dialog.Description>Add a new preset to this scene.</Dialog.Description>
+			<Dialog.Description>Add a new environment preset to this scene.</Dialog.Description>
 		</Dialog.Header>
 
-		<form use:createEnhance class="space-y-4">
-			<Form.Field form={createPresetSuperform} name="name">
-				<Form.Control>
-					{#snippet children({ props })}
-						<Form.Label>Name</Form.Label>
-						<Input {...props} bind:value={$createFormData.name} />
-					{/snippet}
-				</Form.Control>
-				<Form.FieldErrors />
-			</Form.Field>
+		<form use:createEnhance class="space-y-5">
+			<div class="grid grid-cols-2 gap-4">
+				<Form.Field form={createPresetSuperform} name="name">
+					<Form.Control>
+						{#snippet children({ props })}
+							<Form.Label>Name</Form.Label>
+							<Input {...props} bind:value={$createFormData.name} placeholder="e.g., Sunset" />
+						{/snippet}
+					</Form.Control>
+					<Form.FieldErrors />
+				</Form.Field>
 
-			<Form.Field form={createPresetSuperform} name="slug">
-				<Form.Control>
-					{#snippet children({ props })}
-						<Form.Label>Slug</Form.Label>
-						<Input {...props} bind:value={$createFormData.slug} />
-					{/snippet}
-				</Form.Control>
-				<Form.FieldErrors />
-			</Form.Field>
+				<Form.Field form={createPresetSuperform} name="slug">
+					<Form.Control>
+						{#snippet children({ props })}
+							<Form.Label>Slug</Form.Label>
+							<Input {...props} bind:value={$createFormData.slug} placeholder="e.g., sunset" class="font-mono" />
+						{/snippet}
+					</Form.Control>
+					<Form.FieldErrors />
+				</Form.Field>
+			</div>
 
-			<Form.Field form={createPresetSuperform} name="time_of_day_ticks">
-				<Form.Control>
-					{#snippet children({ props })}
-						<Form.Label>Time of Day (ticks)</Form.Label>
-						<Input {...props} type="number" min={0} max={24000} bind:value={$createFormData.time_of_day_ticks} />
-					{/snippet}
-				</Form.Control>
-				<Form.FieldErrors />
-			</Form.Field>
+			<div class="space-y-1.5">
+				<label class="text-sm font-medium">Time of Day</label>
+				<TimeOfDaySlider bind:value={$createFormData.time_of_day_ticks} />
+			</div>
 
-			<Form.Field form={createPresetSuperform} name="weather">
-				<Form.Control>
-					{#snippet children({ props }: { props: { name: string } })}
-						<Form.Label>Weather</Form.Label>
-						<Select.Root
-							type="single"
-							value={$createFormData.weather}
-							onValueChange={(v: string) => {
-								$createFormData.weather = v as 'clear' | 'rain' | 'thunder' | 'snow';
-							}}
-							name={props.name}
-						>
-							<Select.Trigger class="w-full">
-								<span class="capitalize">{$createFormData.weather}</span>
-							</Select.Trigger>
-							<Select.Content>
-								{#each WEATHER_OPTIONS as opt (opt.value)}
-									<Select.Item value={opt.value}>{opt.label}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
-					{/snippet}
-				</Form.Control>
-				<Form.FieldErrors />
-			</Form.Field>
+			<div class="space-y-1.5">
+				<label class="text-sm font-medium">Weather</label>
+				<WeatherToggle bind:value={$createFormData.weather} />
+			</div>
 
-			<Form.Field form={createPresetSuperform} name="weather_intensity">
-				<Form.Control>
-					{#snippet children({ props })}
-						<Form.Label>Weather Intensity</Form.Label>
-						<Input {...props} type="number" min={0} max={1} step={0.01} bind:value={$createFormData.weather_intensity} />
-					{/snippet}
-				</Form.Control>
-				<Form.FieldErrors />
-			</Form.Field>
+			{#if $createFormData.weather !== 'clear'}
+				<WeatherIntensitySlider bind:value={$createFormData.weather_intensity} />
+			{/if}
 
-			<Form.Field form={createPresetSuperform} name="moon_phase">
-				<Form.Control>
-					{#snippet children({ props })}
-						<Form.Label>Moon Phase (0-7, optional)</Form.Label>
-						<Input
-							{...props}
-							type="number"
-							min={0}
-							max={7}
-							value={$createFormData.moon_phase ?? ''}
-							oninput={(e: Event & { currentTarget: HTMLInputElement }) => {
-								const v = e.currentTarget.value;
-								$createFormData.moon_phase = v === '' ? undefined : Number(v);
-							}}
-						/>
-					{/snippet}
-				</Form.Control>
-				<Form.FieldErrors />
-			</Form.Field>
+			<MoonPhaseSelector bind:value={$createFormData.moon_phase} />
 
 			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => (showCreatePreset = false)}>Cancel</Button>
@@ -636,13 +621,19 @@ const WEATHER_OPTIONS = [
 	open={editingPreset !== null}
 	onOpenChange={(open) => { if (!open) editingPreset = null; }}
 >
-	<Dialog.Content class="sm:max-w-md">
+	<Dialog.Content class="sm:max-w-lg">
 		<Dialog.Header>
 			<Dialog.Title>Edit Preset</Dialog.Title>
-			<Dialog.Description>Update preset settings.</Dialog.Description>
+			<Dialog.Description>
+				{#if editingPreset}
+					Update settings for "{editingPreset.name}".
+				{:else}
+					Update preset settings.
+				{/if}
+			</Dialog.Description>
 		</Dialog.Header>
 
-		<form use:editEnhance class="space-y-4">
+		<form use:editEnhance class="space-y-5">
 			<Form.Field form={editPresetSuperform} name="name">
 				<Form.Control>
 					{#snippet children({ props })}
@@ -653,71 +644,21 @@ const WEATHER_OPTIONS = [
 				<Form.FieldErrors />
 			</Form.Field>
 
-			<Form.Field form={editPresetSuperform} name="time_of_day_ticks">
-				<Form.Control>
-					{#snippet children({ props })}
-						<Form.Label>Time of Day (ticks)</Form.Label>
-						<Input {...props} type="number" min={0} max={24000} bind:value={$editFormData.time_of_day_ticks} />
-					{/snippet}
-				</Form.Control>
-				<Form.FieldErrors />
-			</Form.Field>
+			<div class="space-y-1.5">
+				<label class="text-sm font-medium">Time of Day</label>
+				<TimeOfDaySlider bind:value={$editFormData.time_of_day_ticks} />
+			</div>
 
-			<Form.Field form={editPresetSuperform} name="weather">
-				<Form.Control>
-					{#snippet children({ props }: { props: { name: string } })}
-						<Form.Label>Weather</Form.Label>
-						<Select.Root
-							type="single"
-							value={$editFormData.weather}
-							onValueChange={(v: string) => {
-								$editFormData.weather = v as 'clear' | 'rain' | 'thunder' | 'snow';
-							}}
-							name={props.name}
-						>
-							<Select.Trigger class="w-full">
-								<span class="capitalize">{$editFormData.weather}</span>
-							</Select.Trigger>
-							<Select.Content>
-								{#each WEATHER_OPTIONS as opt (opt.value)}
-									<Select.Item value={opt.value}>{opt.label}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
-					{/snippet}
-				</Form.Control>
-				<Form.FieldErrors />
-			</Form.Field>
+			<div class="space-y-1.5">
+				<label class="text-sm font-medium">Weather</label>
+				<WeatherToggle bind:value={$editFormData.weather} />
+			</div>
 
-			<Form.Field form={editPresetSuperform} name="weather_intensity">
-				<Form.Control>
-					{#snippet children({ props })}
-						<Form.Label>Weather Intensity</Form.Label>
-						<Input {...props} type="number" min={0} max={1} step={0.01} bind:value={$editFormData.weather_intensity} />
-					{/snippet}
-				</Form.Control>
-				<Form.FieldErrors />
-			</Form.Field>
+			{#if $editFormData.weather !== 'clear'}
+				<WeatherIntensitySlider bind:value={$editFormData.weather_intensity} />
+			{/if}
 
-			<Form.Field form={editPresetSuperform} name="moon_phase">
-				<Form.Control>
-					{#snippet children({ props })}
-						<Form.Label>Moon Phase (0-7, optional)</Form.Label>
-						<Input
-							{...props}
-							type="number"
-							min={0}
-							max={7}
-							value={$editFormData.moon_phase ?? ''}
-							oninput={(e: Event & { currentTarget: HTMLInputElement }) => {
-								const v = e.currentTarget.value;
-								$editFormData.moon_phase = v === '' ? undefined : Number(v);
-							}}
-						/>
-					{/snippet}
-				</Form.Control>
-				<Form.FieldErrors />
-			</Form.Field>
+			<MoonPhaseSelector bind:value={$editFormData.moon_phase} />
 
 			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => (editingPreset = null)}>Cancel</Button>
