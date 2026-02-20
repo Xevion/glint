@@ -56,13 +56,13 @@ class DeviceAuthScreen(
         contentContainer.surface(Surface.DARK_PANEL)
 
         // Title
-        contentContainer.child(GlintComponents.title(title) as Component)
+        contentContainer.child(GlintComponents.title(title))
 
         // Status/instructions area
         statusLabel = Components.label(McComponent.literal("Starting authorization..."))
         statusLabel.color(Color.ofRgb(GlintTheme.TEXT_WARNING))
         statusLabel.horizontalTextAlignment(HorizontalAlignment.CENTER)
-        contentContainer.child(statusLabel as Component)
+        contentContainer.child(statusLabel)
 
         // Instructions container (hidden initially)
         instructionsContainer = Containers.verticalFlow(Sizing.content(), Sizing.content())
@@ -75,14 +75,14 @@ class DeviceAuthScreen(
         openBrowserButton = GlintComponents.wideButton(McComponent.literal("Open in Browser")) { openBrowser() }
         openBrowserButton.active = false
         contentContainer.child(
-            GlintComponents.buttonRow(copyUrlButton, openBrowserButton) as Component,
+            GlintComponents.buttonRow(copyUrlButton, openBrowserButton),
         )
 
         // Cancel button
         cancelButton = GlintComponents.wideButton(McComponent.literal("Cancel")) { cancel() }
         contentContainer.child(cancelButton as Component)
 
-        root.child(contentContainer as Component)
+        root.child(contentContainer)
 
         // Start device auth flow
         startDeviceAuth()
@@ -95,29 +95,29 @@ class DeviceAuthScreen(
         instructionsContainer.child(
             Components
                 .label(McComponent.literal("To connect this Minecraft client to Glint:"))
-                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)),
         )
 
         // Step 1 - URL
         val step1 = Containers.horizontalFlow(Sizing.content(), Sizing.content())
         step1.gap(GlintTheme.GAP_SM)
-        step1.child(Components.label(McComponent.literal("1. Open:")).color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component)
-        step1.child(Components.label(McComponent.literal(response.verificationUri)).color(Color.ofRgb(0x55FFFF)) as Component)
-        instructionsContainer.child(step1 as Component)
+        step1.child(Components.label(McComponent.literal("1. Open:")).color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)))
+        step1.child(Components.label(McComponent.literal(response.verificationUri)).color(Color.ofRgb(GlintTheme.TEXT_INFO)))
+        instructionsContainer.child(step1)
 
         // Step 2 - Code
         val step2 = Containers.horizontalFlow(Sizing.content(), Sizing.content())
         step2.gap(GlintTheme.GAP_SM)
-        step2.child(Components.label(McComponent.literal("2. Enter code:")).color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component)
-        step2.child(Components.label(McComponent.literal(response.userCode)).color(Color.ofRgb(0x55FF55)) as Component)
-        instructionsContainer.child(step2 as Component)
+        step2.child(Components.label(McComponent.literal("2. Enter code:")).color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)))
+        step2.child(Components.label(McComponent.literal(response.userCode)).color(Color.ofRgb(GlintTheme.TEXT_SUCCESS)))
+        instructionsContainer.child(step2)
 
         // Timer - will be updated in tick
         instructionsContainer.child(
             Components
                 .label(McComponent.literal("Waiting for authorization..."))
                 .color(Color.ofRgb(GlintTheme.TEXT_MUTED))
-                .id("timer-label") as Component,
+                .id("timer-label"),
         )
     }
 
@@ -165,11 +165,11 @@ class DeviceAuthScreen(
                                     child === copyUrlButton || (child is FlowLayout && child.children().any { it === copyUrlButton })
                                 }
                             if (buttonIndex >= 0 && !children.contains(instructionsContainer)) {
-                                children.add(buttonIndex, instructionsContainer as Component)
+                                children.add(buttonIndex, instructionsContainer)
                                 contentContainer.clearChildren()
                                 children.forEach { contentContainer.child(it) }
                             } else if (!children.contains(instructionsContainer)) {
-                                contentContainer.child(instructionsContainer as Component)
+                                contentContainer.child(instructionsContainer)
                             }
 
                             Loggers.Ui.get().info("Device auth started: {}", response.userCode)
@@ -235,7 +235,7 @@ class DeviceAuthScreen(
                                         authResponse = null
                                         copyUrlButton.active = false
                                         openBrowserButton.active = false
-                                        contentContainer.removeChild(instructionsContainer as Component)
+                                        contentContainer.removeChild(instructionsContainer)
                                     }
                                 }
 
@@ -248,7 +248,7 @@ class DeviceAuthScreen(
                                         authResponse = null
                                         copyUrlButton.active = false
                                         openBrowserButton.active = false
-                                        contentContainer.removeChild(instructionsContainer as Component)
+                                        contentContainer.removeChild(instructionsContainer)
                                     }
                                 }
 

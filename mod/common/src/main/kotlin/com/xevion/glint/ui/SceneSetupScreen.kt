@@ -83,7 +83,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
             ) {
                 activeTab = Tab.ENVIRONMENT
                 rebuildPanel(panel)
-            } as Component,
+            },
         )
         tabBar.child(
             GlintComponents.tabButton(
@@ -92,9 +92,9 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
             ) {
                 activeTab = Tab.RENDER
                 rebuildPanel(panel)
-            } as Component,
+            },
         )
-        panel.child(tabBar as Component)
+        panel.child(tabBar)
 
         when (activeTab) {
             Tab.ENVIRONMENT -> buildEnvironmentTab(panel)
@@ -117,7 +117,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
                 openExportDialog()
             } as Component,
         )
-        panel.child(bottomBar as Component)
+        panel.child(bottomBar)
     }
 
     private fun buildEnvironmentTab(panel: FlowLayout) {
@@ -152,7 +152,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
                 } as Component,
             )
         }
-        panel.child(presetRow as Component)
+        panel.child(presetRow)
 
         // Weather cycle button
         val weatherRow = Containers.horizontalFlow(Sizing.content(), Sizing.content())
@@ -161,7 +161,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
         weatherRow.child(
             Components
                 .label(McComponent.literal("Weather:"))
-                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)),
         )
         val weatherButton =
             GlintComponents.smallButton(
@@ -175,7 +175,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
                 syncWeatherIntensityVisibility(panel)
             }
         weatherRow.child(weatherButton as Component)
-        panel.child(weatherRow as Component)
+        panel.child(weatherRow)
 
         // Weather intensity
         weatherIntensityRow = Containers.verticalFlow(Sizing.content(), Sizing.content())
@@ -194,7 +194,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
             state.applyWeather()
         }
         if (state.weather != Weather.CLEAR) {
-            panel.child(weatherIntensityRow as Component)
+            panel.child(weatherIntensityRow!!)
         }
 
         // Moon phase
@@ -234,7 +234,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
         freezeRow.child(
             Components
                 .label(McComponent.literal("Freeze Entities:"))
-                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)),
         )
         val freezeButton =
             GlintComponents.smallButton(
@@ -251,7 +251,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
                 btn.setMessage(McComponent.literal(if (state.entityTicksFrozen) "On" else "Off"))
             }
         freezeRow.child(freezeButton as Component)
-        panel.child(freezeRow as Component)
+        panel.child(freezeRow)
     }
 
     private fun buildRenderTab(panel: FlowLayout) {
@@ -306,7 +306,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
         onChanged: (Double) -> Unit,
     ) {
         label.color(Color.ofRgb(GlintTheme.TEXT_SECONDARY))
-        container.child(label as Component)
+        container.child(label)
 
         val slider =
             Components
@@ -315,10 +315,10 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
                 .max(max)
                 .stepSize(stepSize)
                 .value(initial)
-        (slider as Component).horizontalSizing(Sizing.fixed(SLIDER_WIDTH))
+        slider.horizontalSizing(Sizing.fixed(SLIDER_WIDTH))
         slider.onChanged().subscribe { value -> onChanged(value) }
         onRelease?.let { callback -> slider.onSlideEnd().subscribe { callback() } }
-        container.child(slider as Component)
+        container.child(slider)
 
         trackedSliders.add(
             TrackedSlider(
@@ -345,7 +345,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
         row.child(
             Components
                 .label(McComponent.literal(labelText))
-                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)),
         )
         val button =
             GlintComponents.smallButton(McComponent.literal(initialValue), width = 70) { btn ->
@@ -353,7 +353,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
                 btn.setMessage(McComponent.literal(newLabel))
             }
         row.child(button as Component)
-        panel.child(row as Component)
+        panel.child(row)
     }
 
     /**
@@ -372,7 +372,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
         row.child(
             Components
                 .label(McComponent.literal(labelText))
-                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)),
         )
         var current = initialValue
         val button =
@@ -382,7 +382,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
                 btn.setMessage(McComponent.literal(toggleLabel(current)))
             }
         row.child(button as Component)
-        panel.child(row as Component)
+        panel.child(row)
     }
 
     override fun keyPressed(
@@ -417,8 +417,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
     ): Boolean {
         // Check if cursor is hovering over any tracked slider
         for (tracked in trackedSliders) {
-            val component = tracked.slider as Component
-            if (component.isInBoundingBox(mouseX, mouseY)) {
+            if (tracked.slider.isInBoundingBox(mouseX, mouseY)) {
                 val current = tracked.slider.value()
                 val delta = verticalAmount * tracked.scrollStep
                 val newValue = (current + delta).coerceIn(tracked.min, tracked.max)
@@ -455,7 +454,7 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
 
     private fun openExportDialog() {
         minecraft?.setScreen(
-            ExportSceneDialog(
+            ExportScenePanel(
                 parentScreen = this,
                 onExportComplete = {},
             ),
@@ -484,9 +483,9 @@ class SceneSetupScreen : GlintPanelScreen(McComponent.literal("Scene Setup")) {
     private fun syncWeatherIntensityVisibility(panel: FlowLayout) {
         val row = weatherIntensityRow ?: return
         if (SceneSetupState.weather == Weather.CLEAR) {
-            panel.removeChild(row as Component)
-        } else if ((row as Component).parent() == null) {
-            panel.child(row as Component)
+            panel.removeChild(row)
+        } else if (row.parent() == null) {
+            panel.child(row)
         }
     }
 

@@ -35,9 +35,8 @@ abstract class GlintPanelScreen(
         private const val GRIP_WIDTH = 30
         private const val GRIP_HEIGHT = 3
 
-        /** ARGB format: alpha=0x60 (~37% opacity), RGB=white. Used with context.fill(). */
-        private const val GRIP_COLOR = 0x60FFFFFF
-        private const val PANEL_ALPHA_TRANSPARENT = 0x40000000
+        private const val GRIP_COLOR = GlintTheme.GRIP_COLOR
+        private const val PANEL_ALPHA_TRANSPARENT = GlintTheme.PANEL_BG_TRANSPARENT
 
         /** Roughly 1/3 of normal mouse look. */
         private const val CAMERA_SENSITIVITY = 0.15f
@@ -77,7 +76,7 @@ abstract class GlintPanelScreen(
         titleBar.child(
             Components
                 .label(title)
-                .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)),
         )
 
         val eyeButton =
@@ -91,20 +90,20 @@ abstract class GlintPanelScreen(
             }
         titleBar.child(eyeButton as Component)
 
-        panelContainer.child(titleBar as Component)
+        panelContainer.child(titleBar)
 
         buildPanel(panelContainer)
 
         draggable = Containers.draggable(Sizing.content(), Sizing.content(), panelContainer)
         draggable.foreheadSize(FOREHEAD_HEIGHT)
-        (draggable as Component).zIndex(500)
+        draggable.zIndex(500)
 
         // Custom surface: panel background + centered grip bar in the forehead
         draggable.surface(panelSurface(false))
 
-        (draggable as Component).margins(Insets.of(GlintTheme.PADDING_MD))
+        draggable.margins(Insets.of(GlintTheme.PADDING_MD))
 
-        rootComponent.child(draggable as Component)
+        rootComponent.child(draggable)
     }
 
     /**
@@ -126,7 +125,7 @@ abstract class GlintPanelScreen(
         mouseY: Double,
         button: Int,
     ): Boolean {
-        val onPanel = (draggable as Component).isInBoundingBox(mouseX, mouseY)
+        val onPanel = draggable.isInBoundingBox(mouseX, mouseY)
         val handled = super.mouseClicked(mouseX, mouseY, button)
         if (!onPanel && button == 0) {
             draggingBackground = true
@@ -181,7 +180,7 @@ abstract class GlintPanelScreen(
         horizontalAmount: Double,
         verticalAmount: Double,
     ): Boolean {
-        val onPanel = (draggable as Component).isInBoundingBox(mouseX, mouseY)
+        val onPanel = draggable.isInBoundingBox(mouseX, mouseY)
         if (!onPanel && onBackgroundScroll(verticalAmount)) {
             return true
         }

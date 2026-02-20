@@ -4,7 +4,6 @@ import io.wispforest.owo.ui.base.BaseOwoScreen
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
 import io.wispforest.owo.ui.container.ScrollContainer
-import io.wispforest.owo.ui.core.Component
 import io.wispforest.owo.ui.core.HorizontalAlignment
 import io.wispforest.owo.ui.core.OwoUIAdapter
 import io.wispforest.owo.ui.core.Sizing
@@ -39,7 +38,7 @@ abstract class GlintListScreen(
         headerRow.gap(GlintTheme.GAP_MD)
         headerRow.padding(GlintTheme.paddingSm())
         buildHeader(headerRow)
-        rootComponent.child(headerRow as Component)
+        rootComponent.child(headerRow)
 
         // Content area (scrollable, fills remaining space)
         contentList = Containers.verticalFlow(Sizing.fill(100), Sizing.content())
@@ -55,7 +54,7 @@ abstract class GlintListScreen(
         contentScroll.surface(Surface.DARK_PANEL)
 
         buildContent(contentList)
-        rootComponent.child(contentScroll as Component)
+        rootComponent.child(contentScroll)
 
         // Footer row (fixed, horizontal)
         footerRow = Containers.horizontalFlow(Sizing.content(), Sizing.content())
@@ -63,7 +62,7 @@ abstract class GlintListScreen(
         footerRow.gap(GlintTheme.GAP_MD)
         footerRow.padding(GlintTheme.paddingSm())
         buildFooter(footerRow)
-        rootComponent.child(footerRow as Component)
+        rootComponent.child(footerRow)
     }
 
     /**

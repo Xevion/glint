@@ -32,14 +32,31 @@ object GlintTheme {
     const val TEXT_SUCCESS = 0x55FF55
     const val TEXT_WARNING = 0xFFAA00
     const val TEXT_INFO = 0x55FFFF // Cyan for URLs/info
+    const val TEXT_DISABLED = 0x666666
 
     // List item dimensions
     const val ITEM_HEIGHT = 36
     const val ITEM_HEIGHT_COMPACT = 28
 
+    // Card/surface backgrounds (ARGB format for Surface.flat)
+    const val CARD_BG = 0x22FFFFFF // Default card background
+    const val CARD_BG_LOADED = 0x33AAFFAA // Loaded/active scene card
+    const val THUMBNAIL_BG = 0x44888888 // Thumbnail placeholder
+    const val SURFACE_SUBTLE = 0x33FFFFFF // Subtle form/section background
+
     // Selection/highlight colors (ARGB format for Surface.flat)
     const val HIGHLIGHT_BG = 0x33FFFFFF // Hover state
     const val SELECTED_BG = 0x44AAAAFF // Selection state
+
+    // Panel overlay (ARGB)
+    const val PANEL_BG_TRANSPARENT = 0x40000000 // Semi-transparent panel mode
+
+    // Grip handle (ARGB, ~37% opacity white)
+    const val GRIP_COLOR = 0x60FFFFFF
+
+    // Progress bar
+    const val PROGRESS_BG = 0x333333
+    const val PROGRESS_FILL = 0x5555FF
 
     // Indentation levels for tree views
     const val INDENT_LEVEL_1 = 8

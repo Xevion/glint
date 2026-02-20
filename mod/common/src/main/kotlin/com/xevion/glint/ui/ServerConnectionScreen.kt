@@ -42,6 +42,8 @@ class ServerConnectionScreen(
     private var testingConnection = false
     private var connectionTestResult: String? = null
     private var connectionTestError: String? = null
+    private var proceedCountdown = -1
+    private var validatedUrl: String? = null
 
     override fun buildContent(root: FlowLayout) {
         val content = Containers.verticalFlow(Sizing.content(), Sizing.content())
@@ -51,7 +53,7 @@ class ServerConnectionScreen(
         content.surface(Surface.DARK_PANEL)
 
         // Title
-        content.child(GlintComponents.title(title) as Component)
+        content.child(GlintComponents.title(title))
 
         // URL input section
         val inputSection = Containers.verticalFlow(Sizing.content(), Sizing.content())
@@ -61,7 +63,7 @@ class ServerConnectionScreen(
         inputSection.child(
             Components
                 .label(McComponent.literal("Server URL:"))
-                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)),
         )
 
         urlInput = Components.textBox(Sizing.fixed(300))
@@ -71,19 +73,19 @@ class ServerConnectionScreen(
         urlInput.onChanged().subscribe { validateUrl() }
         inputSection.child(urlInput as Component)
 
-        content.child(inputSection as Component)
+        content.child(inputSection)
 
         // Feedback label
         feedbackLabel = Components.label(McComponent.literal(""))
         feedbackLabel.horizontalTextAlignment(HorizontalAlignment.CENTER)
         feedbackLabel.margins(Insets.vertical(GlintTheme.GAP_SM))
-        content.child(feedbackLabel as Component)
+        content.child(feedbackLabel)
 
         // Button row
         testButton = GlintComponents.wideButton(McComponent.literal("Test Connection")) { testConnection() }
         skipButton = GlintComponents.wideButton(McComponent.literal("Skip (Disable Sync)")) { skipConnection() }
         content.child(
-            GlintComponents.buttonRow(testButton, skipButton) as Component,
+            GlintComponents.buttonRow(testButton, skipButton),
         )
 
         // Cancel button
@@ -95,11 +97,11 @@ class ServerConnectionScreen(
         content.child(
             Components
                 .label(McComponent.literal("Connect to your Glint backend server for scene synchronization"))
-                .color(Color.ofRgb(0x666666))
-                .margins(Insets.top(GlintTheme.GAP_MD)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_DISABLED))
+                .margins(Insets.top(GlintTheme.GAP_MD)),
         )
 
-        root.child(content as Component)
+        root.child(content)
 
         // Initial validation
         validateUrl()
@@ -184,13 +186,9 @@ class ServerConnectionScreen(
                             log.info("Connection test successful") { "url" to normalizedUrl }
                             updateFeedback()
 
-                            // Automatically proceed to world selection after 1 second
-                            minecraft?.execute {
-                                Thread.sleep(1000)
-                                minecraft?.execute {
-                                    onConnectionValidated(normalizedUrl)
-                                }
-                            }
+                            // Automatically proceed to world selection after ~1 second
+                            validatedUrl = normalizedUrl
+                            proceedCountdown = 20 // ~1 second at 20 TPS
                         }.onFailure { error ->
                             connectionTestResult = null
                             connectionTestError = error.message ?: "Connection failed"
@@ -200,6 +198,16 @@ class ServerConnectionScreen(
                     updateButtonStates()
                 }
             }
+    }
+
+    override fun tick() {
+        super.tick()
+        if (proceedCountdown > 0) {
+            proceedCountdown--
+            if (proceedCountdown == 0) {
+                validatedUrl?.let { onConnectionValidated(it) }
+            }
+        }
     }
 
     private fun skipConnection() {

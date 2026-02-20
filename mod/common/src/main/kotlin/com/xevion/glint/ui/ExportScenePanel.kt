@@ -36,7 +36,7 @@ import net.minecraft.network.chat.Component as McComponent
  * only handles the name, slug, and description inputs plus the actual export.
  * [SceneSetupState] must be [active][SceneSetupState.active] before opening.
  */
-class ExportSceneDialog(
+class ExportScenePanel(
     private val parentScreen: Screen,
     private val onExportComplete: () -> Unit,
 ) : GlintPanelScreen(McComponent.literal("Export Scene")) {
@@ -84,7 +84,7 @@ class ExportSceneDialog(
                     validateInput()
                 }
                 child(nameInput as Component)
-            } as Component,
+            },
         )
 
         panel.child(
@@ -96,7 +96,7 @@ class ExportSceneDialog(
                     validateInput()
                 }
                 child(slugInput as Component)
-            } as Component,
+            },
         )
 
         panel.child(
@@ -105,13 +105,13 @@ class ExportSceneDialog(
                 descriptionInput.setMaxLength(256)
                 descriptionInput.setSuggestion("Brief description")
                 child(descriptionInput as Component)
-            } as Component,
+            },
         )
 
         errorLabel = Components.label(McComponent.literal(""))
         errorLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
         errorLabel.margins(Insets.top(GlintTheme.GAP_SM))
-        panel.child(errorLabel as Component)
+        panel.child(errorLabel)
 
         exportButton = GlintComponents.button(McComponent.literal("Export")) { doExport() }
         exportButton.active = false
@@ -119,7 +119,7 @@ class ExportSceneDialog(
             GlintComponents.buttonRow(
                 exportButton,
                 GlintComponents.cancelButton { minecraft?.setScreen(parentScreen) },
-            ) as Component,
+            ),
         )
 
         validateInput()
@@ -127,11 +127,11 @@ class ExportSceneDialog(
     }
 
     private fun buildProgressView(panel: FlowLayout) {
-        panel.child(GlintComponents.title(McComponent.literal("Exporting Scene...")) as Component)
+        panel.child(GlintComponents.title(McComponent.literal("Exporting Scene...")))
 
         progressLabel = Components.label(McComponent.literal("Starting export..."))
         progressLabel.color(Color.ofRgb(GlintTheme.TEXT_SECONDARY))
-        panel.child(progressLabel as Component)
+        panel.child(progressLabel)
     }
 
     override fun onClose() {
@@ -252,7 +252,7 @@ class ExportSceneDialog(
         progressLabel.text(McComponent.literal("Export complete"))
         progressLabel.color(Color.ofRgb(GlintTheme.TEXT_SUCCESS))
 
-        val parent = (progressLabel as Component).parent() as? FlowLayout ?: return
+        val parent = progressLabel.parent() as? FlowLayout ?: return
         parent.child(
             GlintComponents.button(McComponent.literal("Close")) {
                 onExportComplete()
@@ -267,7 +267,7 @@ class ExportSceneDialog(
         progressLabel.text(McComponent.literal("Export failed: $message"))
         progressLabel.color(Color.ofRgb(GlintTheme.TEXT_ERROR))
 
-        val parent = (progressLabel as Component).parent() as? FlowLayout ?: return
+        val parent = progressLabel.parent() as? FlowLayout ?: return
         parent.child(
             GlintComponents.buttonRow(
                 GlintComponents.button(McComponent.literal("Retry")) {
@@ -276,7 +276,7 @@ class ExportSceneDialog(
                     build(uiAdapter.rootComponent)
                 },
                 GlintComponents.cancelButton { minecraft?.setScreen(parentScreen) },
-            ) as Component,
+            ),
         )
     }
 

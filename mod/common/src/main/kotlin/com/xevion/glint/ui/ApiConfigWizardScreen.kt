@@ -38,7 +38,7 @@ class ApiConfigWizardScreen(
         root.child(
             Components
                 .label(McComponent.literal("Loading..."))
-                .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_MUTED)),
         )
     }
 
@@ -118,13 +118,13 @@ class ApiConfigWizardScreen(
             content.surface(Surface.DARK_PANEL)
 
             // Title
-            content.child(GlintComponents.title(title) as Component)
+            content.child(GlintComponents.title(title))
 
             // Status
             content.child(
                 Components
                     .label(McComponent.literal("Connected to server"))
-                    .color(Color.ofRgb(GlintTheme.TEXT_SUCCESS)) as Component,
+                    .color(Color.ofRgb(GlintTheme.TEXT_SUCCESS)),
             )
 
             // Config info
@@ -136,15 +136,15 @@ class ApiConfigWizardScreen(
             infoSection.child(
                 Components
                     .label(McComponent.literal("Server URL:"))
-                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)) as Component,
+                    .color(Color.ofRgb(GlintTheme.TEXT_SECONDARY)),
             )
             infoSection.child(
                 Components
                     .label(McComponent.literal(apiConfig.apiUrl))
-                    .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
+                    .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)),
             )
 
-            content.child(infoSection as Component)
+            content.child(infoSection)
 
             // Buttons
             changeServerButton = Components.button(McComponent.literal("Change Server")) { showConnectionScreen() }
@@ -158,7 +158,7 @@ class ApiConfigWizardScreen(
             doneButton = GlintComponents.wideButton(CommonComponents.GUI_DONE) { minecraft?.setScreen(parentScreen) }
             content.child(doneButton as Component)
 
-            root.child(content as Component)
+            root.child(content)
         }
 
         private fun disableSync() {

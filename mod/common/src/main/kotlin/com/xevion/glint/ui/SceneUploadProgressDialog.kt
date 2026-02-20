@@ -61,7 +61,7 @@ class SceneUploadProgressDialog(
         dialog.child(
             Components
                 .label(McComponent.literal("Uploading: $sceneName"))
-                .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_PRIMARY)),
         )
 
         // Progress container
@@ -73,35 +73,35 @@ class SceneUploadProgressDialog(
         val barContainer = Containers.stack(Sizing.fixed(200), Sizing.fixed(20))
 
         val progressBarBackground = Components.box(Sizing.fill(100), Sizing.fill(100))
-        progressBarBackground.color(Color.ofRgb(0x333333))
+        progressBarBackground.color(Color.ofRgb(GlintTheme.PROGRESS_BG))
         progressBarBackground.fill(true)
 
         progressBar = Components.box(Sizing.fill(0), Sizing.fill(100))
-        progressBar.color(Color.ofRgb(0x5555FF))
+        progressBar.color(Color.ofRgb(GlintTheme.PROGRESS_FILL))
         progressBar.fill(true)
 
-        barContainer.child(progressBarBackground as Component)
-        barContainer.child(progressBar as Component)
+        barContainer.child(progressBarBackground)
+        barContainer.child(progressBar)
 
-        progressContainer.child(barContainer as Component)
+        progressContainer.child(barContainer)
 
         // Progress percentage
         progressText = Components.label(McComponent.literal(""))
         progressText.color(Color.ofRgb(GlintTheme.TEXT_PRIMARY))
-        progressContainer.child(progressText as Component)
+        progressContainer.child(progressText)
 
         // Bytes label
         bytesLabel = Components.label(McComponent.literal(""))
         bytesLabel.color(Color.ofRgb(GlintTheme.TEXT_SECONDARY))
-        progressContainer.child(bytesLabel as Component)
+        progressContainer.child(bytesLabel)
 
-        dialog.child(progressContainer as Component)
+        dialog.child(progressContainer)
 
         // Status label
         statusLabel = Components.label(McComponent.literal("Initiating upload..."))
         statusLabel.color(Color.ofRgb(GlintTheme.TEXT_WARNING))
         statusLabel.margins(Insets.top(GlintTheme.GAP_SM))
-        dialog.child(statusLabel as Component)
+        dialog.child(statusLabel)
 
         // Cancel button
         dialog.child(
@@ -115,11 +115,11 @@ class SceneUploadProgressDialog(
     }
 
     private fun buildCompleteView(dialog: FlowLayout) {
-        dialog.child(GlintComponents.title(McComponent.literal("Upload Complete")) as Component)
+        dialog.child(GlintComponents.title(McComponent.literal("Upload Complete")))
         dialog.child(
             Components
                 .label(McComponent.literal("Scene '$sceneName' uploaded successfully"))
-                .color(Color.ofRgb(GlintTheme.TEXT_SUCCESS)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_SUCCESS)),
         )
         dialog.child(
             GlintComponents.button(McComponent.literal("Close")) {
@@ -130,11 +130,11 @@ class SceneUploadProgressDialog(
     }
 
     private fun buildErrorView(dialog: FlowLayout) {
-        dialog.child(GlintComponents.title(McComponent.literal("Upload Failed")) as Component)
+        dialog.child(GlintComponents.title(McComponent.literal("Upload Failed")))
         dialog.child(
             Components
                 .label(McComponent.literal(error ?: "Unknown error"))
-                .color(Color.ofRgb(GlintTheme.TEXT_ERROR)) as Component,
+                .color(Color.ofRgb(GlintTheme.TEXT_ERROR)),
         )
         dialog.child(
             GlintComponents.buttonRow(
@@ -147,7 +147,7 @@ class SceneUploadProgressDialog(
                     rebuild()
                 },
                 GlintComponents.cancelButton { minecraft?.setScreen(parentScreen) },
-            ) as Component,
+            ),
         )
     }
 
@@ -197,7 +197,7 @@ class SceneUploadProgressDialog(
     private fun updateProgressDisplay() {
         if (totalBytes > 0) {
             val percent = ((bytesUploaded * 100) / totalBytes).toInt().coerceIn(0, 100)
-            (progressBar as Component).horizontalSizing(Sizing.fill(percent))
+            progressBar.horizontalSizing(Sizing.fill(percent))
             progressText.text(McComponent.literal("$percent%"))
 
             val mbUploaded = "%.1f".format(bytesUploaded / (1024.0 * 1024.0))

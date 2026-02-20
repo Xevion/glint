@@ -17,7 +17,7 @@ class StatusLogScreen(
     private val parent: Screen,
 ) : GlintListScreen(McComponent.literal("Status Log")) {
     override fun buildHeader(header: FlowLayout) {
-        header.child(GlintComponents.title(McComponent.literal("Status Log")) as Component)
+        header.child(GlintComponents.title(McComponent.literal("Status Log")))
     }
 
     override fun buildContent(content: FlowLayout) {
@@ -27,7 +27,7 @@ class StatusLogScreen(
             content.child(
                 Components
                     .label(McComponent.literal("No log entries"))
-                    .color(Color.ofRgb(GlintTheme.TEXT_MUTED)) as Component,
+                    .color(Color.ofRgb(GlintTheme.TEXT_MUTED)),
             )
             return
         }
@@ -42,7 +42,7 @@ class StatusLogScreen(
             content.child(
                 Components
                     .label(McComponent.literal("[${entry.formattedTime()}] ${entry.message}"))
-                    .color(Color.ofRgb(color)) as Component,
+                    .color(Color.ofRgb(color)),
             )
         }
     }

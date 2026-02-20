@@ -4,7 +4,6 @@ import io.wispforest.owo.ui.base.BaseOwoScreen
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
 import io.wispforest.owo.ui.container.ScrollContainer
-import io.wispforest.owo.ui.core.Component
 import io.wispforest.owo.ui.core.OwoUIAdapter
 import io.wispforest.owo.ui.core.Sizing
 import io.wispforest.owo.ui.core.Surface
@@ -40,7 +39,7 @@ abstract class GlintTabbedScreen(
         tabBar.gap(GlintTheme.GAP_SM)
         tabBar.verticalAlignment(VerticalAlignment.CENTER)
         buildTabBar(tabBar)
-        rootComponent.child(tabBar as Component)
+        rootComponent.child(tabBar)
 
         // Main content area (master-detail split)
         val contentRow = Containers.horizontalFlow(Sizing.fill(100), Sizing.expand())
@@ -54,8 +53,8 @@ abstract class GlintTabbedScreen(
         masterScroll = Containers.verticalScroll(Sizing.fill(100), Sizing.fill(100), masterPanel)
         masterScroll.surface(Surface.DARK_PANEL)
         masterScroll.padding(GlintTheme.paddingSm())
-        masterContainer.child(masterScroll as Component)
-        contentRow.child(masterContainer as Component)
+        masterContainer.child(masterScroll)
+        contentRow.child(masterContainer)
 
         // Detail panel (right, 35%) - wrapped in scroll for overflow
         val detailContainer = Containers.verticalFlow(Sizing.fill(35), Sizing.fill(100))
@@ -65,10 +64,10 @@ abstract class GlintTabbedScreen(
         buildDetailPanel(detailPanel)
         detailScroll = Containers.verticalScroll(Sizing.fill(100), Sizing.fill(100), detailPanel)
         detailScroll.surface(Surface.DARK_PANEL)
-        detailContainer.child(detailScroll as Component)
-        contentRow.child(detailContainer as Component)
+        detailContainer.child(detailScroll)
+        contentRow.child(detailContainer)
 
-        rootComponent.child(contentRow as Component)
+        rootComponent.child(contentRow)
 
         // Status bar (bottom)
         statusBar = Containers.horizontalFlow(Sizing.fill(100), Sizing.content())
@@ -76,7 +75,7 @@ abstract class GlintTabbedScreen(
         statusBar.gap(GlintTheme.GAP_MD)
         statusBar.verticalAlignment(VerticalAlignment.CENTER)
         buildStatusBar(statusBar)
-        rootComponent.child(statusBar as Component)
+        rootComponent.child(statusBar)
 
         // Build initial master content
         buildMasterContent(masterPanel)
