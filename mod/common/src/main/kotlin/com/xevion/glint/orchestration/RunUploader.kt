@@ -258,6 +258,20 @@ class RunUploader(
         sceneVersionId: String,
         event: CaptureTakenEvent,
     ) {
+        // Wait for image analysis to complete (runs concurrently with WebP encoding)
+        val analysis =
+            event.analysisFuture?.let { future ->
+                try {
+                    future.get(30, java.util.concurrent.TimeUnit.SECONDS)
+                } catch (e: Exception) {
+                    log.warn("Image analysis failed, uploading without analytics") {
+                        "item_id" to itemId
+                        "error" to (e.cause?.message ?: e.message)
+                    }
+                    null
+                }
+            }
+
         log.debug("Claiming item") { "item_id" to itemId }
         val claimResponse =
             retryOnRateLimit(operationName = "claim item $itemId") {
@@ -271,6 +285,7 @@ class RunUploader(
                         capturedAt = event.entry.timestamp,
                         presetId = presetId,
                         sceneVersionId = sceneVersionId,
+                        analysis = analysis,
                     ),
                 )
             }.getOrThrow()

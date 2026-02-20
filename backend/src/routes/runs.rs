@@ -5,14 +5,26 @@ use axum::{
     routing::{get, post},
 };
 use serde::Deserialize;
-use tracing::{debug, info, instrument};
+use tracing::{debug, info, instrument, warn};
 
 use crate::auth::AgentUser;
 use crate::error::{AppError, AppResult};
 use crate::id::generate_id;
 use crate::models::{CaptureRun, CaptureRunItemWithContext, CaptureStatus};
 use crate::repo::{CaptureRepo, CaptureRunRepo, ShaderVersionRepo};
+use crate::services::validation;
 use crate::state::AppState;
+
+/// Map an image format name to its MIME type and file extension.
+fn image_format_metadata(format: &str) -> AppResult<(&'static str, &'static str)> {
+    match format {
+        "webp" => Ok(("image/webp", ".webp")),
+        "png" => Ok(("image/png", ".png")),
+        _ => Err(AppError::BadRequest(format!(
+            "Unsupported image format: {format}"
+        ))),
+    }
+}
 
 #[instrument(skip(s3, content_type), level = "debug")]
 async fn generate_presigned_put_url(
@@ -43,6 +55,9 @@ async fn generate_presigned_put_url(
 #[derive(Debug, Deserialize)]
 pub struct CreateRunRequest {
     pub agent_id: Option<String>,
+    pub resolution_width: i32,
+    pub resolution_height: i32,
+    pub image_format: String,
     pub items: Vec<CreateRunItemRequest>,
     pub metadata_json: Option<serde_json::Value>,
 }
@@ -77,6 +92,8 @@ pub struct ClaimItemRequest {
     pub preset_id: Option<String>,
     /// Scene version this capture was taken against (from WorkItem)
     pub scene_version_id: String,
+    /// Client-side analysis results (e.g. histogram data, detected anomalies)
+    pub analysis: Option<serde_json::Value>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -115,6 +132,9 @@ async fn create_run(
     State(state): State<AppState>,
     Json(request): Json<CreateRunRequest>,
 ) -> AppResult<(StatusCode, Json<CaptureRun>)> {
+    // Validate format upfront — fail fast instead of at claim time
+    image_format_metadata(&request.image_format)?;
+
     let run_id = generate_id();
     let total_items = request.items.len() as i32;
 
@@ -123,6 +143,9 @@ async fn create_run(
         &run_id,
         request.agent_id.as_deref(),
         total_items,
+        request.resolution_width,
+        request.resolution_height,
+        &request.image_format,
         request.metadata_json.as_ref(),
     )
     .await?;
@@ -247,15 +270,18 @@ async fn claim_item(
 
     let shader_id = ShaderVersionRepo::get_shader_id(db, item.shader_version_id.as_ref()).await?;
 
+    let run = CaptureRunRepo::get_by_id(db, &run_id).await?;
+    let (content_type, extension) = image_format_metadata(&run.image_format)?;
+
     let capture_id = generate_id();
     let r2_key = format!(
-        "captures/{}/{}/{}.webp",
+        "captures/{}/{}/{}{extension}",
         shader_id, item.scene_id, capture_id
     );
 
     let presigned_url = if let Some(s3) = state.s3() {
         let bucket = state.config().r2.bucket.as_deref().unwrap_or("glint");
-        generate_presigned_put_url(s3, bucket, &r2_key, "image/webp", 3600).await?
+        generate_presigned_put_url(s3, bucket, &r2_key, content_type, 3600).await?
     } else {
         format!("https://r2.example.com/{}", r2_key)
     };
@@ -275,6 +301,7 @@ async fn claim_item(
         request.preset_id.as_deref(),
         Some(&request.scene_version_id),
         CaptureStatus::Uploading,
+        request.analysis.as_ref(),
     )
     .await?;
 
@@ -295,7 +322,9 @@ async fn confirm_upload(
     State(state): State<AppState>,
     Path((run_id, item_id)): Path<(String, String)>,
 ) -> AppResult<StatusCode> {
-    let item = CaptureRunRepo::get_item_by_id(state.db(), &item_id).await?;
+    let db = state.db();
+
+    let item = CaptureRunRepo::get_item_by_id(db, &item_id).await?;
     if item.run_id.as_ref() != run_id {
         return Err(AppError::NotFound(format!(
             "Run item '{}' not found in run '{}'",
@@ -308,6 +337,61 @@ async fn confirm_upload(
         .as_ref()
         .ok_or_else(|| AppError::BadRequest("Run item has no capture_id".to_string()))?;
     let capture_id_str: &str = capture_id.as_ref();
+
+    // Validate the uploaded image if S3 is available
+    if let Some(s3) = state.s3() {
+        let capture = CaptureRepo::find_by_id(db, capture_id_str)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("Capture '{}' not found", capture_id_str)))?;
+        let run = CaptureRunRepo::get_by_id(db, &run_id).await?;
+
+        let bucket = state.config().r2.bucket.as_deref().unwrap_or("glint");
+        match s3
+            .get_object()
+            .bucket(bucket)
+            .key(&capture.image_path)
+            .range("bytes=0-29")
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                let header_bytes = resp
+                    .body
+                    .collect()
+                    .await
+                    .map_err(|e| {
+                        AppError::Internal(anyhow::anyhow!("Failed to read S3 header bytes: {}", e))
+                    })?
+                    .into_bytes();
+
+                if let Err(e) = validation::validate_capture(
+                    &header_bytes,
+                    &run.image_format,
+                    capture.resolution_width.unwrap_or(0),
+                    capture.resolution_height.unwrap_or(0),
+                ) {
+                    warn!(
+                        capture_id = capture_id_str,
+                        error = %e,
+                        "Capture content validation failed"
+                    );
+                    let mut tx = state.begin_tx().await?;
+                    CaptureRepo::mark_failed(&mut *tx, capture_id_str, &e.to_string()).await?;
+                    CaptureRunRepo::fail_item(&mut *tx, &item_id, &e.to_string(), None, None)
+                        .await?;
+                    tx.commit().await?;
+                    return Err(e);
+                }
+            }
+            Err(e) => {
+                warn!(
+                    capture_id = capture_id_str,
+                    error = %e,
+                    "Failed to fetch capture header from S3, skipping validation"
+                );
+            }
+        }
+    }
 
     let mut tx = state.begin_tx().await?;
     CaptureRepo::confirm_upload(&mut *tx, capture_id_str).await?;

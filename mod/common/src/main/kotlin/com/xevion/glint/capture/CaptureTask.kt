@@ -1,9 +1,11 @@
 package com.xevion.glint.capture
 
 import com.xevion.glint.Loggers
+import com.xevion.glint.mixin.NativeImageAccessor
 import net.minecraft.Util
 import net.minecraft.client.Minecraft
 import net.minecraft.client.Screenshot
+import org.lwjgl.system.MemoryUtil
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 
@@ -26,6 +28,9 @@ class CaptureTask(
     private val log = Loggers.Capture.get()
     private var originalHudState = false
     private var hudHidden = false
+
+    /** Future that completes with image analytics when pixel data is analyzed. Created eagerly so callers can hold a reference before capture() runs. */
+    val analysisFuture: CompletableFuture<CaptureAnalysis> = CompletableFuture()
 
     /**
      * Advances the capture by one frame.
@@ -54,6 +59,36 @@ class CaptureTask(
         }
 
         val image = Screenshot.takeScreenshot(mc.mainRenderTarget)
+
+        // Copy pixel data from native memory while NativeImage is still alive.
+        // ABGR→ARGB conversion matches WebpWriter's approach.
+        val imgWidth = image.width
+        val imgHeight = image.height
+        val pixelCount = imgWidth * imgHeight
+        val pixelPtr = (image as NativeImageAccessor).`glint$getPixels`()
+        val intBuffer = MemoryUtil.memIntBuffer(pixelPtr, pixelCount)
+        val argbPixels = IntArray(pixelCount)
+        for (i in 0 until pixelCount) {
+            val abgr = intBuffer.get(i)
+            val a = abgr and 0xFF000000.toInt()
+            val b = (abgr shr 16) and 0xFF
+            val g = abgr and 0x0000FF00.toInt()
+            val r = (abgr and 0xFF) shl 16
+            argbPixels[i] = a or r or g or b
+        }
+
+        // Start analysis asynchronously — pixel data is now safely copied
+        CompletableFuture
+            .supplyAsync(
+                { CaptureAnalyzer.analyze(argbPixels, imgWidth, imgHeight) },
+                Util.ioPool(),
+            ).whenComplete { result, error ->
+                if (error != null) {
+                    analysisFuture.completeExceptionally(error)
+                } else {
+                    analysisFuture.complete(result)
+                }
+            }
 
         Util.ioPool().execute {
             try {

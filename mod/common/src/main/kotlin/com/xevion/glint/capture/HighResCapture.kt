@@ -94,6 +94,12 @@ object HighResCapture {
     /** Whether a capture session is active (dimensions are at 4K). */
     fun isSessionActive(): Boolean = sessionActive
 
+    /** Result of [startCapture], bundling the file future with the analysis future. */
+    data class CaptureResult(
+        val fileFuture: CompletableFuture<Path>,
+        val analysisFuture: CompletableFuture<CaptureAnalysis>,
+    )
+
     /**
      * Starts a single high-resolution capture within an active session.
      *
@@ -102,12 +108,12 @@ object HighResCapture {
      *
      * @param file Output path for the image file
      * @param hideHud Whether to hide the HUD during capture
-     * @return Future that completes when the capture is saved, or null if a capture is already active
+     * @return [CaptureResult] with futures for the saved file and analysis, or null if a capture is already active
      */
     fun startCapture(
         file: Path,
         hideHud: Boolean = true,
-    ): CompletableFuture<Path>? {
+    ): CaptureResult? {
         if (!sessionActive) {
             log.error("Cannot start capture outside of an active session")
             return null
@@ -123,9 +129,10 @@ object HighResCapture {
             "file" to file.fileName.toString()
         }
 
-        val future = CompletableFuture<Path>()
-        activeTask = CaptureTask(file, hideHud, future)
-        return future
+        val fileFuture = CompletableFuture<Path>()
+        val task = CaptureTask(file, hideHud, fileFuture)
+        activeTask = task
+        return CaptureResult(fileFuture, task.analysisFuture)
     }
 
     /**

@@ -6,3 +6,4 @@ pub mod platform;
 pub mod profile_backfill;
 pub mod run_monitor;
 pub mod shader;
+pub mod validation;

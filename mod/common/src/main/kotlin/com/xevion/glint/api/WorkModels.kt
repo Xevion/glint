@@ -1,5 +1,6 @@
 package com.xevion.glint.api
 
+import com.xevion.glint.capture.CaptureAnalysis
 import com.xevion.glint.orchestration.CaptureItemKey
 import com.xevion.glint.orchestration.ShaderSpec
 import kotlinx.serialization.Serializable
@@ -114,6 +115,9 @@ fun WorkShader.toShaderSpec(): ShaderSpec {
 data class CreateRunRequest(
     val agentId: String? = null,
     val items: List<CreateRunItemRequest>,
+    val resolutionWidth: Int,
+    val resolutionHeight: Int,
+    val imageFormat: String,
     val metadataJson: JsonObject? = null,
 )
 
@@ -138,6 +142,9 @@ data class CaptureRun(
     val completedItems: Int,
     val failedItems: Int,
     val skippedItems: Int,
+    val resolutionWidth: Int = 0,
+    val resolutionHeight: Int = 0,
+    val imageFormat: String = "webp",
     val metadataJson: JsonObject? = null,
 )
 
@@ -184,6 +191,7 @@ data class ClaimItemRequest(
     val capturedAt: String,
     val presetId: String? = null,
     val sceneVersionId: String,
+    val analysis: CaptureAnalysis? = null,
 )
 
 /** Response from claiming a run item. */

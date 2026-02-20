@@ -12,6 +12,35 @@ use crate::id::{
     ShaderVersionProfileId,
 };
 
+/// Luminance statistics: mean value and 8-bin histogram of relative luminance.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LuminanceData {
+    pub mean: f64,
+    /// 8 equal-width bins (0.0–0.125, …, 0.875–1.0), normalized to proportions.
+    pub histogram: Vec<f64>,
+}
+
+/// A dominant color extracted via mean-shift clustering in CIELAB space.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct DominantColor {
+    pub hex: String,
+    /// CIELAB coordinates [L, a, b].
+    pub lab: Vec<f64>,
+    /// Proportion of pixels belonging to this cluster.
+    pub weight: f64,
+}
+
+/// Per-capture image analysis computed by the mod's CaptureAnalyzer.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CaptureAnalysis {
+    pub luminance: LuminanceData,
+    pub edge_density: f64,
+    pub dominant_colors: Vec<DominantColor>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -209,6 +238,8 @@ pub struct Capture {
     pub content_type: Option<String>,
     pub preset_id: Option<ScenePresetId>,
     pub scene_version_id: Option<SceneVersionId>,
+    #[ts(optional, type = "Record<string, unknown>")]
+    pub analysis: Option<serde_json::Value>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "string")]
@@ -230,6 +261,9 @@ pub struct CaptureRun {
     pub completed_items: i32,
     pub failed_items: i32,
     pub skipped_items: i32,
+    pub resolution_width: i32,
+    pub resolution_height: i32,
+    pub image_format: String,
     #[ts(optional, type = "Record<string, unknown>")]
     pub metadata_json: Option<serde_json::Value>,
 }
@@ -379,6 +413,7 @@ pub struct CaptureDetail {
     pub gpu_model: Option<String>,
     pub content_type: Option<String>,
     pub scene_version_id: Option<SceneVersionId>,
+    pub analysis: Option<CaptureAnalysis>,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "string")]

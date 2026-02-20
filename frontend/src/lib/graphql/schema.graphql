@@ -123,6 +123,9 @@ type CaptureRunNode {
 	completedItems: Int!
 	failedItems: Int!
 	skippedItems: Int!
+	resolutionWidth: Int!
+	resolutionHeight: Int!
+	imageFormat: String!
 	items: [CaptureRunItemNode!]!
 }
 

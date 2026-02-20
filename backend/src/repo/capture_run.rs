@@ -25,29 +25,39 @@ pub struct CaptureRunRepo;
 impl CaptureRunRepo {
     /// Create a new capture run
     #[instrument(skip(executor), level = "debug")]
+    #[allow(clippy::too_many_arguments)]
     pub async fn create(
         executor: impl sqlx::PgExecutor<'_>,
         id: &str,
         agent_id: Option<&str>,
         total_items: i32,
+        resolution_width: i32,
+        resolution_height: i32,
+        image_format: &str,
         metadata_json: Option<&serde_json::Value>,
     ) -> AppResult<CaptureRun> {
         let run = sqlx::query_as!(
             CaptureRun,
             r#"
-            INSERT INTO capture_runs (id, agent_id, total_items, metadata_json, status, started_at)
-            VALUES ($1, $2, $3, $4::jsonb, 'running', now())
+            INSERT INTO capture_runs (id, agent_id, total_items, resolution_width, resolution_height, image_format, metadata_json, status, started_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, 'running', now())
             RETURNING id AS "id: CaptureRunId", agent_id, started_at, completed_at,
                 status AS "status!: CaptureRunStatus",
                 total_items,
                 completed_items,
                 failed_items,
                 skipped_items,
+                resolution_width,
+                resolution_height,
+                image_format,
                 metadata_json as "metadata_json: serde_json::Value"
             "#,
             id,
             agent_id,
             total_items,
+            resolution_width,
+            resolution_height,
+            image_format,
             metadata_json,
         )
         .fetch_one(executor)
@@ -70,6 +80,9 @@ impl CaptureRunRepo {
                 COALESCE(counts.completed, 0)::int4 as "completed_items!",
                 COALESCE(counts.failed, 0)::int4 as "failed_items!",
                 COALESCE(counts.skipped, 0)::int4 as "skipped_items!",
+                cr.resolution_width,
+                cr.resolution_height,
+                cr.image_format,
                 cr.metadata_json as "metadata_json: serde_json::Value"
             FROM capture_runs cr
             LEFT JOIN LATERAL (
@@ -101,6 +114,9 @@ impl CaptureRunRepo {
                 COALESCE(counts.completed, 0)::int4 as "completed_items!",
                 COALESCE(counts.failed, 0)::int4 as "failed_items!",
                 COALESCE(counts.skipped, 0)::int4 as "skipped_items!",
+                cr.resolution_width,
+                cr.resolution_height,
+                cr.image_format,
                 cr.metadata_json as "metadata_json: serde_json::Value"
             FROM capture_runs cr
             LEFT JOIN LATERAL (
@@ -152,6 +168,9 @@ impl CaptureRunRepo {
                 capture_runs.completed_items,
                 capture_runs.failed_items,
                 capture_runs.skipped_items,
+                capture_runs.resolution_width,
+                capture_runs.resolution_height,
+                capture_runs.image_format,
                 capture_runs.metadata_json as "metadata_json: serde_json::Value"
             "#,
             id

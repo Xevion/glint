@@ -64,6 +64,9 @@ impl RunQuery {
             completed_items: run.completed_items,
             failed_items: run.failed_items,
             skipped_items: run.skipped_items,
+            resolution_width: run.resolution_width,
+            resolution_height: run.resolution_height,
+            image_format: run.image_format,
             items: item_nodes,
         }))
     }

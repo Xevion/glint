@@ -379,6 +379,14 @@ export type introspection_types = {
 					ofType: { kind: 'SCALAR'; name: 'CaptureRunId'; ofType: null };
 				};
 			};
+			imageFormat: {
+				name: 'imageFormat';
+				type: {
+					kind: 'NON_NULL';
+					name: never;
+					ofType: { kind: 'SCALAR'; name: 'String'; ofType: null };
+				};
+			};
 			items: {
 				name: 'items';
 				type: {
@@ -394,6 +402,14 @@ export type introspection_types = {
 						};
 					};
 				};
+			};
+			resolutionHeight: {
+				name: 'resolutionHeight';
+				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
+			};
+			resolutionWidth: {
+				name: 'resolutionWidth';
+				type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'Int'; ofType: null } };
 			};
 			skippedItems: {
 				name: 'skippedItems';

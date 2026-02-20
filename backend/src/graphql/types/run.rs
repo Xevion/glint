@@ -60,6 +60,9 @@ pub struct CaptureRunNode {
     pub completed_items: i32,
     pub failed_items: i32,
     pub skipped_items: i32,
+    pub resolution_width: i32,
+    pub resolution_height: i32,
+    pub image_format: String,
     pub items: Vec<CaptureRunItemNode>,
 }
 

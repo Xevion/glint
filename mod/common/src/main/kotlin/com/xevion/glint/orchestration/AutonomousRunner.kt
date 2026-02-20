@@ -10,6 +10,7 @@ import com.xevion.glint.api.HttpClient
 import com.xevion.glint.api.WorkItem
 import com.xevion.glint.api.captureKey
 import com.xevion.glint.api.retryOnRateLimit
+import com.xevion.glint.capture.HighResCapture
 import com.xevion.glint.session.SessionRegistry
 import net.minecraft.client.Minecraft
 import java.util.concurrent.CancellationException
@@ -169,6 +170,9 @@ class AutonomousRunner(
                                         presetId = item.preset?.id,
                                     )
                                 },
+                            resolutionWidth = HighResCapture.CAPTURE_WIDTH,
+                            resolutionHeight = HighResCapture.CAPTURE_HEIGHT,
+                            imageFormat = "webp",
                         )
 
                     val run =

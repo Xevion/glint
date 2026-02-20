@@ -28,9 +28,9 @@ pub use background::{
     UpdateBackgroundRequest,
 };
 pub use capture::{
-    Capture, CaptureDetail, CaptureFreshness, CaptureListItem, CaptureRun, CaptureRunItem,
-    CaptureRunItemStatus, CaptureRunItemWithContext, CaptureRunStatus, CaptureStatus,
-    CaptureWithContext,
+    Capture, CaptureAnalysis, CaptureDetail, CaptureFreshness, CaptureListItem, CaptureRun,
+    CaptureRunItem, CaptureRunItemStatus, CaptureRunItemWithContext, CaptureRunStatus,
+    CaptureStatus, CaptureWithContext,
 };
 pub use extraction::{ExtractionStatus, ShaderVersionMetadata, ShaderVersionProfile};
 pub use featured::{FeaturedPair, FeaturedSide};

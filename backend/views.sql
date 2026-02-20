@@ -166,6 +166,7 @@ SELECT
     c.gpu_model,
     c.content_type,
     c.scene_version_id,
+    c.analysis,
     c.created_at,
     c.updated_at
 FROM captures_with_freshness c
@@ -221,6 +222,7 @@ SELECT
     cc.gpu_model,
     cc.content_type,
     cc.scene_version_id,
+    cc.analysis,
     cc.created_at,
     cc.updated_at,
     -- Extra for filtering

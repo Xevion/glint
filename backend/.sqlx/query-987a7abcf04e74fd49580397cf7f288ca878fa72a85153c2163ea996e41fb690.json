@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO capture_runs (id, agent_id, total_items, metadata_json, status, started_at)\n            VALUES ($1, $2, $3, $4::jsonb, 'running', now())\n            RETURNING id AS \"id: CaptureRunId\", agent_id, started_at, completed_at,\n                status AS \"status!: CaptureRunStatus\",\n                total_items,\n                completed_items,\n                failed_items,\n                skipped_items,\n                metadata_json as \"metadata_json: serde_json::Value\"\n            ",
+  "query": "\n            INSERT INTO capture_runs (id, agent_id, total_items, resolution_width, resolution_height, image_format, metadata_json, status, started_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, 'running', now())\n            RETURNING id AS \"id: CaptureRunId\", agent_id, started_at, completed_at,\n                status AS \"status!: CaptureRunStatus\",\n                total_items,\n                completed_items,\n                failed_items,\n                skipped_items,\n                resolution_width,\n                resolution_height,\n                image_format,\n                metadata_json as \"metadata_json: serde_json::Value\"\n            ",
   "describe": {
     "columns": [
       {
@@ -50,6 +50,21 @@
       },
       {
         "ordinal": 9,
+        "name": "resolution_width",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "resolution_height",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "image_format",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
         "name": "metadata_json: serde_json::Value",
         "type_info": "Jsonb"
       }
@@ -59,6 +74,9 @@
         "Text",
         "Text",
         "Int4",
+        "Int4",
+        "Int4",
+        "Text",
         "Jsonb"
       ]
     },
@@ -72,8 +90,11 @@
       false,
       false,
       false,
+      false,
+      false,
+      false,
       true
     ]
   },
-  "hash": "77ef8865f09776bbf50f83af19b24f78f54aa4f558144a7e0f4527ccc1103aa6"
+  "hash": "987a7abcf04e74fd49580397cf7f288ca878fa72a85153c2163ea996e41fb690"
 }

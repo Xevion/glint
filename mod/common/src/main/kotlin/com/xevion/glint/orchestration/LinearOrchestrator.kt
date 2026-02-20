@@ -536,7 +536,7 @@ class LinearOrchestrator {
         val sceneId = item.scene.id
         val presetId = item.preset?.id
 
-        val future =
+        val (fileFuture, analysisFuture) =
             HighResCapture.startCapture(outputPath) ?: run {
                 log.error("Failed to start high-res capture")
                 CaptureTimeOverride.deactivate()
@@ -544,11 +544,13 @@ class LinearOrchestrator {
                 return
             }
 
-        future.thenAccept {
+        fileFuture.thenAccept {
             log.debug("Capture saved") { "file" to captureFilename }
             if (captureFile.exists()) {
                 val bytes = captureFile.readBytes()
-                callback?.invoke(CaptureTakenEvent(entry, bytes, sceneId, presetId))
+                callback?.invoke(
+                    CaptureTakenEvent(entry, bytes, sceneId, presetId, analysisFuture),
+                )
             } else {
                 log.warn("Capture file not found after save") {
                     "path" to captureFile.absolutePath
@@ -594,7 +596,7 @@ class LinearOrchestrator {
             ),
         )
 
-        pendingCapture = future
+        pendingCapture = fileFuture
     }
 
     private fun handleGeneratingManifest() {

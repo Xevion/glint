@@ -69,6 +69,7 @@ impl CaptureRepo {
                 error_message, thumbhash, file_size_bytes, content_type,
                 preset_id AS "preset_id: ScenePresetId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
+                analysis as "analysis: serde_json::Value",
                 created_at, updated_at
             FROM captures WHERE id = $1"#,
             id
@@ -291,6 +292,7 @@ impl CaptureRepo {
                 error_message, thumbhash, file_size_bytes, content_type,
                 preset_id AS "preset_id: ScenePresetId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
+                analysis as "analysis: serde_json::Value",
                 created_at, updated_at
             FROM captures WHERE shader_version_id = $1 ORDER BY created_at DESC"#,
             shader_version_id
@@ -326,6 +328,7 @@ impl CaptureRepo {
                 error_message, thumbhash, file_size_bytes, content_type,
                 preset_id AS "preset_id: ScenePresetId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
+                analysis as "analysis: serde_json::Value",
                 created_at, updated_at
             FROM captures WHERE scene_id = $1 ORDER BY created_at DESC"#,
             scene_id
@@ -709,14 +712,15 @@ impl CaptureRepo {
         preset_id: Option<&str>,
         scene_version_id: Option<&str>,
         status: CaptureStatus,
+        analysis: Option<&serde_json::Value>,
     ) -> AppResult<()> {
         sqlx::query!(
             r#"
             INSERT INTO captures (
                 id, shader_version_id, scene_id, profile_id, image_path,
                 resolution_width, resolution_height, preset_id, scene_version_id,
-                status, created_at, updated_at, captured_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $11)
+                status, created_at, updated_at, captured_at, analysis
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $11, $12)
             "#,
             id,
             shader_version_id,
@@ -728,7 +732,8 @@ impl CaptureRepo {
             preset_id,
             scene_version_id,
             status as CaptureStatus,
-            captured_at
+            captured_at,
+            analysis,
         )
         .execute(executor)
         .await
@@ -838,6 +843,7 @@ impl CaptureRepo {
             gpu_model: Option<String>,
             content_type: Option<String>,
             scene_version_id: Option<SceneVersionId>,
+            analysis: Option<serde_json::Value>,
             created_at: DateTime<Utc>,
             updated_at: DateTime<Utc>,
         }
@@ -861,6 +867,7 @@ impl CaptureRepo {
                 avg_fps, min_fps, max_fps, frame_time_avg, frame_time_p99,
                 minecraft_version, iris_version, gpu_model, content_type,
                 scene_version_id AS "scene_version_id: SceneVersionId",
+                analysis AS "analysis: serde_json::Value",
                 created_at AS "created_at!", updated_at AS "updated_at!"
             FROM capture_details
             WHERE id = $1
@@ -1012,6 +1019,7 @@ impl CaptureRepo {
             gpu_model: row.gpu_model,
             content_type: row.content_type,
             scene_version_id: row.scene_version_id,
+            analysis: row.analysis.and_then(|v| serde_json::from_value(v).ok()),
             created_at: row.created_at,
             updated_at: row.updated_at,
             same_shader_scene,
@@ -1450,6 +1458,7 @@ impl CaptureRepo {
                 error_message, thumbhash, file_size_bytes, content_type,
                 preset_id AS "preset_id: ScenePresetId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
+                analysis as "analysis: serde_json::Value",
                 created_at, updated_at
             FROM captures
             WHERE status = 'uploading'
@@ -1491,6 +1500,7 @@ impl CaptureRepo {
                 error_message, thumbhash, file_size_bytes, content_type,
                 preset_id AS "preset_id: ScenePresetId",
                 scene_version_id AS "scene_version_id: SceneVersionId",
+                analysis as "analysis: serde_json::Value",
                 created_at, updated_at
             FROM captures
             WHERE status = 'completed'

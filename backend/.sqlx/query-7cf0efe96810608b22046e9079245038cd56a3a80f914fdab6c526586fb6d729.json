@@ -1,0 +1,92 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                cr.id AS \"id: CaptureRunId\", cr.agent_id, cr.started_at, cr.completed_at,\n                cr.status AS \"status!: CaptureRunStatus\", cr.total_items,\n                COALESCE(counts.completed, 0)::int4 as \"completed_items!\",\n                COALESCE(counts.failed, 0)::int4 as \"failed_items!\",\n                COALESCE(counts.skipped, 0)::int4 as \"skipped_items!\",\n                cr.resolution_width,\n                cr.resolution_height,\n                cr.image_format,\n                cr.metadata_json as \"metadata_json: serde_json::Value\"\n            FROM capture_runs cr\n            LEFT JOIN LATERAL (\n                SELECT\n                    COUNT(*) FILTER (WHERE status = 'completed') AS completed,\n                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,\n                    COUNT(*) FILTER (WHERE status = 'skipped') AS skipped\n                FROM capture_run_items WHERE run_id = cr.id\n            ) counts ON TRUE\n            ORDER BY cr.started_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: CaptureRunId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "agent_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "status!: CaptureRunStatus",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "total_items",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "completed_items!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "failed_items!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "skipped_items!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "resolution_width",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "resolution_height",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "image_format",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "metadata_json: serde_json::Value",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      null,
+      null,
+      null,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "7cf0efe96810608b22046e9079245038cd56a3a80f914fdab6c526586fb6d729"
+}
