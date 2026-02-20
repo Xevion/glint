@@ -107,6 +107,24 @@ export const handle: Handle = async ({ event, resolve }) => {
 			response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 		}
 
+		// SSR page-level caching for Cloudflare edge.
+		// Only applies to HTML responses (not static assets).
+		const contentType = response.headers.get('content-type');
+		if (contentType?.includes('text/html')) {
+			if (pathname.startsWith('/admin')) {
+				// Admin pages: never cache, always revalidate
+				response.headers.set('Cache-Control', 'private, no-store, must-revalidate');
+			} else {
+				// Public pages: cache at edge for 60s, stale-while-revalidate for 120s.
+				// Browsers always revalidate (max-age=0), but Cloudflare serves from
+				// edge cache for up to 60s without hitting origin.
+				response.headers.set(
+					'Cache-Control',
+					'public, max-age=0, s-maxage=60, stale-while-revalidate=120'
+				);
+			}
+		}
+
 		if (response.status >= 400) {
 			const reqLogger = getLogger(['ssr', 'request']);
 			reqLogger.warn('{method} {path} {status}', {

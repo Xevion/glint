@@ -331,13 +331,13 @@ function handleDragEnd() {
 							</Form.Field>
 
 							<div class="space-y-2">
-								<label class="text-sm font-medium text-muted-foreground">Slug</label>
-								<Input value={scene.slug} disabled class="font-mono text-xs" />
+								<label for="scene-slug" class="text-sm font-medium text-muted-foreground">Slug</label>
+								<Input id="scene-slug" value={scene.slug} disabled class="font-mono text-xs" />
 							</div>
 
 							<div class="space-y-2">
-								<label class="text-sm font-medium text-muted-foreground">ID</label>
-								<Input value={scene.id} disabled class="font-mono text-xs" />
+								<label for="scene-id" class="text-sm font-medium text-muted-foreground">ID</label>
+								<Input id="scene-id" value={scene.id} disabled class="font-mono text-xs" />
 							</div>
 						</div>
 
@@ -588,12 +588,12 @@ function handleDragEnd() {
 			</div>
 
 			<div class="space-y-1.5">
-				<label class="text-sm font-medium">Time of Day</label>
+				<span class="text-sm font-medium">Time of Day</span>
 				<TimeOfDaySlider bind:value={$createFormData.time_of_day_ticks} />
 			</div>
 
 			<div class="space-y-1.5">
-				<label class="text-sm font-medium">Weather</label>
+				<span class="text-sm font-medium">Weather</span>
 				<WeatherToggle bind:value={$createFormData.weather} />
 			</div>
 
@@ -645,12 +645,12 @@ function handleDragEnd() {
 			</Form.Field>
 
 			<div class="space-y-1.5">
-				<label class="text-sm font-medium">Time of Day</label>
+				<span class="text-sm font-medium">Time of Day</span>
 				<TimeOfDaySlider bind:value={$editFormData.time_of_day_ticks} />
 			</div>
 
 			<div class="space-y-1.5">
-				<label class="text-sm font-medium">Weather</label>
+				<span class="text-sm font-medium">Weather</span>
 				<WeatherToggle bind:value={$editFormData.weather} />
 			</div>
 

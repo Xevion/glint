@@ -2,19 +2,22 @@
 import { Slider as SliderPrimitive } from 'bits-ui';
 import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
 
+// bits-ui Slider.RootProps is a discriminated union on `type: 'single' | 'multiple'`.
+// Svelte 5 $props() destructuring loses discriminant narrowing, causing TypeScript to
+// fail with "expression too complex" or "type missing" errors on the spread.
+// All usages in this codebase use type="single", so we narrow to that variant to
+// give TypeScript a concrete non-union type it can check.
+type SingleSliderRootProps = Extract<SliderPrimitive.RootProps, { type: 'single' }>;
+
 let {
 	ref = $bindable(null),
 	value = $bindable(),
 	orientation = 'horizontal',
 	class: className,
 	...restProps
-}: WithoutChildrenOrChild<SliderPrimitive.RootProps> = $props();
+}: WithoutChildrenOrChild<SingleSliderRootProps> = $props();
 </script>
 
-<!--
-Discriminated Unions + Destructing (required for bindable) do not
-get along, so we shut typescript up by casting `value` to `never`.
--->
 <SliderPrimitive.Root
 	bind:ref
 	bind:value={value as never}

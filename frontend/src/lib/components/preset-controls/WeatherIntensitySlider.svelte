@@ -7,10 +7,10 @@ interface Props {
 }
 let { value = $bindable(), onchange }: Props = $props();
 
-let sliderValue = $derived([Math.round(value * 100)]);
+let sliderValue = $derived(Math.round(value * 100));
 
-function handleValueChange(v: number[]) {
-	const newValue = v[0] / 100;
+function handleValueChange(v: number) {
+	const newValue = v / 100;
 	if (newValue === value) return;
 	value = newValue;
 	onchange?.(newValue);

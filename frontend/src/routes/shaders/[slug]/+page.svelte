@@ -11,7 +11,13 @@ import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import BrandIcon from '$lib/components/icons/BrandIcon.svelte';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import * as Select from '$lib/components/ui/select';
-import { formatNumber, formatVersion, getCurseforgeUrl, getModrinthUrl } from '$lib/utils/format';
+import {
+	formatDate,
+	formatNumber,
+	formatVersion,
+	getCurseforgeUrl,
+	getModrinthUrl
+} from '$lib/utils/format';
 import { imageUrl } from '$lib/utils/image';
 import { themeStore } from '$lib/stores/theme.svelte';
 import { createGraphQLClient, query } from '$lib/graphql';
@@ -341,9 +347,12 @@ const ogDescription = $derived.by(() => {
 												Latest
 											</span>
 										{/if}
-										<span class="ml-auto text-xs text-muted-foreground">
-											{version.captureCount}
-										</span>
+									<span class="ml-auto text-xs text-muted-foreground">
+										{version.captureCount}
+										{#if version.upstreamPublishedAt}
+											· {formatDate(version.upstreamPublishedAt)}
+										{/if}
+									</span>
 									</span>
 								</Select.Item>
 							{/each}

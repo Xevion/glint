@@ -8,12 +8,10 @@ interface Props {
 }
 let { value = $bindable(), onchange }: Props = $props();
 
-let sliderValue = $derived([value]);
-
-function handleValueChange(v: number[]) {
-	if (v[0] === value) return;
-	value = v[0];
-	onchange?.(v[0]);
+function handleValueChange(v: number) {
+	if (v === value) return;
+	value = v;
+	onchange?.(v);
 }
 
 const MARKERS = [
@@ -33,7 +31,7 @@ let displayTime = $derived(formatTimeTicks(value));
 	</div>
 	<Slider
 		type="single"
-		value={sliderValue}
+		value={value}
 		min={0}
 		max={24000}
 		step={100}

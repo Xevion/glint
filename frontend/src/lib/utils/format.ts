@@ -1,5 +1,3 @@
-// ─── Date / Time Normalization ───────────────────────────────────────────────
-
 /**
  * Normalize various date inputs to a Date object.
  * Accepts ISO strings or existing Date instances.
@@ -8,7 +6,17 @@ export function toDate(input: string | Date): Date {
 	return typeof input === 'string' ? new Date(input) : input;
 }
 
-// ─── Datetime Formatting ─────────────────────────────────────────────────────
+/**
+ * Human-readable date: "Jan 15, 2024".
+ * Uses the browser's locale for formatting.
+ */
+export function formatDate(input: string | Date): string {
+	return toDate(input).toLocaleDateString(undefined, {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric'
+	});
+}
 
 /**
  * Human-readable datetime: "Jan 15, 2:00 PM".
@@ -30,8 +38,6 @@ export function formatDatetime(input: string | Date): string {
 export function formatTime(input: string | Date): string {
 	return toDate(input).toLocaleTimeString();
 }
-
-// ─── Relative Time ───────────────────────────────────────────────────────────
 
 /**
  * Compact relative time: "just now", "5m ago", "3d ago".
@@ -59,8 +65,6 @@ export function formatRelativeTime(input: string | Date): string {
 export function ageMs(input: string | Date): number {
 	return Date.now() - toDate(input).getTime();
 }
-
-// ─── Duration ────────────────────────────────────────────────────────────────
 
 /**
  * Adaptive duration formatting from milliseconds.
@@ -100,8 +104,6 @@ export function formatElapsedDuration(run: {
 	const ms = new Date(run.completed_at).getTime() - new Date(run.started_at).getTime();
 	return formatDuration(ms);
 }
-
-// ─── Numeric Formatting ──────────────────────────────────────────────────────
 
 const EM_DASH = '\u2014';
 
@@ -162,8 +164,6 @@ export function formatBytes(bytes: number, decimals = 2): string {
 	const i = Math.floor(Math.log(bytes) / Math.log(k));
 	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`;
 }
-
-// ─── Minecraft Display ───────────────────────────────────────────────────────
 
 /**
  * Construct Modrinth shader URL from ID.

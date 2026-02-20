@@ -1,7 +1,7 @@
 <script lang="ts" module>
 import { getContext, setContext } from 'svelte';
 import type { VariantProps } from 'tailwind-variants';
-import { toggleVariants } from '$lib/components/ui/toggle/index.js';
+import type { toggleVariants } from '$lib/components/ui/toggle/index.js';
 
 type ToggleVariants = VariantProps<typeof toggleVariants>;
 
@@ -33,9 +33,9 @@ export function getToggleGroupCtx() {
 	}: ToggleGroupPrimitive.RootProps & ToggleVariants & { spacing?: number } = $props();
 
 	setToggleGroupCtx({
-		variant,
-		size,
-		spacing,
+		get variant() { return variant; },
+		get size() { return size; },
+		get spacing() { return spacing; },
 	});
 </script>
 

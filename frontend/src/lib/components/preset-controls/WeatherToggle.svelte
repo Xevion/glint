@@ -1,6 +1,6 @@
 <script lang="ts">
 import * as ToggleGroup from '$lib/components/ui/toggle-group';
-import { Cloud, CloudLightning, CloudRain, Snowflake, Sun } from '@lucide/svelte';
+import { CloudLightning, CloudRain, Snowflake, Sun } from '@lucide/svelte';
 
 type Weather = 'clear' | 'rain' | 'thunder' | 'snow';
 

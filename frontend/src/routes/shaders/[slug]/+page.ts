@@ -24,6 +24,7 @@ export const _ShaderDetailQuery = graphql(`
             version {
               id
               version
+              upstreamPublishedAt
             }
             captureCount
           }
@@ -124,6 +125,7 @@ export interface ShaderDetailVersion {
 	id: string;
 	version: string;
 	captureCount: number;
+	upstreamPublishedAt?: string | null;
 }
 
 export type ShaderDetailCapture = GqlCapture;
@@ -163,7 +165,8 @@ function mapVersion(v: GqlVersion): ShaderDetailVersion {
 	return {
 		id: v.version.id,
 		version: v.version.version,
-		captureCount: v.captureCount
+		captureCount: v.captureCount,
+		upstreamPublishedAt: v.version.upstreamPublishedAt
 	};
 }
 
