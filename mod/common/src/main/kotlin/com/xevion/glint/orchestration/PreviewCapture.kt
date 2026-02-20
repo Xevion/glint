@@ -83,7 +83,7 @@ object PreviewCapture {
                         fov = metadata.fov,
                         renderDistance = metadata.renderDistance,
                         minecraftVersion = metadata.minecraftVersion,
-                        versionId = metadata.versions.firstOrNull()?.backendVersionId,
+                        versionId = null,
                     ),
                 preset =
                     preset?.let {
@@ -91,7 +91,7 @@ object PreviewCapture {
                             // Unsynced local presets use "local" as a sentinel ID.
                             // Preview captures don't flow through RunUploader, so
                             // this never reaches the backend API.
-                            id = it.backendPresetId ?: "local",
+                            id = "local",
                             name = it.name,
                             slug = it.slug,
                             timeOfDayTicks = it.timeOfDayTicks,

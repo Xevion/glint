@@ -42,6 +42,10 @@ pub use scene::{
     SceneWithVersion, UpdatePresetRequest, UpdateSceneMetadataRequest, UpdateSceneRequest,
     UploadInitiatedResponse,
 };
+pub use scene::{
+    ReconcileLocalScene, ReconcileRequest, ReconcileResponse, ReconcileSceneInfo,
+    ReconcileSceneStatus, SyncStatus,
+};
 pub use shader::{
     CreateShaderRequest, CreateShaderVersionRequest, ExtractionSummary, Shader, ShaderAdopted,
     ShaderAuthor, ShaderListItem, ShaderSearchRequest, ShaderSearchResponse, ShaderSearchResult,

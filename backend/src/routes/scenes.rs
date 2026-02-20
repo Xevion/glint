@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Redirect, Response},
-    routing::{delete, get, patch, put},
+    routing::{delete, get, patch, post, put},
 };
 use serde::Deserialize;
 use tracing::instrument;
@@ -17,8 +17,10 @@ use crate::{
     id::ScenePresetId,
     models::{
         CaptureStatus, CaptureWithContext, CreatePresetRequest, CreateSceneRequest, PageQuery,
-        Paginated, ReorderPresetsRequest, Scene, SceneListItem, ScenePreset, SceneWithCaptures,
-        SceneWithVersion, UpdatePresetRequest, UpdateSceneMetadataRequest, UpdateSceneRequest,
+        Paginated, ReconcileRequest, ReconcileResponse, ReconcileSceneInfo, ReconcileSceneStatus,
+        ReorderPresetsRequest, Scene, SceneListItem, ScenePreset, SceneWithCaptures,
+        SceneWithVersion, SyncStatus, UpdatePresetRequest, UpdateSceneMetadataRequest,
+        UpdateSceneRequest,
     },
     repo::{
         CaptureRepo, ScenePresetRepo, SceneRepo, SceneVersionRepo, SlugRedirectRepo, TagRepo,
@@ -30,6 +32,7 @@ use crate::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_scenes_public).post(create_scene))
+        .route("/reconcile", post(reconcile))
         .route("/all", get(list_scenes_all))
         .route("/batch", delete(batch_disable_scenes))
         .route(
@@ -111,6 +114,118 @@ async fn list_scenes_all(
 ) -> AppResult<Json<Vec<SceneListItem>>> {
     let scenes = SceneRepo::list_all(state.db()).await?;
     Ok(Json(scenes))
+}
+
+/// POST /api/scenes/reconcile - Compute sync status for mod's local scenes against server state.
+///
+/// The mod sends its local scene manifest (slug → package hash). The server returns
+/// a per-scene computed status indicating the relationship between local and remote.
+#[instrument(skip(state, request))]
+async fn reconcile(
+    State(state): State<AppState>,
+    Json(request): Json<ReconcileRequest>,
+) -> AppResult<Json<ReconcileResponse>> {
+    let db = state.db();
+
+    // Fetch all active scenes with their latest versions
+    let scenes = SceneRepo::list_active(db).await?;
+    let scene_ids: Vec<String> = scenes.iter().map(|s| s.id.0.clone()).collect();
+    let versions = SceneVersionRepo::get_latest_batch(db, &scene_ids).await?;
+
+    // Index server scenes by slug
+    let server_by_slug: HashMap<&str, (&Scene, Option<&crate::models::SceneVersion>)> = scenes
+        .iter()
+        .map(|s| (s.slug.as_str(), (s, versions.get(&s.id))))
+        .collect();
+
+    let mut result: HashMap<String, ReconcileSceneStatus> = HashMap::new();
+
+    // Process scenes the mod has locally
+    for (slug, local) in &request.scenes {
+        match server_by_slug.get(slug.as_str()) {
+            Some(&(scene, Some(version))) => {
+                let status = match (&local.package_hash, &version.package_hash) {
+                    (Some(local_hash), Some(remote_hash)) if local_hash == remote_hash => {
+                        SyncStatus::Synced
+                    }
+                    (Some(_), Some(_)) => {
+                        // Hashes differ — we can't tell direction without version history,
+                        // so report local_ahead (mod has changes not matching server)
+                        SyncStatus::LocalAhead
+                    }
+                    (None, _) => SyncStatus::LocalAhead,
+                    (_, None) => SyncStatus::LocalAhead,
+                };
+
+                result.insert(
+                    slug.clone(),
+                    ReconcileSceneStatus {
+                        status,
+                        scene: Some(scene_info(scene, version)),
+                    },
+                );
+            }
+            Some(&(scene, None)) => {
+                // Scene exists but has no version — treat as local_ahead
+                result.insert(
+                    slug.clone(),
+                    ReconcileSceneStatus {
+                        status: SyncStatus::LocalAhead,
+                        scene: Some(ReconcileSceneInfo {
+                            id: scene.id.clone(),
+                            name: scene.name.clone(),
+                            slug: scene.slug.clone(),
+                            description: scene.description.clone(),
+                            dimension: scene.dimension.clone(),
+                            version_id: crate::id::SceneVersionId("".to_string()),
+                            package_hash: None,
+                            package_url: None,
+                        }),
+                    },
+                );
+            }
+            None => {
+                // Server doesn't have this scene
+                result.insert(
+                    slug.clone(),
+                    ReconcileSceneStatus {
+                        status: SyncStatus::LocalOnly,
+                        scene: None,
+                    },
+                );
+            }
+        }
+    }
+
+    // Add remote-only scenes (on server but not in mod's manifest)
+    for (slug, &(scene, version_opt)) in &server_by_slug {
+        if !request.scenes.contains_key(*slug)
+            && let Some(version) = version_opt
+        {
+            result.insert(
+                slug.to_string(),
+                ReconcileSceneStatus {
+                    status: SyncStatus::RemoteOnly,
+                    scene: Some(scene_info(scene, version)),
+                },
+            );
+        }
+    }
+
+    Ok(Json(ReconcileResponse { scenes: result }))
+}
+
+fn scene_info(scene: &Scene, version: &crate::models::SceneVersion) -> ReconcileSceneInfo {
+    ReconcileSceneInfo {
+        id: scene.id.clone(),
+        name: scene.name.clone(),
+        slug: scene.slug.clone(),
+        description: scene.description.clone(),
+        dimension: scene.dimension.clone(),
+        version_id: version.id.clone(),
+        package_hash: version.package_hash.clone(),
+        package_url: version.package_url.clone(),
+    }
 }
 
 /// Response type for scene-by-slug endpoint: JSON data, 301 redirect, or 304 not modified.

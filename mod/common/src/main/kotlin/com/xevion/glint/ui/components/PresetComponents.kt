@@ -288,7 +288,6 @@ object PresetComponents {
             weather = state.weather.toMinecraftString(),
             weatherIntensity = finalIntensity,
             moonPhase = state.moonPhase,
-            backendPresetId = initial?.backendPresetId,
         )
     }
 }

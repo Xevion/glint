@@ -1,6 +1,10 @@
 package com.xevion.glint.ui.tabs
 
 import com.xevion.glint.api.ApiConfig
+import com.xevion.glint.api.ReconcileResult
+import com.xevion.glint.api.ReconcileSceneStatus
+import com.xevion.glint.api.SceneSyncManager
+import com.xevion.glint.api.SyncStatus
 import com.xevion.glint.orchestration.PreviewCapture
 import com.xevion.glint.scene.LocalPreset
 import com.xevion.glint.scene.LocalSceneMetadata
@@ -8,7 +12,6 @@ import com.xevion.glint.scene.LocalSceneStore
 import com.xevion.glint.scene.SceneApplicator
 import com.xevion.glint.scene.SceneApplyResult
 import com.xevion.glint.scene.SceneFormatting
-import com.xevion.glint.scene.SceneState
 import com.xevion.glint.scene.Weather
 import com.xevion.glint.ui.GlintMainScreen
 import com.xevion.glint.ui.SceneSetupScreen
@@ -28,6 +31,7 @@ import io.wispforest.owo.ui.core.HorizontalAlignment
 import io.wispforest.owo.ui.core.Insets
 import io.wispforest.owo.ui.core.Sizing
 import io.wispforest.owo.ui.core.VerticalAlignment
+import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component as McComponent
 
 class ScenesTab(
@@ -37,13 +41,17 @@ class ScenesTab(
         val slug: String,
         val name: String,
         val dimension: String,
-        val state: SceneState,
+        val syncStatus: SyncStatus,
         val presetCount: Int,
-        val needsPush: Boolean,
         val isLoaded: Boolean,
+        /** True if this scene only exists on the server (no local package) */
+        val isRemoteOnly: Boolean,
     )
 
     private var sceneEntries: List<SceneListEntry> = emptyList()
+
+    /** Live sync status from the last reconcile call, keyed by slug */
+    private var syncStatuses: Map<String, ReconcileSceneStatus> = emptyMap()
     var selectedSceneSlug: String? = null
         private set
     private var editingPresetSlug: String? = null
@@ -100,8 +108,28 @@ class ScenesTab(
             return
         }
 
-        val localScenes = sceneEntries.filter { it.state == SceneState.LOCAL }
-        val syncedScenes = sceneEntries.filter { it.state == SceneState.SYNCED }
+        // Group by sync status
+        val localScenes =
+            sceneEntries.filter {
+                it.syncStatus == SyncStatus.LOCAL_ONLY || it.syncStatus == SyncStatus.UNKNOWN
+            }
+        val syncedScenes = sceneEntries.filter { it.syncStatus == SyncStatus.SYNCED }
+        val needsAttention =
+            sceneEntries.filter {
+                it.syncStatus == SyncStatus.LOCAL_AHEAD || it.syncStatus == SyncStatus.REMOTE_AHEAD
+            }
+        val remoteOnly = sceneEntries.filter { it.syncStatus == SyncStatus.REMOTE_ONLY }
+
+        if (needsAttention.isNotEmpty()) {
+            master.child(
+                Components
+                    .label(McComponent.literal("Needs Sync"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_WARNING)),
+            )
+            for (entry in needsAttention) {
+                master.child(buildSceneCard(entry))
+            }
+        }
 
         if (localScenes.isNotEmpty()) {
             master.child(
@@ -111,18 +139,7 @@ class ScenesTab(
             )
             val sorted = localScenes.sortedByDescending { it.isLoaded }
             for (entry in sorted) {
-                master.child(
-                    GlintListComponents.sceneCard(
-                        name = entry.name,
-                        dimension = entry.dimension,
-                        state = entry.state,
-                        presetCount = entry.presetCount,
-                        isSelected = entry.slug == selectedSceneSlug,
-                        isLoaded = entry.isLoaded,
-                        needsPush = entry.needsPush,
-                        onClick = { selectScene(entry.slug) },
-                    ),
-                )
+                master.child(buildSceneCard(entry))
             }
         }
 
@@ -134,21 +151,32 @@ class ScenesTab(
             )
             val sorted = syncedScenes.sortedBy { it.name }
             for (entry in sorted) {
-                master.child(
-                    GlintListComponents.sceneCard(
-                        name = entry.name,
-                        dimension = entry.dimension,
-                        state = entry.state,
-                        presetCount = entry.presetCount,
-                        isSelected = entry.slug == selectedSceneSlug,
-                        isLoaded = entry.isLoaded,
-                        needsPush = entry.needsPush,
-                        onClick = { selectScene(entry.slug) },
-                    ),
-                )
+                master.child(buildSceneCard(entry))
+            }
+        }
+
+        if (remoteOnly.isNotEmpty()) {
+            master.child(
+                Components
+                    .label(McComponent.literal("Available to Download"))
+                    .color(Color.ofRgb(GlintTheme.TEXT_INFO)),
+            )
+            for (entry in remoteOnly.sortedBy { it.name }) {
+                master.child(buildSceneCard(entry))
             }
         }
     }
+
+    private fun buildSceneCard(entry: SceneListEntry): FlowLayout =
+        GlintListComponents.sceneCard(
+            name = entry.name,
+            dimension = entry.dimension,
+            syncStatus = entry.syncStatus,
+            presetCount = entry.presetCount,
+            isSelected = entry.slug == selectedSceneSlug,
+            isLoaded = entry.isLoaded,
+            onClick = { selectScene(entry.slug) },
+        )
 
     override fun buildDetail(detail: FlowLayout) {
         val slug = selectedSceneSlug
@@ -198,12 +226,13 @@ class ScenesTab(
             )
         }
 
+        val syncStatus = syncStatuses[slug]?.status ?: SyncStatus.UNKNOWN
         detail.child(
             GlintListComponents.collapsibleSection("Metadata") {
                 child(GlintListComponents.itemDetail("Slug: ${metadata.slug}"))
                 child(GlintListComponents.itemDetail("Dimension: ${metadata.dimension}"))
                 child(GlintListComponents.itemDetail("Minecraft: ${metadata.minecraftVersion}"))
-                child(GlintListComponents.itemDetail("State: ${metadata.state}"))
+                child(GlintListComponents.itemDetail("Sync: ${syncStatus.name.lowercase().replace('_', ' ')}"))
                 child(GlintListComponents.itemDetail("Exported: ${metadata.exportedAt}"))
                 val sizeMb = "%.1f".format(metadata.packageSizeBytes / (1024.0 * 1024.0))
                 child(GlintListComponents.itemDetail("Package: $sizeMb MB"))
@@ -285,7 +314,8 @@ class ScenesTab(
 
         val config = ApiConfig.load()
         val canUpload = config.isValid()
-        val isNewUpload = metadata.backend == null
+        val syncStatus = syncStatuses[metadata.slug]?.status
+        val isNewUpload = syncStatus == null || syncStatus == SyncStatus.LOCAL_ONLY || syncStatus == SyncStatus.UNKNOWN
         val uploadLabel = if (isNewUpload) "Upload" else "Push Update"
         val uploadBtn =
             GlintComponents.smallButton(
@@ -302,6 +332,7 @@ class ScenesTab(
                         slug = metadata.slug,
                         sceneName = metadata.name,
                         config = config,
+                        syncStatus = syncStatus,
                         onComplete = { refreshScenes() },
                     ),
                 )
@@ -543,21 +574,95 @@ class ScenesTab(
     fun refreshScenes() {
         LocalSceneStore.clearCache()
         val index = LocalSceneStore.loadIndex()
-        sceneEntries =
+
+        // Build entries from local scenes first, all with UNKNOWN status
+        val localEntries =
             index.scenes.map { (slug, entry) ->
                 SceneListEntry(
                     slug = slug,
                     name = entry.name,
                     dimension = entry.dimension,
-                    state = entry.state,
+                    syncStatus = syncStatuses[slug]?.status ?: SyncStatus.UNKNOWN,
                     presetCount = 0,
-                    needsPush = LocalSceneStore.needsPush(slug),
                     isLoaded = false,
+                    isRemoteOnly = false,
                 )
             }
+
+        // Add remote-only scenes from the last reconcile
+        val remoteOnlyEntries =
+            syncStatuses
+                .filter { (slug, status) ->
+                    status.status == SyncStatus.REMOTE_ONLY && !index.scenes.containsKey(slug)
+                }.mapNotNull { (slug, status) ->
+                    val sceneInfo = status.scene ?: return@mapNotNull null
+                    SceneListEntry(
+                        slug = slug,
+                        name = sceneInfo.name,
+                        dimension = sceneInfo.dimension,
+                        syncStatus = SyncStatus.REMOTE_ONLY,
+                        presetCount = 0,
+                        isLoaded = false,
+                        isRemoteOnly = true,
+                    )
+                }
+
+        sceneEntries = localEntries + remoteOnlyEntries
+
+        // Kick off async reconciliation against the backend
+        val config = ApiConfig.load()
+        if (config.isValid()) {
+            SceneSyncManager.reconcile(config).thenAccept { result ->
+                when (result) {
+                    is ReconcileResult.Success -> {
+                        syncStatuses = result.scenes
+                        // Re-build entries with updated sync statuses
+                        val updatedLocal =
+                            index.scenes.map { (slug, entry) ->
+                                SceneListEntry(
+                                    slug = slug,
+                                    name = entry.name,
+                                    dimension = entry.dimension,
+                                    syncStatus = syncStatuses[slug]?.status ?: SyncStatus.UNKNOWN,
+                                    presetCount = 0,
+                                    isLoaded = false,
+                                    isRemoteOnly = false,
+                                )
+                            }
+                        val updatedRemote =
+                            syncStatuses
+                                .filter { (slug, status) ->
+                                    status.status == SyncStatus.REMOTE_ONLY && !index.scenes.containsKey(slug)
+                                }.mapNotNull { (slug, status) ->
+                                    val sceneInfo = status.scene ?: return@mapNotNull null
+                                    SceneListEntry(
+                                        slug = slug,
+                                        name = sceneInfo.name,
+                                        dimension = sceneInfo.dimension,
+                                        syncStatus = SyncStatus.REMOTE_ONLY,
+                                        presetCount = 0,
+                                        isLoaded = false,
+                                        isRemoteOnly = true,
+                                    )
+                                }
+                        sceneEntries = updatedLocal + updatedRemote
+                        // Schedule UI rebuild on the render thread — owo-lib requires it
+                        Minecraft.getInstance().execute { host.triggerRefreshMaster() }
+                    }
+
+                    is ReconcileResult.Failure -> {
+                        // Keep UNKNOWN status — already set
+                    }
+                }
+            }
+        }
+
         host.triggerRefreshMaster()
         host.triggerRefreshDetail()
     }
+
+    /** Get the current sync status for a scene slug. */
+    fun syncStatusFor(slug: String): SyncStatus? = syncStatuses[slug]?.status
 
     fun hasScenes(): Boolean = sceneEntries.isNotEmpty()
 }

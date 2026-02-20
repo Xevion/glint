@@ -1,11 +1,9 @@
 package com.xevion.glint.api
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.scene.BackendSyncState
 import com.xevion.glint.scene.LocalSceneMetadata
 import com.xevion.glint.scene.LocalSceneStore
 import com.xevion.glint.scene.ScenePackageMeta
-import com.xevion.glint.scene.SceneState
 import com.xevion.glint.scene.scenePackageJson
 import java.io.File
 import java.security.MessageDigest
@@ -15,14 +13,14 @@ import java.util.concurrent.Executors
 import java.util.zip.ZipFile
 
 /**
- * Reconciles local scene packages with the Glint backend scene list.
- * Replaces the old world-based pull/push model with package-level sync.
+ * Reconciles local scene packages with the Glint backend.
+ * Sync status is computed live by the server — never persisted locally.
  */
 object SceneSyncManager {
     private val log = Loggers.Api.get()
     private val executor = Executors.newSingleThreadExecutor()
 
-    /** Pull scene list from backend and reconcile with local index. */
+    /** Reconcile local scenes against the backend, returning per-scene sync status. */
     fun reconcile(config: ApiConfig): CompletableFuture<ReconcileResult> {
         if (!config.isValid()) {
             return CompletableFuture.completedFuture(
@@ -35,11 +33,31 @@ object SceneSyncManager {
                 log.info("Reconciling scenes with backend")
 
                 val client = HttpClient(config.apiUrl, token = config.accessToken)
-                val fetchResult = SceneClient.fetchScenes(client)
 
-                fetchResult.fold(
-                    onSuccess = { apiScenes ->
-                        reconcileIndex(apiScenes)
+                // Build local manifest: slug → package hash
+                val index = LocalSceneStore.loadIndex()
+                val localScenes =
+                    index.scenes.mapValues { (slug, _) ->
+                        val meta = LocalSceneStore.loadMetadata(slug)
+                        ReconcileLocalScene(packageHash = meta?.packageHash?.normalizeHash())
+                    }
+
+                val result = SceneClient.reconcile(client, localScenes)
+
+                result.fold(
+                    onSuccess = { response ->
+                        val statusCounts =
+                            response.scenes.values
+                                .groupingBy { it.status }
+                                .eachCount()
+                        log.info("Reconciliation complete") {
+                            "synced" to (statusCounts[SyncStatus.SYNCED] ?: 0)
+                            "localOnly" to (statusCounts[SyncStatus.LOCAL_ONLY] ?: 0)
+                            "remoteOnly" to (statusCounts[SyncStatus.REMOTE_ONLY] ?: 0)
+                            "localAhead" to (statusCounts[SyncStatus.LOCAL_AHEAD] ?: 0)
+                            "remoteAhead" to (statusCounts[SyncStatus.REMOTE_AHEAD] ?: 0)
+                        }
+                        ReconcileResult.Success(response.scenes)
                     },
                     onFailure = { throwable ->
                         val error = ApiError.from(throwable)
@@ -52,64 +70,12 @@ object SceneSyncManager {
         )
     }
 
-    private fun reconcileIndex(apiScenes: List<ApiSceneListItem>): ReconcileResult {
-        val index = LocalSceneStore.loadIndex()
-        val localSlugs = index.scenes.keys.toMutableSet()
-        val apiBySlug = apiScenes.associateBy { it.slug }
-
-        val now = Instant.now().toString()
-        var matched = 0
-        var stale = 0
-        var remoteOnly = 0
-
-        for ((slug, apiScene) in apiBySlug) {
-            val localEntry = index.scenes[slug]
-            if (localEntry != null) {
-                localSlugs.remove(slug)
-                val localMeta = LocalSceneStore.loadMetadata(slug)
-                val localHash = localMeta?.packageHash
-                val remoteHash = apiScene.version.packageHash
-
-                LocalSceneStore.markSynced(
-                    slug,
-                    BackendSyncState(
-                        sceneId = apiScene.id,
-                        latestVersionId = apiScene.version.id,
-                        syncedAt = now,
-                        syncedVersionHash = remoteHash ?: "",
-                    ),
-                )
-                if (localHash != null && localHash == remoteHash) matched++ else stale++
-            } else {
-                // Remote-only: exists on backend but not locally.
-                // No action needed — user can download later via downloadScene().
-                remoteOnly++
-            }
-        }
-
-        // Remaining localSlugs are local-only (not on backend)
-        val localOnly = localSlugs.size
-
-        log.info("Reconciliation complete") {
-            "matched" to matched
-            "stale" to stale
-            "remoteOnly" to remoteOnly
-            "localOnly" to localOnly
-        }
-
-        return ReconcileResult.Success(
-            matched = matched,
-            stale = stale,
-            remoteOnly = remoteOnly,
-            localOnly = localOnly,
-        )
-    }
-
     /** Upload a local scene to the backend. */
     @Suppress("LongMethod")
     fun uploadScene(
         slug: String,
         config: ApiConfig,
+        syncStatus: SyncStatus?,
         onProgress: ((bytesUploaded: Long, totalBytes: Long) -> Unit)? = null,
     ): CompletableFuture<UploadResult> {
         if (!config.isValid()) {
@@ -145,9 +111,10 @@ object SceneSyncManager {
                 val sizeBytes = packageFile.length()
                 val client = HttpClient(config.apiUrl, token = config.accessToken)
 
-                // Initiate upload — new scene or new version
+                // Decide new scene vs new version based on live sync status
+                val isNewScene = syncStatus == null || syncStatus == SyncStatus.LOCAL_ONLY || syncStatus == SyncStatus.UNKNOWN
                 val initiateResult =
-                    if (metadata.backend == null) {
+                    if (isNewScene) {
                         SceneUploadClient.initiateNewScene(
                             client,
                             InitiateNewSceneUploadRequest(
@@ -248,17 +215,6 @@ object SceneSyncManager {
                         return@supplyAsync UploadResult.Failure(error)
                     }
 
-                // Update local sync state
-                LocalSceneStore.markSynced(
-                    slug,
-                    BackendSyncState(
-                        sceneId = completed.sceneId,
-                        latestVersionId = completed.sceneVersionId,
-                        syncedAt = Instant.now().toString(),
-                        syncedVersionHash = fileHash,
-                    ),
-                )
-
                 log.info("Scene uploaded successfully") {
                     "slug" to slug
                     "sceneId" to completed.sceneId
@@ -355,7 +311,6 @@ object SceneSyncManager {
                         description = detail.description,
                         dimension = detail.dimension,
                         minecraftVersion = meta.minecraftVersion,
-                        state = SceneState.SYNCED,
                         exportedAt = now,
                         camera = meta.camera,
                         fov = meta.fov,
@@ -365,18 +320,9 @@ object SceneSyncManager {
                         entityCount = 0,
                         packageHash = fileHash,
                         packageSizeBytes = targetFile.length(),
-                        backend =
-                            BackendSyncState(
-                                sceneId = detail.id,
-                                latestVersionId = detail.version.id,
-                                syncedAt = now,
-                                syncedVersionHash = detail.version.packageHash ?: fileHash,
-                            ),
                     )
 
                 LocalSceneStore.registerExport(slug, localMeta)
-                // registerExport sets state to LOCAL; mark as SYNCED
-                LocalSceneStore.markSynced(slug, localMeta.backend!!)
 
                 log.info("Scene downloaded successfully") {
                     "slug" to slug
@@ -388,6 +334,9 @@ object SceneSyncManager {
             executor,
         )
     }
+
+    /** Ensure hash has `sha256:` prefix for comparison with server-stored hashes. */
+    private fun String.normalizeHash(): String = if (startsWith("sha256:")) this else "sha256:$this"
 
     private fun computeFileHash(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -462,10 +411,7 @@ object SceneSyncManager {
 
 sealed class ReconcileResult {
     data class Success(
-        val matched: Int,
-        val stale: Int,
-        val remoteOnly: Int,
-        val localOnly: Int,
+        val scenes: Map<String, ReconcileSceneStatus>,
     ) : ReconcileResult()
 
     data class Failure(

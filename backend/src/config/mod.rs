@@ -55,6 +55,10 @@ pub struct Config {
     )]
     pub cors_origins: Vec<String>,
 
+    /// Public URL of the frontend (e.g., "https://glint.example.com").
+    /// Used for device auth verification URLs. Falls back to first CORS origin.
+    pub frontend_url: Option<String>,
+
     /// R2/S3 configuration for capture image storage
     #[serde(default)]
     pub r2: R2Config,

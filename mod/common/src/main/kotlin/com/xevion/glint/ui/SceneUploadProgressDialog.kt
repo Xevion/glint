@@ -3,6 +3,7 @@ package com.xevion.glint.ui
 import com.xevion.glint.Loggers
 import com.xevion.glint.api.ApiConfig
 import com.xevion.glint.api.SceneSyncManager
+import com.xevion.glint.api.SyncStatus
 import com.xevion.glint.api.UploadResult
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintDialogScreen
@@ -32,6 +33,7 @@ class SceneUploadProgressDialog(
     private val slug: String,
     private val sceneName: String,
     private val config: ApiConfig,
+    private val syncStatus: SyncStatus? = null,
     private val onComplete: () -> Unit,
 ) : GlintDialogScreen(McComponent.literal("Upload Scene")) {
     private var bytesUploaded: Long = 0
@@ -153,7 +155,7 @@ class SceneUploadProgressDialog(
 
     private fun startUpload() {
         uploadFuture =
-            SceneSyncManager.uploadScene(slug, config) { uploaded, total ->
+            SceneSyncManager.uploadScene(slug, config, syncStatus) { uploaded, total ->
                 minecraft?.execute {
                     bytesUploaded = uploaded
                     totalBytes = total

@@ -297,6 +297,69 @@ pub struct CompleteUploadResponse {
     pub preset_id: Option<ScenePresetId>,
 }
 
+// Scene reconciliation types
+
+/// POST /api/scenes/reconcile — Mod sends local scene manifest, server computes sync status.
+#[derive(Debug, Deserialize)]
+pub struct ReconcileRequest {
+    /// Map of scene slug → local scene info (hash, etc.)
+    pub scenes: std::collections::HashMap<String, ReconcileLocalScene>,
+}
+
+/// Local scene info sent by the mod during reconciliation.
+#[derive(Debug, Deserialize)]
+pub struct ReconcileLocalScene {
+    /// SHA-256 hash of the local scene package
+    pub package_hash: Option<String>,
+}
+
+/// Response from reconciliation endpoint.
+#[derive(Debug, Serialize)]
+pub struct ReconcileResponse {
+    /// Map of scene slug → computed sync status with optional scene metadata
+    pub scenes: std::collections::HashMap<String, ReconcileSceneStatus>,
+}
+
+/// Computed sync status for a single scene.
+#[skip_serializing_none]
+#[derive(Debug, Serialize)]
+pub struct ReconcileSceneStatus {
+    /// The computed relationship between local and remote
+    pub status: SyncStatus,
+    /// Scene metadata from the server (present for any scene the server knows about)
+    pub scene: Option<ReconcileSceneInfo>,
+}
+
+/// Lightweight scene info included in reconcile responses.
+#[skip_serializing_none]
+#[derive(Debug, Serialize)]
+pub struct ReconcileSceneInfo {
+    pub id: SceneId,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub dimension: String,
+    pub version_id: SceneVersionId,
+    pub package_hash: Option<String>,
+    pub package_url: Option<String>,
+}
+
+/// Bidirectional sync status between local and remote scene.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SyncStatus {
+    /// Local scene exists, server doesn't have it
+    LocalOnly,
+    /// Server scene exists, mod doesn't have it
+    RemoteOnly,
+    /// Both exist, hashes match
+    Synced,
+    /// Both exist, local hash differs (local has changes not on server)
+    LocalAhead,
+    /// Both exist, remote hash differs (server has a newer version)
+    RemoteAhead,
+}
+
 // Scene preset CRUD types
 
 /// POST /api/scenes/{slug}/presets — Create a new preset.

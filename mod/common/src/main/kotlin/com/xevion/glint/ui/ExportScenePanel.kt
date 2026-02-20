@@ -6,7 +6,6 @@ import com.xevion.glint.scene.LocalSceneStore
 import com.xevion.glint.scene.SceneExporter
 import com.xevion.glint.scene.ScenePackageMeta
 import com.xevion.glint.scene.SceneSetupState
-import com.xevion.glint.scene.SceneState
 import com.xevion.glint.scene.scenePackageJson
 import com.xevion.glint.ui.base.GlintComponents
 import com.xevion.glint.ui.base.GlintPanelScreen
@@ -223,7 +222,6 @@ class ExportScenePanel(
                     description = description,
                     dimension = meta.dimension,
                     minecraftVersion = meta.minecraftVersion,
-                    state = SceneState.LOCAL,
                     exportedAt = Instant.now().toString(),
                     camera = meta.camera,
                     fov = meta.fov,
@@ -307,6 +305,7 @@ class ExportScenePanel(
                 digest.update(buffer, 0, bytesRead)
             }
         }
-        return digest.digest().joinToString("") { "%02x".format(it) }
+        val hex = digest.digest().joinToString("") { "%02x".format(it) }
+        return "sha256:$hex"
     }
 }

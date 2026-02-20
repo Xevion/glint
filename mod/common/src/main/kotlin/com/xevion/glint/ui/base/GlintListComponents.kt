@@ -1,6 +1,6 @@
 package com.xevion.glint.ui.base
 
-import com.xevion.glint.scene.SceneState
+import com.xevion.glint.api.SyncStatus
 import io.wispforest.owo.ui.component.ButtonComponent
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.container.Containers
@@ -256,11 +256,10 @@ object GlintListComponents {
     fun sceneCard(
         name: String,
         dimension: String,
-        state: SceneState,
+        syncStatus: SyncStatus,
         presetCount: Int,
         isSelected: Boolean,
         isLoaded: Boolean,
-        needsPush: Boolean,
         onClick: () -> Unit,
     ): FlowLayout {
         val card = Containers.horizontalFlow(Sizing.fill(100), Sizing.fixed(GlintTheme.CARD_HEIGHT))
@@ -276,16 +275,20 @@ object GlintListComponents {
         }
 
         val statusIcon =
-            when {
-                needsPush -> "^"
-                state == SceneState.SYNCED -> "="
-                else -> "*"
+            when (syncStatus) {
+                SyncStatus.SYNCED -> "="
+                SyncStatus.LOCAL_AHEAD, SyncStatus.REMOTE_AHEAD -> "^"
+                SyncStatus.LOCAL_ONLY -> "*"
+                SyncStatus.REMOTE_ONLY -> "v"
+                SyncStatus.UNKNOWN -> "?"
             }
         val statusColor =
-            when {
-                needsPush -> GlintTheme.TEXT_WARNING
-                state == SceneState.SYNCED -> GlintTheme.TEXT_SUCCESS
-                else -> GlintTheme.TEXT_INFO
+            when (syncStatus) {
+                SyncStatus.SYNCED -> GlintTheme.TEXT_SUCCESS
+                SyncStatus.LOCAL_AHEAD, SyncStatus.REMOTE_AHEAD -> GlintTheme.TEXT_WARNING
+                SyncStatus.LOCAL_ONLY -> GlintTheme.TEXT_INFO
+                SyncStatus.REMOTE_ONLY -> GlintTheme.TEXT_SECONDARY
+                SyncStatus.UNKNOWN -> GlintTheme.TEXT_MUTED
             }
         val thumbnail = Containers.verticalFlow(Sizing.fixed(GlintTheme.CARD_THUMBNAIL_SIZE), Sizing.fixed(GlintTheme.CARD_THUMBNAIL_SIZE))
         thumbnail.surface(Surface.flat(GlintTheme.THUMBNAIL_BG))

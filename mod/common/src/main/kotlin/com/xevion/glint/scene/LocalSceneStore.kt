@@ -16,18 +16,9 @@ data class SceneIndex(
 data class SceneIndexEntry(
     val name: String,
     val dimension: String,
-    val state: SceneState,
     val exportedAt: String,
     val packageSizeBytes: Long,
-    val backendSceneId: String? = null,
-    val latestVersionId: String? = null,
 )
-
-@Serializable
-enum class SceneState {
-    LOCAL,
-    SYNCED,
-}
 
 /** Full per-scene metadata, loaded on-demand when a scene is selected. */
 @Serializable
@@ -37,7 +28,6 @@ data class LocalSceneMetadata(
     val description: String? = null,
     val dimension: String,
     val minecraftVersion: String,
-    val state: SceneState,
     val exportedAt: String,
     val camera: CameraPosition,
     val fov: Int,
@@ -47,17 +37,8 @@ data class LocalSceneMetadata(
     val entityCount: Int,
     val packageHash: String,
     val packageSizeBytes: Long,
-    val backend: BackendSyncState? = null,
     val presets: List<LocalPreset> = emptyList(),
     val versions: List<LocalVersionEntry> = emptyList(),
-)
-
-@Serializable
-data class BackendSyncState(
-    val sceneId: String,
-    val latestVersionId: String,
-    val syncedAt: String,
-    val syncedVersionHash: String,
 )
 
 @Serializable
@@ -68,7 +49,6 @@ data class LocalPreset(
     val weather: String,
     val weatherIntensity: Double = 0.0,
     val moonPhase: Int? = null,
-    val backendPresetId: String? = null,
 )
 
 @Serializable
@@ -77,7 +57,6 @@ data class LocalVersionEntry(
     val exportedAt: String,
     val packageHash: String,
     val sizeBytes: Long,
-    val backendVersionId: String? = null,
 )
 
 /** Manages local scene storage under `.minecraft/glint/scenes/`. */
@@ -150,7 +129,6 @@ object LocalSceneStore {
                                 SceneIndexEntry(
                                     name = meta.name,
                                     dimension = meta.dimension,
-                                    state = SceneState.LOCAL,
                                     exportedAt = meta.exportedAt,
                                     packageSizeBytes = meta.packageSizeBytes,
                                 )
@@ -158,50 +136,6 @@ object LocalSceneStore {
             )
         saveIndex()
         saveMetadata(slug, meta)
-    }
-
-    /** Update sync state after successful upload. */
-    fun markSynced(
-        slug: String,
-        backendState: BackendSyncState,
-    ) {
-        val idx = loadIndex()
-        val existing = idx.scenes[slug]
-        if (existing == null) {
-            log.warn("Cannot mark scene as synced — not found in index") { "slug" to slug }
-            return
-        }
-
-        index =
-            idx.copy(
-                scenes =
-                    idx.scenes +
-                        (
-                            slug to
-                                existing.copy(
-                                    state = SceneState.SYNCED,
-                                    backendSceneId = backendState.sceneId,
-                                    latestVersionId = backendState.latestVersionId,
-                                )
-                        ),
-            )
-        saveIndex()
-
-        val metadata = loadMetadata(slug) ?: return
-        saveMetadata(
-            slug,
-            metadata.copy(
-                state = SceneState.SYNCED,
-                backend = backendState,
-            ),
-        )
-    }
-
-    /** Check if a local scene needs pushing (hash mismatch or no backend state). */
-    fun needsPush(slug: String): Boolean {
-        val metadata = loadMetadata(slug) ?: return false
-        val backend = metadata.backend ?: return true
-        return metadata.packageHash != backend.syncedVersionHash
     }
 
     fun deleteScene(slug: String) {

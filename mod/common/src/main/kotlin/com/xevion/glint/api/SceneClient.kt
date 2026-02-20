@@ -1,6 +1,7 @@
 package com.xevion.glint.api
 
 import com.xevion.glint.api.HttpClient.Method
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -95,6 +96,17 @@ object SceneClient {
             method = Method.PUT
             path = "/api/scenes/by-slug/$sceneSlug/presets/reorder"
             jsonBody(ReorderPresetsRequest.serializer(), ReorderPresetsRequest(presetIds))
+        }
+
+    /** POST /api/scenes/reconcile — compute sync status for local scenes against the server. */
+    fun reconcile(
+        client: HttpClient,
+        localScenes: Map<String, ReconcileLocalScene>,
+    ): Result<ReconcileResponse> =
+        client.request {
+            method = Method.POST
+            path = "/api/scenes/reconcile"
+            jsonBody(ReconcileRequest.serializer(), ReconcileRequest(localScenes))
         }
 }
 
@@ -213,3 +225,66 @@ data class UpdatePresetRequest(
 data class ReorderPresetsRequest(
     val presetIds: List<String>,
 )
+
+// Reconcile types
+
+@Serializable
+data class ReconcileRequest(
+    val scenes: Map<String, ReconcileLocalScene>,
+)
+
+@Serializable
+data class ReconcileLocalScene(
+    val packageHash: String? = null,
+)
+
+@Serializable
+data class ReconcileResponse(
+    val scenes: Map<String, ReconcileSceneStatus>,
+)
+
+@Serializable
+data class ReconcileSceneStatus(
+    val status: SyncStatus,
+    val scene: ReconcileSceneInfo? = null,
+)
+
+@Serializable
+data class ReconcileSceneInfo(
+    val id: String,
+    val name: String,
+    val slug: String,
+    val description: String? = null,
+    val dimension: String,
+    val versionId: String,
+    val packageHash: String? = null,
+    val packageUrl: String? = null,
+)
+
+/** Bidirectional sync status computed by the server. */
+@Serializable
+enum class SyncStatus {
+    /** No server connection — status unknown */
+    @SerialName("unknown")
+    UNKNOWN,
+
+    /** Local scene exists, server doesn't have it */
+    @SerialName("local_only")
+    LOCAL_ONLY,
+
+    /** Server scene exists, mod doesn't have it */
+    @SerialName("remote_only")
+    REMOTE_ONLY,
+
+    /** Both exist, hashes match */
+    @SerialName("synced")
+    SYNCED,
+
+    /** Both exist, local hash differs from server */
+    @SerialName("local_ahead")
+    LOCAL_AHEAD,
+
+    /** Both exist, server has a newer version */
+    @SerialName("remote_ahead")
+    REMOTE_AHEAD,
+}
