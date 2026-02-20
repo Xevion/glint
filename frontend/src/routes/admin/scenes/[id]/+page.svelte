@@ -294,9 +294,8 @@ const WEATHER_OPTIONS = [
 		</Alert>
 	{/if}
 
-	<FolderCard.Root value="editing">
+	<FolderCard.Root value="details">
 		{#snippet tabs()}
-			<FolderCard.Tab value="editing">Editing & Presets</FolderCard.Tab>
 			<FolderCard.Tab value="details">Details</FolderCard.Tab>
 			<FolderCard.Tab value="captures">Captures ({captureCount})</FolderCard.Tab>
 		{/snippet}
@@ -315,159 +314,154 @@ const WEATHER_OPTIONS = [
 			{/if}
 		{/snippet}
 
-		<!-- Tab 1: Editing & Presets -->
-		<FolderCard.Content value="editing">
-			<div class="space-y-6">
-				<!-- Scene Edit Form -->
-				<form use:sceneEnhance class="space-y-4">
-					<Form.Field form={sceneSuperform} name="name">
-						<Form.Control>
-							{#snippet children({ props })}
-								<Form.Label>Name</Form.Label>
-								<Input {...props} bind:value={$sceneFormData.name} />
-							{/snippet}
-						</Form.Control>
-						<Form.FieldErrors />
-					</Form.Field>
+		<FolderCard.Content value="details">
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
+				<!-- Scene Edit Form + Info -->
+				<div class="space-y-6 lg:col-span-3">
+					<form use:sceneEnhance class="space-y-4">
+						<Form.Field form={sceneSuperform} name="name">
+							<Form.Control>
+								{#snippet children({ props })}
+									<Form.Label>Name</Form.Label>
+									<Input {...props} bind:value={$sceneFormData.name} />
+								{/snippet}
+							</Form.Control>
+							<Form.FieldErrors />
+						</Form.Field>
 
-					<Form.Field form={sceneSuperform} name="description">
-						<Form.Control>
-							{#snippet children({ props })}
-								<Form.Label>Description</Form.Label>
-								<Textarea {...props} bind:value={$sceneFormData.description} rows={3} />
-							{/snippet}
-						</Form.Control>
-						<Form.FieldErrors />
-					</Form.Field>
+						<Form.Field form={sceneSuperform} name="description">
+							<Form.Control>
+								{#snippet children({ props })}
+									<Form.Label>Description</Form.Label>
+									<Textarea {...props} bind:value={$sceneFormData.description} rows={3} />
+								{/snippet}
+							</Form.Control>
+							<Form.FieldErrors />
+						</Form.Field>
 
-					<div class="flex justify-end gap-2">
-						<Button
-							type="button"
-							variant="outline"
-							disabled={!sceneIsDirty || $sceneSubmitting}
-							onclick={() => sceneSuperform.reset()}
-						>
-							Reset
-						</Button>
-						<Form.Button disabled={!sceneIsDirty || $sceneSubmitting}>
-							{#if $sceneSubmitting}
-								<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+						<div class="flex justify-end gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								disabled={!sceneIsDirty || $sceneSubmitting}
+								onclick={() => sceneSuperform.reset()}
+							>
+								Reset
+							</Button>
+							<Form.Button disabled={!sceneIsDirty || $sceneSubmitting}>
+								{#if $sceneSubmitting}
+									<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+								{/if}
+								{$sceneSubmitting ? 'Saving...' : 'Save Changes'}
+							</Form.Button>
+						</div>
+					</form>
+
+					<dl class="space-y-2 text-sm">
+						<DetailField label="ID">
+							<code class="text-xs">{scene.id}</code>
+						</DetailField>
+						<DetailField label="Slug">
+							{scene.slug}
+						</DetailField>
+						<DetailField label="Position">
+							<code class="text-xs">
+								{formatDecimal(scene.version.x, 1)}, {formatDecimal(scene.version.y, 1)}, {formatDecimal(scene.version.z, 1)}
+							</code>
+						</DetailField>
+						<DetailField label="Camera">
+							<code class="text-xs">
+								Yaw: {formatDecimal(scene.version.yaw, 1)}, Pitch: {formatDecimal(scene.version.pitch, 1)}
+							</code>
+						</DetailField>
+						<DetailField label="Dimension">
+							{scene.dimension}
+						</DetailField>
+						<DetailField label="Time of Day">
+							{formatTimeTicks(scene.version.time_of_day_ticks)}
+						</DetailField>
+						<DetailField label="Weather">
+							<span class="capitalize">{scene.version.weather}</span>
+							{#if scene.version.weather_intensity > 0}
+								<span class="text-muted-foreground">
+									(intensity: {formatDecimal(scene.version.weather_intensity)})
+								</span>
 							{/if}
-							{$sceneSubmitting ? 'Saving...' : 'Save Changes'}
-						</Form.Button>
-					</div>
-				</form>
+						</DetailField>
+						{#if scene.version.biome}
+							<DetailField label="Biome">
+								{scene.version.biome}
+							</DetailField>
+						{/if}
+						{#if scene.version.moon_phase != null}
+							<DetailField label="Moon Phase">
+								{formatMoonPhase(scene.version.moon_phase)}
+							</DetailField>
+						{/if}
+						<DetailField label="Created">
+							<TimeAgo timestamp={scene.created_at} />
+						</DetailField>
+					</dl>
+				</div>
 
 				<!-- Presets Section -->
-				<div class="space-y-3">
-					<div class="flex items-center justify-between">
-						<h3 class="text-sm font-medium">Presets ({presets.length})</h3>
-						<Button size="sm" onclick={() => { createPresetSuperform.reset(); showCreatePreset = true; }}>
-							<Plus class="mr-1 h-3 w-3" />
-							New Preset
-						</Button>
-					</div>
-
-					{#if presets.length === 0}
-						<p class="text-sm text-muted-foreground">No presets configured.</p>
-					{:else}
-						<div role="list" class="flex flex-col overflow-hidden rounded-lg border border-border">
-							{#each presets as preset, i (preset.id)}
-								<div
-									role="listitem"
-									draggable="true"
-									ondragstart={(e) => handleDragStart(e, i)}
-									ondragover={(e) => handleDragOver(e, i)}
-									ondrop={() => handleDrop(i)}
-									ondragend={handleDragEnd}
-									class="flex items-center gap-4 border-b border-border bg-card p-3 last:border-b-0 {dragOverIndex === i && dragIndex !== i ? 'bg-muted/50' : ''}"
-								>
-									<GripVertical class="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/50" />
-									<div class="min-w-0 flex-1">
-										<div class="flex items-center gap-2">
-											<span class="text-sm font-medium">{preset.name}</span>
-											<code class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{preset.slug}</code>
-											{#if i === 0}
-												<span class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Default</span>
-											{/if}
-										</div>
-										<div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-<span>{formatTimeTicks(preset.time_of_day_ticks)}</span>
-										<span class="capitalize">{preset.weather}{preset.weather_intensity > 0 ? ` (${formatDecimal(preset.weather_intensity)})` : ''}</span>
-											{#if preset.moon_phase != null}
-												<span>{formatMoonPhase(preset.moon_phase)}</span>
-											{/if}
-										</div>
+				<div class="space-y-2 lg:col-span-2">
+					<span class="text-sm font-medium">Presets ({presets.length})</span>
+					<div role="list" class="flex flex-col overflow-hidden rounded-lg border border-border">
+						{#each presets as preset, i (preset.id)}
+							<div
+								role="listitem"
+								draggable="true"
+								ondragstart={(e) => handleDragStart(e, i)}
+								ondragover={(e) => handleDragOver(e, i)}
+								ondrop={() => handleDrop(i)}
+								ondragend={handleDragEnd}
+								class="flex items-center gap-4 border-b border-border bg-card p-3 last:border-b-0 {dragOverIndex === i && dragIndex !== i ? 'bg-muted/50' : ''}"
+							>
+								<GripVertical class="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/50" />
+								<div class="min-w-0 flex-1">
+									<div class="flex items-center gap-2">
+										<span class="text-sm font-medium">{preset.name}</span>
+										<code class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{preset.slug}</code>
+										{#if i === 0}
+											<span class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Default</span>
+										{/if}
 									</div>
-									<div class="flex shrink-0 items-center gap-1">
-										<Button variant="ghost" size="icon" class="h-7 w-7" onclick={() => startEdit(preset)}>
-											<Pencil class="h-3.5 w-3.5" />
-										</Button>
-										<Button
-											variant="ghost"
-											size="icon"
-											class="h-7 w-7 text-destructive/70 hover:text-destructive"
-											onclick={() => { deletingPreset = preset; showDeletePresetConfirm = true; }}
-											disabled={presets.length <= 1}
-										>
-											<Trash2 class="h-3.5 w-3.5" />
-										</Button>
+									<div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+										<span>{formatTimeTicks(preset.time_of_day_ticks)}</span>
+										<span class="capitalize">{preset.weather}{preset.weather_intensity > 0 ? ` (${formatDecimal(preset.weather_intensity)})` : ''}</span>
+										{#if preset.moon_phase != null}
+											<span>{formatMoonPhase(preset.moon_phase)}</span>
+										{/if}
 									</div>
 								</div>
-							{/each}
-						</div>
-					{/if}
+								<div class="flex shrink-0 items-center gap-1">
+									<Button variant="ghost" size="icon" class="h-7 w-7" onclick={() => startEdit(preset)}>
+										<Pencil class="h-3.5 w-3.5" />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon"
+										class="h-7 w-7 text-destructive/70 hover:text-destructive"
+										onclick={() => { deletingPreset = preset; showDeletePresetConfirm = true; }}
+										disabled={presets.length <= 1}
+									>
+										<Trash2 class="h-3.5 w-3.5" />
+									</Button>
+								</div>
+							</div>
+						{/each}
+						<button
+							type="button"
+							onclick={() => { createPresetSuperform.reset(); showCreatePreset = true; }}
+							class="flex items-center gap-2 border-dashed border-t border-border p-3 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+						>
+							<Plus class="h-4 w-4" />
+							Add preset
+						</button>
+					</div>
 				</div>
 			</div>
-		</FolderCard.Content>
-
-		<!-- Tab 2: Details -->
-		<FolderCard.Content value="details">
-			<dl class="space-y-2 text-sm">
-				<DetailField label="ID">
-					<code class="text-xs">{scene.id}</code>
-				</DetailField>
-				<DetailField label="Slug">
-					{scene.slug}
-				</DetailField>
-				<DetailField label="Position">
-					<code class="text-xs">
-						{formatDecimal(scene.version.x, 1)}, {formatDecimal(scene.version.y, 1)}, {formatDecimal(scene.version.z, 1)}
-					</code>
-				</DetailField>
-				<DetailField label="Camera">
-					<code class="text-xs">
-						Yaw: {formatDecimal(scene.version.yaw, 1)}, Pitch: {formatDecimal(scene.version.pitch, 1)}
-					</code>
-				</DetailField>
-				<DetailField label="Dimension">
-					{scene.dimension}
-				</DetailField>
-				<DetailField label="Time of Day">
-					{formatTimeTicks(scene.version.time_of_day_ticks)}
-				</DetailField>
-				<DetailField label="Weather">
-					<span class="capitalize">{scene.version.weather}</span>
-				{#if scene.version.weather_intensity > 0}
-					<span class="text-muted-foreground">
-						(intensity: {formatDecimal(scene.version.weather_intensity)})
-					</span>
-					{/if}
-				</DetailField>
-				{#if scene.version.biome}
-					<DetailField label="Biome">
-						{scene.version.biome}
-					</DetailField>
-				{/if}
-				{#if scene.version.moon_phase != null}
-					<DetailField label="Moon Phase">
-						{formatMoonPhase(scene.version.moon_phase)}
-					</DetailField>
-				{/if}
-				<DetailField label="Created">
-					<TimeAgo timestamp={scene.created_at} />
-				</DetailField>
-			</dl>
 		</FolderCard.Content>
 
 		<!-- Tab 3: Captures -->

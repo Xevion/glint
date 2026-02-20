@@ -9,8 +9,8 @@ interface Props {
 let { label, children }: Props = $props();
 </script>
 
-<div class="space-y-1">
-	<dt class="text-sm font-medium text-muted-foreground">{label}</dt>
+<div class="flex items-baseline gap-2">
+	<dt class="shrink-0 text-sm font-medium text-muted-foreground">{label}</dt>
 	<dd class="text-sm">
 		{@render children()}
 	</dd>

@@ -84,10 +84,14 @@ onMount(() => {
 
 			<!-- Content with contextual sidebar -->
 			<main class="flex-1 flex gap-8 pb-5">
-				<svelte:boundary onerror={(e) => console.error('[Sidebar]', e)}>
-					<Sidebar />
-					{#snippet failed()}{/snippet}
-				</svelte:boundary>
+			<svelte:boundary onerror={(e) => console.error('[Sidebar]', e)}>
+				<Sidebar />
+				{#snippet failed()}
+					<aside class="hidden w-40 shrink-0 pt-1 md:flex md:flex-col">
+						<span class="px-2 text-xs text-muted-foreground">Nav unavailable</span>
+					</aside>
+				{/snippet}
+			</svelte:boundary>
 			<div class="flex-1 min-w-0" style="view-transition-name: app-content">
 				<SectionBoundary title="Page">
 					{@render children()}
