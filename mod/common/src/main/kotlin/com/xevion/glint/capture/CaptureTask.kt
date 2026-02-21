@@ -60,21 +60,26 @@ class CaptureTask(
 
         val image = Screenshot.takeScreenshot(mc.mainRenderTarget)
 
-        // Copy pixel data from native memory while NativeImage is still alive.
-        // ABGR→ARGB conversion matches WebpWriter's approach.
-        val imgWidth = image.width
-        val imgHeight = image.height
-        val pixelCount = imgWidth * imgHeight
-        val pixelPtr = (image as NativeImageAccessor).`glint$getPixels`()
-        val intBuffer = MemoryUtil.memIntBuffer(pixelPtr, pixelCount)
-        val argbPixels = IntArray(pixelCount)
-        for (i in 0 until pixelCount) {
-            val abgr = intBuffer.get(i)
-            val a = abgr and 0xFF000000.toInt()
-            val b = (abgr shr 16) and 0xFF
-            val g = abgr and 0x0000FF00.toInt()
-            val r = (abgr and 0xFF) shl 16
-            argbPixels[i] = a or r or g or b
+        // Copy pixel data from native memory while NativeImage is alive, then close it immediately.
+        // ABGR→ARGB conversion is done once here; argbPixels is shared by both IO tasks below.
+        val imgWidth: Int
+        val imgHeight: Int
+        val argbPixels: IntArray
+        image.use { img ->
+            imgWidth = img.width
+            imgHeight = img.height
+            val pixelCount = imgWidth * imgHeight
+            val pixelPtr = (img as NativeImageAccessor).`glint$getPixels`()
+            val intBuffer = MemoryUtil.memIntBuffer(pixelPtr, pixelCount)
+            argbPixels = IntArray(pixelCount)
+            for (i in 0 until pixelCount) {
+                val abgr = intBuffer.get(i)
+                val a = abgr and 0xFF000000.toInt()
+                val b = (abgr shr 16) and 0xFF
+                val g = abgr and 0x0000FF00.toInt()
+                val r = (abgr and 0xFF) shl 16
+                argbPixels[i] = a or r or g or b
+            }
         }
 
         // Start analysis asynchronously — pixel data is now safely copied
@@ -92,10 +97,8 @@ class CaptureTask(
 
         Util.ioPool().execute {
             try {
-                image.use { nativeImage ->
-                    WebpWriter.write(nativeImage, file)
-                    future.complete(file)
-                }
+                WebpWriter.write(argbPixels, imgWidth, imgHeight, file)
+                future.complete(file)
             } catch (e: Throwable) {
                 log.error("Failed to save high-res screenshot") {
                     "exception" to e.javaClass.simpleName
