@@ -1,12 +1,9 @@
 package com.xevion.glint.orchestration
 
 import com.xevion.glint.Loggers
-import com.xevion.glint.api.GlintJsonFile
 import com.xevion.glint.api.WorkItem
-import com.xevion.glint.api.effectiveMoonPhase
 import com.xevion.glint.api.effectiveTimeOfDayTicks
 import com.xevion.glint.api.effectiveWeather
-import com.xevion.glint.api.effectiveWeatherIntensity
 import com.xevion.glint.api.toShaderSpec
 import com.xevion.glint.capture.CaptureEntry
 import com.xevion.glint.capture.CaptureSessionData
@@ -14,20 +11,15 @@ import com.xevion.glint.capture.CaptureStateManager
 import com.xevion.glint.capture.CaptureTimeOverride
 import com.xevion.glint.capture.ChunkForceLoader
 import com.xevion.glint.capture.HighResCapture
-import com.xevion.glint.capture.IrisIntegration
 import com.xevion.glint.capture.MinecraftInfo
 import com.xevion.glint.capture.Resolution
 import com.xevion.glint.capture.StabilizationDetector
-import com.xevion.glint.io.SessionDirectoryManager
 import com.xevion.glint.scene.CameraPosition
 import com.xevion.glint.scene.InjectionProcess
 import com.xevion.glint.scene.LoadedScene
 import com.xevion.glint.scene.SceneInjector
 import net.minecraft.client.Minecraft
-import net.minecraft.world.level.GameRules
-import net.minecraft.world.level.GameType
 import java.io.File
-import java.io.IOException
 import java.nio.file.Path
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
@@ -43,6 +35,9 @@ import java.util.concurrent.CompletableFuture
  *
  * Uses a void staging world ([StagingWorld]) as the injection target.
  * Scene data is served from memory via [SceneInjector] and the ChunkStorageMixin.
+ *
+ * Delegates environment manipulation to [EnvironmentController] and session I/O
+ * to [CaptureSession].
  */
 class LinearOrchestrator {
     private val log = Loggers.Orchestration.get()
@@ -93,18 +88,11 @@ class LinearOrchestrator {
 
     // Capture state
     private var pendingCapture: CompletableFuture<Path>? = null
-    private var sessionDir: File? = null
-    private var sessionId: String = ""
-    private var startedAt: Instant? = null
     private var highResSessionActive: Boolean = false
-    private var originalShaderPack: String? = null
-    private var renderSettingsApplied: Boolean = false
 
-    // Capture tracking for manifest
-    private val captureEntries = mutableListOf<CaptureSessionData>()
-
-    // Shader filenames that failed to load — skip remaining items using the same pack
-    private val failedShaderPacks = mutableSetOf<String>()
+    // Collaborators (constructed fresh per run)
+    private var environmentController: EnvironmentController? = null
+    private var captureSession: CaptureSession? = null
 
     /**
      * Starts orchestration from pre-ordered [WorkItem]s with scene package paths.
@@ -136,9 +124,13 @@ class LinearOrchestrator {
         this.scenePackages = packages
         this.outputDir = outputDir
 
-        if (!createSessionDirectory()) {
+        val session = CaptureSession(runId, outputDir)
+        if (!session.createSessionDirectory()) {
             return false
         }
+        captureSession = session
+
+        environmentController = EnvironmentController()
 
         if (!CaptureStateManager.startCapture()) {
             log.warn("Cannot start orchestration — capture already active")
@@ -235,15 +227,7 @@ class LinearOrchestrator {
             "shaders" to totalShaders
         }
 
-        // Save original shader state and begin 4K session
-        if (IrisIntegration.isAvailable) {
-            originalShaderPack =
-                if (IrisIntegration.isShaderPackInUse().getOrDefault(false)) {
-                    IrisIntegration.getShaderPackName().getOrNull()
-                } else {
-                    null
-                }
-        }
+        environmentController!!.saveOriginalShader()
 
         if (!HighResCapture.beginSession()) {
             finishWithError("Failed to begin high-res capture session")
@@ -260,8 +244,8 @@ class LinearOrchestrator {
         if (stagingWorld.tick()) {
             if (stagingWorld.state == StagingWorld.State.READY) {
                 log.info("Staging world ready")
-                applyStandardRenderSettings()
-                freezeWorldState()
+                environmentController!!.applyStandardRenderSettings()
+                environmentController!!.freezeWorldState()
                 advanceToItem()
             } else {
                 finishWithError("Staging world failed: ${stagingWorld.error}")
@@ -341,7 +325,7 @@ class LinearOrchestrator {
                 injectionProcess = null
                 if (process.isComplete) {
                     log.info("Scene injection complete")
-                    applySceneViewSettings(currentWorkItem()!!)
+                    environmentController!!.applySceneViewSettings(currentWorkItem()!!)
                     transitionTo(State.ApplyingPreset)
                 } else {
                     finishWithError("Scene injection failed: ${process.error}")
@@ -378,7 +362,7 @@ class LinearOrchestrator {
                 return
             }
 
-        applyPresetEnvironment(item)
+        environmentController!!.applyPresetEnvironment(item)
         currentPresetId = item.preset?.id
 
         log.info("Preset applied") {
@@ -397,6 +381,7 @@ class LinearOrchestrator {
                 return
             }
 
+        val env = environmentController!!
         val newSpec = item.shader.toShaderSpec()
         val sameVersion = item.shader.versionId == currentShaderVersionId && currentShaderSpec != null
         val sameProfile = newSpec.profileId == currentShaderSpec?.profileId
@@ -413,7 +398,7 @@ class LinearOrchestrator {
 
         // Skip items whose shader pack already failed to load (avoids repeated
         // reload attempts for every profile of a broken pack)
-        if (newSpec.filename != null && newSpec.filename in failedShaderPacks) {
+        if (newSpec.filename != null && env.isShaderFailed(newSpec.filename)) {
             log.warn("Shader pack previously failed, skipping") {
                 "shader" to newSpec.displayName
             }
@@ -433,24 +418,9 @@ class LinearOrchestrator {
             }
         }
 
-        if (IrisIntegration.isAvailable) {
-            val result =
-                if (newSpec.filename == null) {
-                    IrisIntegration.disableShaders()
-                } else {
-                    IrisIntegration.enableShaders(newSpec.filename, newSpec.profile)
-                }
-
-            if (result.isFailure) {
-                log.error("Failed to load shader, skipping item") {
-                    "shader" to newSpec.displayName
-                }
-                if (newSpec.filename != null) {
-                    failedShaderPacks.add(newSpec.filename)
-                }
-                skipCurrentItem()
-                return
-            }
+        if (env.loadShader(newSpec).isFailure) {
+            skipCurrentItem()
+            return
         }
 
         currentShaderVersionId = item.shader.versionId
@@ -463,7 +433,7 @@ class LinearOrchestrator {
     private fun handleStabilizing() {
         if (stabilizationDetector.isStable()) {
             // Snap weather levels after stabilization to counteract stale packets
-            currentWorkItem()?.let { applyWeatherSnap(it) }
+            currentWorkItem()?.let { environmentController!!.applyWeatherSnap(it) }
             CaptureTimeOverride.activate()
             transitionTo(State.SettlingForCapture)
         }
@@ -495,8 +465,9 @@ class LinearOrchestrator {
                 return
             }
 
+        val session = captureSession!!
         val shader = currentShaderSpec ?: ShaderSpec(filename = null)
-        val captureFilename = buildCaptureFilename(item, shader)
+        val captureFilename = session.buildCaptureFilename(item, shader)
 
         log.info("Taking capture") {
             "shader" to shader.displayName
@@ -506,7 +477,7 @@ class LinearOrchestrator {
         }
 
         val timestamp = Instant.now().toString()
-        val shaderMeta = buildShaderMetadata(shader)
+        val shaderMeta = session.buildShaderMetadata(shader)
 
         val entry =
             CaptureEntry(
@@ -521,7 +492,7 @@ class LinearOrchestrator {
             )
 
         val currentSessionDir =
-            sessionDir ?: run {
+            session.sessionDir ?: run {
                 finishWithError("No session directory")
                 return
             }
@@ -566,12 +537,12 @@ class LinearOrchestrator {
                 ?.toString()
         val sessionDirPath = currentSessionDir.relativeTo(mc.gameDirectory).path
 
-        captureEntries.add(
+        session.recordCapture(
             CaptureSessionData(
                 worldName = StagingWorld.FOLDER_NAME,
                 sceneId = sceneId,
                 sessionDir = sessionDirPath,
-                startedAt = (startedAt ?: Instant.now()).toString(),
+                startedAt = (session.startedAt ?: Instant.now()).toString(),
                 completedAt = Instant.now().toString(),
                 totalCaptures = 1,
                 shaders = listOfNotNull(shader.filename),
@@ -598,13 +569,14 @@ class LinearOrchestrator {
     }
 
     private fun handleGeneratingManifest() {
+        val session = captureSession!!
         log.info("Generating manifest")
-        writeManifest(partial = false)
+        session.writeManifest(partial = false)
 
-        sessionDir?.let { dir ->
+        session.sessionDir?.let { dir ->
             log.info("Orchestration complete") {
                 "results_dir" to dir.absolutePath
-                "captures" to captureEntries.size
+                "captures" to session.entries.size
             }
         }
 
@@ -658,287 +630,37 @@ class LinearOrchestrator {
         advanceToNextItem()
     }
 
-    /**
-     * Applies the effective environment for a work item.
-     * Preset values override scene defaults when present.
-     */
-    private fun applyPresetEnvironment(item: WorkItem) {
-        val mc = Minecraft.getInstance()
-        val server = mc.singleplayerServer ?: return
-        val overworld = server.overworld()
-
-        // Time of day
-        val time = item.effectiveTimeOfDayTicks
-        overworld.dayTime = time.toLong()
-
-        // Weather
-        val weather = item.effectiveWeather
-        val intensity = item.effectiveWeatherIntensity
-        when (weather) {
-            "clear" -> overworld.setWeatherParameters(6000, 0, false, false)
-            "rain" -> overworld.setWeatherParameters(0, 6000, true, false)
-            "thunder" -> overworld.setWeatherParameters(0, 6000, true, true)
-        }
-
-        // Snap weather levels immediately
-        applyWeatherSnap(item)
-
-        // Moon phase (if applicable — requires setting world time to the right day)
-        val moonPhase = item.effectiveMoonPhase
-        if (moonPhase != null) {
-            // Moon phase is derived from dayTime / 24000. To set a specific phase,
-            // adjust the day count while keeping the time-of-day component.
-            val dayCount = moonPhase.toLong() // Phase 0 = day 0, phase 1 = day 1, etc.
-            overworld.dayTime = dayCount * 24000L + time.toLong()
-        }
-    }
-
-    /** Snaps weather levels on both server and client to target values. */
-    private fun applyWeatherSnap(item: WorkItem) {
-        val mc = Minecraft.getInstance()
-        val server = mc.singleplayerServer ?: return
-        val overworld = server.overworld()
-
-        val weather = item.effectiveWeather
-        val intensity = item.effectiveWeatherIntensity.toFloat()
-
-        val (targetRain, targetThunder) =
-            when (weather) {
-                "clear" -> {
-                    0f to 0f
-                }
-
-                "rain" -> {
-                    (if (intensity > 0f) intensity else 1f) to 0f
-                }
-
-                "thunder" -> {
-                    val level = if (intensity > 0f) intensity else 1f
-                    level to level
-                }
-
-                else -> {
-                    0f to 0f
-                }
-            }
-
-        overworld.setRainLevel(targetRain)
-        overworld.setThunderLevel(targetThunder)
-        mc.level?.let { clientLevel ->
-            clientLevel.setRainLevel(targetRain)
-            clientLevel.setThunderLevel(targetThunder)
-        }
-    }
-
-    /**
-     * Applies standardized render settings for captures.
-     * Called once after the staging world is ready.
-     */
-    private fun applyStandardRenderSettings() {
-        val mc = Minecraft.getInstance()
-        val options = mc.options
-
-        // Standard capture settings (SceneConfig.DEFAULT equivalent)
-        options.graphicsMode().set(net.minecraft.client.GraphicsStatus.FANCY)
-        options.ambientOcclusion().set(true)
-        options.entityShadows().set(true)
-        options.particles().set(net.minecraft.server.level.ParticleStatus.ALL)
-        options.cloudStatus().set(net.minecraft.client.CloudStatus.FANCY)
-        options.bobView().set(false)
-        options.gamma().set(0.0)
-        options.screenEffectScale().set(0.0)
-        options.fovEffectScale().set(0.0)
-        options.hideGui = true
-
-        // Set spectator mode
-        mc.singleplayerServer?.let { server ->
-            val player = server.playerList.players.firstOrNull()
-            if (player != null && !player.isSpectator) {
-                player.setGameMode(GameType.SPECTATOR)
-            }
-        }
-
-        renderSettingsApplied = true
-        log.debug("Standard render settings applied")
-    }
-
-    /** Applies per-scene FOV and render distance from the work item. */
-    private fun applySceneViewSettings(item: WorkItem) {
-        val mc = Minecraft.getInstance()
-        mc.options.fov().set(item.scene.fov)
-        mc.options.renderDistance().set(item.scene.renderDistance)
-        mc.options.simulationDistance().set(item.scene.renderDistance)
-
-        log.debug("Scene view settings applied") {
-            "fov" to item.scene.fov
-            "render_distance" to item.scene.renderDistance
-        }
-    }
-
-    /** Freezes daylight cycle and weather cycle via game rules. */
-    private fun freezeWorldState() {
-        val mc = Minecraft.getInstance()
-        mc.singleplayerServer?.let { server ->
-            server
-                .overworld()
-                .gameRules
-                .getRule(GameRules.RULE_DAYLIGHT)
-                .set(false, server)
-            server
-                .overworld()
-                .gameRules
-                .getRule(GameRules.RULE_WEATHER_CYCLE)
-                .set(false, server)
-            log.debug("World state frozen")
-        }
-    }
-
-    private fun buildShaderMetadata(shader: ShaderSpec): com.xevion.glint.capture.ShaderMetadata? {
-        if (shader.filename == null) return null
-        val info = parseShaderPackName(shader.filename)
-        return com.xevion.glint.capture.ShaderMetadata(
-            filename = shader.filename,
-            id = info.id,
-            version = info.version,
-            profile = shader.profile,
-            profileId = shader.profileId,
-        )
-    }
-
-    private fun parseShaderPackName(filename: String): ShaderPackInfo {
-        val baseName = filename.removeSuffix(".zip").removeSuffix(".ZIP")
-        val parts = baseName.split("-")
-
-        return if (parts.size >= 3) {
-            ShaderPackInfo(
-                id = sanitize(parts.dropLast(2).joinToString("-")),
-                version = sanitize(parts[parts.size - 2]),
-            )
-        } else if (parts.size >= 2) {
-            ShaderPackInfo(
-                id = sanitize(parts.dropLast(1).joinToString("-")),
-                version = sanitize(parts.last()),
-            )
-        } else {
-            ShaderPackInfo(id = sanitize(baseName), version = "unknown")
-        }
-    }
-
-    private data class ShaderPackInfo(
-        val id: String,
-        val version: String,
-    )
-
-    private fun buildCaptureFilename(
-        item: WorkItem,
-        shader: ShaderSpec,
-    ): String {
-        val scenePrefix = sanitize(item.scene.slug)
-        val presetSuffix = item.preset?.slug?.let { "_${sanitize(it)}" } ?: ""
-
-        if (shader.filename == null) {
-            return "${scenePrefix}${presetSuffix}_vanilla.webp"
-        }
-
-        val info = parseShaderPackName(shader.filename)
-        val profileSuffix = shader.profile?.let { "_${sanitize(it)}" } ?: ""
-        return "${scenePrefix}${presetSuffix}_${info.id}_${info.version}$profileSuffix.webp"
-    }
-
-    private fun sanitize(input: String): String = input.lowercase().replace(Regex("[^a-z0-9._-]"), "-")
-
-    private fun createSessionDirectory(): Boolean {
-        val mc = Minecraft.getInstance()
-        startedAt = Instant.now()
-
-        return try {
-            if (outputDir != null) {
-                val dir = File(mc.gameDirectory, outputDir!!)
-                if (!dir.exists() && !dir.mkdirs()) {
-                    log.error("Failed to create output directory") { "path" to dir.absolutePath }
-                    return false
-                }
-                sessionId = runId?.let { "run_$it" } ?: dir.name
-                sessionDir = dir
-            } else {
-                val capturesDir = File(mc.gameDirectory, "glint/captures")
-                val (dir, id) = SessionDirectoryManager.createSessionDirectory(capturesDir, startedAt!!)
-                sessionId = id
-                sessionDir = dir
-            }
-            log.info("Session directory created") { "path" to sessionDir!!.absolutePath }
-            true
-        } catch (e: IOException) {
-            log.error(e, "Failed to create session directory")
-            false
-        } catch (e: SecurityException) {
-            log.error(e, "Failed to create session directory")
-            false
-        }
-    }
-
-    private fun writeManifest(partial: Boolean) {
-        val currentSessionDir = sessionDir ?: return
-        val manifestName = if (partial) "manifest_partial.json" else "manifest.json"
-        val manifestFile = File(currentSessionDir, manifestName)
-
-        val manifest =
-            OrchestrationManifest.create(
-                captureEntries,
-                sessionId,
-                startedAt ?: Instant.now(),
-                runId = runId,
-            )
-
-        try {
-            manifestFile.writeText(GlintJsonFile.encodeToString(OrchestrationManifest.serializer(), manifest))
-            log.info("Manifest written") {
-                "partial" to partial
-                "path" to manifestFile.absolutePath
-            }
-        } catch (e: IOException) {
-            log.error(e, "Failed to write manifest")
-        } catch (e: kotlinx.serialization.SerializationException) {
-            log.error(e, "Failed to serialize manifest")
-        }
-    }
-
     private fun finishWithError(reason: String) {
         log.error("Orchestration failed") { "reason" to reason }
-        if (captureEntries.isNotEmpty()) {
-            writeManifest(partial = true)
+        val session = captureSession
+        if (session != null && session.entries.isNotEmpty()) {
+            session.writeManifest(partial = true)
         }
         cleanup()
     }
 
     private fun cleanup() {
-        // End any active injection (must run on server thread for chunk ticket removal)
+        // Deactivate scene injection
         val level = stagingWorld.getServerLevel()
         if (level != null && loadedScene != null) {
             level.server.execute { sceneInjector.deactivate(level) }
         }
-        loadedScene = null
-        injectionProcess = null
-        serverDispatch = ServerDispatchState.Idle
 
-        // End 4K session if active
+        // Close collaborators
+        environmentController?.close()
+        captureSession?.close()
+
+        // End high-res session
         if (highResSessionActive) {
             HighResCapture.endSession()
             highResSessionActive = false
         }
 
-        // Deactivate time override
         CaptureTimeOverride.deactivate()
         ChunkForceLoader.releaseAll()
-
-        // Restore original shader
-        if (IrisIntegration.isAvailable) {
-            originalShaderPack?.let { IrisIntegration.enableShaders(it) }
-                ?: IrisIntegration.disableShaders()
-        }
-
         CaptureStateManager.endCapture()
 
+        // Reset orchestration state
         state = State.Idle
         ticksInState = 0
         workItems = emptyList()
@@ -948,17 +670,15 @@ class LinearOrchestrator {
         currentPresetId = null
         currentShaderVersionId = null
         currentShaderSpec = null
-        sessionDir = null
-        sessionId = ""
-        startedAt = null
-        captureEntries.clear()
-        failedShaderPacks.clear()
-        renderSettingsApplied = false
-        originalShaderPack = null
-        runId = null
-        outputDir = null
+        loadedScene = null
+        injectionProcess = null
+        serverDispatch = ServerDispatchState.Idle
         pendingCapture = null
         onCaptureTaken = null
+        environmentController = null
+        captureSession = null
+        runId = null
+        outputDir = null
         stagingWorld.reset()
     }
 
