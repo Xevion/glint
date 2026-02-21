@@ -1026,10 +1026,10 @@ function handleLinkKeydown(e: KeyboardEvent) {
                                 <!-- Metadata -->
                                 {#if metadata}
                                     {@const pipelineFeatures = (metadata.pipelineFeatures ?? {}) as Record<string, unknown>}
-                                    {@const irisFeaturesRequired = (metadata.irisFeaturesRequired ?? []) as string[]}
-                                    {@const irisFeaturesOptional = (metadata.irisFeaturesOptional ?? []) as string[]}
-                                    {@const dimensionSupport = (metadata.dimensionSupport ?? []) as string[]}
-                                    {@const filePaths = (metadata.filePaths ?? []) as string[]}
+                                    {@const irisFeaturesRequired = metadata.irisFeaturesRequired ?? []}
+                                    {@const irisFeaturesOptional = metadata.irisFeaturesOptional ?? []}
+                                    {@const dimensionSupport = metadata.dimensionSupport ?? []}
+                                    {@const filePaths = metadata.filePaths ?? []}
                                     {@const settingsScreen = (metadata.settingsScreen ?? []) as unknown[]}
                                     <div class="rounded-lg border">
                                         <div

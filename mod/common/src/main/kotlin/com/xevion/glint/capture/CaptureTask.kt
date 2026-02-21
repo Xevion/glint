@@ -99,7 +99,10 @@ class CaptureTask(
             try {
                 WebpWriter.write(argbPixels, imgWidth, imgHeight, file)
                 future.complete(file)
-            } catch (e: Throwable) {
+                // Throwable is intentional — OutOfMemoryError is an Error, not an Exception.
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Throwable,
+            ) {
                 log.error("Failed to save high-res screenshot") {
                     "exception" to e.javaClass.simpleName
                     "error" to (e.message ?: "no message")

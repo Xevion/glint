@@ -1085,11 +1085,11 @@ type ShaderVersionMetadataNode {
 	"""
 	Iris features required by this shader.
 	"""
-	irisFeaturesRequired: JSON
+	irisFeaturesRequired: [String!]
 	"""
 	Iris features optionally used by this shader.
 	"""
-	irisFeaturesOptional: JSON
+	irisFeaturesOptional: [String!]
 	"""
 	Settings screen configuration.
 	"""
@@ -1097,11 +1097,11 @@ type ShaderVersionMetadataNode {
 	"""
 	Shader file paths.
 	"""
-	filePaths: JSON
+	filePaths: [String!]
 	"""
 	Supported dimensions (e.g. `["overworld", "nether", "end"]`).
 	"""
-	dimensionSupport: JSON
+	dimensionSupport: [String!]
 }
 
 type ShaderVersionNode {

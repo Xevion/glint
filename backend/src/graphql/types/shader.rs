@@ -519,15 +519,15 @@ pub struct ShaderVersionMetadataNode {
     /// Pipeline features (e.g. `{"separateAo": true, "clouds": "fancy"}`).
     pub pipeline_features: Option<Json<serde_json::Value>>,
     /// Iris features required by this shader.
-    pub iris_features_required: Option<Json<serde_json::Value>>,
+    pub iris_features_required: Option<Vec<String>>,
     /// Iris features optionally used by this shader.
-    pub iris_features_optional: Option<Json<serde_json::Value>>,
+    pub iris_features_optional: Option<Vec<String>>,
     /// Settings screen configuration.
     pub settings_screen: Option<Json<serde_json::Value>>,
     /// Shader file paths.
-    pub file_paths: Option<Json<serde_json::Value>>,
+    pub file_paths: Option<Vec<String>>,
     /// Supported dimensions (e.g. `["overworld", "nether", "end"]`).
-    pub dimension_support: Option<Json<serde_json::Value>>,
+    pub dimension_support: Option<Vec<String>>,
 }
 
 impl From<ShaderVersionMetadata> for ShaderVersionMetadataNode {
@@ -537,11 +537,17 @@ impl From<ShaderVersionMetadata> for ShaderVersionMetadataNode {
             has_custom_textures: m.has_custom_textures,
             extracted_at: m.extracted_at,
             pipeline_features: m.pipeline_features.map(Json),
-            iris_features_required: m.iris_features_required.map(Json),
-            iris_features_optional: m.iris_features_optional.map(Json),
+            iris_features_required: m
+                .iris_features_required
+                .and_then(|v| serde_json::from_value(v).ok()),
+            iris_features_optional: m
+                .iris_features_optional
+                .and_then(|v| serde_json::from_value(v).ok()),
             settings_screen: m.settings_screen.map(Json),
-            file_paths: m.file_paths.map(Json),
-            dimension_support: m.dimension_support.map(Json),
+            file_paths: m.file_paths.and_then(|v| serde_json::from_value(v).ok()),
+            dimension_support: m
+                .dimension_support
+                .and_then(|v| serde_json::from_value(v).ok()),
         }
     }
 }

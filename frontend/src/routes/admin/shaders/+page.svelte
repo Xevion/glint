@@ -51,7 +51,11 @@ let shadersError = $derived(data.error);
 
 // Tab state (synced to URL)
 type PageTab = 'my-shaders' | 'discover';
-let activeTab = $state<PageTab>((page.url.searchParams.get('tab') as PageTab) || 'my-shaders');
+const VALID_TABS = new Set<string>(['my-shaders', 'discover'] satisfies PageTab[]);
+const tabParam = page.url.searchParams.get('tab');
+let activeTab = $state<PageTab>(
+	tabParam && VALID_TABS.has(tabParam) ? (tabParam as PageTab) : 'my-shaders'
+);
 
 function handleTabChange(tab: string) {
 	activeTab = tab as PageTab;

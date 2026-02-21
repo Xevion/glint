@@ -176,11 +176,11 @@ function mapMetadata(m: GqlMetadata): ShaderDetailMetadata {
 		hasCustomTextures: m.hasCustomTextures,
 		extractedAt: m.extractedAt,
 		pipelineFeatures: m.pipelineFeatures as Record<string, unknown> | undefined,
-		irisFeaturesRequired: m.irisFeaturesRequired as string[] | undefined,
-		irisFeaturesOptional: m.irisFeaturesOptional as string[] | undefined,
+		irisFeaturesRequired: m.irisFeaturesRequired ?? undefined,
+		irisFeaturesOptional: m.irisFeaturesOptional ?? undefined,
 		settingsScreen: m.settingsScreen as Record<string, unknown>[] | undefined,
-		filePaths: m.filePaths as string[] | undefined,
-		dimensionSupport: m.dimensionSupport as string[] | undefined
+		filePaths: m.filePaths ?? undefined,
+		dimensionSupport: m.dimensionSupport ?? undefined
 	};
 }
 
