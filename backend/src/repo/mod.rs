@@ -23,7 +23,7 @@ pub mod work_ordering;
 
 pub use background::BackgroundRepo;
 pub use capture::{CaptureRepo, ThumbnailInfo};
-pub use capture_health::CaptureHealthRepo;
+pub use capture_health::{CaptureHealthRepo, ShaderCaptureHealth};
 pub use capture_run::CaptureRunRepo;
 pub use device_code::DeviceCodeRepo;
 pub use extraction::ExtractionRepo;

@@ -9,9 +9,9 @@ use scene::{
     SceneThumbnailLoader,
 };
 use shader::{
-    ShaderAuthorsLoader, ShaderCategoriesLoader, ShaderExtractionSummaryLoader,
-    ShaderFeaturesLoader, ShaderLatestVersionIdLoader, ShaderLatestVersionLoader,
-    ShaderThumbnailLoader, ShaderVersionCountLoader,
+    ShaderAuthorsLoader, ShaderCaptureHealthLoader, ShaderCategoriesLoader,
+    ShaderExtractionSummaryLoader, ShaderFeaturesLoader, ShaderLatestVersionIdLoader,
+    ShaderLatestVersionLoader, ShaderThumbnailLoader, ShaderVersionCountLoader,
 };
 
 /// Request-scoped collection of DataLoaders. Created fresh per GraphQL request
@@ -25,6 +25,7 @@ pub struct RequestLoaders {
     pub shader_latest_version_ids: DataLoader<ShaderLatestVersionIdLoader>,
     pub shader_extraction_summaries: DataLoader<ShaderExtractionSummaryLoader>,
     pub shader_version_counts: DataLoader<ShaderVersionCountLoader>,
+    pub shader_capture_health: DataLoader<ShaderCaptureHealthLoader>,
     pub scene_thumbnails: DataLoader<SceneThumbnailLoader>,
     pub scene_capture_counts: DataLoader<SceneCaptureCountLoader>,
     pub scene_latest_versions: DataLoader<SceneLatestVersionLoader>,
@@ -59,6 +60,10 @@ impl RequestLoaders {
             ),
             shader_version_counts: DataLoader::new(
                 ShaderVersionCountLoader::new(pool.clone()),
+                tokio::spawn,
+            ),
+            shader_capture_health: DataLoader::new(
+                ShaderCaptureHealthLoader::new(pool.clone()),
                 tokio::spawn,
             ),
             scene_thumbnails: DataLoader::new(

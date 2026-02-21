@@ -1,5 +1,5 @@
 <script lang="ts">
-import type { AdminShader } from './+page';
+import type { AdminShader } from './queries';
 
 interface Props {
 	shader: AdminShader;

@@ -1,49 +1,31 @@
-import { type ResultOf, createGraphQLClient, graphql, query } from '$lib/graphql';
+import { createGraphQLClient, query } from '$lib/graphql';
 import type { PageLoad } from './$types';
-
-const ShadersQuery = graphql(`
-	query AdminShadersList {
-		shaders(first: 250, visibility: INCLUDE) {
-			edges {
-				node {
-					id
-					name
-					slug
-					description
-					modrinthId
-					curseforgeId
-					websiteUrl
-					iconUrl
-					lastSyncedAt
-					createdAt
-					captureEnabled
-					versionCount
-					extractionSummary {
-						completed
-						failed
-						pending
-						skipped
-						total
-					}
-				}
-			}
-			totalCount
-		}
-	}
-`);
-
-export type AdminShader = ResultOf<typeof ShadersQuery>['shaders']['edges'][number]['node'];
+import { AdminShadersQuery, type AdminShader } from './queries';
 
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('glint:shaders');
 	const client = createGraphQLClient(fetch);
-	const result = await query(client, ShadersQuery, {}, { requestPolicy: 'cache-and-network' });
 
-	return result.match({
-		Ok: (data) => ({
-			shaders: data.shaders.edges.map((e) => e.node),
-			error: null as string | null
-		}),
-		Err: (err) => ({ shaders: [] as AdminShader[], error: err.message })
-	});
+	// Extract into closure so TypeScript can infer result type without a circular reference
+	// caused by the while loop reassigning `after` from `result.value`.
+	const fetchPage = (cursor?: string) =>
+		query(client, AdminShadersQuery, { first: 100, after: cursor });
+
+	const allShaders: AdminShader[] = [];
+	let hasNextPage = true;
+	let cursor: string | undefined;
+
+	while (hasNextPage) {
+		// eslint-disable-next-line no-await-in-loop
+		const result = await fetchPage(cursor);
+		if (!result.isOk) {
+			return { shaders: [] as AdminShader[], error: result.error.message };
+		}
+		const conn = result.value.shaders;
+		allShaders.push(...conn.edges.map((e) => e.node));
+		hasNextPage = conn.pageInfo.hasNextPage;
+		cursor = conn.pageInfo.endCursor ?? undefined;
+	}
+
+	return { shaders: allShaders, error: null as string | null };
 };

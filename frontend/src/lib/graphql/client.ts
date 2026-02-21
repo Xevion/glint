@@ -23,6 +23,7 @@ export function createGraphQLClient(fetchFn: typeof fetch = fetch): Client {
 					PageInfo: () => null,
 					CaptureCompletedEvent: () => null,
 					CaptureHealthNode: () => null,
+					ShaderCaptureHealthNode: () => null,
 					StorageStatsNode: () => null,
 					StorageBucketNode: () => null
 				}

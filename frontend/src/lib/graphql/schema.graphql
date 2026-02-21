@@ -765,6 +765,20 @@ type ShaderAuthorNode {
 	platform: String!
 }
 
+"""
+Capture health summary for a single shader (total targets vs completed captures).
+"""
+type ShaderCaptureHealthNode {
+	"""
+	Total capture targets for this shader's latest version.
+	"""
+	total: Int!
+	"""
+	Captures that are completed with a stored image.
+	"""
+	completed: Int!
+}
+
 scalar ShaderId
 
 type ShaderNode {
@@ -832,6 +846,13 @@ type ShaderNode {
 	Extraction summary across all versions.
 	"""
 	extractionSummary: ExtractionSummaryNode
+	"""
+	Capture health for this shader: total targets vs completed captures.
+	
+	Returns `null` when the shader has no capture targets (no entries in
+	`capture_target_matrix` for its latest version).
+	"""
+	captureHealth: ShaderCaptureHealthNode
 	"""
 	Completed captures for this shader, optionally filtered by version and profile.
 	

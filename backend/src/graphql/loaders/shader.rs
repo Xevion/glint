@@ -7,7 +7,8 @@ use sqlx::PgPool;
 use crate::id::ShaderVersionId;
 use crate::models::{Category, ExtractionSummary, Feature, ShaderAuthor, ShaderVersion};
 use crate::repo::{
-    CaptureRepo, CategoryRepo, FeatureRepo, ShaderAuthorRepo, ShaderVersionRepo, ThumbnailInfo,
+    CaptureHealthRepo, CaptureRepo, CategoryRepo, FeatureRepo, ShaderAuthorRepo,
+    ShaderCaptureHealth, ShaderVersionRepo, ThumbnailInfo,
 };
 
 pub struct ShaderAuthorsLoader {
@@ -180,6 +181,27 @@ impl Loader<String> for ShaderVersionCountLoader {
 
     async fn load(&self, keys: &[String]) -> Result<HashMap<String, Self::Value>, Self::Error> {
         ShaderVersionRepo::batch_version_counts(&self.pool, keys)
+            .await
+            .map_err(|e| Arc::new(sqlx::Error::Protocol(e.to_string())))
+    }
+}
+
+pub struct ShaderCaptureHealthLoader {
+    pool: PgPool,
+}
+
+impl ShaderCaptureHealthLoader {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+impl Loader<String> for ShaderCaptureHealthLoader {
+    type Value = ShaderCaptureHealth;
+    type Error = Arc<sqlx::Error>;
+
+    async fn load(&self, keys: &[String]) -> Result<HashMap<String, Self::Value>, Self::Error> {
+        CaptureHealthRepo::batch_shader_health(&self.pool, keys)
             .await
             .map_err(|e| Arc::new(sqlx::Error::Protocol(e.to_string())))
     }

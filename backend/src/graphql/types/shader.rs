@@ -182,6 +182,19 @@ impl ShaderNode {
         Ok(summary.map(Into::into))
     }
 
+    /// Capture health for this shader: total targets vs completed captures.
+    ///
+    /// Returns `null` when the shader has no capture targets (no entries in
+    /// `capture_target_matrix` for its latest version).
+    async fn capture_health(&self, ctx: &Context<'_>) -> Result<Option<ShaderCaptureHealthNode>> {
+        let loaders = ctx.data_unchecked::<RequestLoaders>();
+        let health = loaders
+            .shader_capture_health
+            .load_one(self.id.0.clone())
+            .await?;
+        Ok(health.map(Into::into))
+    }
+
     /// Completed captures for this shader, optionally filtered by version and profile.
     ///
     /// Returns one capture per scene (deduplication via `CaptureDistinct::PerScene`),
@@ -580,6 +593,24 @@ impl From<crate::models::TrendingShader> for TrendingShaderNode {
             trending_views: t.trending_views,
             image_path: t.image_path,
             thumbhash: t.thumbhash,
+        }
+    }
+}
+
+/// Capture health summary for a single shader (total targets vs completed captures).
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ShaderCaptureHealthNode {
+    /// Total capture targets for this shader's latest version.
+    pub total: i64,
+    /// Captures that are completed with a stored image.
+    pub completed: i64,
+}
+
+impl From<crate::repo::ShaderCaptureHealth> for ShaderCaptureHealthNode {
+    fn from(h: crate::repo::ShaderCaptureHealth) -> Self {
+        Self {
+            total: h.total,
+            completed: h.completed,
         }
     }
 }

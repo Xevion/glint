@@ -39,7 +39,7 @@ import {
 	X as XIcon
 } from '@lucide/svelte';
 import type { PageData } from './$types';
-import type { AdminShader } from './+page';
+import type { AdminShader } from './queries';
 import { columns } from './columns.js';
 
 interface Props {
@@ -71,6 +71,7 @@ function handleTabChange(tab: string) {
 // eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- needs implicit index signature for Record<string, FilterDescriptor>
 type ShaderFilters = {
 	captureDisabled: FilterDescriptor<boolean>;
+	hasPlatformLink: FilterDescriptor<boolean>;
 };
 
 const shaderList = createClientList<AdminShader, ShaderFilters>({
@@ -96,10 +97,19 @@ const shaderList = createClientList<AdminShader, ShaderFilters>({
 		}
 	},
 	filters: {
-		captureDisabled: filter(false)
+		captureDisabled: filter(false),
+		hasPlatformLink: filter(false)
 	},
-	// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- intentional boolean short-circuit: show all when filter is on, otherwise only enabled
-	applyFilters: (shader, filters) => filters.captureDisabled || shader.captureEnabled,
+	applyFilters: (shader, filters) => {
+		// Boolean OR: when filter is on, bypass the enabled check entirely
+		// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+		const captureOk = filters.captureDisabled || shader.captureEnabled;
+		// Boolean OR: only apply when filter is on; modrinthId/curseforgeId are strings not booleans
+		// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+		const platformOk =
+			!filters.hasPlatformLink || shader.modrinthId != null || shader.curseforgeId != null;
+		return captureOk && platformOk;
+	},
 	viewMode: 'table'
 });
 
@@ -331,6 +341,10 @@ function handleShaderAdopted(shader: Shader) {
           <BooleanToggle
             label="Show disabled"
             bind:checked={shaderList.filters.captureDisabled}
+          />
+          <BooleanToggle
+            label="Has platform link"
+            bind:checked={shaderList.filters.hasPlatformLink}
           />
           <div class="flex-1"></div>
           <Sort options={shaderList.sortOptions} bind:value={shaderList.sort} />

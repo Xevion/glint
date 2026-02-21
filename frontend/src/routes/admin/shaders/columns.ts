@@ -6,7 +6,8 @@ import {
 	timeColumn
 } from '$lib/components/data-table';
 import { Sparkles } from '@lucide/svelte';
-import type { AdminShader } from './+page';
+import type { AdminShader } from './queries';
+import CaptureHealthCell from './capture-health-cell.svelte';
 import DescriptionCell from './description-cell.svelte';
 import ExtractionCell from './extraction-cell.svelte';
 import ShaderNameCell from './shader-name-cell.svelte';
@@ -43,6 +44,14 @@ export const columns: ColumnDef<AdminShader>[] = [
 				versionCount: row.original.versionCount,
 				summary: row.original.extractionSummary ?? undefined
 			})
+	},
+	{
+		accessorKey: 'captureHealth',
+		size: 100,
+		header: ({ column }) => renderComponent(DataTableColumnHeader, { column, title: 'Captures' }),
+		cell: ({ row }) =>
+			renderComponent(CaptureHealthCell, { health: row.original.captureHealth ?? undefined }),
+		enableSorting: false
 	},
 	timeColumn<AdminShader>('createdAt', 'Created')
 ];

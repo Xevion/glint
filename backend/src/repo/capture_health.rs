@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
@@ -116,6 +118,16 @@ struct CaptureHealthRow {
     status: TargetHealth,
     scene_outdated: bool,
     preset_outdated: bool,
+}
+
+/// Per-shader capture health counts for DataLoader batching.
+#[derive(Debug, Clone)]
+pub struct ShaderCaptureHealth {
+    pub shader_id: ShaderId,
+    /// Total capture targets for the shader's latest version.
+    pub total: i64,
+    /// Completed captures (status = completed, image_path IS NOT NULL).
+    pub completed: i64,
 }
 
 pub struct CaptureHealthRepo;
@@ -253,5 +265,63 @@ impl CaptureHealthRepo {
         );
 
         Ok(CaptureHealthResponse { targets, summary })
+    }
+
+    /// Batch-load capture health counts per shader for the DataLoader.
+    ///
+    /// For each shader ID, counts total capture targets (via `capture_target_matrix`
+    /// joined to `latest_shader_versions`) and completed captures.
+    /// Returns a map from shader ID string to `ShaderCaptureHealth`.
+    #[instrument(skip(pool, shader_ids), level = "debug")]
+    pub async fn batch_shader_health(
+        pool: &DbPool,
+        shader_ids: &[String],
+    ) -> AppResult<HashMap<String, ShaderCaptureHealth>> {
+        struct Row {
+            shader_id: ShaderId,
+            total: i64,
+            completed: i64,
+        }
+
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT
+                sh.id AS "shader_id!: ShaderId",
+                COUNT(ctm.shader_version_id)::int8 AS "total!",
+                COUNT(c.id) FILTER (WHERE c.status = 'completed' AND c.image_path IS NOT NULL)::int8 AS "completed!"
+            FROM shaders sh
+            JOIN latest_shader_versions lsv ON lsv.shader_id = sh.id
+            JOIN capture_target_matrix ctm ON ctm.shader_version_id = lsv.id
+            LEFT JOIN captures c
+                ON c.shader_version_id = ctm.shader_version_id
+                AND c.scene_id = ctm.scene_id
+                AND c.preset_id IS NOT DISTINCT FROM ctm.preset_id
+                AND c.profile_id IS NOT DISTINCT FROM ctm.profile_id
+            WHERE sh.id = ANY($1)
+            GROUP BY sh.id
+            "#,
+            shader_ids as &[String],
+        )
+        .fetch_all(pool)
+        .await
+        .context("failed to batch load capture health for shaders")?;
+
+        debug!(count = rows.len(), "Batch loaded shader capture health");
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let key = r.shader_id.0.clone();
+                (
+                    key,
+                    ShaderCaptureHealth {
+                        shader_id: r.shader_id,
+                        total: r.total,
+                        completed: r.completed,
+                    },
+                )
+            })
+            .collect())
     }
 }

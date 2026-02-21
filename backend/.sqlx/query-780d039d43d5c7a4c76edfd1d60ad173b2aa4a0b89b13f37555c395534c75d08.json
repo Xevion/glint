@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                sh.id AS \"shader_id!: ShaderId\",\n                COUNT(ctm.shader_version_id)::int8 AS \"total!\",\n                COUNT(c.id) FILTER (WHERE c.status = 'completed' AND c.image_path IS NOT NULL)::int8 AS \"completed!\"\n            FROM shaders sh\n            JOIN latest_shader_versions lsv ON lsv.shader_id = sh.id\n            JOIN capture_target_matrix ctm ON ctm.shader_version_id = lsv.id\n            LEFT JOIN captures c\n                ON c.shader_version_id = ctm.shader_version_id\n                AND c.scene_id = ctm.scene_id\n                AND c.preset_id IS NOT DISTINCT FROM ctm.preset_id\n                AND c.profile_id IS NOT DISTINCT FROM ctm.profile_id\n            WHERE sh.id = ANY($1)\n            GROUP BY sh.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shader_id!: ShaderId",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "total!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "completed!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "780d039d43d5c7a4c76edfd1d60ad173b2aa4a0b89b13f37555c395534c75d08"
+}
