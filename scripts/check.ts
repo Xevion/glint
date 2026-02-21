@@ -14,16 +14,8 @@ import { join } from 'path';
 import { getCommand } from './lib/commands';
 import { c, elapsed, isStderrTTY, parseFlags } from './lib/fmt';
 import { type CollectResult, raceInOrder, run, runPiped, spawnCollect } from './lib/proc';
+import { ensureFresh, newestMtime } from './lib/preflight';
 import { type Subsystem, isAll, resolveTargets, targetLabel } from './lib/targets';
-
-function newestMtime(dir: string, pattern: string): number {
-	let newest = 0;
-	for (const file of new Bun.Glob(pattern).scanSync(dir)) {
-		const mt = statSync(`${dir}/${file}`).mtimeMs;
-		if (mt > newest) newest = mt;
-	}
-	return newest;
-}
 
 const { flags, passthrough } = parseFlags(
 	process.argv.slice(2),
@@ -85,174 +77,164 @@ const rustSrcMtime = Math.max(
 // Pre-flight: TS bindings (frontend depends on Rust types)
 if (has('frontend')) {
 	const BINDINGS_DIR = 'frontend/src/lib/bindings';
-
-	const newestBindingMtime = existsSync(BINDINGS_DIR)
-		? newestMtime(BINDINGS_DIR, '**/*')
-		: 0;
-
-	const stale = newestBindingMtime === 0 || rustSrcMtime > newestBindingMtime;
-	if (stale) {
-		const t = Date.now();
-		process.stdout.write(
-			c('1;36', '→ Regenerating TypeScript bindings (Rust sources changed)...') + '\n'
-		);
-
-		const tmpDir = mkdtempSync(join(tmpdir(), 'glint-bindings-'));
-		try {
-			for (const cmd of [
-				{ cmd: ['cargo', 'test', '--no-run', '--quiet'], opts: { cwd: 'backend' } },
-				{
-					cmd: ['cargo', 'test', 'export_bindings', '--quiet'],
-					opts: { cwd: 'backend', env: { TS_RS_EXPORT_DIR: tmpDir } }
+	ensureFresh({
+		label: 'bindings',
+		sourceMtime: rustSrcMtime,
+		artifactDir: BINDINGS_DIR,
+		artifactGlob: '**/*',
+		reason: 'Rust sources changed',
+		regenerate: () => {
+			const tmpDir = mkdtempSync(join(tmpdir(), 'glint-bindings-'));
+			try {
+				for (const cmd of [
+					{ cmd: ['cargo', 'test', '--no-run', '--quiet'], opts: { cwd: 'backend' } },
+					{
+						cmd: ['cargo', 'test', 'export_bindings', '--quiet'],
+						opts: { cwd: 'backend', env: { TS_RS_EXPORT_DIR: tmpDir } },
+					},
+				]) {
+					const result = runPiped(cmd.cmd, cmd.opts);
+					if (result.exitCode !== 0) {
+						if (result.stdout) process.stdout.write(result.stdout);
+						if (result.stderr) process.stderr.write(result.stderr);
+						process.exit(result.exitCode);
+					}
 				}
-			]) {
-				const result = runPiped(cmd.cmd, cmd.opts);
-				if (result.exitCode !== 0) {
-					if (result.stdout) process.stdout.write(result.stdout);
-					if (result.stderr) process.stderr.write(result.stderr);
-					process.exit(result.exitCode);
+
+				if (!existsSync(BINDINGS_DIR)) {
+					mkdirSync(BINDINGS_DIR, { recursive: true });
 				}
-			}
 
-			if (!existsSync(BINDINGS_DIR)) {
-				mkdirSync(BINDINGS_DIR, { recursive: true });
-			}
+				const newFiles = new Set(readdirSync(tmpDir).filter((f) => f.endsWith('.ts')));
+				const oldFiles = new Set(
+					readdirSync(BINDINGS_DIR).filter((f) => f.endsWith('.ts') && f !== 'index.ts'),
+				);
 
-			const newFiles = new Set(readdirSync(tmpDir).filter((f) => f.endsWith('.ts')));
-			const oldFiles = new Set(
-				readdirSync(BINDINGS_DIR).filter((f) => f.endsWith('.ts') && f !== 'index.ts')
-			);
-
-			let changed = 0;
-			for (const file of newFiles) {
-				const newContent = readFileSync(join(tmpDir, file));
-				const oldPath = join(BINDINGS_DIR, file);
-				if (existsSync(oldPath)) {
-					const oldContent = readFileSync(oldPath);
-					if (Buffer.compare(newContent, oldContent) === 0) continue;
-				}
-				writeFileSync(oldPath, newContent);
-				changed++;
-			}
-
-			for (const file of oldFiles) {
-				if (!newFiles.has(file)) {
-					rmSync(join(BINDINGS_DIR, file));
+				let changed = 0;
+				for (const file of newFiles) {
+					const newContent = readFileSync(join(tmpDir, file));
+					const oldPath = join(BINDINGS_DIR, file);
+					if (existsSync(oldPath)) {
+						const oldContent = readFileSync(oldPath);
+						if (Buffer.compare(newContent, oldContent) === 0) continue;
+					}
+					writeFileSync(oldPath, newContent);
 					changed++;
 				}
+
+				for (const file of oldFiles) {
+					if (!newFiles.has(file)) {
+						rmSync(join(BINDINGS_DIR, file));
+						changed++;
+					}
+				}
+
+				run(['bun', 'scripts/bindings-barrel.ts']);
+
+				const count = newFiles.size;
+				const detail =
+					changed > 0 ? `${count} types, ${changed} changed` : `${count} types, no changes`;
+				return { detail };
+			} finally {
+				rmSync(tmpDir, { recursive: true, force: true });
 			}
-
-			run(['bun', 'scripts/bindings-barrel.ts']);
-
-			const count = newFiles.size;
-			const detail = changed > 0 ? `, ${changed} changed` : ', no changes';
-			process.stdout.write(c('32', '✓ bindings') + ` (${elapsed(t)}s, ${count} types${detail})\n`);
-		} finally {
-			rmSync(tmpDir, { recursive: true, force: true });
-		}
-	} else {
-		process.stdout.write(c('2', '· bindings up-to-date, skipped') + '\n');
-	}
+		},
+	});
 }
 
 // Pre-flight: JSON schemas (mod tests use these for contract drift detection)
 if (has('mod')) {
-	const SCHEMAS_DIR = 'schemas';
-
-	const newestSchemaMtime = existsSync(SCHEMAS_DIR)
-		? newestMtime(SCHEMAS_DIR, '*.json')
-		: 0;
-
-	const stale = newestSchemaMtime === 0 || rustSrcMtime > newestSchemaMtime;
-	if (stale) {
-		const t = Date.now();
-		process.stdout.write(c('1;36', '→ Regenerating JSON schemas (Rust sources changed)...') + '\n');
-		run(['cargo', 'test', 'export_all_schemas', '--quiet'], { cwd: 'backend' });
-
-		const count = readdirSync(SCHEMAS_DIR).filter((f) => f.endsWith('.json')).length;
-		process.stdout.write(c('32', '✓ schemas') + ` (${elapsed(t)}s, ${count} types)\n`);
-	} else {
-		process.stdout.write(c('2', '· schemas up-to-date, skipped') + '\n');
-	}
+	ensureFresh({
+		label: 'schemas',
+		sourceMtime: rustSrcMtime,
+		artifactDir: 'schemas',
+		artifactGlob: '*.json',
+		reason: 'Rust sources changed',
+		regenerate: () => {
+			run(['cargo', 'test', 'export_all_schemas', '--quiet'], { cwd: 'backend' });
+			const count = readdirSync('schemas').filter((f) => f.endsWith('.json')).length;
+			return { detail: `${count} types` };
+		},
+	});
 }
 
 // Pre-flight: SQLx query metadata (backend compile-time verification)
 if (has('backend')) {
-	const SQLX_DIR = 'backend/.sqlx';
-
 	const sqlxSrcMtime = Math.max(rustSrcMtime, newestMtime('backend/migrations', '*.sql'));
-
-	const newestSqlxMtime = existsSync(SQLX_DIR)
-		? newestMtime(SQLX_DIR, '*.json')
-		: 0;
-
-	const stale = newestSqlxMtime === 0 || sqlxSrcMtime > newestSqlxMtime;
-	if (stale) {
-		const t = Date.now();
-		process.stdout.write(c('1;36', '→ Regenerating SQLx query metadata (sources changed)...') + '\n');
-		const result = runPiped(['cargo', 'sqlx', 'prepare'], { cwd: 'backend' });
-		if (result.exitCode !== 0) {
-			process.stdout.write(
-				c('33', '⚠ sqlx prepare failed (is the database running?)') + ` (${elapsed(t)}s)\n`
-			);
-			if (result.stderr) process.stderr.write(result.stderr);
-		} else {
-			const count = existsSync(SQLX_DIR)
-				? readdirSync(SQLX_DIR).filter((f) => f.endsWith('.json')).length
+	ensureFresh({
+		label: 'sqlx',
+		sourceMtime: sqlxSrcMtime,
+		artifactDir: 'backend/.sqlx',
+		artifactGlob: '*.json',
+		reason: 'sources changed',
+		regenerate: () => {
+			const result = runPiped(['cargo', 'sqlx', 'prepare'], { cwd: 'backend' });
+			if (result.exitCode !== 0) {
+				if (result.stderr) process.stderr.write(result.stderr);
+				return { warning: 'sqlx prepare failed (is the database running?)' };
+			}
+			const count = existsSync('backend/.sqlx')
+				? readdirSync('backend/.sqlx').filter((f) => f.endsWith('.json')).length
 				: 0;
-			process.stdout.write(c('32', '✓ sqlx') + ` (${elapsed(t)}s, ${count} queries)\n`);
-		}
-	} else {
-		process.stdout.write(c('2', '· sqlx metadata up-to-date, skipped') + '\n');
-	}
+			return { detail: `${count} queries` };
+		},
+	});
 }
 
 // Pre-flight: GraphQL schema + gql-tada (frontend type checking)
 if (has('frontend')) {
-	const SCHEMA_PATH = 'frontend/src/lib/graphql/schema.graphql';
-	const GQL_ENV_PATH = 'frontend/src/lib/graphql/graphql-env.d.ts';
+	const GQL_DIR = 'frontend/src/lib/graphql';
 
-	{
-		const t = Date.now();
-		const existingSchema = existsSync(SCHEMA_PATH) ? readFileSync(SCHEMA_PATH) : null;
+	ensureFresh({
+		label: 'graphql schema',
+		sourceMtime: rustSrcMtime,
+		artifactDir: GQL_DIR,
+		artifactGlob: 'schema.graphql',
+		reason: 'Rust sources changed',
+		regenerate: () => {
+			const schemaPath = join(GQL_DIR, 'schema.graphql');
+			const existing = existsSync(schemaPath) ? readFileSync(schemaPath) : null;
 
-		process.stdout.write(c('1;36', '→ Verifying GraphQL schema...') + '\n');
-		const result = runPiped(['cargo', 'test', '--test', 'graphql_schema', '--quiet'], {
-			cwd: 'backend',
-		});
-		if (result.exitCode !== 0) {
-			process.stdout.write(c('31', '✗ graphql schema generation failed') + '\n');
-			if (result.stdout) process.stdout.write(result.stdout);
-			if (result.stderr) process.stderr.write(result.stderr);
-			process.exit(1);
-		}
+			const result = runPiped(['cargo', 'test', '--test', 'graphql_schema', '--quiet'], {
+				cwd: 'backend',
+			});
+			if (result.exitCode !== 0) {
+				if (result.stdout) process.stdout.write(result.stdout);
+				if (result.stderr) process.stderr.write(result.stderr);
+				process.exit(1);
+			}
 
-		const newSchema = readFileSync(SCHEMA_PATH);
-		const changed = !existingSchema || Buffer.compare(existingSchema, newSchema) !== 0;
-		const detail = changed ? ', updated' : '';
-		process.stdout.write(c('32', '✓ graphql schema') + ` (${elapsed(t)}s${detail})\n`);
-	}
+			const updated = readFileSync(schemaPath);
+			const changed = !existing || Buffer.compare(existing, updated) !== 0;
+			return changed ? { detail: 'updated' } : {};
+		},
+	});
 
-	{
-		const t = Date.now();
-		const existingGqlEnv = existsSync(GQL_ENV_PATH) ? readFileSync(GQL_ENV_PATH) : null;
+	const schemaMtime = newestMtime(GQL_DIR, 'schema.graphql');
+	ensureFresh({
+		label: 'gql-tada',
+		sourceMtime: schemaMtime,
+		artifactDir: GQL_DIR,
+		artifactGlob: 'graphql-env.d.ts',
+		reason: 'schema changed',
+		regenerate: () => {
+			const envPath = join(GQL_DIR, 'graphql-env.d.ts');
+			const existing = existsSync(envPath) ? readFileSync(envPath) : null;
 
-		process.stdout.write(c('1;36', '→ Verifying gql-tada introspection output...') + '\n');
-		const result = runPiped(['bunx', 'gql-tada', 'generate', 'output'], {
-			cwd: 'frontend',
-		});
-		if (result.exitCode !== 0) {
-			process.stdout.write(c('31', '✗ gql-tada generate failed') + '\n');
-			if (result.stdout) process.stdout.write(result.stdout);
-			if (result.stderr) process.stderr.write(result.stderr);
-			process.exit(1);
-		}
+			const result = runPiped(['bunx', 'gql-tada', 'generate', 'output'], {
+				cwd: 'frontend',
+			});
+			if (result.exitCode !== 0) {
+				if (result.stdout) process.stdout.write(result.stdout);
+				if (result.stderr) process.stderr.write(result.stderr);
+				process.exit(1);
+			}
 
-		const newGqlEnv = readFileSync(GQL_ENV_PATH);
-		const changed = !existingGqlEnv || Buffer.compare(existingGqlEnv, newGqlEnv) !== 0;
-		const detail = changed ? ', updated' : '';
-		process.stdout.write(c('32', '✓ gql-tada') + ` (${elapsed(t)}s${detail})\n`);
-	}
+			const updated = readFileSync(envPath);
+			const changed = !existing || Buffer.compare(existing, updated) !== 0;
+			return changed ? { detail: 'updated' } : {};
+		},
+	});
 }
 
 interface Check {
