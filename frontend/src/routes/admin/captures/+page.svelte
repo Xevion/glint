@@ -36,6 +36,7 @@ interface Props {
 let { data }: Props = $props();
 
 const list = createCursorList<AdminCaptureNode, CaptureFilters>({
+	key: (c) => c.id,
 	initial: () => data.captures,
 	query: AdminCapturesQuery,
 	extract: (d: ResultOf<typeof AdminCapturesQuery>) => d.adminCaptures,
@@ -115,7 +116,7 @@ const sceneOptions = $derived(data.scenes);
 				/>
 			{/snippet}
 		</Table>
-		<Grid href={(capture: AdminCaptureNode) => `/admin/captures/${capture.id}`} key={(capture: AdminCaptureNode) => capture.id} xlCols={4}>
+		<Grid href={(capture: AdminCaptureNode) => `/admin/captures/${capture.id}`} xlCols={4}>
 			{#snippet card(capture: AdminCaptureNode)}
 				<CaptureCard layout="tile"
 					{capture}

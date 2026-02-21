@@ -59,6 +59,9 @@ const ctx: DataViewContext<T> = {
 	get viewMode() {
 		return list?.viewMode ?? viewMode ?? 'grid';
 	},
+	get key() {
+		return list?.key;
+	},
 	loadMore: async () => {
 		await list?.loadMore();
 	},

@@ -17,6 +17,8 @@ interface SortConfig<T> {
 }
 
 export interface ClientListConfig<T, F extends Record<string, FilterDescriptor<unknown>>> {
+	/** Unique identity extractor for DOM keying. */
+	key: (item: T) => string | number;
 	/** Reactive getter for the full item array. */
 	items: () => T[];
 	/** Search configuration. */
@@ -119,6 +121,9 @@ export function createClientList<
 	}
 
 	return {
+		get key() {
+			return config.key;
+		},
 		get items() {
 			return filteredItems;
 		},

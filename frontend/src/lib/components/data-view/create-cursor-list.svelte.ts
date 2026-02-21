@@ -17,6 +17,8 @@ interface SortConfig {
 }
 
 export interface CursorListConfig<T, F extends Record<string, FilterDescriptor<unknown>>> {
+	/** Unique identity extractor for deduplication and DOM keying. */
+	key: (item: T) => string | number;
 	/** Reactive getter for SSR data (first page, already unwrapped from Result). */
 	initial: () => RelayConnection<T>;
 	/** gql-tada typed document for fetching subsequent pages. */
@@ -221,7 +223,7 @@ export function createCursorList<
 			Ok: (data) => {
 				const connection = config.extract(data);
 				const unwrapped = unwrapConnection(connection);
-				accumulatedItems = appendDeduplicatedItems(accumulatedItems, unwrapped.items);
+				accumulatedItems = appendDeduplicatedItems(accumulatedItems, unwrapped.items, config.key);
 				endCursor = unwrapped.endCursor;
 				hasNextPage = unwrapped.hasNextPage;
 				if (unwrapped.totalCount != null) {
@@ -247,6 +249,9 @@ export function createCursorList<
 	}
 
 	return {
+		get key() {
+			return config.key;
+		},
 		get items() {
 			return accumulatedItems;
 		},

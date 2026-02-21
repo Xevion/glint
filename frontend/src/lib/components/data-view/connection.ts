@@ -24,19 +24,13 @@ export function unwrapConnection<T>(connection: RelayConnection<T>) {
 }
 
 /**
- * Append new items to an existing array, deduplicating by `id` when present.
- * Items without an `id` property are always appended.
+ * Append new items to an existing array, deduplicating by the provided key function.
  */
-export function appendDeduplicatedItems<T>(existing: T[], incoming: T[]): T[] {
-	const getId = (item: T): string | number | undefined => {
-		const rec = item as Record<string, unknown>;
-		const id = rec.id;
-		return typeof id === 'string' || typeof id === 'number' ? id : undefined;
-	};
-	const existingIds = new Set(existing.map(getId).filter((id) => id != null));
-	const uniqueNew = incoming.filter((item) => {
-		const id = getId(item);
-		return id == null || !existingIds.has(id);
-	});
-	return [...existing, ...uniqueNew];
+export function appendDeduplicatedItems<T>(
+	existing: T[],
+	incoming: T[],
+	keyFn: (item: T) => string | number
+): T[] {
+	const existingKeys = new Set(existing.map(keyFn));
+	return [...existing, ...incoming.filter((item) => !existingKeys.has(keyFn(item)))];
 }

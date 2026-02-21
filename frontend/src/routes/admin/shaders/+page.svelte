@@ -80,6 +80,7 @@ type ShaderFilters = {
 };
 
 const shaderList = createClientList<AdminShader, ShaderFilters>({
+	key: (s) => s.id,
 	items: () => shaders,
 	search: {
 		clientFilter: (shader, q) =>
@@ -163,6 +164,7 @@ let filteredResults = $derived.by(() => {
 
 /* eslint-disable @typescript-eslint/no-empty-function, @typescript-eslint/no-explicit-any */
 const discoverList: ListState<ShaderSearchResult, any> = {
+	key: (r) => r.platform + ':' + r.platform_id,
 	get items() {
 		return filteredResults;
 	},
@@ -425,7 +427,7 @@ function handleShaderAdopted(shader: Shader) {
           <div class="mt-3">
             <Pagination style="pages" />
           </div>
-          <Grid size="small" key={(s: AdminShader) => s.id}>
+          <Grid size="small">
             {#snippet card(shader: AdminShader)}
               <a
                 href="/admin/shaders/{shader.id}"
@@ -657,7 +659,7 @@ function handleShaderAdopted(shader: Shader) {
             </p>
           {/snippet}
 
-          <Grid mode="grid" size="medium" key={(r: ShaderSearchResult) => r.platform + ':' + r.platform_id}>
+          <Grid mode="grid" size="medium">
             {#snippet card(result: ShaderSearchResult)}
               <div
                 class="group relative flex flex-col rounded-lg border bg-card transition-colors hover:border-foreground/20 {result.adopted

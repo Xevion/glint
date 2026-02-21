@@ -26,6 +26,7 @@ const scenes = $derived(data.scenes);
 const loadError = $derived(data.error);
 
 const list = createClientList({
+	key: (s) => s.slug,
 	items: () => scenes,
 	search: {
 		clientFilter: (scene, q) => scene.name.toLowerCase().includes(q.toLowerCase())
@@ -106,7 +107,6 @@ const ogImage: string | null = $derived(scenes[0]?.imagePath ?? null);
 			<Grid
 				mode={list.viewMode}
 				size="small"
-				key={(s: PageData['scenes'][number]) => s.slug}
 			>
 				{#snippet card(scene: PageData['scenes'][number])}
 					<SceneCard {scene} />

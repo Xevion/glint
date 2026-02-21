@@ -40,6 +40,7 @@ let {
 const ctx = getDataViewContext<T>();
 
 const resolvedMode = $derived(mode ?? ctx.viewMode);
+const resolvedKey = $derived(keyFn ?? ctx.key);
 
 const CARD_SIZE_MIN: Record<CardSize, string> = {
 	small: '220px',
@@ -85,7 +86,7 @@ $effect(() => {
 
 {#if resolvedMode === 'grid' && card}
 	<div role="list" class={cn('grid gap-5', className)} style={gridStyle}>
-		{#each ctx.items as item, i (keyFn ? keyFn(item) : i)}
+		{#each ctx.items as item, i (resolvedKey ? resolvedKey(item) : i)}
 			<div
 				role="listitem"
 				in:scale={{
@@ -106,7 +107,7 @@ $effect(() => {
 			className
 		)}
 	>
-		{#each ctx.items as item, i (keyFn ? keyFn(item) : i)}
+		{#each ctx.items as item, i (resolvedKey ? resolvedKey(item) : i)}
 			<div role="listitem">
 				{@render row(item, i)}
 			</div>
@@ -120,7 +121,7 @@ $effect(() => {
 			className
 		)}
 	>
-		{#each ctx.items as item, i (keyFn ? keyFn(item) : i)}
+		{#each ctx.items as item, i (resolvedKey ? resolvedKey(item) : i)}
 			<svelte:element
 				this={href ? 'a' : 'div'}
 				href={href ? href(item) : undefined}

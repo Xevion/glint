@@ -17,6 +17,8 @@ export interface DataViewContext<T> {
 	readonly hasMore: boolean;
 	readonly totalCount: number | null;
 	readonly viewMode: ViewMode;
+	/** Item identity function, provided by the list state. */
+	readonly key?: (item: T) => string | number;
 	loadMore: () => Promise<void>;
 	/** The full list state, if created via createListState. */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -66,6 +66,7 @@ let presets: ScenePreset[] = $derived(data.presets);
 
 // Captures tab: cursor-paginated with forced scene filter
 const captureList = createCursorList<AdminCaptureNode, CaptureFilters>({
+	key: (c) => c.id,
 	initial: () => data.captures,
 	query: AdminCapturesQuery,
 	extract: (d: ResultOf<typeof AdminCapturesQuery>) => d.adminCaptures,
@@ -577,7 +578,7 @@ function handleDragEnd() {
 							/>
 						{/snippet}
 					</Table>
-					<Grid href={(capture: AdminCaptureNode) => `/admin/captures/${capture.id}`} key={(capture: AdminCaptureNode) => capture.id}>
+					<Grid href={(capture: AdminCaptureNode) => `/admin/captures/${capture.id}`}>
 						{#snippet card(capture: AdminCaptureNode)}
 							<CaptureCard layout="tile"
 								{capture}

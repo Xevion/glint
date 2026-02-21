@@ -33,6 +33,7 @@ const roleOptions = [
 ];
 
 const list = createClientList<User, UserFilters>({
+	key: (u) => u.id,
 	items: () => data.users,
 	search: {
 		clientFilter: (user, q) =>

@@ -29,6 +29,7 @@ let { data }: Props = $props();
 const author = $derived(data.author);
 
 const list = createCursorList<ShaderCardShader>({
+	key: (s) => s.id,
 	initial: () => data.shaders,
 	query: AuthorShadersQuery,
 	extract: (d: ResultOf<typeof AuthorShadersQuery>) =>
@@ -135,7 +136,6 @@ const curseforgePlatform = $derived(author.platforms.find((p) => p.platform === 
 		<Grid
 			mode={list.viewMode}
 			size="medium"
-			key={(s: ShaderCardShader) => s.id}
 		>
 			{#snippet card(shader: ShaderCardShader)}
 				<ShaderCard {shader} />

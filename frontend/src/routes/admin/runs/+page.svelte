@@ -32,6 +32,7 @@ const statusOptions = [
 ];
 
 const list = createCursorList<RunNode, RunFilters>({
+	key: (r) => String(r.id),
 	initial: () => data.runs,
 	query: AdminRunsQuery,
 	extract: (d: ResultOf<typeof AdminRunsQuery>) => d.adminCaptureRuns,
@@ -143,7 +144,7 @@ const list = createCursorList<RunNode, RunFilters>({
 				{@render runCard(run)}
 			{/snippet}
 		</Table>
-		<Grid href={(run: RunNode) => `/admin/runs/${String(run.id)}`} key={(run: RunNode) => String(run.id)}>
+		<Grid href={(run: RunNode) => `/admin/runs/${String(run.id)}`}>
 			{#snippet card(run: RunNode)}
 				<div class="p-4">
 					{@render runCard(run)}

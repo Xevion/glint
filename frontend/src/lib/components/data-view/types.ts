@@ -26,6 +26,7 @@ export interface ListState<T, F extends Record<string, FilterDescriptor<unknown>
 	readonly error: string | null;
 	readonly hasMore: boolean;
 	readonly totalCount: number | null;
+	readonly key: (item: T) => string | number;
 	loadMore: () => Promise<void>;
 	reset: () => void;
 	search: string;

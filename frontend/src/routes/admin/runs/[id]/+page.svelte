@@ -52,6 +52,7 @@ function normalizeStatus(status: string): StatusBadgeStatus {
 }
 
 const list = createClientList<AdminCaptureRunItem>({
+	key: (i) => i.id,
 	items: () => {
 		if (statusFilter.length === 0) return items;
 		return items.filter((i) => statusFilter.includes(i.status));
@@ -317,7 +318,7 @@ function handleRowClick(item: AdminCaptureRunItem) {
 		{/if}
 
 		<!-- Grid view -->
-		<Grid key={(item: AdminCaptureRunItem) => item.id} size="small">
+		<Grid size="small">
 			{#snippet card(item: AdminCaptureRunItem)}
 				<svelte:element
 					this={item.captureId ? 'a' : 'div'}

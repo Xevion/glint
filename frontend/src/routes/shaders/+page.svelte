@@ -28,6 +28,7 @@ interface Props {
 let { data }: Props = $props();
 
 const list = createCursorList<ShaderCardShader>({
+	key: (s) => s.id,
 	initial: () => data.shaders,
 	query: BrowseShadersQuery,
 	extract: (d: ResultOf<typeof BrowseShadersQuery>) => d.shaders,
@@ -110,7 +111,6 @@ const ogImage = $derived(list.items[0]?.imagePath ?? null);
 		<Grid
 			mode={list.viewMode}
 			size="medium"
-			key={(s: ShaderCardShader) => s.id}
 		>
 			{#snippet card(shader: ShaderCardShader)}
 				<ShaderCard {shader} />

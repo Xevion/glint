@@ -133,6 +133,7 @@ let metadata: ShaderMetadata | null = $derived(data.shader.metadata);
 
 // Captures tab: cursor-paginated with forced shader filter
 const captureList = createCursorList<AdminCaptureNode, CaptureFilters>({
+	key: (c) => c.id,
 	initial: () => data.captures,
 	query: AdminCapturesQuery,
 	extract: (d: ResultOf<typeof AdminCapturesQuery>) => d.adminCaptures,
@@ -1340,7 +1341,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
                             />
                         {/snippet}
                     </Table>
-                    <Grid href={(capture: AdminCaptureNode) => `/admin/captures/${capture.id}`} key={(capture: AdminCaptureNode) => capture.id}>
+                    <Grid href={(capture: AdminCaptureNode) => `/admin/captures/${capture.id}`}>
                         {#snippet card(capture: AdminCaptureNode)}
                             <CaptureCard layout="tile"
                                 {capture}

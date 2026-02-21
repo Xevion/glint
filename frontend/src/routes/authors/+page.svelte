@@ -28,6 +28,7 @@ interface Props {
 let { data }: Props = $props();
 
 const list = createCursorList<AuthorCardData>({
+	key: (a) => a.slug,
 	initial: () => data.authors,
 	query: BrowseAuthorsQuery,
 	extract: (d: ResultOf<typeof BrowseAuthorsQuery>) => d.authors,
@@ -105,7 +106,6 @@ const hasError = $derived(!!data.error);
 		<Grid
 			mode={list.viewMode}
 			size="medium"
-			key={(a: AuthorCardData) => a.slug}
 		>
 			{#snippet card(author: AuthorCardData)}
 				<AuthorCard {author} />

@@ -30,6 +30,7 @@ type SceneFilters = {
 };
 
 const list = createClientList<AdminScene, SceneFilters>({
+	key: (s) => s.id,
 	items: () => data.scenes,
 	search: {
 		clientFilter: (scene, q) =>
@@ -77,7 +78,7 @@ const inactiveCount = $derived(data.scenes.filter((s) => !s.active).length);
 			{columns}
 			getRowHref={(scene: AdminScene) => `/admin/scenes/${scene.id}`}
 		/>
-		<Grid key={(s: AdminScene) => s.id} size="small">
+		<Grid size="small">
 			{#snippet card(scene: AdminScene)}
 				<a
 					href="/admin/scenes/{scene.id}"
