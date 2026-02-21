@@ -28,7 +28,9 @@ impl ShaderMutation {
         let state = ctx.data_unchecked::<AppState>();
         let db = state.db();
 
-        let old = ShaderRepo::get(db, &id).await.map_err(|e| e.extend())?;
+        let old = ShaderRepo::get(db, &id, true)
+            .await
+            .map_err(|e| e.extend())?;
 
         let request = input.into();
 
@@ -50,7 +52,40 @@ impl ShaderMutation {
             .map_err(|e| e.extend())?;
 
         if !deleted {
-            return Err(AppError::NotFound("Shader not found".into()).extend());
+            return Err(AppError::NotFound("Shader not found or already deleted".into()).extend());
+        }
+
+        Ok(true)
+    }
+
+    /// Restore a soft-deleted shader.
+    #[graphql(guard = "AdminGuard")]
+    async fn restore_shader(&self, ctx: &Context<'_>, id: ID) -> Result<ShaderNode> {
+        let _user = require_admin(ctx)?;
+        let state = ctx.data_unchecked::<AppState>();
+
+        let shader = ShaderRepo::restore(state.db(), &id)
+            .await
+            .map_err(|e| e.extend())?;
+
+        match shader {
+            Some(s) => Ok(s.into()),
+            None => Err(AppError::NotFound("Shader not found or not deleted".into()).extend()),
+        }
+    }
+
+    /// Permanently delete a soft-deleted shader (hard delete with CASCADE).
+    #[graphql(guard = "AdminGuard")]
+    async fn purge_shader(&self, ctx: &Context<'_>, id: ID) -> Result<bool> {
+        let _user = require_admin(ctx)?;
+        let state = ctx.data_unchecked::<AppState>();
+
+        let purged = ShaderRepo::purge(state.db(), &id)
+            .await
+            .map_err(|e| e.extend())?;
+
+        if !purged {
+            return Err(AppError::NotFound("Shader not found or not deleted".into()).extend());
         }
 
         Ok(true)

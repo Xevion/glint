@@ -246,6 +246,9 @@ export const load: PageLoad = async ({ params, fetch, url, depends }) => {
 			return data.shader;
 		},
 		Err: (err) => {
+			if (err.code === 'GONE') {
+				pageError(410, 'This shader has been removed.');
+			}
 			if (err.type === ApiErrorType.NotFound) {
 				pageError(404, `Shader "${params.slug}" not found`);
 			}

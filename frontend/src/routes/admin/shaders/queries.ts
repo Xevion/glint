@@ -16,6 +16,7 @@ export const AdminShadersQuery = graphql(`
 					lastSyncedAt
 					createdAt
 					captureEnabled
+					deletedAt
 					versionCount
 					extractionSummary {
 						completed

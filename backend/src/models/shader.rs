@@ -37,6 +37,8 @@ pub struct Shader {
     pub view_count: i64,
     pub preferred_version_id: Option<String>,
     pub capture_enabled: bool,
+    #[ts(as = "Option<String>")]
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 /// Specific release of a shader pack

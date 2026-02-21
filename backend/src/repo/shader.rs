@@ -17,10 +17,13 @@ pub struct ShaderRepo;
 impl ShaderRepo {
     #[instrument(skip(executor), level = "debug")]
     pub async fn list(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<Shader>> {
-        let shaders = sqlx::query_as!(Shader, "SELECT * FROM shaders ORDER BY name")
-            .fetch_all(executor)
-            .await
-            .context("failed to list shaders")?;
+        let shaders = sqlx::query_as!(
+            Shader,
+            "SELECT * FROM shaders WHERE deleted_at IS NULL ORDER BY name"
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to list shaders")?;
         debug!(count = shaders.len(), "Listed shaders");
         Ok(shaders)
     }
@@ -54,8 +57,9 @@ impl ShaderRepo {
             )
         });
 
-        let mut qb: QueryBuilder<'_, sqlx::Postgres> =
-            QueryBuilder::new("SELECT s.*, COUNT(*) OVER() AS total FROM shaders s WHERE TRUE");
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
+            "SELECT s.*, COUNT(*) OVER() AS total FROM shaders s WHERE s.deleted_at IS NULL",
+        );
 
         if require_captures {
             qb.push(
@@ -153,7 +157,7 @@ impl ShaderRepo {
              )";
 
         let mut qb: QueryBuilder<'_, sqlx::Postgres> =
-            QueryBuilder::new("SELECT s.* FROM shaders s WHERE TRUE");
+            QueryBuilder::new("SELECT s.* FROM shaders s WHERE s.deleted_at IS NULL");
 
         match visibility {
             Visibility::Exclude => {
@@ -202,7 +206,7 @@ impl ShaderRepo {
         let items: Vec<Shader> = items.into_iter().take(limit as usize).collect();
 
         let mut cqb: QueryBuilder<'_, sqlx::Postgres> =
-            QueryBuilder::new("SELECT COUNT(*) FROM shaders s WHERE TRUE");
+            QueryBuilder::new("SELECT COUNT(*) FROM shaders s WHERE s.deleted_at IS NULL");
 
         match visibility {
             Visibility::Exclude => {
@@ -239,12 +243,31 @@ impl ShaderRepo {
 
     /// Resolve a shader by ID or slug. Inputs longer than `ID_LENGTH` can only
     /// be slugs; shorter ones could be either, so we check both in one query.
+    ///
+    /// When `include_deleted` is `true`, soft-deleted shaders are included
+    /// (used by admin mutations that need to operate on deleted shaders).
     #[instrument(skip(db), level = "debug")]
-    pub async fn get(db: &DbPool, id_or_slug: &str) -> AppResult<Shader> {
-        if id_or_slug.len() <= crate::id::ID_LENGTH {
+    pub async fn get(db: &DbPool, id_or_slug: &str, include_deleted: bool) -> AppResult<Shader> {
+        if include_deleted {
+            if id_or_slug.len() <= crate::id::ID_LENGTH {
+                sqlx::query_as!(
+                    Shader,
+                    "SELECT * FROM shaders WHERE id = $1 OR slug = $1",
+                    id_or_slug
+                )
+                .fetch_optional(db)
+                .await
+                .context(format!("failed to find shader '{}'", id_or_slug))?
+                .or_not_found("Shader", id_or_slug)
+            } else {
+                Self::find_by_slug_including_deleted(db, id_or_slug)
+                    .await?
+                    .or_not_found("Shader", id_or_slug)
+            }
+        } else if id_or_slug.len() <= crate::id::ID_LENGTH {
             sqlx::query_as!(
                 Shader,
-                "SELECT * FROM shaders WHERE id = $1 OR slug = $1",
+                "SELECT * FROM shaders WHERE (id = $1 OR slug = $1) AND deleted_at IS NULL",
                 id_or_slug
             )
             .fetch_optional(db)
@@ -265,10 +288,14 @@ impl ShaderRepo {
         executor: impl sqlx::PgExecutor<'_>,
         ids: &[String],
     ) -> AppResult<HashMap<String, Shader>> {
-        let shaders = sqlx::query_as!(Shader, "SELECT * FROM shaders WHERE id = ANY($1)", ids)
-            .fetch_all(executor)
-            .await
-            .context("failed to batch fetch shaders")?;
+        let shaders = sqlx::query_as!(
+            Shader,
+            "SELECT * FROM shaders WHERE id = ANY($1) AND deleted_at IS NULL",
+            ids
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to batch fetch shaders")?;
 
         debug!(count = shaders.len(), "Batch fetched shaders");
         Ok(shaders.into_iter().map(|s| (s.id.0.clone(), s)).collect())
@@ -276,6 +303,23 @@ impl ShaderRepo {
 
     #[instrument(skip(executor), level = "debug")]
     pub async fn find_by_slug(
+        executor: impl sqlx::PgExecutor<'_>,
+        slug: &str,
+    ) -> AppResult<Option<Shader>> {
+        sqlx::query_as!(
+            Shader,
+            "SELECT * FROM shaders WHERE slug = $1 AND deleted_at IS NULL",
+            slug
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to find shader '{}'", slug))
+        .map_err(Into::into)
+    }
+
+    /// Find a shader by slug regardless of soft-delete status (admin use).
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn find_by_slug_including_deleted(
         executor: impl sqlx::PgExecutor<'_>,
         slug: &str,
     ) -> AppResult<Option<Shader>> {
@@ -291,6 +335,23 @@ impl ShaderRepo {
         executor: impl sqlx::PgExecutor<'_>,
         id: &str,
     ) -> AppResult<Option<Shader>> {
+        sqlx::query_as!(
+            Shader,
+            "SELECT * FROM shaders WHERE id = $1 AND deleted_at IS NULL",
+            id
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to find shader by id '{}'", id))
+        .map_err(Into::into)
+    }
+
+    /// Find a shader by ID regardless of soft-delete status (admin use).
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn find_by_id_including_deleted(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+    ) -> AppResult<Option<Shader>> {
         sqlx::query_as!(Shader, "SELECT * FROM shaders WHERE id = $1", id)
             .fetch_optional(executor)
             .await
@@ -303,19 +364,25 @@ impl ShaderRepo {
         executor: impl sqlx::PgExecutor<'_>,
         slug: &str,
     ) -> AppResult<bool> {
-        let result = sqlx::query_scalar!("SELECT 1 as one FROM shaders WHERE slug = $1", slug)
-            .fetch_optional(executor)
-            .await
-            .context(format!("failed to check shader existence '{}'", slug))?;
+        let result = sqlx::query_scalar!(
+            "SELECT 1 as one FROM shaders WHERE slug = $1 AND deleted_at IS NULL",
+            slug
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to check shader existence '{}'", slug))?;
         Ok(result.is_some())
     }
 
     #[instrument(skip(executor), level = "debug")]
     pub async fn exists_by_id(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<bool> {
-        let result = sqlx::query_scalar!("SELECT 1 as one FROM shaders WHERE id = $1", id)
-            .fetch_optional(executor)
-            .await
-            .context(format!("failed to check shader existence by id '{}'", id))?;
+        let result = sqlx::query_scalar!(
+            "SELECT 1 as one FROM shaders WHERE id = $1 AND deleted_at IS NULL",
+            id
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to check shader existence by id '{}'", id))?;
         Ok(result.is_some())
     }
 
@@ -347,13 +414,61 @@ impl ShaderRepo {
         result.conflict_on_unique(format!("Shader with slug '{}' already exists", slug))
     }
 
+    /// Soft-delete a shader by setting `deleted_at`. Returns `true` if a row was updated.
     #[instrument(skip(executor), level = "debug")]
     pub async fn delete(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<bool> {
-        let result = sqlx::query!("DELETE FROM shaders WHERE id = $1", id)
-            .execute(executor)
-            .await
-            .context(format!("failed to delete shader '{}'", id))?;
+        let result = sqlx::query!(
+            "UPDATE shaders SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL",
+            id
+        )
+        .execute(executor)
+        .await
+        .context(format!("failed to soft-delete shader '{}'", id))?;
         Ok(result.rows_affected() > 0)
+    }
+
+    /// Restore a soft-deleted shader by clearing `deleted_at`.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn restore(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: &str,
+    ) -> AppResult<Option<Shader>> {
+        sqlx::query_as!(
+            Shader,
+            "UPDATE shaders SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *",
+            id
+        )
+        .fetch_optional(executor)
+        .await
+        .context(format!("failed to restore shader '{}'", id))
+        .map_err(Into::into)
+    }
+
+    /// Permanently delete a soft-deleted shader (hard delete with CASCADE).
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn purge(executor: impl sqlx::PgExecutor<'_>, id: &str) -> AppResult<bool> {
+        let result = sqlx::query!(
+            "DELETE FROM shaders WHERE id = $1 AND deleted_at IS NOT NULL",
+            id
+        )
+        .execute(executor)
+        .await
+        .context(format!("failed to purge shader '{}'", id))?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// List all soft-deleted shaders, most recently deleted first.
+    #[instrument(skip(executor), level = "debug")]
+    pub async fn list_deleted(executor: impl sqlx::PgExecutor<'_>) -> AppResult<Vec<Shader>> {
+        let shaders = sqlx::query_as!(
+            Shader,
+            "SELECT * FROM shaders WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+        )
+        .fetch_all(executor)
+        .await
+        .context("failed to list deleted shaders")?;
+        debug!(count = shaders.len(), "Listed deleted shaders");
+        Ok(shaders)
     }
 
     #[instrument(skip(executor, req), level = "debug")]
@@ -552,7 +667,7 @@ impl ShaderRepo {
             Row,
             r#"
             SELECT id, slug, modrinth_id, curseforge_id FROM shaders
-            WHERE modrinth_id = ANY($1) OR curseforge_id = ANY($2)
+            WHERE deleted_at IS NULL AND (modrinth_id = ANY($1) OR curseforge_id = ANY($2))
             "#,
             modrinth_ids,
             curseforge_ids,

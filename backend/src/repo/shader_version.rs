@@ -328,7 +328,7 @@ impl ShaderVersionRepo {
             r#"
             SELECT s.slug FROM shaders s
             JOIN shader_versions sv ON sv.shader_id = s.id
-            WHERE sv.id = $1
+            WHERE sv.id = $1 AND s.deleted_at IS NULL
             "#,
             version_id
         )

@@ -57,6 +57,7 @@ import {
 	Pin,
 	PinOff,
 	RefreshCw,
+	RotateCcw,
 	SkipForward,
 	Trash2
 } from '@lucide/svelte';
@@ -93,6 +94,20 @@ const SyncShaderMutation = graphql(`
 		syncShader(id: $id) {
 			id
 		}
+	}
+`);
+
+const RestoreShaderMutation = graphql(`
+	mutation RestoreShader($id: ID!) {
+		restoreShader(id: $id) {
+			id
+		}
+	}
+`);
+
+const PurgeShaderMutation = graphql(`
+	mutation PurgeShader($id: ID!) {
+		purgeShader(id: $id)
 	}
 `);
 
@@ -198,12 +213,17 @@ let isDirty = $derived($tainted != null && Object.values($tainted).some(Boolean)
 
 const deleteAction = createAction({
 	action: () => mutation(client, DeleteShaderMutation, { id: shader.id }),
-	onSuccess: () => void goto('/admin/shaders'),
+	onSuccess: () => {
+		toast.success('Shader moved to trash');
+		void Promise.all([invalidate(`glint:admin:shader:${shader.id}`), invalidate('glint:shaders')]);
+	},
 	setError: (msg: string) => toast.error(msg)
 });
 
 let syncing = $state(false);
 let showDeleteConfirm = $state(false);
+let showPurgeConfirm = $state(false);
+let restoring = $state(false);
 let linkDialogOpen = $state(false);
 let linkUrl = $state('');
 let linkError = $state<string | null>(null);
@@ -239,6 +259,31 @@ async function handleSync() {
 		syncing = false;
 	}
 }
+
+async function handleRestore() {
+	restoring = true;
+	try {
+		const result = await mutation(client, RestoreShaderMutation, { id: shader.id });
+		result.match({
+			Ok: () => {
+				toast.success('Shader restored');
+				void Promise.all([invalidate(`glint:admin:shader:${shader.id}`), invalidate('glint:shaders')]);
+			},
+			Err: (err) => toast.error(err.message)
+		});
+	} finally {
+		restoring = false;
+	}
+}
+
+const purgeAction = createAction({
+	action: () => mutation(client, PurgeShaderMutation, { id: shader.id }),
+	onSuccess: () => {
+		toast.success('Shader permanently deleted');
+		void goto('/admin/shaders');
+	},
+	setError: (msg: string) => toast.error(msg)
+});
 
 function isValidPlatformUrl(input: string): boolean {
 	return PLATFORM_URL_PATTERN.test(input.trim());
@@ -315,6 +360,38 @@ function handleLinkKeydown(e: KeyboardEvent) {
         {/snippet}
     </Breadcrumb>
 
+    {#if shader.deletedAt}
+        <Alert variant="destructive">
+            <Trash2 class="h-4 w-4" />
+            <div class="flex items-center justify-between">
+                <span>This shader was deleted <TimeAgo timestamp={shader.deletedAt} />.</span>
+                <div class="flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onclick={handleRestore}
+                        disabled={restoring}
+                    >
+                        {#if restoring}
+                            <LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+                        {:else}
+                            <RotateCcw class="mr-2 h-4 w-4" />
+                        {/if}
+                        Restore
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        size="sm"
+                        onclick={() => (showPurgeConfirm = true)}
+                    >
+                        <Trash2 class="mr-2 h-4 w-4" />
+                        Permanently Delete
+                    </Button>
+                </div>
+            </div>
+        </Alert>
+    {/if}
+
     <FolderCard.Root value="sync">
         {#snippet tabs()}
             <FolderCard.Tab value="sync">Sync & Editing</FolderCard.Tab>
@@ -325,15 +402,17 @@ function handleLinkKeydown(e: KeyboardEvent) {
         {/snippet}
 
         {#snippet trailing()}
-            <Button
-                variant="destructive"
-                size="sm"
-                onclick={() => (showDeleteConfirm = true)}
-                disabled={deleteAction.loading}
-            >
-                <Trash2 class="mr-2 h-4 w-4" />
-                Delete
-            </Button>
+            {#if !shader.deletedAt}
+                <Button
+                    variant="destructive"
+                    size="sm"
+                    onclick={() => (showDeleteConfirm = true)}
+                    disabled={deleteAction.loading}
+                >
+                    <Trash2 class="mr-2 h-4 w-4" />
+                    Delete
+                </Button>
+            {/if}
         {/snippet}
 
         <!-- Tab 1: Sync & Editing -->
@@ -1283,7 +1362,15 @@ function handleLinkKeydown(e: KeyboardEvent) {
 <ConfirmDialog
     bind:open={showDeleteConfirm}
     title="Delete Shader"
-    description={`Delete shader "${shader.name}"? This cannot be undone.`}
+    description={`Delete shader "${shader.name}"? It will be moved to trash and can be restored later.`}
     confirmLabel="Delete"
     onConfirm={deleteAction.execute}
+/>
+
+<ConfirmDialog
+    bind:open={showPurgeConfirm}
+    title="Permanently Delete Shader"
+    description={`Permanently delete "${shader.name}"? This cannot be undone. All versions, captures, and metadata will be destroyed.`}
+    confirmLabel="Permanently Delete"
+    onConfirm={purgeAction.execute}
 />

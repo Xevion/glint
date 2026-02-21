@@ -36,6 +36,7 @@ impl SitemapRepo {
             FROM shaders s
             LEFT JOIN shader_versions sv ON sv.shader_id = s.id
             LEFT JOIN captures c ON c.shader_version_id = sv.id AND c.status = 'completed'
+            WHERE s.deleted_at IS NULL
             GROUP BY s.id, s.slug, s.updated_at
             ORDER BY s.slug
             "#
@@ -83,6 +84,7 @@ impl SitemapRepo {
             SELECT sa.name, MAX(s.updated_at) AS "last_modified!"
             FROM shader_authors sa
             JOIN shaders s ON s.id = sa.shader_id
+            WHERE s.deleted_at IS NULL
             GROUP BY sa.name
             ORDER BY sa.name
             "#

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                (SELECT COUNT(*) FROM shaders) AS \"shader_count!\",\n                (SELECT COUNT(*) FROM scenes WHERE active = TRUE) AS \"scene_count!\",\n                (SELECT COUNT(*) FROM captures WHERE status = 'completed') AS \"capture_count!\",\n                (SELECT COUNT(*) FROM users) AS \"user_count!\",\n                (SELECT COUNT(*) FROM capture_runs) AS \"run_count!\",\n                (SELECT MAX(captured_at) FROM captures WHERE status = 'completed') AS latest_capture_at\n            ",
+  "query": "\n            SELECT\n                (SELECT COUNT(*) FROM shaders WHERE deleted_at IS NULL) AS \"shader_count!\",\n                (SELECT COUNT(*) FROM scenes WHERE active = TRUE) AS \"scene_count!\",\n                (SELECT COUNT(*) FROM captures WHERE status = 'completed') AS \"capture_count!\",\n                (SELECT COUNT(*) FROM users) AS \"user_count!\",\n                (SELECT COUNT(*) FROM capture_runs) AS \"run_count!\",\n                (SELECT MAX(captured_at) FROM captures WHERE status = 'completed') AS latest_capture_at\n            ",
   "describe": {
     "columns": [
       {
@@ -46,5 +46,5 @@
       null
     ]
   },
-  "hash": "b4182c04ace0dad9dbd6ab5cb4c16243bf125e6214187ce52748ae11bdfbe23c"
+  "hash": "264860fac662f319cdb255cdf086cb01c233dff604910391f94968345c5396f3"
 }

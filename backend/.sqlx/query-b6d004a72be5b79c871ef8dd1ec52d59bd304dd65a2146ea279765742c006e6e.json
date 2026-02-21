@@ -92,6 +92,11 @@
         "ordinal": 17,
         "name": "capture_enabled",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 18,
+        "name": "deleted_at",
+        "type_info": "Timestamptz"
       }
     ],
     "parameters": {
@@ -126,7 +131,8 @@
       true,
       false,
       true,
-      false
+      false,
+      true
     ]
   },
   "hash": "b6d004a72be5b79c871ef8dd1ec52d59bd304dd65a2146ea279765742c006e6e"

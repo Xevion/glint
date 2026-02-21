@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "DELETE FROM shaders WHERE id = $1",
+  "query": "DELETE FROM shaders WHERE id = $1 AND deleted_at IS NOT NULL",
   "describe": {
     "columns": [],
     "parameters": {
@@ -10,5 +10,5 @@
     },
     "nullable": []
   },
-  "hash": "77c6f02a75a7ab9a070fdc4b482b6062e39e34b49b5fb0e4dbac531712677f16"
+  "hash": "a23edf1a5f4939c9a6ff12a0e9a1497aafdf1c1da351dff6bf67f0d1c78ad761"
 }

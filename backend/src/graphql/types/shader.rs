@@ -59,6 +59,7 @@ pub struct ShaderNode {
     pub view_count: i64,
     pub preferred_version_id: Option<String>,
     pub capture_enabled: bool,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 /// Resolve the "effective" version for a shader.
@@ -351,6 +352,7 @@ impl From<Shader> for ShaderNode {
             view_count: s.view_count,
             preferred_version_id: s.preferred_version_id,
             capture_enabled: s.capture_enabled,
+            deleted_at: s.deleted_at,
         }
     }
 }

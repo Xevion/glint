@@ -14,7 +14,7 @@ impl StatsRepo {
             Stats,
             r#"
             SELECT
-                (SELECT COUNT(*) FROM shaders) AS "shader_count!",
+                (SELECT COUNT(*) FROM shaders WHERE deleted_at IS NULL) AS "shader_count!",
                 (SELECT COUNT(*) FROM scenes WHERE active = TRUE) AS "scene_count!",
                 (SELECT COUNT(*) FROM captures WHERE status = 'completed') AS "capture_count!",
                 (SELECT COUNT(*) FROM users) AS "user_count!",

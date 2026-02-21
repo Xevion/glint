@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT DISTINCT ON (sh.id, sc.id)\n                c.image_path AS \"image_path!\",\n                c.thumbhash,\n                sh.name AS \"shader_name!\",\n                sh.slug AS \"shader_slug!\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = sh.id LIMIT 1) AS shader_author,\n                sv.version AS \"shader_version!\",\n                sc.name AS \"scene_name!\",\n                sc.id AS \"scene_id!\"\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders sh ON sv.shader_id = sh.id\n            JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.status = 'completed'\n              AND c.image_path IS NOT NULL\n              AND sc.active = true\n            ORDER BY sh.id, sc.id, COALESCE(sh.upstream_downloads, 0) DESC, c.created_at DESC\n            ",
+  "query": "\n            SELECT DISTINCT ON (sh.id, sc.id)\n                c.image_path AS \"image_path!\",\n                c.thumbhash,\n                sh.name AS \"shader_name!\",\n                sh.slug AS \"shader_slug!\",\n                (SELECT sa.name FROM shader_authors sa WHERE sa.shader_id = sh.id LIMIT 1) AS shader_author,\n                sv.version AS \"shader_version!\",\n                sc.name AS \"scene_name!\",\n                sc.id AS \"scene_id!\"\n            FROM captures c\n            JOIN shader_versions sv ON c.shader_version_id = sv.id\n            JOIN shaders sh ON sv.shader_id = sh.id\n            JOIN scenes sc ON c.scene_id = sc.id\n            WHERE c.status = 'completed'\n              AND c.image_path IS NOT NULL\n              AND sc.active = true\n              AND sh.deleted_at IS NULL\n            ORDER BY sh.id, sc.id, COALESCE(sh.upstream_downloads, 0) DESC, c.created_at DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -58,5 +58,5 @@
       false
     ]
   },
-  "hash": "3a9fd6365a2c3fb6a8998435cc46ec3716330b7d6686edf623be973cd5f98dfe"
+  "hash": "41fb97332ae69084b56c55843da70534d6d56c4a9b2f73e4a54c3f5227331b11"
 }

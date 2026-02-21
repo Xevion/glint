@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM shaders WHERE slug = $1",
+  "query": "SELECT * FROM shaders WHERE id = $1 AND deleted_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -126,5 +126,5 @@
       true
     ]
   },
-  "hash": "bea06d8573e30b25c719efcfce3c598114f29b36ea1770bebb355bac81eb3327"
+  "hash": "14a02fe7b838c034fc2b77aa39d0d9aef890397546e3104c065375957a96a90e"
 }

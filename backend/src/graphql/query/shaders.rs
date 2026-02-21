@@ -1,4 +1,4 @@
-use async_graphql::{Context, Object, Result};
+use async_graphql::{Context, ErrorExtensions, Object, Result};
 
 use crate::graphql::guard::require_admin_for_visibility;
 use crate::graphql::types::common::Visibility;
@@ -56,6 +56,9 @@ impl ShaderQuery {
     ///
     /// Returns a `ShaderNode` whose nested fields (versions, authors) are
     /// resolved on demand via `ComplexObject` resolvers.
+    ///
+    /// Returns a `GONE` error extension when the shader exists but has been
+    /// soft-deleted, allowing the frontend to show a 410 page.
     async fn shader(
         &self,
         ctx: &Context<'_>,
@@ -81,9 +84,34 @@ impl ShaderQuery {
                 {
                     match ShaderRepo::find_by_id(db, &entity_id).await? {
                         Some(s) => s,
-                        None => return Ok(None),
+                        None => {
+                            // Check if the redirect target was soft-deleted
+                            if ShaderRepo::find_by_id_including_deleted(db, &entity_id)
+                                .await?
+                                .is_some_and(|s| s.deleted_at.is_some())
+                            {
+                                return Err(async_graphql::Error::new(
+                                    "This shader has been removed.",
+                                )
+                                .extend_with(|_, e| e.set("code", "GONE")));
+                            }
+                            return Ok(None);
+                        }
                     }
                 } else {
+                    // Not found by slug redirect — check if soft-deleted
+                    let deleted = if id.len() <= crate::id::ID_LENGTH {
+                        ShaderRepo::find_by_id_including_deleted(db, &id)
+                            .await?
+                            .or(ShaderRepo::find_by_slug_including_deleted(db, &id).await?)
+                    } else {
+                        ShaderRepo::find_by_slug_including_deleted(db, &id).await?
+                    };
+
+                    if deleted.is_some_and(|s| s.deleted_at.is_some()) {
+                        return Err(async_graphql::Error::new("This shader has been removed.")
+                            .extend_with(|_, e| e.set("code", "GONE")));
+                    }
                     return Ok(None);
                 }
             }

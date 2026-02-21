@@ -371,6 +371,7 @@ impl SceneRepo {
                 JOIN shader_versions sv ON sv.id = c.shader_version_id
                 JOIN shaders sh ON sh.id = sv.shader_id
                 WHERE c.status = 'completed' AND c.image_path IS NOT NULL
+                  AND sh.deleted_at IS NULL
             ),
             scene_counts AS (
                 SELECT scene_id, COUNT(*) AS capture_count

@@ -72,6 +72,7 @@ function handleTabChange(tab: string) {
 type ShaderFilters = {
 	captureDisabled: FilterDescriptor<boolean>;
 	hasPlatformLink: FilterDescriptor<boolean>;
+	showDeleted: FilterDescriptor<boolean>;
 };
 
 const shaderList = createClientList<AdminShader, ShaderFilters>({
@@ -98,9 +99,13 @@ const shaderList = createClientList<AdminShader, ShaderFilters>({
 	},
 	filters: {
 		captureDisabled: filter(false),
-		hasPlatformLink: filter(false)
+		hasPlatformLink: filter(false),
+		showDeleted: filter(false)
 	},
 	applyFilters: (shader, filters) => {
+		// Hide deleted shaders unless the filter is on
+		// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+		const deletedOk = filters.showDeleted || !shader.deletedAt;
 		// Boolean OR: when filter is on, bypass the enabled check entirely
 		// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
 		const captureOk = filters.captureDisabled || shader.captureEnabled;
@@ -108,7 +113,7 @@ const shaderList = createClientList<AdminShader, ShaderFilters>({
 		// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
 		const platformOk =
 			!filters.hasPlatformLink || shader.modrinthId != null || shader.curseforgeId != null;
-		return captureOk && platformOk;
+		return deletedOk && captureOk && platformOk;
 	},
 	viewMode: 'table'
 });
@@ -346,6 +351,10 @@ function handleShaderAdopted(shader: Shader) {
             label="Has platform link"
             bind:checked={shaderList.filters.hasPlatformLink}
           />
+          <BooleanToggle
+            label="Show deleted"
+            bind:checked={shaderList.filters.showDeleted}
+          />
           <div class="flex-1"></div>
           <Sort options={shaderList.sortOptions} bind:value={shaderList.sort} />
           <ViewToggle
@@ -416,7 +425,7 @@ function handleShaderAdopted(shader: Shader) {
             {#snippet card(shader: AdminShader)}
               <a
                 href="/admin/shaders/{shader.id}"
-                class="group flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-foreground/20"
+                class="group flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-foreground/20 {shader.deletedAt ? 'opacity-50' : ''}"
               >
                 <div class="flex gap-3 p-4">
                   {#if shader.iconUrl}
@@ -439,7 +448,12 @@ function handleShaderAdopted(shader: Shader) {
                       <span class="truncate text-sm font-semibold"
                         >{shader.name}</span
                       >
-                      {#if !shader.captureEnabled}
+                      {#if shader.deletedAt}
+                        <span
+                          class="shrink-0 rounded bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive"
+                          >Deleted</span
+                        >
+                      {:else if !shader.captureEnabled}
                         <span
                           class="shrink-0 rounded bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive"
                           >Disabled</span

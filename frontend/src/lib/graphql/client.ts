@@ -83,6 +83,8 @@ function mapGraphQLError(error: CombinedError): ApiError {
 				return new ApiError(ApiErrorType.Forbidden, gqlError.message, 403, undefined, code);
 			case 'UNAUTHORIZED':
 				return new ApiError(ApiErrorType.Unauthorized, gqlError.message, 401, undefined, code);
+			case 'GONE':
+				return new ApiError(ApiErrorType.NotFound, gqlError.message, 410, undefined, code);
 			default:
 				return new ApiError(ApiErrorType.ServerError, gqlError.message, 500, undefined, code);
 		}

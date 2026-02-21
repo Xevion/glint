@@ -21,6 +21,7 @@ export const ShaderDetailQuery = graphql(`
 			viewCount
 			preferredVersionId
 			captureEnabled
+			deletedAt
 			versions(first: 100) {
 				edges {
 					node {

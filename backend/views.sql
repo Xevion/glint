@@ -36,6 +36,7 @@ SELECT DISTINCT ON (sv.shader_id)
     sv.extraction_status, sv.extraction_error, sv.extracted_at
 FROM shader_versions sv
 JOIN shaders s ON s.id = sv.shader_id
+WHERE s.deleted_at IS NULL
 ORDER BY sv.shader_id,
     (sv.id = s.preferred_version_id) DESC,
     sv.upstream_published_at DESC NULLS LAST,
@@ -63,6 +64,7 @@ JOIN latest_scene_versions lsv ON lsv.scene_id = s.id
 JOIN scene_presets sp ON sp.scene_id = s.id
 WHERE s.active = TRUE
   AND sh.capture_enabled = TRUE
+  AND sh.deleted_at IS NULL
 
 UNION ALL
 
@@ -80,6 +82,7 @@ JOIN latest_scene_versions lsv ON lsv.scene_id = s.id
 JOIN scene_presets sp ON sp.scene_id = s.id
 WHERE s.active = TRUE
   AND sh.capture_enabled = TRUE
+  AND sh.deleted_at IS NULL
   AND NOT EXISTS (
       SELECT 1 FROM shader_version_profiles svp
       WHERE svp.shader_version_id = sv.id
@@ -171,7 +174,7 @@ SELECT
     c.updated_at
 FROM captures_with_freshness c
 JOIN shader_versions sv ON c.shader_version_id = sv.id
-JOIN shaders s ON sv.shader_id = s.id
+JOIN shaders s ON sv.shader_id = s.id AND s.deleted_at IS NULL
 LEFT JOIN shader_version_profiles svp ON c.profile_id = svp.id
 LEFT JOIN scene_presets sp ON c.preset_id = sp.id
 LEFT JOIN capture_run_items cri ON cri.capture_id = c.id

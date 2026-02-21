@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                sa.name,\n                COUNT(DISTINCT sa.shader_id) AS \"shader_count!\",\n                COALESCE(SUM(s.view_count), 0)::BIGINT AS \"total_views!\",\n                COALESCE((SELECT COUNT(DISTINCT c2.id)\n                 FROM shader_authors sa2\n                 JOIN shaders s2 ON s2.id = sa2.shader_id\n                 JOIN shader_versions sv2 ON sv2.shader_id = s2.id\n                 JOIN captures c2 ON c2.shader_version_id = sv2.id AND c2.status = 'completed'\n                 WHERE sa2.name = sa.name AND s2.deleted_at IS NULL\n                ), 0) AS \"total_captures!\",\n                MAX(s.updated_at) AS \"last_modified!\",\n                (SELECT c3.image_path FROM shaders s3\n                 JOIN shader_authors sa3 ON sa3.shader_id = s3.id\n                 JOIN shader_versions sv3 ON sv3.shader_id = s3.id\n                 JOIN captures c3 ON c3.shader_version_id = sv3.id AND c3.status = 'completed' AND c3.image_path IS NOT NULL\n                 WHERE sa3.name = sa.name AND s3.deleted_at IS NULL\n                 ORDER BY s3.view_count DESC\n                 LIMIT 1\n                ) AS image_path,\n                (SELECT c4.thumbhash FROM shaders s4\n                 JOIN shader_authors sa4 ON sa4.shader_id = s4.id\n                 JOIN shader_versions sv4 ON sv4.shader_id = s4.id\n                 JOIN captures c4 ON c4.shader_version_id = sv4.id AND c4.status = 'completed' AND c4.image_path IS NOT NULL\n                 WHERE sa4.name = sa.name AND s4.deleted_at IS NULL\n                 ORDER BY s4.view_count DESC\n                 LIMIT 1\n                ) AS thumbhash,\n                (SELECT s5.name FROM shaders s5\n                 JOIN shader_authors sa5 ON sa5.shader_id = s5.id\n                 WHERE sa5.name = sa.name AND s5.deleted_at IS NULL\n                 ORDER BY s5.view_count DESC\n                 LIMIT 1\n                ) AS top_shader_name,\n                (SELECT s6.slug FROM shaders s6\n                 JOIN shader_authors sa6 ON sa6.shader_id = s6.id\n                 WHERE sa6.name = sa.name AND s6.deleted_at IS NULL\n                 ORDER BY s6.view_count DESC\n                 LIMIT 1\n                ) AS top_shader_slug\n            FROM shader_authors sa\n            JOIN shaders s ON s.id = sa.shader_id\n            WHERE sa.name = $1 AND s.deleted_at IS NULL\n            GROUP BY sa.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "shader_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "total_views!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "total_captures!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "last_modified!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "image_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "thumbhash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "top_shader_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "top_shader_slug",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "5eebfc2311f43dcc7010642cde29c3977a121caec5b66858f5c1d4bd26230974"
+}

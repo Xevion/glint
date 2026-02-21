@@ -475,6 +475,14 @@ type MutationRoot {
 	"""
 	deleteShader(id: ID!): Boolean!
 	"""
+	Restore a soft-deleted shader.
+	"""
+	restoreShader(id: ID!): ShaderNode!
+	"""
+	Permanently delete a soft-deleted shader (hard delete with CASCADE).
+	"""
+	purgeShader(id: ID!): Boolean!
+	"""
 	Sync shader metadata from upstream platform.
 	"""
 	syncShader(id: ID!): ShaderNode!
@@ -589,6 +597,9 @@ type QueryRoot {
 	
 	Returns a `ShaderNode` whose nested fields (versions, authors) are
 	resolved on demand via `ComplexObject` resolvers.
+	
+	Returns a `GONE` error extension when the shader exists but has been
+	soft-deleted, allowing the frontend to show a 410 page.
 	"""
 	shader(
 		"""
@@ -891,6 +902,7 @@ type ShaderNode {
 	viewCount: Int!
 	preferredVersionId: String
 	captureEnabled: Boolean!
+	deletedAt: DateTime
 	"""
 	All versions of this shader, ordered by publish date descending.
 	Not DataLoader-batched — only called on single-shader detail pages.

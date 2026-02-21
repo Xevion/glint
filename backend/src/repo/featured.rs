@@ -45,6 +45,7 @@ impl FeaturedRepo {
             WHERE c.status = 'completed'
               AND c.image_path IS NOT NULL
               AND sc.active = true
+              AND sh.deleted_at IS NULL
             ORDER BY sh.id, sc.id, COALESCE(sh.upstream_downloads, 0) DESC, c.created_at DESC
             "#,
         )

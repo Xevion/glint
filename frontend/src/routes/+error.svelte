@@ -19,6 +19,10 @@ const errorTitles: Record<number, { title: string; description: string }> = {
 		title: 'Page Not Found',
 		description: "The page you're looking for doesn't exist or has been moved."
 	},
+	410: {
+		title: 'Gone',
+		description: 'This content has been permanently removed.'
+	},
 	502: {
 		title: 'Backend Unavailable',
 		description: 'The backend service is unreachable. Please try again later.'

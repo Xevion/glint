@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM shaders WHERE id = ANY($1)",
+  "query": "SELECT * FROM shaders WHERE slug = $1 AND deleted_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -92,11 +92,16 @@
         "ordinal": 17,
         "name": "capture_enabled",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 18,
+        "name": "deleted_at",
+        "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "TextArray"
+        "Text"
       ]
     },
     "nullable": [
@@ -117,8 +122,9 @@
       true,
       false,
       true,
-      false
+      false,
+      true
     ]
   },
-  "hash": "ef83a7353d2f29cd9098b9a363af0807cf20bfeccd1f2628a82e0b333f3a444c"
+  "hash": "ae1b733203b4450c1565534716c8ba076475753063ac0ca35011dbc027da01ee"
 }
