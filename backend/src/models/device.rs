@@ -32,9 +32,9 @@ pub struct DeviceAuthResponse {
     /// Complete URL with code pre-filled
     pub verification_uri_complete: String,
     /// Seconds until this code expires
-    pub expires_in: i64,
+    pub expires_in: u64,
     /// Recommended polling interval in seconds
-    pub interval: i64,
+    pub interval: u64,
 }
 
 /// Request body for POST /api/device/token
@@ -50,7 +50,7 @@ pub struct DeviceTokenResponse {
     pub access_token: String,
     pub token_type: String,
     /// Seconds until token expires
-    pub expires_in: i64,
+    pub expires_in: u64,
 }
 
 /// Error response from POST /api/device/token (RFC 8628 error codes)

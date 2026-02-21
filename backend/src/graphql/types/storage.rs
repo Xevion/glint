@@ -15,10 +15,10 @@ pub struct StorageStatsNode {
 impl From<StorageStats> for StorageStatsNode {
     fn from(s: StorageStats) -> Self {
         Self {
-            total_bytes: s.total_bytes,
-            capture_count: s.capture_count,
-            avg_bytes: s.avg_bytes,
-            missing_count: s.missing_count,
+            total_bytes: s.total_bytes as i64,
+            capture_count: s.capture_count as i64,
+            avg_bytes: s.avg_bytes as i64,
+            missing_count: s.missing_count as i64,
         }
     }
 }
@@ -36,9 +36,9 @@ impl From<StorageBucket> for StorageBucketNode {
     fn from(b: StorageBucket) -> Self {
         Self {
             date: b.date,
-            cumulative_bytes: b.cumulative_bytes,
-            cumulative_count: b.cumulative_count,
-            bucket_bytes: b.bucket_bytes,
+            cumulative_bytes: b.cumulative_bytes as i64,
+            cumulative_count: b.cumulative_count as i64,
+            bucket_bytes: b.bucket_bytes as i64,
         }
     }
 }

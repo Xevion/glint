@@ -48,8 +48,8 @@ pub struct CaptureRecord {
     pub scene_id: String,
     pub profile_id: Option<String>,
     pub image_path: String,
-    pub resolution_width: i32,
-    pub resolution_height: i32,
+    pub resolution_width: u32,
+    pub resolution_height: u32,
     pub captured_at: DateTime<Utc>,
 }
 
@@ -70,7 +70,7 @@ pub struct OrchestrationInfo {
     pub run_id: Option<String>,
     pub started_at: String,
     pub completed_at: String,
-    pub total_sessions: i32,
+    pub total_sessions: u32,
     pub status: OrchestrationStatus,
 }
 
@@ -88,7 +88,7 @@ pub struct CaptureSessionData {
     pub session_dir: String,
     pub started_at: String,
     pub completed_at: String,
-    pub total_captures: i32,
+    pub total_captures: u32,
     pub shaders: Vec<String>,
     pub minecraft: MinecraftInfo,
     pub captures: Vec<CaptureEntry>,
@@ -124,8 +124,8 @@ pub struct ShaderMetadata {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Resolution {
-    pub width: i32,
-    pub height: i32,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

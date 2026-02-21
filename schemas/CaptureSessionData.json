@@ -32,7 +32,8 @@
     },
     "total_captures": {
       "type": "integer",
-      "format": "int32"
+      "format": "uint32",
+      "minimum": 0
     }
   },
   "required": [
@@ -162,11 +163,13 @@
       "properties": {
         "height": {
           "type": "integer",
-          "format": "int32"
+          "format": "uint32",
+          "minimum": 0
         },
         "width": {
           "type": "integer",
-          "format": "int32"
+          "format": "uint32",
+          "minimum": 0
         }
       },
       "required": [

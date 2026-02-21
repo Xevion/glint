@@ -91,7 +91,7 @@ async fn storage_audit(
     let bucket = state.config().r2.bucket.as_deref().unwrap_or("glint");
 
     // 1. List all R2 objects via paginated ListObjectsV2
-    let mut r2_objects: Vec<(String, i64, DateTime<Utc>)> = Vec::new();
+    let mut r2_objects: Vec<(String, u64, DateTime<Utc>)> = Vec::new();
     let mut continuation_token: Option<String> = None;
 
     loop {
@@ -107,7 +107,7 @@ async fn storage_audit(
 
         for obj in resp.contents() {
             let key = obj.key().unwrap_or_default().to_string();
-            let size = obj.size().unwrap_or(0);
+            let size = obj.size().unwrap_or(0) as u64;
             let last_modified = obj
                 .last_modified()
                 .and_then(|dt| Utc.timestamp_opt(dt.secs(), dt.subsec_nanos()).single())
@@ -140,8 +140,8 @@ async fn storage_audit(
     let mut orphaned = Vec::new();
     let mut stale_staging = Vec::new();
     let mut unknown_prefix = Vec::new();
-    let mut total_r2_bytes: i64 = 0;
-    let mut orphaned_bytes: i64 = 0;
+    let mut total_r2_bytes: u64 = 0;
+    let mut orphaned_bytes: u64 = 0;
 
     for (key, size, last_modified) in &r2_objects {
         total_r2_bytes += size;
@@ -186,14 +186,14 @@ async fn storage_audit(
     }
 
     let summary = AuditSummary {
-        total_r2_objects: r2_objects.len() as i64,
+        total_r2_objects: r2_objects.len() as u64,
         total_r2_bytes,
-        total_db_references: db_refs.len() as i64,
-        orphaned_count: orphaned.len() as i64,
+        total_db_references: db_refs.len() as u64,
+        orphaned_count: orphaned.len() as u64,
         orphaned_bytes,
-        stale_staging_count: stale_staging.len() as i64,
-        missing_count: missing.len() as i64,
-        unknown_prefix_count: unknown_prefix.len() as i64,
+        stale_staging_count: stale_staging.len() as u64,
+        missing_count: missing.len() as u64,
+        unknown_prefix_count: unknown_prefix.len() as u64,
         url_mismatch_count: 0,
     };
 
@@ -241,10 +241,10 @@ async fn storage_cleanup(
         .collect();
 
     let mut results = Vec::with_capacity(request.keys.len());
-    let mut deleted_count: i64 = 0;
-    let mut skipped_count: i64 = 0;
-    let mut failed_count: i64 = 0;
-    let mut freed_bytes: i64 = 0;
+    let mut deleted_count: u64 = 0;
+    let mut skipped_count: u64 = 0;
+    let mut failed_count: u64 = 0;
+    let mut freed_bytes: u64 = 0;
 
     for key in &request.keys {
         // Safety: re-check if key is still unreferenced
@@ -260,7 +260,7 @@ async fn storage_cleanup(
 
         // Get object size before deleting
         let size = match s3.head_object().bucket(bucket).key(key).send().await {
-            Ok(head) => head.content_length().unwrap_or(0),
+            Ok(head) => head.content_length().unwrap_or(0) as u64,
             Err(e) => {
                 warn!(key = %key, error = %e, "HeadObject failed during cleanup");
                 0

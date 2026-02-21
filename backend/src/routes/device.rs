@@ -55,7 +55,7 @@ async fn authorize(State(state): State<AppState>) -> AppResult<Json<DeviceAuthRe
     let verification_uri = format!("{}/auth/device", base_url);
     let verification_uri_complete = format!("{}?code={}", verification_uri, code.user_code);
 
-    let expires_in = (code.expires_at - Utc::now()).num_seconds().max(0);
+    let expires_in = (code.expires_at - Utc::now()).num_seconds().max(0) as u64;
 
     debug!(user_code = %code.user_code, "Device authorization started");
 
@@ -122,7 +122,7 @@ async fn token(
                     DeviceTokenErrorResponse::server_error()
                 })?;
 
-            let expires_in = (session.expires_at - Utc::now()).num_seconds().max(0);
+            let expires_in = (session.expires_at - Utc::now()).num_seconds().max(0) as u64;
 
             debug!(user_id, "Device authorization completed, token issued");
 

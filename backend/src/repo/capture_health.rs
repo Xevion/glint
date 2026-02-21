@@ -78,18 +78,18 @@ pub struct CaptureTargetHealth {
     pub stale_reason: Option<StaleReason>,
     #[ts(as = "Option<String>")]
     pub last_capture_at: Option<DateTime<Utc>>,
-    pub failure_count: i32,
+    pub failure_count: u32,
 }
 
 /// Summary counts for the capture health matrix
 #[derive(Debug, Clone, Serialize, JsonSchema, TS)]
 #[ts(export)]
 pub struct CaptureHealthSummary {
-    pub total_targets: i32,
-    pub completed: i32,
-    pub missing: i32,
-    pub stale: i32,
-    pub failed: i32,
+    pub total_targets: u32,
+    pub completed: u32,
+    pub missing: u32,
+    pub stale: u32,
+    pub failed: u32,
 }
 
 /// Full capture health response
@@ -230,29 +230,29 @@ impl CaptureHealthRepo {
                     status: row.status,
                     stale_reason,
                     last_capture_at: row.last_capture_at,
-                    failure_count: row.capture_failure_count,
+                    failure_count: row.capture_failure_count as u32,
                 }
             })
             .collect();
 
         let summary = CaptureHealthSummary {
-            total_targets: targets.len() as i32,
+            total_targets: targets.len() as u32,
             completed: targets
                 .iter()
                 .filter(|t| t.status == TargetHealth::Completed)
-                .count() as i32,
+                .count() as u32,
             missing: targets
                 .iter()
                 .filter(|t| t.status == TargetHealth::Missing)
-                .count() as i32,
+                .count() as u32,
             stale: targets
                 .iter()
                 .filter(|t| t.status == TargetHealth::Stale)
-                .count() as i32,
+                .count() as u32,
             failed: targets
                 .iter()
                 .filter(|t| t.status == TargetHealth::Failed)
-                .count() as i32,
+                .count() as u32,
         };
 
         debug!(

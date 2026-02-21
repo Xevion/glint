@@ -5,10 +5,10 @@ use ts_rs::TS;
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
 pub struct StorageStats {
-    pub total_bytes: i64,
-    pub capture_count: i64,
-    pub avg_bytes: i64,
-    pub missing_count: i64,
+    pub total_bytes: u64,
+    pub capture_count: u64,
+    pub avg_bytes: u64,
+    pub missing_count: u64,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -16,9 +16,9 @@ pub struct StorageStats {
 pub struct StorageBucket {
     #[ts(type = "string")]
     pub date: DateTime<Utc>,
-    pub cumulative_bytes: i64,
-    pub cumulative_count: i64,
-    pub bucket_bytes: i64,
+    pub cumulative_bytes: u64,
+    pub cumulative_count: u64,
+    pub bucket_bytes: u64,
 }
 
 // Audit types
@@ -28,7 +28,7 @@ pub struct StorageBucket {
 #[ts(export)]
 pub struct AuditObject {
     pub key: String,
-    pub size: i64,
+    pub size: u64,
     #[ts(type = "string")]
     pub last_modified: DateTime<Utc>,
     /// The R2 key prefix (e.g. "captures", "packages", "_uploads")
@@ -67,15 +67,15 @@ pub struct StorageAuditResult {
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
 pub struct AuditSummary {
-    pub total_r2_objects: i64,
-    pub total_r2_bytes: i64,
-    pub total_db_references: i64,
-    pub orphaned_count: i64,
-    pub orphaned_bytes: i64,
-    pub stale_staging_count: i64,
-    pub missing_count: i64,
-    pub unknown_prefix_count: i64,
-    pub url_mismatch_count: i64,
+    pub total_r2_objects: u64,
+    pub total_r2_bytes: u64,
+    pub total_db_references: u64,
+    pub orphaned_count: u64,
+    pub orphaned_bytes: u64,
+    pub stale_staging_count: u64,
+    pub missing_count: u64,
+    pub unknown_prefix_count: u64,
+    pub url_mismatch_count: u64,
 }
 
 /// Request body for POST /api/admin/storage/cleanup
@@ -109,8 +109,8 @@ pub enum CleanupKeyStatus {
 #[ts(export)]
 pub struct StorageCleanupResult {
     pub results: Vec<CleanupKeyResult>,
-    pub deleted_count: i64,
-    pub skipped_count: i64,
-    pub failed_count: i64,
-    pub freed_bytes: i64,
+    pub deleted_count: u64,
+    pub skipped_count: u64,
+    pub failed_count: u64,
+    pub freed_bytes: u64,
 }

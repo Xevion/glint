@@ -1653,10 +1653,10 @@ impl CaptureRepo {
         .context("failed to get storage stats")?;
 
         Ok(StorageStats {
-            total_bytes: row.total_bytes,
-            capture_count: row.capture_count,
-            avg_bytes: row.avg_bytes,
-            missing_count: row.missing_count,
+            total_bytes: row.total_bytes as u64,
+            capture_count: row.capture_count as u64,
+            avg_bytes: row.avg_bytes as u64,
+            missing_count: row.missing_count as u64,
         })
     }
 
@@ -1728,9 +1728,9 @@ impl CaptureRepo {
             .into_iter()
             .map(|r| StorageBucket {
                 date: r.date,
-                cumulative_bytes: r.cumulative_bytes,
-                cumulative_count: r.cumulative_count,
-                bucket_bytes: r.bucket_bytes,
+                cumulative_bytes: r.cumulative_bytes as u64,
+                cumulative_count: r.cumulative_count as u64,
+                bucket_bytes: r.bucket_bytes as u64,
             })
             .collect())
     }

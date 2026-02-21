@@ -10,7 +10,7 @@ use crate::models::device::DeviceCode;
 pub const DEVICE_CODE_EXPIRY_MINUTES: i64 = 15;
 
 /// Polling interval in seconds (RFC 8628 recommends 5 seconds minimum)
-pub const POLLING_INTERVAL_SECONDS: i64 = 5;
+pub const POLLING_INTERVAL_SECONDS: u64 = 5;
 
 /// User-facing code charset (no ambiguous characters: 0/O, 1/I/L)
 const USER_CODE_CHARSET: &[u8] = b"ABCDEFGHJKMNPQRSTUVWXYZ23456789";
