@@ -216,7 +216,7 @@ When using reflection for optional mod integration (e.g., Iris, Sodium):
 
 ## Testing
 
-- **Runner**: Gradle test (`just test mod`)
+- **Runner**: Gradle test (`just test mod` or `just test m`)
 - **Smoke test**: `just smoke` for runtime mixin verification
 - Integration testing via smoke test is the highest-value test for mod code
 - Unit tests for pure logic (scene resolution, state machine transitions)

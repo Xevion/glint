@@ -1,7 +1,11 @@
 /**
- * Run all project checks in parallel. Auto-fixes formatting when safe.
+ * Run project checks in parallel. Auto-fixes formatting when safe.
  *
- * Usage: bun scripts/check.ts [--fix|-f] [--help|-h]
+ * Usage: bun scripts/check.ts [--fix|-f] [--help|-h] [targets...]
+ *
+ * Targets scope checks to specific subsystems (comma-delimited):
+ *   backend, frontend, mod (and aliases: b, f, m, rust, web, etc.)
+ *   Omit targets to check everything.
  */
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
@@ -9,8 +13,8 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { c, elapsed, isStderrTTY, parseFlags } from './lib/fmt';
 import { type CollectResult, raceInOrder, run, runPiped, spawnCollect } from './lib/proc';
+import { type Subsystem, isAll, resolveTargets, targetLabel } from './lib/targets';
 
-/** Scan files matching a glob pattern and return the newest mtime (ms). */
 function newestMtime(dir: string, pattern: string): number {
 	let newest = 0;
 	for (const file of new Bun.Glob(pattern).scanSync(dir)) {
@@ -20,7 +24,7 @@ function newestMtime(dir: string, pattern: string): number {
 	return newest;
 }
 
-const { flags } = parseFlags(
+const { flags, passthrough } = parseFlags(
 	process.argv.slice(2),
 	{ fix: 'bool', help: 'bool' } as const,
 	{ f: 'fix', h: 'help' },
@@ -28,24 +32,43 @@ const { flags } = parseFlags(
 );
 
 if (flags.help) {
-	console.log(`Usage: bun scripts/check.ts [flags]
+	console.log(`Usage: bun scripts/check.ts [flags] [targets...]
 
-Runs all project checks in parallel. Auto-fixes formatting when safe.
+Runs project checks in parallel. Auto-fixes formatting when safe.
+
+Targets (comma-delimited, omit for all):
+  backend (b, back, rust)     Backend: format, clippy, tests
+  frontend (f, front, web)    Frontend: typecheck, lint, format, tests
+  mod (m, minecraft)          Mod: format, lint, compile, tests
 
 Flags:
   -f, --fix     Format code first, then verify
-  -h, --help    Show this help message and exit`);
+  -h, --help    Show this help message and exit
+
+Examples:
+  bun scripts/check.ts              Check everything
+  bun scripts/check.ts backend      Check backend only
+  bun scripts/check.ts b,f          Check backend + frontend
+  bun scripts/check.ts mod --fix    Format mod, then verify`);
 	process.exit(0);
+}
+
+const targets = resolveTargets(passthrough);
+const has = (s: Subsystem) => targets.subsystems.has(s);
+const targeted = !isAll(targets);
+
+if (targeted) {
+	process.stdout.write(c('1;36', `→ Checking: ${targetLabel(targets)}`) + '\n');
 }
 
 const fix = flags.fix;
 
 if (fix) {
-	console.log(c('1;36', '→ Fixing...'));
-	run(['bun', 'run', '--cwd', 'frontend', 'format']);
-	run(['cargo', 'fmt', '--manifest-path', 'backend/Cargo.toml']);
-	runPiped(['./gradlew', 'spotlessApply', 'ktlintFormat', '--quiet'], { cwd: 'mod' });
-	console.log(c('1;36', '→ Verifying...'));
+	process.stdout.write(c('1;36', '→ Fixing...') + '\n');
+	if (has('frontend')) run(['bun', 'run', '--cwd', 'frontend', 'format']);
+	if (has('backend')) run(['cargo', 'fmt', '--manifest-path', 'backend/Cargo.toml']);
+	if (has('mod')) runPiped(['./gradlew', 'spotlessApply', 'ktlintFormat', '--quiet'], { cwd: 'mod' });
+	process.stdout.write(c('1;36', '→ Verifying...') + '\n');
 }
 
 const rustSrcMtime = Math.max(
@@ -55,7 +78,8 @@ const rustSrcMtime = Math.max(
 		.map((f) => statSync(f).mtimeMs),
 );
 
-{
+// Pre-flight: TS bindings (frontend depends on Rust types)
+if (has('frontend')) {
 	const BINDINGS_DIR = 'frontend/src/lib/bindings';
 
 	const newestBindingMtime = existsSync(BINDINGS_DIR)
@@ -69,7 +93,6 @@ const rustSrcMtime = Math.max(
 			c('1;36', '→ Regenerating TypeScript bindings (Rust sources changed)...') + '\n'
 		);
 
-		// Generate into a temp directory to avoid triggering HMR for every file
 		const tmpDir = mkdtempSync(join(tmpdir(), 'glint-bindings-'));
 		try {
 			for (const cmd of [
@@ -87,7 +110,6 @@ const rustSrcMtime = Math.max(
 				}
 			}
 
-			// Diff-sync: only write files whose content actually changed
 			if (!existsSync(BINDINGS_DIR)) {
 				mkdirSync(BINDINGS_DIR, { recursive: true });
 			}
@@ -109,7 +131,6 @@ const rustSrcMtime = Math.max(
 				changed++;
 			}
 
-			// Remove orphaned files (types deleted from Rust)
 			for (const file of oldFiles) {
 				if (!newFiles.has(file)) {
 					rmSync(join(BINDINGS_DIR, file));
@@ -130,9 +151,8 @@ const rustSrcMtime = Math.max(
 	}
 }
 
-// Regenerate JSON schemas if Rust sources are newer than exported schemas.
-// These schemas are used by mod-test to detect API contract drift.
-{
+// Pre-flight: JSON schemas (mod tests use these for contract drift detection)
+if (has('mod')) {
 	const SCHEMAS_DIR = 'schemas';
 
 	const newestSchemaMtime = existsSync(SCHEMAS_DIR)
@@ -152,8 +172,8 @@ const rustSrcMtime = Math.max(
 	}
 }
 
-// Regenerate SQLx query metadata if Rust sources or migrations are newer.
-{
+// Pre-flight: SQLx query metadata (backend compile-time verification)
+if (has('backend')) {
 	const SQLX_DIR = 'backend/.sqlx';
 
 	const sqlxSrcMtime = Math.max(rustSrcMtime, newestMtime('backend/migrations', '*.sql'));
@@ -183,10 +203,8 @@ const rustSrcMtime = Math.max(
 	}
 }
 
-// Always regenerate GraphQL schema + gql-tada output and content-compare.
-// Mtime-based staleness is unreliable (e.g. async-graphql SDL format changes,
-// dependency updates) — always regenerate to guarantee local matches CI.
-{
+// Pre-flight: GraphQL schema + gql-tada (frontend type checking)
+if (has('frontend')) {
 	const SCHEMA_PATH = 'frontend/src/lib/graphql/schema.graphql';
 	const GQL_ENV_PATH = 'frontend/src/lib/graphql/graphql-env.d.ts';
 
@@ -241,8 +259,7 @@ interface Check {
 	subsystem: 'frontend' | 'backend' | 'mod' | 'security';
 }
 
-const checks: Check[] = [
-	// Frontend checks (3)
+const allChecks: Check[] = [
 	{
 		name: 'frontend-check',
 		subsystem: 'frontend',
@@ -257,14 +274,13 @@ const checks: Check[] = [
 		name: 'frontend-format',
 		subsystem: 'frontend',
 		cmd: ['bun', 'run', '--cwd', 'frontend', 'format:check'],
-		hint: "Run 'bun run --cwd frontend format' to fix formatting."
+		hint: "Run 'just format frontend' to fix."
 	},
-	// Backend checks (3)
 	{
 		name: 'backend-format',
 		subsystem: 'backend',
 		cmd: ['cargo', 'fmt', '--manifest-path', 'backend/Cargo.toml', '--', '--check'],
-		hint: "Run 'cargo fmt --manifest-path backend/Cargo.toml' to fix formatting."
+		hint: "Run 'just format backend' to fix."
 	},
 	{
 		name: 'backend-lint',
@@ -284,13 +300,12 @@ const checks: Check[] = [
 			'not test(export_bindings) and not test(export_graphql_sdl)'
 		]
 	},
-	// Mod checks (4)
 	{
 		name: 'mod-format',
 		subsystem: 'mod',
 		cmd: ['./gradlew', 'spotlessCheck', 'ktlintCheck', '--quiet'],
 		cwd: 'mod',
-		hint: "Run 'cd mod && ./gradlew spotlessApply ktlintFormat --quiet' to fix formatting."
+		hint: "Run 'just format mod' to fix."
 	},
 	{
 		name: 'mod-lint',
@@ -310,13 +325,11 @@ const checks: Check[] = [
 		cmd: ['./gradlew', 'test', '--quiet'],
 		cwd: 'mod'
 	},
-	// Frontend unit tests
 	{
 		name: 'frontend-test',
 		subsystem: 'frontend',
 		cmd: ['bun', 'run', '--cwd', 'frontend', 'test:unit']
 	},
-	// Security audits (2)
 	{
 		name: 'backend-audit',
 		subsystem: 'security',
@@ -328,6 +341,11 @@ const checks: Check[] = [
 		cmd: ['bun', 'scripts/audit.ts']
 	}
 ];
+
+// Filter checks: include matching subsystems + always include security
+const checks = allChecks.filter(
+	(ch) => ch.subsystem === 'security' || targets.subsystems.has(ch.subsystem as Subsystem)
+);
 
 const domains: Record<
 	string,
@@ -389,6 +407,14 @@ const domains: Record<
 	}
 };
 
+// Filter domains to only include targeted subsystems
+const activeDomains = Object.fromEntries(
+	Object.entries(domains).filter(([name]) => {
+		const subsystem = name.replace('-format', '') as Subsystem;
+		return targets.subsystems.has(subsystem);
+	})
+);
+
 const start = Date.now();
 const remaining = new Set(checks.map((ch) => ch.name));
 
@@ -431,10 +457,13 @@ if (isStderrTTY) process.stderr.write('\r\x1b[K');
 
 const autoFixedDomains = new Set<string>();
 
-for (const [fmtName, domain] of Object.entries(domains)) {
+for (const [fmtName, domain] of Object.entries(activeDomains)) {
 	const fmtResult = results[fmtName];
 	if (!fmtResult || fmtResult.exitCode === 0) continue;
-	if (!domain.peers.every((p) => results[p]?.exitCode === 0)) continue;
+	// Only auto-fix if peers that were actually run all passed
+	const runPeers = domain.peers.filter((p) => results[p]);
+	if (runPeers.length === 0) continue;
+	if (!runPeers.every((p) => results[p]?.exitCode === 0)) continue;
 
 	process.stdout.write(
 		'\n' + c('1;36', `→ Auto-formatting ${fmtName} (peers passed, only formatting failed)...`) + '\n'

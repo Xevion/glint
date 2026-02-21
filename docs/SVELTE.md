@@ -490,8 +490,8 @@ logger.error('{errorId} [{status}] {message}', { errorId, status, message });
 
 ## Testing
 
-- **Unit tests**: Vitest (`just test web`)
-- **E2E tests**: Playwright (`just test web-e2e`)
+- **Unit tests**: Vitest (`just test frontend`)
+- **E2E tests**: Playwright (`just test e2e`)
 - Test user-visible behavior, not component internals
 - Use Playwright for flows that span multiple pages or involve navigation
 - Use Vitest for utility functions, store logic, and API client behavior
