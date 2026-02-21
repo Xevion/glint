@@ -42,7 +42,7 @@ object ChunkForceLoader {
 
             val chunkX = player.blockPosition().x shr 4
             val chunkZ = player.blockPosition().z shr 4
-            val renderDistance = mc.options.effectiveRenderDistance
+            val renderDistance = mc.options.renderDistance().get()
             val dimension = player.level().dimension()
 
             generationComplete.set(false)
@@ -50,6 +50,20 @@ object ChunkForceLoader {
             // Execute on server thread
             server.execute {
                 val serverLevel = server.getLevel(dimension) ?: return@execute
+
+                // Sync the server's view distance to the client's render distance before
+                // force-loading. IntegratedServer.tickServer() does this once per tick, but
+                // we may run before that tick — causing the server to send chunk packets for
+                // the new render distance while the client's chunk cache is still sized to the
+                // old server-sent radius, producing "Ignoring chunk" warnings.
+                val serverViewDistance = server.playerList.viewDistance
+                if (renderDistance != serverViewDistance) {
+                    log.debug("Syncing server view distance to client render distance") {
+                        "server" to serverViewDistance
+                        "client" to renderDistance
+                    }
+                    server.playerList.setViewDistance(renderDistance)
+                }
 
                 forcedDimension = dimension
                 var count = 0
