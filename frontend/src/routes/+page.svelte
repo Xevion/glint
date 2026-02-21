@@ -1,12 +1,13 @@
 <script lang="ts">
+import { invalidate } from '$app/navigation';
 import { resolve } from '$app/paths';
 import ErrorBanner from '$lib/components/ErrorBanner.svelte';
-import { ItemGrid } from '$lib/components/item-grid';
 import Meta from '$lib/components/Meta.svelte';
 import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import ShaderCard from '$lib/components/ShaderCard.svelte';
 import type { ShaderCardShader } from '$lib/components/ShaderCard.svelte';
 import HeroSlider from '$lib/components/hero/HeroSlider.svelte';
+import { DataView, Grid } from '$lib/components/data-view';
 import { Button } from '$lib/components/ui/button';
 import { fade, fly } from 'svelte/transition';
 import type { PageData } from './$types';
@@ -49,7 +50,7 @@ const ogImage = $derived(featuredPairs[0]?.right.imagePath ?? null);
 
 {#if errors.length > 0}
 	<div class="mb-4">
-		<ErrorBanner message="Some content failed to load. You may see incomplete data." />
+		<ErrorBanner message="Some content failed to load. You may see incomplete data." onRetry={() => invalidate('glint:shaders')} />
 	</div>
 {/if}
 
@@ -152,11 +153,13 @@ const ogImage = $derived(featuredPairs[0]?.right.imagePath ?? null);
 				</a>
 			</div>
 
-		<ItemGrid items={featuredShaders} key={(s: ShaderCardShader) => s.id} size="medium">
-			{#snippet card(shader: ShaderCardShader)}
-				<ShaderCard {shader} />
-			{/snippet}
-		</ItemGrid>
+		<DataView items={featuredShaders}>
+			<Grid key={(s: ShaderCardShader) => s.id} size="medium">
+				{#snippet card(shader: ShaderCardShader)}
+					<ShaderCard {shader} />
+				{/snippet}
+			</Grid>
+		</DataView>
 		</section>
 	</SectionBoundary>
 {/if}

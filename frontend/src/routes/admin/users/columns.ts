@@ -15,6 +15,7 @@ export const columns: ColumnDef<User>[] = [
 		accessorKey: 'discord_avatar',
 		header: '',
 		size: 48,
+		minSize: 48,
 		enableSorting: false,
 		cell: ({ row }) => renderComponent(AvatarCell, { user: row.original })
 	},

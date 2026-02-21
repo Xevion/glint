@@ -1,15 +1,15 @@
 <script lang="ts">
-import type { CaptureWithContext } from '$lib/bindings';
+import type { AdminCaptureNode } from './queries';
 
 interface Props {
-	capture: CaptureWithContext;
+	capture: AdminCaptureNode;
 }
 
 let { capture }: Props = $props();
 </script>
 
-{#if capture.resolution_width && capture.resolution_height}
-	{capture.resolution_width}x{capture.resolution_height}
+{#if capture.resolutionWidth && capture.resolutionHeight}
+	{capture.resolutionWidth}x{capture.resolutionHeight}
 {:else}
 	<span class="text-muted-foreground">-</span>
 {/if}

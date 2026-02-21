@@ -311,7 +311,7 @@ async fn get_scene_by_slug(
     for scene in scenes {
         let scene_filters = CaptureFilters {
             scene_id: Some(scene.id.clone()),
-            status: Some(CaptureStatus::Completed),
+            statuses: Some(vec![CaptureStatus::Completed]),
             ..Default::default()
         };
         let (version, presets, (captures, _)) = tokio::try_join!(
@@ -519,7 +519,7 @@ async fn list_scene_captures(
 
     let filters = CaptureFilters {
         scene_id: Some(scene.id),
-        status: Some(CaptureStatus::Completed),
+        statuses: Some(vec![CaptureStatus::Completed]),
         ..Default::default()
     };
 

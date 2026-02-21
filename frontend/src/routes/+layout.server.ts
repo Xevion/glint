@@ -1,6 +1,6 @@
 import { createApiClient } from '$lib/api';
 import type { User } from '$lib/bindings';
-import { createGraphQLClient, graphql, query, type ResultOf } from '$lib/graphql';
+import { type ResultOf, createGraphQLClient, graphql, query } from '$lib/graphql';
 import { pick } from '$lib/utils';
 import type { LayoutServerLoad } from './$types';
 

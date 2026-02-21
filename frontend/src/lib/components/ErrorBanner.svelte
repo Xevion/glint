@@ -1,5 +1,4 @@
 <script lang="ts">
-import { invalidateAll } from '$app/navigation';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { cn } from '$lib/utils';
@@ -7,18 +6,19 @@ import { AlertTriangle, LoaderCircle, RefreshCw } from '@lucide/svelte';
 
 interface Props {
 	message: string;
-	retryable?: boolean;
+	onRetry?: () => void | Promise<void>;
 	class?: string;
 }
 
-let { message, retryable = true, class: className }: Props = $props();
+let { message, onRetry, class: className }: Props = $props();
 
 let retrying = $state(false);
 
 async function retry() {
+	if (!onRetry) return;
 	retrying = true;
 	try {
-		await invalidateAll();
+		await onRetry();
 	} finally {
 		retrying = false;
 	}
@@ -28,7 +28,7 @@ async function retry() {
 <Alert variant="destructive" class={cn('flex items-center gap-3', className)}>
 	<AlertTriangle class="h-4 w-4 shrink-0" />
 	<span class="flex-1 text-sm">{message}</span>
-	{#if retryable}
+	{#if onRetry}
 		<Button
 			variant="outline"
 			size="sm"

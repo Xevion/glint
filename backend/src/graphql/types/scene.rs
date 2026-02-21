@@ -9,10 +9,8 @@ use crate::repo::CaptureRepo;
 use crate::repo::capture::{CaptureDistinct, CaptureFilters};
 use crate::state::AppState;
 
-use super::capture::CaptureWithContextConnection;
-use super::connection::{
-    CursorEncodable, CursorPage, PageInfo, decode_cursor_for_query, encode_cursor,
-};
+use super::capture::CaptureWithContextNode;
+use super::connection::{Connection, CursorPayload, CursorSource, decode_cursor_for_query};
 use super::preset::PresetNode;
 use super::taxonomy::TagNode;
 use super::version::SceneVersionNode;
@@ -89,11 +87,11 @@ impl SceneNode {
         ctx: &Context<'_>,
         #[graphql(default = 20, desc = "Number of items to return.")] first: i32,
         #[graphql(desc = "Cursor to paginate after.")] after: Option<String>,
-    ) -> Result<CaptureWithContextConnection> {
+    ) -> Result<Connection<CaptureWithContextNode>> {
         let state = ctx.data_unchecked::<AppState>();
         let filters = CaptureFilters {
             scene_id: Some(self.id.clone()),
-            status: Some(CaptureStatus::Completed),
+            statuses: Some(vec![CaptureStatus::Completed]),
             ..Default::default()
         };
         let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
@@ -103,9 +101,10 @@ impl SceneNode {
             first,
             decoded_after,
             CaptureDistinct::PerShader,
+            None,
         )
         .await?;
-        Ok(page.into())
+        Ok(page.into_connection())
     }
 
     /// Tags associated with this scene.
@@ -134,37 +133,8 @@ impl From<Scene> for SceneNode {
     }
 }
 
-impl CursorEncodable for Scene {
-    fn encode_cursor(&self) -> String {
-        encode_cursor(self.id.as_ref(), self.created_at.timestamp_millis())
-    }
-}
-
-/// Concrete Relay-style edge for scenes.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct SceneEdge {
-    pub cursor: String,
-    pub node: SceneNode,
-}
-
-/// Concrete Relay-style connection for scenes.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct SceneConnection {
-    pub edges: Vec<SceneEdge>,
-    pub page_info: PageInfo,
-    pub total_count: i64,
-}
-
-impl From<CursorPage<Scene>> for SceneConnection {
-    fn from(page: CursorPage<Scene>) -> Self {
-        let (edges, page_info, total_count) = page.into_connection(SceneNode::from);
-        SceneConnection {
-            edges: edges
-                .into_iter()
-                .map(|(cursor, node)| SceneEdge { cursor, node })
-                .collect(),
-            page_info,
-            total_count,
-        }
+impl CursorSource for Scene {
+    fn to_cursor(&self) -> CursorPayload {
+        CursorPayload::new(self.id.as_ref(), self.created_at.timestamp_millis())
     }
 }

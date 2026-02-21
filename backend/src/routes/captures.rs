@@ -1,69 +1,24 @@
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::get,
 };
-use custom_debug_derive::Debug as CustomDebug;
-use serde::Deserialize;
 use tracing::{instrument, warn};
 
 use crate::{
     auth::AdminUser,
     error::{AppError, AppResult, OptionNotFoundExt},
-    id::{CaptureRunId, SceneId},
-    models::{CaptureDetail, CaptureStatus, CaptureWithContext, PageQuery, Paginated},
-    repo::{
-        CaptureRepo, SceneRepo,
-        capture::{CaptureDistinct, CaptureFilters},
-    },
+    models::CaptureDetail,
+    repo::{CaptureRepo, SceneRepo},
     state::AppState,
 };
 
-#[derive(CustomDebug, Deserialize)]
-pub struct CaptureListParams {
-    #[serde(flatten)]
-    pub page: PageQuery,
-    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
-    pub shader: Option<String>,
-    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
-    pub scene: Option<String>,
-    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
-    pub status: Option<CaptureStatus>,
-    #[debug(skip_if = Option::is_none, with = "crate::fmt::opt")]
-    pub run_id: Option<String>,
-}
-
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/all", get(list_captures_all))
         .route("/{id}", get(get_capture_public).delete(delete_capture))
         .route("/{id}/details", get(get_capture_details))
-}
-
-/// GET /api/captures/all - List all captures with context, paginated (admin)
-#[instrument(skip(state, _admin), fields(user_id = _admin.user.id))]
-async fn list_captures_all(
-    _admin: AdminUser,
-    State(state): State<AppState>,
-    Query(params): Query<CaptureListParams>,
-) -> AppResult<Json<Paginated<CaptureWithContext>>> {
-    let p = params.page.normalize();
-
-    let filters = CaptureFilters {
-        shader_slug: params.shader,
-        scene_id: params.scene.map(SceneId::from),
-        status: params.status,
-        run_id: params.run_id.map(CaptureRunId::from),
-        ..Default::default()
-    };
-
-    let (items, total) =
-        CaptureRepo::list_with_context(state.db(), &filters, Some(&p), CaptureDistinct::None)
-            .await?;
-
-    Ok(Json(Paginated::new(items, total.unwrap_or(0), &p)))
 }
 
 /// Check `If-None-Match` against an ETag value.
@@ -164,51 +119,4 @@ async fn delete_capture(
     }
 
     Ok(StatusCode::NO_CONTENT)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// With DisplayFromStr on PageQuery, serde_urlencoded handles flatten correctly.
-    #[test]
-    fn serde_urlencoded_flatten_with_display_from_str() {
-        let qs = "page=1&page_size=50";
-        let params: CaptureListParams = serde_urlencoded::from_str(qs)
-            .expect("DisplayFromStr should fix flatten with serde_urlencoded");
-        assert_eq!(params.page.page, Some(1));
-        assert_eq!(params.page.page_size, Some(50));
-        assert!(params.shader.is_none());
-        assert!(params.status.is_none());
-    }
-
-    #[test]
-    fn serde_urlencoded_flatten_with_filters() {
-        let qs = "page=2&page_size=25&shader=bsl&status=completed";
-        let params: CaptureListParams =
-            serde_urlencoded::from_str(qs).expect("DisplayFromStr should fix flatten with filters");
-        assert_eq!(params.page.page, Some(2));
-        assert_eq!(params.page.page_size, Some(25));
-        assert_eq!(params.shader.as_deref(), Some("bsl"));
-        assert_eq!(params.status, Some(CaptureStatus::Completed));
-    }
-
-    /// PageQuery also works when used directly (non-flattened).
-    #[test]
-    fn page_query_direct_deserialization() {
-        let qs = "page=3&page_size=100";
-        let params: PageQuery = serde_urlencoded::from_str(qs)
-            .expect("PageQuery should deserialize directly with DisplayFromStr");
-        assert_eq!(params.page, Some(3));
-        assert_eq!(params.page_size, Some(100));
-    }
-
-    /// Empty query string yields None for both fields.
-    #[test]
-    fn page_query_empty() {
-        let params: PageQuery =
-            serde_urlencoded::from_str("").expect("empty query string should give defaults");
-        assert_eq!(params.page, None);
-        assert_eq!(params.page_size, None);
-    }
 }

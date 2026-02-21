@@ -1,5 +1,6 @@
 use std::fmt;
 
+use async_graphql::Enum;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -41,7 +42,7 @@ pub struct CaptureAnalysis {
     pub dominant_colors: Vec<DominantColor>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS, Enum)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub enum CaptureStatus {
@@ -93,7 +94,7 @@ impl sqlx::Encode<'_, sqlx::Postgres> for CaptureStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS, Enum)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub enum CaptureRunStatus {
@@ -151,7 +152,7 @@ impl sqlx::Encode<'_, sqlx::Postgres> for CaptureRunStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS, Enum)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub enum CaptureRunItemStatus {
@@ -322,7 +323,7 @@ pub struct CaptureRunItemWithContext {
 }
 
 /// Freshness status of a capture relative to current versions and newer captures
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema, TS)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, JsonSchema, TS, Enum)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub enum CaptureFreshness {
@@ -332,6 +333,22 @@ pub enum CaptureFreshness {
     Stale,
     /// A newer capture exists for this target — this capture is obsolete
     Superseded,
+}
+
+impl fmt::Display for CaptureFreshness {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl CaptureFreshness {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Fresh => "fresh",
+            Self::Stale => "stale",
+            Self::Superseded => "superseded",
+        }
+    }
 }
 
 impl<'r> sqlx::Decode<'r, sqlx::Postgres> for CaptureFreshness {
@@ -349,6 +366,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for CaptureFreshness {
 impl sqlx::Type<sqlx::Postgres> for CaptureFreshness {
     fn type_info() -> sqlx::postgres::PgTypeInfo {
         <&str as sqlx::Type<sqlx::Postgres>>::type_info()
+    }
+}
+
+impl sqlx::Encode<'_, sqlx::Postgres> for CaptureFreshness {
+    fn encode_by_ref(
+        &self,
+        buf: &mut sqlx::postgres::PgArgumentBuffer,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        <&str as sqlx::Encode<sqlx::Postgres>>::encode_by_ref(&self.as_str(), buf)
     }
 }
 

@@ -1,50 +1,82 @@
 <script lang="ts">
-import { goto, invalidateAll } from '$app/navigation';
-import { untrack } from 'svelte';
+import { goto, invalidate } from '$app/navigation';
 import { api } from '$lib/api';
-import type {
-	CaptureWithContext,
-	ScenePreset,
-	SceneWithVersion,
-	UpdateSceneMetadataRequest
-} from '$lib/bindings';
-import { ItemGrid } from '$lib/components/item-grid';
-import {
-	TimeOfDaySlider,
-	WeatherToggle,
-	WeatherIntensitySlider,
-	MoonPhaseSelector
-} from '$lib/components/preset-controls';
-import { formatDecimal, formatMoonPhase, formatTimeTicks } from '$lib/utils/format';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
+import type { ScenePreset, SceneWithVersion, UpdateSceneMetadataRequest } from '$lib/bindings';
 import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import CaptureCard from '$lib/components/CaptureCard.svelte';
 import DetailField from '$lib/components/DetailField.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { createAction } from '$lib/components/action-form.svelte';
+import {
+	Counter,
+	DataView,
+	Grid,
+	Pagination,
+	Table,
+	Toolbar,
+	ViewToggle,
+	createCursorList
+} from '$lib/components/data-view';
+import {
+	DateRangeFilter,
+	FilterCombobox,
+	NumericRangeFilter,
+	PopoverMultiSelect
+} from '$lib/components/filters';
+import {
+	AdminCapturesQuery,
+	type AdminCaptureNode,
+	captureFilterConfig,
+	captureFreshnessOptions,
+	captureStatusOptions,
+	type CaptureFilters
+} from '../../captures/queries';
+import { columns as captureColumns } from '../../captures/columns';
+import * as FolderCard from '$lib/components/folder-card';
+import {
+	MoonPhaseSelector,
+	TimeOfDaySlider,
+	WeatherIntensitySlider,
+	WeatherToggle
+} from '$lib/components/preset-controls';
 import { Alert } from '$lib/components/ui/alert';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Dialog from '$lib/components/ui/dialog';
-import * as FolderCard from '$lib/components/folder-card';
 import * as Form from '$lib/components/ui/form';
 import { Input } from '$lib/components/ui/input';
 import { StatusBadge } from '$lib/components/ui/status-badge';
 import { Textarea } from '$lib/components/ui/textarea';
+import { formatDecimal, formatMoonPhase, formatTimeTicks } from '$lib/utils/format';
+import { type ResultOf } from '$lib/graphql';
 import { GripVertical, LoaderCircle, Pencil, Plus, RotateCcw, Trash2 } from '@lucide/svelte';
+import { untrack } from 'svelte';
+import { toast } from 'svelte-sonner';
 import { defaults, superForm } from 'sveltekit-superforms';
 import { zod4Client } from 'sveltekit-superforms/adapters';
-import { toast } from 'svelte-sonner';
-import { sceneFormSchema, createPresetSchema, editPresetSchema } from './schema.js';
 import type { PageData } from './$types';
+import { createPresetSchema, editPresetSchema, sceneFormSchema } from './schema.js';
 
 interface Props {
 	data: PageData;
 }
 let { data }: Props = $props();
 let scene: SceneWithVersion = $derived(data.scene);
-let captures: CaptureWithContext[] = $derived(data.captures);
-let captureCount: number = $derived(data.captureCount);
 let presets: ScenePreset[] = $derived(data.presets);
+
+// Captures tab: cursor-paginated with forced scene filter
+const captureList = createCursorList<AdminCaptureNode, CaptureFilters>({
+	initial: () => data.captures,
+	query: AdminCapturesQuery,
+	extract: (d: ResultOf<typeof AdminCapturesQuery>) => d.adminCaptures,
+	pageSize: 24,
+	filters: captureFilterConfig,
+	filterVariable: 'filters',
+	fixedFilters: { sceneId: untrack(() => data.scene.id) },
+	viewMode: 'table'
+});
+
+const shaderOptions = $derived(data.shaderOptions);
 
 const initialScene = untrack(() => scene);
 const sceneSuperform = superForm(
@@ -70,7 +102,7 @@ const sceneSuperform = superForm(
 				result.match({
 					Ok: () => {
 						toast.success('Scene updated');
-						void invalidateAll();
+						void invalidate(`glint:admin:scene:${scene.id}`);
 					},
 					Err: (err) => toast.error(err.message)
 				});
@@ -119,7 +151,7 @@ const createPresetSuperform = superForm(
 					Ok: () => {
 						showCreatePreset = false;
 						createPresetSuperform.reset();
-						void invalidateAll();
+						void invalidate(`glint:admin:scene:${scene.id}`);
 					},
 					Err: (err) => toast.error(err.message)
 				});
@@ -173,7 +205,7 @@ const editPresetSuperform = superForm(
 				result.match({
 					Ok: () => {
 						editingPreset = null;
-						void invalidateAll();
+						void invalidate(`glint:admin:scene:${scene.id}`);
 					},
 					Err: (err) => toast.error(err.message)
 				});
@@ -204,7 +236,7 @@ const disableAction = createAction({
 
 const reactivateAction = createAction({
 	action: () => api.admin.reactivateScene(scene.id),
-	onSuccess: () => void invalidateAll(),
+	onSuccess: () => void invalidate(`glint:admin:scene:${scene.id}`),
 	setError: (msg: string) => toast.error(msg)
 });
 
@@ -220,7 +252,7 @@ async function handleDeletePreset() {
 		Ok: () => {
 			deletingPreset = null;
 			showDeletePresetConfirm = false;
-			void invalidateAll();
+			void invalidate(`glint:admin:scene:${scene.id}`);
 		},
 		Err: (err) => {
 			toast.error(err.message);
@@ -259,7 +291,7 @@ async function handleDrop(targetIndex: number) {
 
 	const result = await api.admin.reorderPresets(scene.slug, presetIds);
 	result.match({
-		Ok: () => void invalidateAll(),
+		Ok: () => void invalidate(`glint:admin:scene:${scene.id}`),
 		Err: (err) => toast.error(err.message)
 	});
 }
@@ -296,7 +328,7 @@ function handleDragEnd() {
 	<FolderCard.Root value="details">
 		{#snippet tabs()}
 			<FolderCard.Tab value="details">Details</FolderCard.Tab>
-			<FolderCard.Tab value="captures">Captures ({captureCount})</FolderCard.Tab>
+			<FolderCard.Tab value="captures">Captures{captureList.totalCount != null ? ` (${captureList.totalCount})` : ''}</FolderCard.Tab>
 		{/snippet}
 
 		{#snippet trailing()}
@@ -494,48 +526,72 @@ function handleDragEnd() {
 
 		<!-- Tab: Captures -->
 		<FolderCard.Content value="captures">
-			{#if captures.length === 0}
-				<div class="flex flex-col items-center justify-center py-12 text-center">
-					<p class="text-sm text-muted-foreground">No captures have been taken for this scene yet.</p>
-				</div>
-			{:else}
-				<div class="space-y-3">
-					<div class="flex items-center justify-between">
-						<p class="text-sm text-muted-foreground">
-							Showing {captures.length} of {captureCount} captures
-						</p>
-						<a
-							href="/admin/captures?scene={scene.id}"
-							class="text-sm text-primary hover:underline"
-						>
-							View all
-						</a>
-					</div>
-					<ItemGrid items={captures} key={(c: CaptureWithContext) => c.id} size="small">
-						{#snippet card(capture: CaptureWithContext)}
-							<CaptureCard {capture}>
-								<div class="p-2">
-									<div class="flex items-center justify-between">
-										<div class="text-sm font-medium">{capture.shader_name}</div>
-										{#if capture.freshness !== 'fresh'}
-											<StatusBadge status={capture.freshness} class="px-1.5 text-[10px]">{capture.freshness}</StatusBadge>
-										{/if}
-									</div>
-									<div class="text-xs text-muted-foreground">
-										{capture.shader_version}
-										{#if capture.profile_display_name}
-											&middot; {capture.profile_display_name}
-										{/if}
-										{#if capture.preset_name}
-											&middot; {capture.preset_name}
-										{/if}
-									</div>
-								</div>
-							</CaptureCard>
+			<div class="space-y-3">
+				<Toolbar>
+					<FilterCombobox
+						placeholder="Shader"
+						options={shaderOptions}
+						bind:value={captureList.filters.shaderSlug}
+					/>
+					<PopoverMultiSelect
+						label="Status"
+						options={captureStatusOptions}
+						bind:value={captureList.filters.statuses}
+					/>
+					<PopoverMultiSelect
+						label="Freshness"
+						options={captureFreshnessOptions}
+						bind:value={captureList.filters.freshness}
+					/>
+					<DateRangeFilter
+						label="Captured"
+						bind:after={captureList.filters.capturedAfter}
+						bind:before={captureList.filters.capturedBefore}
+					/>
+					<NumericRangeFilter
+						label="File Size"
+						unit="MB"
+						scale={1048576}
+						step={0.1}
+						bind:min={captureList.filters.minFileSize}
+						bind:max={captureList.filters.maxFileSize}
+					/>
+					<div class="flex-1"></div>
+					<ViewToggle modes={['table', 'tile']} bind:mode={captureList.viewMode} />
+				</Toolbar>
+
+				<DataView list={captureList}>
+					{#snippet empty()}
+						<p class="py-8 text-center text-sm text-muted-foreground">No captures have been taken for this scene yet.</p>
+					{/snippet}
+
+					<Table
+						columns={captureColumns}
+						getRowHref={(capture: AdminCaptureNode) => `/admin/captures/${capture.id}`}
+					>
+						{#snippet card(capture: AdminCaptureNode)}
+							<CaptureCard layout="row"
+								{capture}
+								title={capture.shaderName}
+								subtitle={[capture.shaderVersion, capture.profileDisplayName].filter(Boolean).join(' \u00b7 ')}
+							/>
 						{/snippet}
-					</ItemGrid>
-				</div>
-			{/if}
+					</Table>
+					<Grid href={(capture: AdminCaptureNode) => `/admin/captures/${capture.id}`} key={(capture: AdminCaptureNode) => capture.id}>
+						{#snippet card(capture: AdminCaptureNode)}
+							<CaptureCard layout="tile"
+								{capture}
+								title={capture.shaderName}
+								subtitle={[capture.shaderVersion, capture.profileDisplayName].filter(Boolean).join(' \u00b7 ')}
+							/>
+						{/snippet}
+					</Grid>
+
+					<Counter noun="capture" />
+
+					<Pagination style="load-more" />
+				</DataView>
+			</div>
 		</FolderCard.Content>
 	</FolderCard.Root>
 </div>

@@ -1,4 +1,3 @@
-import type { AdminShader } from './+page';
 import {
 	type ColumnDef,
 	DataTableColumnHeader,
@@ -7,6 +6,7 @@ import {
 	timeColumn
 } from '$lib/components/data-table';
 import { Sparkles } from '@lucide/svelte';
+import type { AdminShader } from './+page';
 import DescriptionCell from './description-cell.svelte';
 import ExtractionCell from './extraction-cell.svelte';
 import ShaderNameCell from './shader-name-cell.svelte';

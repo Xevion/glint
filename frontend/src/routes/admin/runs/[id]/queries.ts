@@ -1,4 +1,4 @@
-import { graphql, type ResultOf } from '$lib/graphql';
+import { type ResultOf, graphql } from '$lib/graphql';
 
 const CaptureRunItemFragment = graphql(`
 	fragment CaptureRunItemFields on CaptureRunItemNode @_unmask {
@@ -39,6 +39,9 @@ export const AdminCaptureRunQuery = graphql(
 				completedItems
 				failedItems
 				skippedItems
+				resolutionWidth
+				resolutionHeight
+				imageFormat
 				items {
 					...CaptureRunItemFields
 				}

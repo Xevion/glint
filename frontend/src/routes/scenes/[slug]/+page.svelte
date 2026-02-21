@@ -1,11 +1,11 @@
 <script lang="ts">
 import { resolve } from '$app/paths';
-import type { SceneCapture } from './+page';
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
-import CaptureGallery, { type CaptureGalleryItem } from '$lib/components/CaptureGallery.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
+import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import Meta from '$lib/components/Meta.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
+import type { SceneCapture } from './+page';
 
 import { formatMoonPhase, formatPercent, formatTimeTicks } from '$lib/utils/format';
 import { fly } from 'svelte/transition';
@@ -37,6 +37,17 @@ $effect(() => {
 
 function loadMoreCaptures() {
 	visibleCount = Math.min(visibleCount + capturesPageSize, allCaptures.length);
+}
+
+function observeSentinel(node: HTMLElement) {
+	const observer = new IntersectionObserver(
+		(entries) => {
+			if (entries[0]?.isIntersecting) loadMoreCaptures();
+		},
+		{ rootMargin: '200px' }
+	);
+	observer.observe(node);
+	return { destroy: () => observer.disconnect() };
 }
 
 // Use original scene captures for the shader thumbnail strip (not paginated)
@@ -240,30 +251,51 @@ const ogDescription = $derived.by(() => {
 			</div>
 
 	<!-- Captures Grid -->
-	<CaptureGallery
-		captures={visibleCaptures}
-		title="Shader Renders"
-		emptyMessage="Captures for this scene are being generated."
-		onclick={(capture) => (selectedCapture = visibleCaptures.find(c => c.id === capture.id) ?? null)}
-		alt={(capture) => {
-			const c = visibleCaptures.find(v => v.id === capture.id);
-			return c ? `${c.shaderName} render` : 'Capture';
-		}}
-		hasMore={hasMoreCaptures}
-		loading={false}
-		onLoadMore={loadMoreCaptures}
-	>
-		{#snippet overlay(capture: CaptureGalleryItem)}
-			{@const c = visibleCaptures.find(v => v.id === capture.id)}
-			{#if c}
-				<CaptureBadges
-					shaderName={c.shaderName}
-					profileName={c.profileDisplayName}
-					version={c.shaderVersion}
-				/>
+	<div class="mb-8">
+		{#if visibleCaptures.length > 0}
+			<h2 class="mb-4 text-2xl font-bold text-foreground">Shader Renders</h2>
+			<div role="list" class="grid gap-5" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+				{#each visibleCaptures as capture (capture.id)}
+					<div role="listitem">
+						<button
+							type="button"
+							onclick={() => (selectedCapture = capture)}
+							class="group relative overflow-hidden rounded-xl transition-transform hover:scale-[1.02]"
+						>
+							<CaptureImage
+								src={capture.imagePath}
+								thumbhash={capture.thumbhash}
+								preset="card"
+								alt="{capture.shaderName} render"
+								class="h-full w-full object-cover"
+								containerClass="aspect-video"
+							/>
+							<ImageOverlay hover />
+							<div
+								class="absolute right-0 bottom-0 left-0 p-3 opacity-0 transition-opacity group-hover:opacity-100"
+							>
+								<CaptureBadges
+									shaderName={capture.shaderName}
+									profileName={capture.profileDisplayName}
+									version={capture.shaderVersion}
+								/>
+							</div>
+						</button>
+					</div>
+				{/each}
+			</div>
+
+			{#if hasMoreCaptures}
+				<div use:observeSentinel class="flex justify-center py-8"></div>
 			{/if}
-		{/snippet}
-		</CaptureGallery>
+		{:else}
+			<div class="flex flex-col items-center justify-center py-16 text-center">
+				<ImageOff class="mb-4 h-16 w-16 text-muted-foreground opacity-50" strokeWidth={1.5} />
+				<h3 class="text-lg font-semibold text-foreground">No Captures Yet</h3>
+				<p class="mt-1 text-sm text-foreground/70">Captures for this scene are being generated.</p>
+			</div>
+		{/if}
+	</div>
 		</div>
 	{/key}
 {/if}

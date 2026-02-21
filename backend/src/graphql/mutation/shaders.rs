@@ -6,7 +6,6 @@ use crate::graphql::types::shader::{
     CreateShaderVersionInput, ShaderNode, ShaderVersionNode, UpdateShaderInput,
 };
 use crate::id;
-use crate::models::{CreateShaderVersionRequest, UpdateShaderRequest};
 use crate::platform;
 use crate::repo::{ShaderRepo, ShaderVersionRepo};
 use crate::services::platform::PlatformService;
@@ -31,16 +30,7 @@ impl ShaderMutation {
 
         let old = ShaderRepo::get(db, &id).await.map_err(|e| e.extend())?;
 
-        let request = UpdateShaderRequest {
-            name: input.name,
-            slug: None,
-            description: input.description,
-            modrinth_id: input.modrinth_id,
-            curseforge_id: input.curseforge_id,
-            website_url: input.website_url,
-            preferred_version_id: input.preferred_version_id,
-            capture_enabled: input.capture_enabled,
-        };
+        let request = input.into();
 
         let shader = ShaderRepo::update(db, &old.id.0, &request)
             .await
@@ -133,12 +123,7 @@ impl ShaderMutation {
         }
 
         let version_id = id::generate_id();
-        let request = CreateShaderVersionRequest {
-            version: input.version,
-            modrinth_version_id: input.modrinth_version_id,
-            download_url: input.download_url,
-            file_hash: input.file_hash,
-        };
+        let request = input.into();
 
         let version = ShaderVersionRepo::create(db, &version_id, &shader_id, &request)
             .await

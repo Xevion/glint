@@ -1,7 +1,10 @@
 use async_graphql::{Context, Object, Result};
 
 use crate::graphql::guard::AdminGuard;
-use crate::graphql::types::run::{CaptureRunItemNode, CaptureRunNode};
+use crate::graphql::types::connection::{Connection, decode_cursor_for_query};
+use crate::graphql::types::run::{
+    AdminRunFiltersInput, CaptureRunItemNode, CaptureRunListNode, CaptureRunNode,
+};
 use crate::repo::CaptureRunRepo;
 use crate::state::AppState;
 
@@ -10,6 +13,35 @@ pub struct RunQuery;
 
 #[Object]
 impl RunQuery {
+    /// Cursor-paginated list of capture runs with optional filtering (admin only).
+    #[graphql(guard = "AdminGuard")]
+    async fn admin_capture_runs(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(default = 25, desc = "Number of items to return (max 100)")] first: i32,
+        #[graphql(desc = "Cursor from a previous page's endCursor")] after: Option<String>,
+        #[graphql(desc = "Sort: startedAt, durationSecs, status, totalItems (prefix - for desc)")]
+        sort: Option<String>,
+        filters: Option<AdminRunFiltersInput>,
+    ) -> Result<Connection<CaptureRunListNode>> {
+        let state = ctx.data_unchecked::<AppState>();
+
+        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+
+        let run_filters = filters.unwrap_or_default().into();
+
+        let page = CaptureRunRepo::list_cursor(
+            state.db(),
+            first,
+            decoded_after,
+            &run_filters,
+            sort.as_deref(),
+        )
+        .await?;
+
+        Ok(page.into_connection())
+    }
+
     /// Get a capture run by ID with all items (admin only).
     #[graphql(guard = "AdminGuard")]
     async fn admin_capture_run(
@@ -25,49 +57,12 @@ impl RunQuery {
             Err(_) => return Ok(None),
         };
 
-        let items = CaptureRunRepo::list_items_with_context(db, &id).await?;
-
-        let item_nodes: Vec<CaptureRunItemNode> = items
+        let items: Vec<CaptureRunItemNode> = CaptureRunRepo::list_items_with_context(db, &id)
+            .await?
             .into_iter()
-            .map(|item| CaptureRunItemNode {
-                id: item.id,
-                run_id: item.run_id,
-                shader_version_id: item.shader_version_id,
-                scene_id: item.scene_id,
-                profile_id: item.profile_id,
-                profile_name: item.profile_name,
-                profile_display_name: item.profile_display_name,
-                preset_id: item.preset_id,
-                status: item.status.into(),
-                capture_id: item.capture_id,
-                error_message: item.error_message,
-                error_log: item.error_log,
-                duration_ms: item.duration_ms,
-                started_at: item.started_at,
-                completed_at: item.completed_at,
-                shader_name: item.shader_name,
-                shader_slug: item.shader_slug,
-                shader_version: item.shader_version,
-                scene_name: item.scene_name,
-                image_path: item.image_path,
-                thumbhash: item.thumbhash,
-            })
+            .map(Into::into)
             .collect();
 
-        Ok(Some(CaptureRunNode {
-            id: run.id,
-            agent_id: run.agent_id,
-            started_at: run.started_at,
-            completed_at: run.completed_at,
-            status: run.status.into(),
-            total_items: run.total_items,
-            completed_items: run.completed_items,
-            failed_items: run.failed_items,
-            skipped_items: run.skipped_items,
-            resolution_width: run.resolution_width,
-            resolution_height: run.resolution_height,
-            image_format: run.image_format,
-            items: item_nodes,
-        }))
+        Ok(Some((run, items).into()))
     }
 }

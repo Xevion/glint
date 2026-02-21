@@ -1,6 +1,6 @@
 <script lang="ts">
-import type { AdminShader } from './+page';
 import { ageMs, formatDuration } from '$lib/utils/format';
+import type { AdminShader } from './+page';
 
 interface Props {
 	shader: AdminShader;

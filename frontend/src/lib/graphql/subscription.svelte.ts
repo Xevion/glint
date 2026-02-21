@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
-import { createClient as createWSClient, type Client as WSClient } from 'graphql-ws';
 import type { TypedDocumentNode } from '@graphql-typed-document-node/core';
 import { print } from 'graphql';
+import { type Client as WSClient, createClient as createWSClient } from 'graphql-ws';
 
 let wsClient: WSClient | null = null;
 

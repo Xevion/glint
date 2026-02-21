@@ -1,86 +1,63 @@
-import { createApiClient } from '$lib/api';
-import type { CaptureWithContext, ShaderListItem } from '$lib/bindings';
-import { createGraphQLClient, graphql, query } from '$lib/graphql';
-import { pick } from '$lib/utils';
+import {
+	type RelayConnection,
+	emptyConnection,
+	extractFiltersFromUrl
+} from '$lib/components/data-view';
+import { createGraphQLClient, query } from '$lib/graphql';
 import type { PageLoad } from './$types';
+import {
+	type AdminCaptureNode,
+	AdminCapturesQuery,
+	SceneFiltersQuery,
+	ShaderFiltersQuery,
+	captureFilterConfig
+} from './queries';
 
-type FilterOption = Pick<ShaderListItem, 'id' | 'slug' | 'name'>;
-interface SceneFilterOption {
-	id: string;
-	name: string;
+interface FilterOption {
+	value: string;
+	label: string;
 }
 
-const SceneFiltersQuery = graphql(`
-	query CaptureSceneFilters {
-		scenes(first: 250, visibility: INCLUDE) {
-			edges {
-				node {
-					id
-					name
-				}
-			}
-		}
-	}
-`);
-
 export const load: PageLoad = async ({ fetch, url }) => {
-	const api = createApiClient(fetch);
 	const gql = createGraphQLClient(fetch);
+	const filters = extractFiltersFromUrl(url.searchParams, captureFilterConfig, 'filters');
 
-	const page = Number(url.searchParams.get('page') ?? '1');
-	const pageSize = Number(url.searchParams.get('pageSize') ?? '50');
-	const shader = url.searchParams.get('shader') ?? undefined;
-	const scene = url.searchParams.get('scene') ?? undefined;
-	const status = url.searchParams.get('status') ?? undefined;
-	const runId = url.searchParams.get('runId') ?? undefined;
-
-	const [result, shadersRes, scenesRes] = await Promise.all([
-		api.admin.listCaptures({ page, pageSize, shader, scene, status, runId }),
-		api.admin.listShaders(),
-		query(gql, SceneFiltersQuery, {})
+	const [capturesRes, scenesRes, shadersRes] = await Promise.all([
+		query(gql, AdminCapturesQuery, {
+			first: 50,
+			...filters
+		}),
+		query(gql, SceneFiltersQuery, {}),
+		query(gql, ShaderFiltersQuery, {})
 	]);
 
 	const shaders: FilterOption[] = shadersRes.match({
-		Ok: (v) => v.items.map((s) => pick(s, ['id', 'slug', 'name'])),
+		Ok: (data) => data.shaders.edges.map((e) => ({ value: e.node.slug, label: e.node.name })),
 		Err: () => []
 	});
 
-	const scenes: SceneFilterOption[] = scenesRes.match({
-		Ok: (data) => data.scenes.edges.map((e) => ({ id: e.node.id, name: e.node.name })),
+	const scenes: FilterOption[] = scenesRes.match({
+		Ok: (data) => data.scenes.edges.map((e) => ({ value: e.node.id, label: e.node.name })),
 		Err: () => []
 	});
 
-	interface CapturesPageData {
-		captures: CaptureWithContext[];
-		totalCount: number;
-		page: number;
-		pageSize: number;
-		error: string | null;
-		filters: { shader?: string; scene?: string; status?: string; runId?: string };
+	return capturesRes.match<{
+		captures: RelayConnection<AdminCaptureNode>;
 		shaders: FilterOption[];
-		scenes: SceneFilterOption[];
-	}
-
-	return result.match<CapturesPageData>({
+		scenes: FilterOption[];
+		error: string | null;
+	}>({
 		Ok: (data) => ({
-			captures: data.items,
-			totalCount: data.total,
-			page: data.page,
-			pageSize: data.page_size,
-			error: null,
-			filters: { shader, scene, status, runId },
+			captures: data.adminCaptures,
 			shaders,
-			scenes
+			scenes,
+			error: null
 		}),
 		Err: (err) => ({
-			captures: [],
-			totalCount: 0,
-			page: 1,
-			pageSize: 50,
-			error: err.message,
-			filters: { shader, scene, status, runId },
+			captures: emptyConnection<AdminCaptureNode>(),
 			shaders,
-			scenes
+			scenes,
+			error: err.message
 		})
 	});
 };

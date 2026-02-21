@@ -1,16 +1,16 @@
 <script lang="ts">
-import type { CaptureWithContext } from '$lib/bindings';
 import { formatBytes } from '$lib/utils/format';
+import type { AdminCaptureNode } from './queries';
 
 interface Props {
-	capture: CaptureWithContext;
+	capture: AdminCaptureNode;
 }
 
 let { capture }: Props = $props();
 </script>
 
-{#if capture.file_size_bytes}
-	{formatBytes(capture.file_size_bytes)}
+{#if capture.fileSizeBytes}
+	{formatBytes(capture.fileSizeBytes)}
 {:else}
 	<span class="text-muted-foreground">-</span>
 {/if}

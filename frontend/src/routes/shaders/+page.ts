@@ -1,26 +1,8 @@
-import { ShaderCardFragment, type ShaderCardShader } from '$lib/components/ShaderCard.svelte';
-import { createGraphQLClient, graphql, query } from '$lib/graphql';
+import type { ShaderCardShader } from '$lib/components/ShaderCard.svelte';
+import { type RelayConnection, emptyConnection } from '$lib/components/data-view';
+import { createGraphQLClient, query } from '$lib/graphql';
 import type { PageLoad } from './$types';
-
-export const _BrowseShadersQuery = graphql(
-	`
-		query BrowseShaders($first: Int!, $after: String, $search: String, $sort: String) {
-			shaders(first: $first, after: $after, search: $search, sort: $sort) {
-				edges {
-					node {
-						...ShaderCardFields
-					}
-				}
-				pageInfo {
-					hasNextPage
-					endCursor
-				}
-				totalCount
-			}
-		}
-	`,
-	[ShaderCardFragment]
-);
+import { BrowseShadersQuery } from './queries';
 
 export const load: PageLoad = async ({ fetch, url, depends }) => {
 	depends('glint:shaders');
@@ -31,36 +13,21 @@ export const load: PageLoad = async ({ fetch, url, depends }) => {
 
 	const result = await query(
 		client,
-		_BrowseShadersQuery,
+		BrowseShadersQuery,
 		{ first: 24, search: q, sort },
 		{ requestPolicy: 'cache-and-network' }
 	);
 
 	return result.match<{
-		shaders: ShaderCardShader[];
-		total: number;
-		hasNextPage: boolean;
-		endCursor: string | null;
-		q: string;
-		sort: string;
+		shaders: RelayConnection<ShaderCardShader>;
 		error: string | null;
 	}>({
 		Ok: (data) => ({
-			shaders: data.shaders.edges.map((e) => e.node as ShaderCardShader),
-			total: data.shaders.totalCount,
-			hasNextPage: data.shaders.pageInfo.hasNextPage,
-			endCursor: data.shaders.pageInfo.endCursor ?? null,
-			q: q ?? '',
-			sort: sort ?? 'popular',
+			shaders: data.shaders,
 			error: null
 		}),
 		Err: (error) => ({
-			shaders: [],
-			total: 0,
-			hasNextPage: false,
-			endCursor: null,
-			q: q ?? '',
-			sort: sort ?? 'popular',
+			shaders: emptyConnection<ShaderCardShader>(),
 			error: error.message
 		})
 	});

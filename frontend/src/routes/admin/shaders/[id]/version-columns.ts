@@ -1,10 +1,10 @@
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { type ColumnDef, DataTableColumnHeader, renderComponent } from '$lib/components/data-table';
 import { formatGameVersions } from '$lib/utils/format';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
+import type { ShaderVersionDetail } from './queries';
 import VersionExtractionCell from './version-extraction-cell.svelte';
 import VersionFileCell from './version-file-cell.svelte';
 import VersionNameCell from './version-name-cell.svelte';
-import type { ShaderVersionDetail } from './queries';
 
 export function createVersionColumns(
 	latestVersionId: string | undefined

@@ -1,20 +1,20 @@
 <script lang="ts">
-import type { CaptureWithContext } from '$lib/bindings';
-import { StatusBadge } from '$lib/components/ui/status-badge';
+import { StatusBadge, type StatusBadgeStatus } from '$lib/components/ui/status-badge';
+import type { AdminCaptureNode } from './queries';
 
 interface Props {
-	capture: CaptureWithContext;
+	capture: AdminCaptureNode;
 }
 
 let { capture }: Props = $props();
 </script>
 
-{#if capture.run_id}
+{#if capture.runId}
 	<a
-		href="/admin/runs/{capture.run_id}"
+		href="/admin/runs/{capture.runId}"
 		class="relative z-10 inline-flex items-center gap-1"
 	>
-		<StatusBadge status={capture.run_status ?? 'inactive'}>{capture.run_status ?? '?'}</StatusBadge>
+		<StatusBadge status={(capture.runStatus?.toLowerCase() ?? 'inactive') as StatusBadgeStatus}>{capture.runStatus ?? '?'}</StatusBadge>
 	</a>
 {:else}
 	<span class="text-muted-foreground">&mdash;</span>

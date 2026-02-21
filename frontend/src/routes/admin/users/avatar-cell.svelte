@@ -1,19 +1,24 @@
 <script lang="ts">
+import ImageCell from '$lib/components/data-table/cells/image-cell.svelte';
+import ImageFallbackCell from '$lib/components/data-table/cells/image-fallback-cell.svelte';
 import type { User } from '$lib/bindings';
+import { CircleUser } from '@lucide/svelte';
 
 interface Props {
 	user: User;
 }
 
 let { user }: Props = $props();
+
+const avatarUrl = $derived(
+	user.discord_avatar
+		? `https://cdn.discordapp.com/avatars/${user.discord_id}/${user.discord_avatar}.png?size=40`
+		: null
+);
 </script>
 
-{#if user.discord_avatar}
-	<img
-		src="https://cdn.discordapp.com/avatars/{user.discord_id}/{user.discord_avatar}.png?size=40"
-		alt="Avatar"
-		class="h-8 w-8 rounded-full"
-	/>
+{#if avatarUrl}
+	<ImageCell url={avatarUrl} sizeClass="h-8 w-8" roundedClass="rounded-full" />
 {:else}
-	<div class="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs">?</div>
+	<ImageFallbackCell icon={CircleUser} sizeClass="h-8 w-8" roundedClass="rounded-full" />
 {/if}

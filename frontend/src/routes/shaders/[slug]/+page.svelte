@@ -4,13 +4,17 @@ import type { ShaderCardShader } from '$lib/components/ShaderCard.svelte';
 
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
-import { CompactRow, ItemGrid, MiniCard } from '$lib/components/item-grid';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import BrandIcon from '$lib/components/icons/BrandIcon.svelte';
+import CompactRow from '$lib/components/CompactRow.svelte';
+import MiniCard from '$lib/components/MiniCard.svelte';
+import { DataView, Grid } from '$lib/components/data-view';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import * as Select from '$lib/components/ui/select';
+import { createGraphQLClient, query } from '$lib/graphql';
+import { themeStore } from '$lib/stores/theme.svelte';
 import {
 	formatDate,
 	formatNumber,
@@ -19,8 +23,6 @@ import {
 	getModrinthUrl
 } from '$lib/utils/format';
 import { imageUrl } from '$lib/utils/image';
-import { themeStore } from '$lib/stores/theme.svelte';
-import { createGraphQLClient, query } from '$lib/graphql';
 import {
 	Camera,
 	ChevronDown,
@@ -575,7 +577,8 @@ const ogDescription = $derived.by(() => {
 						</h2>
 
 					<!-- Mobile: compact rows -->
-					<ItemGrid items={similarShaders.slice(0, 6)} key={(s: ShaderCardShader) => s.id} mode="row" class="md:hidden">
+					<DataView items={similarShaders.slice(0, 6)}>
+					<Grid key={(s: ShaderCardShader) => s.id} mode="row" class="md:hidden">
 						{#snippet row(shader: ShaderCardShader)}
 								<CompactRow
 								name={shader.name}
@@ -600,7 +603,8 @@ const ogDescription = $derived.by(() => {
 									{/snippet}
 								</CompactRow>
 							{/snippet}
-						</ItemGrid>
+						</Grid>
+					</DataView>
 
 					<!-- Desktop: horizontal scroll carousel -->
 					<div class="hidden md:block">

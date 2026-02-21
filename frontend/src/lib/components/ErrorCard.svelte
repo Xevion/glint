@@ -1,11 +1,11 @@
 <script lang="ts">
-import { untrack, type Snippet } from 'svelte';
 import { dev } from '$app/environment';
 import { Button } from '$lib/components/ui/button';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import { cn } from '$lib/utils';
 import { formatTime } from '$lib/utils/format';
-import { ChevronDown, Clipboard, Check } from '@lucide/svelte';
+import { Check, ChevronDown, Clipboard } from '@lucide/svelte';
+import { type Snippet, untrack } from 'svelte';
 
 interface Props {
 	title: string;

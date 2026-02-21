@@ -10,8 +10,8 @@ use async_graphql::{Context, MergedObject, Object, Result};
 
 use crate::graphql::guard::require_admin_for_visibility;
 use crate::graphql::types::common::Visibility;
-use crate::graphql::types::connection::decode_cursor;
-use crate::graphql::types::scene::{SceneConnection, SceneNode};
+use crate::graphql::types::connection::{Connection, decode_cursor_for_query};
+use crate::graphql::types::scene::SceneNode;
 use crate::repo::SceneRepo;
 use crate::state::AppState;
 
@@ -52,23 +52,14 @@ impl SceneQuery {
             desc = "Filter inactive scenes: EXCLUDE (default, active only), INCLUDE (all, admin), ONLY (inactive only, admin)"
         )]
         visibility: Visibility,
-    ) -> Result<SceneConnection> {
+    ) -> Result<Connection<SceneNode>> {
         require_admin_for_visibility(ctx, visibility)?;
         let state = ctx.data_unchecked::<AppState>();
 
-        let decoded_after = after
-            .map(|c| decode_cursor(&c))
-            .transpose()?
-            .map(|(id, ts)| {
-                let dt = chrono::DateTime::from_timestamp_millis(ts).ok_or_else(|| {
-                    crate::error::AppError::BadRequest("Invalid cursor timestamp".into())
-                })?;
-                Ok::<_, crate::error::AppError>((dt, id))
-            })
-            .transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
 
         let page = SceneRepo::list_cursor(state.db(), first, decoded_after, visibility).await?;
-        Ok(page.into())
+        Ok(page.into_connection())
     }
 
     /// Get a single scene by ID or slug.

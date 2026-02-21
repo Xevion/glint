@@ -3,8 +3,8 @@ import { Button } from '$lib/components/ui/button';
 import { imageUrl, rawImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { ChevronLeft, ChevronRight, ImageOff, X } from '@lucide/svelte';
-import { fade } from 'svelte/transition';
 import { Spring } from 'svelte/motion';
+import { fade } from 'svelte/transition';
 
 export interface CaptureItem {
 	id: string;

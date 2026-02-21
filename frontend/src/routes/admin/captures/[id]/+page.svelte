@@ -2,23 +2,22 @@
 import { goto } from '$app/navigation';
 import { api } from '$lib/api';
 import type { CaptureDetail, CaptureWithContext } from '$lib/bindings';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import Lightbox from '$lib/components/Lightbox.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
-import Breadcrumb from '$lib/components/Breadcrumb.svelte';
-import CaptureCard from '$lib/components/CaptureCard.svelte';
 import { createAction } from '$lib/components/action-form.svelte';
-import { ItemGrid } from '$lib/components/item-grid';
+import { DataView, Grid } from '$lib/components/data-view';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
+import { StatusBadge } from '$lib/components/ui/status-badge';
 import * as Tabs from '$lib/components/ui/tabs';
 import { formatBytes, formatDecimal, formatMetric, formatPercent } from '$lib/utils/format';
 import { preloadImage } from '$lib/utils/image';
-import { StatusBadge } from '$lib/components/ui/status-badge';
 import { Trash2 } from '@lucide/svelte';
-import { toast } from 'svelte-sonner';
 import { scaleBand } from 'd3-scale';
 import { BarChart } from 'layerchart';
+import { toast } from 'svelte-sonner';
 import type { PageData } from './$types';
 
 interface Props {
@@ -447,18 +446,38 @@ let viewAllHref = $derived.by(() => {
 
 		{#if capture.same_shader_scene.length > 0}
 			<Tabs.Content value="shader-scene">
-				<ItemGrid items={capture.same_shader_scene} key={(c: CaptureWithContext) => c.id} size="small">
+				<DataView items={capture.same_shader_scene}>
+				<Grid key={(c: CaptureWithContext) => c.id} size="small">
 			{#snippet card(c: CaptureWithContext)}
-				<CaptureCard capture={c} alt="{c.shader_name} {c.shader_version}">
+				<a
+					href="/admin/captures/{c.id}"
+					class="block rounded-lg border bg-card transition-colors hover:bg-muted/50"
+				>
+					<div class="overflow-hidden rounded-t-lg">
+						{#if c.image_path ?? c.thumbhash}
+							<CaptureImage
+								src={c.image_path}
+								thumbhash={c.thumbhash}
+								preset="card"
+								alt="{c.shader_name} {c.shader_version}"
+								class="w-full"
+								containerClass="aspect-video w-full"
+							/>
+						{:else}
+							<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+								No image
+							</div>
+						{/if}
+					</div>
 					<div class="p-2">
 						<div class="flex items-center justify-between">
 							<div class="text-sm font-medium">
-						{c.shader_version}
-						{#if c.profile_display_name}
-							&middot; {c.profile_display_name}
-						{/if}
-					</div>
-					{#if c.freshness !== 'fresh'}
+								{c.shader_version}
+								{#if c.profile_display_name}
+									&middot; {c.profile_display_name}
+								{/if}
+							</div>
+							{#if c.freshness !== 'fresh'}
 								<StatusBadge status={c.freshness} class="px-1.5 text-[10px]">{c.freshness}</StatusBadge>
 							{/if}
 						</div>
@@ -468,49 +487,92 @@ let viewAllHref = $derived.by(() => {
 							</div>
 						{/if}
 					</div>
-				</CaptureCard>
+				</a>
 			{/snippet}
-			</ItemGrid>
+			</Grid>
+			</DataView>
 		</Tabs.Content>
 	{/if}
 
 	{#if capture.same_scene.length > 0}
 			<Tabs.Content value="scene">
-				<ItemGrid items={capture.same_scene} key={(c: CaptureWithContext) => c.id} size="small">
+				<DataView items={capture.same_scene}>
+				<Grid key={(c: CaptureWithContext) => c.id} size="small">
 				{#snippet card(c: CaptureWithContext)}
-					<CaptureCard capture={c} alt="{c.shader_name} in {c.scene_name ?? 'scene'}">
-						<div class="p-2">
-							<div class="text-sm font-medium">{c.shader_name}</div>
-						<div class="text-xs text-muted-foreground">
-							{c.shader_version}
-							{#if c.profile_display_name}
-								&middot; {c.profile_display_name}
+					<a
+						href="/admin/captures/{c.id}"
+						class="block rounded-lg border bg-card transition-colors hover:bg-muted/50"
+					>
+						<div class="overflow-hidden rounded-t-lg">
+							{#if c.image_path ?? c.thumbhash}
+								<CaptureImage
+									src={c.image_path}
+									thumbhash={c.thumbhash}
+									preset="card"
+									alt="{c.shader_name} in {c.scene_name ?? 'scene'}"
+									class="w-full"
+									containerClass="aspect-video w-full"
+								/>
+							{:else}
+								<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+									No image
+								</div>
 							{/if}
 						</div>
+						<div class="p-2">
+							<div class="text-sm font-medium">{c.shader_name}</div>
+							<div class="text-xs text-muted-foreground">
+								{c.shader_version}
+								{#if c.profile_display_name}
+									&middot; {c.profile_display_name}
+								{/if}
+							</div>
 						</div>
-					</CaptureCard>
+					</a>
 				{/snippet}
-				</ItemGrid>
+				</Grid>
+				</DataView>
 			</Tabs.Content>
 		{/if}
 
 	{#if capture.same_run.length > 0}
 			<Tabs.Content value="run">
-				<ItemGrid items={capture.same_run} key={(c: CaptureWithContext) => c.id} size="small">
+				<DataView items={capture.same_run}>
+				<Grid key={(c: CaptureWithContext) => c.id} size="small">
 				{#snippet card(c: CaptureWithContext)}
-					<CaptureCard capture={c} alt="{c.shader_name} - {c.scene_name ?? 'scene'}">
-						<div class="p-2">
-							<div class="text-sm font-medium">{c.shader_name}</div>
-						<div class="text-xs text-muted-foreground">
-						{c.scene_name ?? c.scene_id}
-						{#if c.profile_display_name}
-							&middot; {c.profile_display_name}
+					<a
+						href="/admin/captures/{c.id}"
+						class="block rounded-lg border bg-card transition-colors hover:bg-muted/50"
+					>
+						<div class="overflow-hidden rounded-t-lg">
+							{#if c.image_path ?? c.thumbhash}
+								<CaptureImage
+									src={c.image_path}
+									thumbhash={c.thumbhash}
+									preset="card"
+									alt="{c.shader_name} - {c.scene_name ?? 'scene'}"
+									class="w-full"
+									containerClass="aspect-video w-full"
+								/>
+							{:else}
+								<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+									No image
+								</div>
 							{/if}
 						</div>
+						<div class="p-2">
+							<div class="text-sm font-medium">{c.shader_name}</div>
+							<div class="text-xs text-muted-foreground">
+								{c.scene_name ?? c.scene_id}
+								{#if c.profile_display_name}
+									&middot; {c.profile_display_name}
+								{/if}
+							</div>
 						</div>
-					</CaptureCard>
+					</a>
 				{/snippet}
-				</ItemGrid>
+				</Grid>
+				</DataView>
 			</Tabs.Content>
 		{/if}
 		</Tabs.Root>

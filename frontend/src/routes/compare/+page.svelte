@@ -1,5 +1,5 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
+import { goto, invalidate } from '$app/navigation';
 import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import SectionBoundary from '$lib/components/SectionBoundary.svelte';
@@ -143,7 +143,7 @@ const ogDescription = $derived.by(() => {
 		</div>
 
 		{#if data.error}
-			<ErrorBanner message="Failed to load captures: {data.error}" class="mb-6" />
+			<ErrorBanner message="Failed to load captures: {data.error}" onRetry={() => invalidate('glint:scenes')} class="mb-6" />
 		{/if}
 
 		{#if images.length >= 2 && leftImage && rightImage}

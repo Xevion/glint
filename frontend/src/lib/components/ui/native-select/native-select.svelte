@@ -20,7 +20,7 @@ export type NativeSelectSize = VariantProps<typeof nativeSelectVariants>['size']
 
 <script lang="ts">
 	import type { HTMLSelectAttributes } from 'svelte/elements';
-	import { cn, type WithElementRef } from '$lib/utils.js';
+	import { cn, type WithElementRef } from '$lib/utils';
 
 	let {
 		ref = $bindable(null),

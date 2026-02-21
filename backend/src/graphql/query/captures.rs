@@ -1,10 +1,11 @@
 use async_graphql::{Context, Object, Result};
 
-use crate::error::AppError;
 use crate::graphql::guard::AdminGuard;
-use crate::graphql::types::capture::{CaptureConnection, CaptureWithContextNode};
+use crate::graphql::types::capture::{
+    AdminCaptureFiltersInput, CaptureNode, CaptureWithContextNode,
+};
 use crate::graphql::types::capture_health::CaptureHealthNode;
-use crate::graphql::types::connection::decode_cursor;
+use crate::graphql::types::connection::{Connection, decode_cursor_for_query};
 use crate::models::{CaptureStatus, PageQuery};
 use crate::repo::capture::{CaptureDistinct, CaptureFilters};
 use crate::repo::{CaptureHealthRepo, CaptureRepo};
@@ -21,21 +22,13 @@ impl CaptureQuery {
         ctx: &Context<'_>,
         #[graphql(default = 20, desc = "Number of items to return (max 100)")] first: i32,
         #[graphql(desc = "Cursor from a previous page's endCursor")] after: Option<String>,
-    ) -> Result<CaptureConnection> {
+    ) -> Result<Connection<CaptureNode>> {
         let state = ctx.data_unchecked::<AppState>();
 
-        let decoded_after = after
-            .map(|c| decode_cursor(&c))
-            .transpose()?
-            .map(|(id, ts)| {
-                let dt = chrono::DateTime::from_timestamp_millis(ts)
-                    .ok_or_else(|| AppError::BadRequest("Invalid cursor timestamp".into()))?;
-                Ok::<_, AppError>((dt, id))
-            })
-            .transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
 
         let page = CaptureRepo::list_items_cursor(state.db(), first, decoded_after).await?;
-        Ok(page.into())
+        Ok(page.into_connection())
     }
 
     /// Capture health summary — target matrix completion status (admin).
@@ -55,7 +48,7 @@ impl CaptureQuery {
     ) -> Result<Vec<CaptureWithContextNode>> {
         let state = ctx.data_unchecked::<AppState>();
         let filters = CaptureFilters {
-            status: Some(CaptureStatus::Completed),
+            statuses: Some(vec![CaptureStatus::Completed]),
             ..Default::default()
         };
         let page = PageQuery {
@@ -71,5 +64,34 @@ impl CaptureQuery {
         )
         .await?;
         Ok(captures.into_iter().map(Into::into).collect())
+    }
+
+    /// Cursor-paginated list of captures with rich filtering (admin).
+    #[graphql(guard = "AdminGuard")]
+    async fn admin_captures(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(default = 25, desc = "Number of items to return (max 100)")] first: i32,
+        #[graphql(desc = "Cursor from a previous page's endCursor")] after: Option<String>,
+        #[graphql(desc = "Sort: capturedAt, fileSizeBytes, shaderName (prefix - for desc)")]
+        sort: Option<String>,
+        filters: Option<AdminCaptureFiltersInput>,
+    ) -> Result<Connection<CaptureWithContextNode>> {
+        let state = ctx.data_unchecked::<AppState>();
+        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+
+        let capture_filters: CaptureFilters = filters.unwrap_or_default().into();
+
+        let page = CaptureRepo::list_with_context_cursor(
+            state.db(),
+            &capture_filters,
+            first,
+            decoded_after,
+            CaptureDistinct::None,
+            sort.as_deref(),
+        )
+        .await?;
+
+        Ok(page.into_connection())
     }
 }

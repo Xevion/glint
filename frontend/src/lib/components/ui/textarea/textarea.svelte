@@ -1,5 +1,5 @@
 <script lang="ts">
-import { type WithElementRef, type WithoutChildren, cn } from '$lib/utils.js';
+import { type WithElementRef, type WithoutChildren, cn } from '$lib/utils';
 import type { HTMLTextareaAttributes } from 'svelte/elements';
 
 let {

@@ -1,12 +1,12 @@
 <script lang="ts">
-import type { CaptureWithContext } from '$lib/bindings';
-import { StatusBadge } from '$lib/components/ui/status-badge';
+import { StatusBadge, type StatusBadgeStatus } from '$lib/components/ui/status-badge';
+import type { AdminCaptureNode } from './queries';
 
 interface Props {
-	capture: CaptureWithContext;
+	capture: AdminCaptureNode;
 }
 
 let { capture }: Props = $props();
 </script>
 
-<StatusBadge status={capture.freshness}>{capture.freshness}</StatusBadge>
+<StatusBadge status={capture.freshness.toLowerCase() as StatusBadgeStatus}>{capture.freshness}</StatusBadge>

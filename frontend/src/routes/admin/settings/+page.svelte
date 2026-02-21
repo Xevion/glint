@@ -1,7 +1,7 @@
 <svelte:head><title>Settings - Glint</title></svelte:head>
 
 <script lang="ts">
-import { invalidateAll } from '$app/navigation';
+import { invalidate } from '$app/navigation';
 import { createApiClient } from '$lib/api';
 import type { ThemeMode } from '$lib/bindings';
 import Breadcrumb from '$lib/components/Breadcrumb.svelte';
@@ -31,7 +31,7 @@ let actionLoading = $state(false);
 const api = createApiClient();
 
 async function refresh() {
-	await invalidateAll();
+	await invalidate('glint:admin:backgrounds');
 }
 
 function handleDragOver(e: DragEvent) {

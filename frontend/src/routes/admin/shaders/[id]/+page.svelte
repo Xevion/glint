@@ -1,25 +1,49 @@
 <script lang="ts">
 import { goto, invalidate } from '$app/navigation';
-import { untrack } from 'svelte';
-import { createGraphQLClient, graphql, mutation } from '$lib/graphql';
-import { createDataTable, DataTable } from '$lib/components/data-table';
-import { ItemGrid } from '$lib/components/item-grid';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
-import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import CaptureCard from '$lib/components/CaptureCard.svelte';
+import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import DetailField from '$lib/components/DetailField.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { createAction } from '$lib/components/action-form.svelte';
+import {
+	Counter,
+	DataView,
+	Grid,
+	Pagination,
+	Table,
+	Toolbar,
+	ViewToggle,
+	createCursorList
+} from '$lib/components/data-view';
+import {
+	DateRangeFilter,
+	FilterCombobox,
+	NumericRangeFilter,
+	PopoverMultiSelect
+} from '$lib/components/filters';
+import {
+	AdminCapturesQuery,
+	type AdminCaptureNode,
+	captureFilterConfig,
+	captureFreshnessOptions,
+	captureStatusOptions,
+	type CaptureFilters
+} from '../../captures/queries';
+import { columns as captureColumns } from '../../captures/columns';
+import * as FolderCard from '$lib/components/folder-card';
 import { Alert } from '$lib/components/ui/alert';
 import { Badge } from '$lib/components/ui/badge';
 import { Button } from '$lib/components/ui/button';
-import * as FolderCard from '$lib/components/folder-card';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Dialog from '$lib/components/ui/dialog';
 import * as Form from '$lib/components/ui/form';
 import { Input } from '$lib/components/ui/input';
+import * as Select from '$lib/components/ui/select';
+import { Switch } from '$lib/components/ui/switch';
 import { Textarea } from '$lib/components/ui/textarea';
-import { StatusBadge, type StatusBadgeStatus } from '$lib/components/ui/status-badge';
+import { type ResultOf, createGraphQLClient, graphql, mutation } from '$lib/graphql';
+import { ageMs, formatCount } from '$lib/utils/format';
 import {
 	AlertTriangle,
 	ChevronDown,
@@ -36,21 +60,18 @@ import {
 	SkipForward,
 	Trash2
 } from '@lucide/svelte';
-import * as Select from '$lib/components/ui/select';
-import { Switch } from '$lib/components/ui/switch';
+import { untrack } from 'svelte';
+import { toast } from 'svelte-sonner';
 import { defaults, superForm } from 'sveltekit-superforms';
 import { zod4Client } from 'sveltekit-superforms/adapters';
-import { toast } from 'svelte-sonner';
-import { shaderFormSchema } from './schema.js';
 import type { PageData } from './$types';
 import type {
 	ShaderDetailData,
-	ShaderVersionDetail,
-	ShaderCapture,
+	ShaderMetadata,
 	ShaderProfile,
-	ShaderMetadata
+	ShaderVersionDetail
 } from './queries';
-import { ageMs, formatCount } from '$lib/utils/format';
+import { shaderFormSchema } from './schema.js';
 import { createVersionColumns } from './version-columns.js';
 
 const UpdateShaderMutation = graphql(`
@@ -92,24 +113,27 @@ interface Props {
 let { data }: Props = $props();
 let shader: ShaderDetailData = $derived(data.shader);
 let versions: ShaderVersionDetail[] = $derived(data.shader.versions.edges.map((e) => e.node));
-let captures: ShaderCapture[] = $derived(data.shader.captures.edges.map((e) => e.node));
 let profiles: ShaderProfile[] = $derived(data.shader.profiles.edges.map((e) => e.node));
 let metadata: ShaderMetadata | null = $derived(data.shader.metadata);
+
+// Captures tab: cursor-paginated with forced shader filter
+const captureList = createCursorList<AdminCaptureNode, CaptureFilters>({
+	initial: () => data.captures,
+	query: AdminCapturesQuery,
+	extract: (d: ResultOf<typeof AdminCapturesQuery>) => d.adminCaptures,
+	pageSize: 24,
+	filters: captureFilterConfig,
+	filterVariable: 'filters',
+	fixedFilters: { shaderSlug: untrack(() => data.shader.slug) },
+	viewMode: 'table'
+});
+
+const sceneOptions = $derived(data.sceneOptions);
 
 /** The effective (latest) version — matches what the backend returns profiles/metadata for */
 let effectiveVersion = $derived(versions.length > 0 ? versions[0] : null);
 
 let versionColumns = $derived(createVersionColumns(effectiveVersion?.version.id));
-const versionTable = createDataTable<ShaderVersionDetail>({
-	get data() {
-		return versions;
-	},
-	get columns() {
-		return versionColumns;
-	},
-	pageSize: false,
-	selection: false
-});
 
 /** Humanize a camelCase or snake_case key into words */
 function humanize(key: string): string {
@@ -296,7 +320,7 @@ function handleLinkKeydown(e: KeyboardEvent) {
             <FolderCard.Tab value="sync">Sync & Editing</FolderCard.Tab>
             <FolderCard.Tab value="details">Details & Versions</FolderCard.Tab>
             <FolderCard.Tab value="captures"
-                >Captures ({captures.length})</FolderCard.Tab
+                >Captures{captureList.totalCount != null ? ` (${captureList.totalCount})` : ''}</FolderCard.Tab
             >
         {/snippet}
 
@@ -723,7 +747,9 @@ function handleLinkKeydown(e: KeyboardEvent) {
                             No versions yet.
                         </p>
                     {:else}
-                        <DataTable table={versionTable} />
+                        <DataView items={versions}>
+                            <Table columns={versionColumns} />
+                        </DataView>
                     {/if}
                 </div>
 
@@ -1160,43 +1186,72 @@ function handleLinkKeydown(e: KeyboardEvent) {
 
         <!-- Tab 3: Captures -->
         <FolderCard.Content value="captures">
-            {#if captures.length === 0}
-                <p class="text-sm text-muted-foreground">No captures yet.</p>
-            {:else}
-                <div class="space-y-3">
-                    <div class="flex justify-end">
-                        <a
-                            href="/admin/captures?shader={shader.slug}"
-                            class="text-sm text-primary hover:underline"
-                        >
-                            View all
-                        </a>
-                    </div>
-                    <ItemGrid items={captures} key={(c: ShaderCapture) => c.id} size="small">
-                        {#snippet card(capture: ShaderCapture)}
-                            <CaptureCard {capture} alt={capture.sceneName ?? capture.sceneId}>
-                                <div class="p-2">
-                                    <div class="flex items-center justify-between">
-                                        <div class="text-sm font-medium">
-                                            {capture.sceneName ?? capture.sceneId}
-                                        </div>
-                                        {#if capture.freshness !== "FRESH"}
-                                            {@const freshness = capture.freshness.toLowerCase() as StatusBadgeStatus}
-                                            <StatusBadge status={freshness} class="px-1.5 text-[10px]">{capture.freshness.toLowerCase()}</StatusBadge>
-                                        {/if}
-                                    </div>
-                                    <div class="text-xs text-muted-foreground">
-                                        {capture.shaderVersion}
-                                        {#if capture.profileDisplayName}
-                                            &middot; {capture.profileDisplayName}
-                                        {/if}
-                                    </div>
-                                </div>
-                            </CaptureCard>
+            <div class="space-y-3">
+                <Toolbar>
+                    <FilterCombobox
+                        placeholder="Scene"
+                        options={sceneOptions}
+                        bind:value={captureList.filters.sceneId}
+                    />
+                    <PopoverMultiSelect
+                        label="Status"
+                        options={captureStatusOptions}
+                        bind:value={captureList.filters.statuses}
+                    />
+                    <PopoverMultiSelect
+                        label="Freshness"
+                        options={captureFreshnessOptions}
+                        bind:value={captureList.filters.freshness}
+                    />
+                    <DateRangeFilter
+                        label="Captured"
+                        bind:after={captureList.filters.capturedAfter}
+                        bind:before={captureList.filters.capturedBefore}
+                    />
+                    <NumericRangeFilter
+                        label="File Size"
+                        unit="MB"
+                        scale={1048576}
+                        step={0.1}
+                        bind:min={captureList.filters.minFileSize}
+                        bind:max={captureList.filters.maxFileSize}
+                    />
+                    <div class="flex-1"></div>
+                    <ViewToggle modes={['table', 'tile']} bind:mode={captureList.viewMode} />
+                </Toolbar>
+
+                <DataView list={captureList}>
+                    {#snippet empty()}
+                        <p class="py-8 text-center text-sm text-muted-foreground">No captures yet.</p>
+                    {/snippet}
+
+                    <Table
+                        columns={captureColumns}
+                        getRowHref={(capture: AdminCaptureNode) => `/admin/captures/${capture.id}`}
+                    >
+                        {#snippet card(capture: AdminCaptureNode)}
+                            <CaptureCard layout="row"
+                                {capture}
+                                title={capture.sceneName ?? 'Unknown scene'}
+                                subtitle={[capture.shaderVersion, capture.profileDisplayName].filter(Boolean).join(' \u00b7 ')}
+                            />
                         {/snippet}
-                    </ItemGrid>
-                </div>
-            {/if}
+                    </Table>
+                    <Grid href={(capture: AdminCaptureNode) => `/admin/captures/${capture.id}`} key={(capture: AdminCaptureNode) => capture.id}>
+                        {#snippet card(capture: AdminCaptureNode)}
+                            <CaptureCard layout="tile"
+                                {capture}
+                                title={capture.sceneName ?? 'Unknown scene'}
+                                subtitle={[capture.shaderVersion, capture.profileDisplayName].filter(Boolean).join(' \u00b7 ')}
+                            />
+                        {/snippet}
+                    </Grid>
+
+                    <Counter noun="capture" />
+
+                    <Pagination style="load-more" />
+                </DataView>
+            </div>
         </FolderCard.Content>
     </FolderCard.Root>
 </div>

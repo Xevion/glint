@@ -1,5 +1,5 @@
 <script lang="ts">
-import { cn } from '$lib/utils.js';
+import { cn } from '$lib/utils';
 import { Tabs as TabsPrimitive } from 'bits-ui';
 import type { Snippet } from 'svelte';
 import { setContext } from 'svelte';

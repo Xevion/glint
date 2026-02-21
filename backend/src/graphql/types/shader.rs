@@ -5,14 +5,17 @@ use crate::graphql::loaders::RequestLoaders;
 use crate::id::{ShaderId, ShaderVersionId, ShaderVersionProfileId};
 use crate::models::capture::CaptureStatus;
 use crate::models::extraction::{ExtractionStatus, ShaderVersionMetadata, ShaderVersionProfile};
-use crate::models::{ExtractionSummary, Shader, ShaderAuthor, ShaderVersion, ShaderVersionDetail};
+use crate::models::{
+    CreateShaderVersionRequest, ExtractionSummary, Shader, ShaderAuthor, ShaderVersion,
+    ShaderVersionDetail, UpdateShaderRequest,
+};
 use crate::repo::capture::{CaptureDistinct, CaptureFilters};
 use crate::repo::{CaptureRepo, ExtractionRepo, ShaderVersionRepo};
 use crate::state::AppState;
 
-use super::capture::CaptureWithContextConnection;
+use super::capture::CaptureWithContextNode;
 use super::connection::{
-    CursorEncodable, CursorPage, PageInfo, decode_cursor_for_query, encode_cursor,
+    Connection, CursorPayload, CursorSource, TotalCount, decode_cursor_for_query,
 };
 use super::taxonomy::{CategoryNode, FeatureNode};
 
@@ -83,7 +86,7 @@ impl ShaderNode {
         ctx: &Context<'_>,
         #[graphql(default = 20, desc = "Number of items to return.")] first: i32,
         #[graphql(desc = "Cursor to paginate after.")] after: Option<String>,
-    ) -> Result<ShaderVersionDetailConnection> {
+    ) -> Result<Connection<ShaderVersionDetailNode>> {
         let state = ctx.data_unchecked::<AppState>();
         let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
         let page = ShaderVersionRepo::list_by_shader_cursor(
@@ -93,7 +96,7 @@ impl ShaderNode {
             decoded_after,
         )
         .await?;
-        Ok(page.into())
+        Ok(page.into_connection())
     }
 
     /// Authors attributed to this shader from upstream platforms.
@@ -195,7 +198,7 @@ impl ShaderNode {
         >,
         #[graphql(default = 20, desc = "Number of items to return.")] first: i32,
         #[graphql(desc = "Cursor to paginate after.")] after: Option<String>,
-    ) -> Result<CaptureWithContextConnection> {
+    ) -> Result<Connection<CaptureWithContextNode>> {
         let state = ctx.data_unchecked::<AppState>();
         let db = state.db();
         let loaders = ctx.data_unchecked::<RequestLoaders>();
@@ -214,7 +217,7 @@ impl ShaderNode {
             shader_id: Some(self.id.clone()),
             version_id: effective_version_id,
             profile_id,
-            status: Some(CaptureStatus::Completed),
+            statuses: Some(vec![CaptureStatus::Completed]),
             scene_active: Some(true),
             ..Default::default()
         };
@@ -226,10 +229,11 @@ impl ShaderNode {
             first,
             decoded_after,
             CaptureDistinct::PerScene,
+            None,
         )
         .await?;
 
-        Ok(page.into())
+        Ok(page.into_connection())
     }
 
     /// Profiles for this shader, optionally filtered to a specific version.
@@ -244,7 +248,7 @@ impl ShaderNode {
         version_id: Option<String>,
         #[graphql(default = 20, desc = "Number of items to return.")] first: i32,
         #[graphql(desc = "Cursor to paginate after.")] after: Option<String>,
-    ) -> Result<ShaderVersionProfileConnection> {
+    ) -> Result<Connection<ShaderVersionProfileNode>> {
         let state = ctx.data_unchecked::<AppState>();
         let db = state.db();
         let loaders = ctx.data_unchecked::<RequestLoaders>();
@@ -268,18 +272,13 @@ impl ShaderNode {
                 decoded_after,
             )
             .await?;
-            Ok(page.into())
+            Ok(page.into_connection())
         } else {
-            Ok(ShaderVersionProfileConnection {
-                edges: vec![],
-                page_info: PageInfo {
-                    has_next_page: false,
-                    has_previous_page: false,
-                    start_cursor: None,
-                    end_cursor: None,
-                },
-                total_count: 0,
-            })
+            Ok(Connection::with_additional_fields(
+                false,
+                false,
+                TotalCount::default(),
+            ))
         }
     }
 
@@ -343,9 +342,9 @@ impl From<Shader> for ShaderNode {
     }
 }
 
-impl CursorEncodable for Shader {
-    fn encode_cursor(&self) -> String {
-        encode_cursor(self.id.as_ref(), self.created_at.timestamp_millis())
+impl CursorSource for Shader {
+    fn to_cursor(&self) -> CursorPayload {
+        CursorPayload::new(self.id.as_ref(), self.created_at.timestamp_millis())
     }
 }
 
@@ -482,18 +481,18 @@ impl From<ShaderVersionProfile> for ShaderVersionProfileNode {
     }
 }
 
-impl CursorEncodable for ShaderVersionDetail {
-    fn encode_cursor(&self) -> String {
-        encode_cursor(
+impl CursorSource for ShaderVersionDetail {
+    fn to_cursor(&self) -> CursorPayload {
+        CursorPayload::new(
             self.version.id.as_ref(),
             self.version.created_at.timestamp_millis(),
         )
     }
 }
 
-impl CursorEncodable for ShaderVersionProfile {
-    fn encode_cursor(&self) -> String {
-        encode_cursor(self.id.as_ref(), self.created_at.timestamp_millis())
+impl CursorSource for ShaderVersionProfile {
+    fn to_cursor(&self) -> CursorPayload {
+        CursorPayload::new(self.id.as_ref(), self.created_at.timestamp_millis())
     }
 }
 
@@ -585,93 +584,6 @@ impl From<crate::models::TrendingShader> for TrendingShaderNode {
     }
 }
 
-/// Relay-style edge for shaders.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ShaderEdge {
-    pub cursor: String,
-    pub node: ShaderNode,
-}
-
-/// Relay-style connection for shaders.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ShaderConnection {
-    pub edges: Vec<ShaderEdge>,
-    pub page_info: PageInfo,
-    pub total_count: i64,
-}
-
-impl From<CursorPage<Shader>> for ShaderConnection {
-    fn from(page: CursorPage<Shader>) -> Self {
-        let (edges, page_info, total_count) = page.into_connection(ShaderNode::from);
-        ShaderConnection {
-            edges: edges
-                .into_iter()
-                .map(|(cursor, node)| ShaderEdge { cursor, node })
-                .collect(),
-            page_info,
-            total_count,
-        }
-    }
-}
-
-/// Relay-style edge for shader version details.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ShaderVersionDetailEdge {
-    pub cursor: String,
-    pub node: ShaderVersionDetailNode,
-}
-
-/// Relay-style connection for shader version details.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ShaderVersionDetailConnection {
-    pub edges: Vec<ShaderVersionDetailEdge>,
-    pub page_info: PageInfo,
-    pub total_count: i64,
-}
-
-impl From<CursorPage<ShaderVersionDetail>> for ShaderVersionDetailConnection {
-    fn from(page: CursorPage<ShaderVersionDetail>) -> Self {
-        let (edges, page_info, total_count) = page.into_connection(ShaderVersionDetailNode::from);
-        ShaderVersionDetailConnection {
-            edges: edges
-                .into_iter()
-                .map(|(cursor, node)| ShaderVersionDetailEdge { cursor, node })
-                .collect(),
-            page_info,
-            total_count,
-        }
-    }
-}
-
-/// Relay-style edge for shader version profiles.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ShaderVersionProfileEdge {
-    pub cursor: String,
-    pub node: ShaderVersionProfileNode,
-}
-
-/// Relay-style connection for shader version profiles.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ShaderVersionProfileConnection {
-    pub edges: Vec<ShaderVersionProfileEdge>,
-    pub page_info: PageInfo,
-    pub total_count: i64,
-}
-
-impl From<CursorPage<ShaderVersionProfile>> for ShaderVersionProfileConnection {
-    fn from(page: CursorPage<ShaderVersionProfile>) -> Self {
-        let (edges, page_info, total_count) = page.into_connection(ShaderVersionProfileNode::from);
-        ShaderVersionProfileConnection {
-            edges: edges
-                .into_iter()
-                .map(|(cursor, node)| ShaderVersionProfileEdge { cursor, node })
-                .collect(),
-            page_info,
-            total_count,
-        }
-    }
-}
-
 /// Input for updating a shader.
 #[derive(async_graphql::InputObject, Debug)]
 pub struct UpdateShaderInput {
@@ -692,4 +604,30 @@ pub struct CreateShaderVersionInput {
     pub modrinth_version_id: Option<String>,
     pub download_url: Option<String>,
     pub file_hash: Option<String>,
+}
+
+impl From<CreateShaderVersionInput> for CreateShaderVersionRequest {
+    fn from(i: CreateShaderVersionInput) -> Self {
+        Self {
+            version: i.version,
+            modrinth_version_id: i.modrinth_version_id,
+            download_url: i.download_url,
+            file_hash: i.file_hash,
+        }
+    }
+}
+
+impl From<UpdateShaderInput> for UpdateShaderRequest {
+    fn from(i: UpdateShaderInput) -> Self {
+        Self {
+            name: i.name,
+            slug: None,
+            description: i.description,
+            modrinth_id: i.modrinth_id,
+            curseforge_id: i.curseforge_id,
+            website_url: i.website_url,
+            preferred_version_id: i.preferred_version_id,
+            capture_enabled: i.capture_enabled,
+        }
+    }
 }

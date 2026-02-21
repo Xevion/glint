@@ -1,6 +1,6 @@
 <script lang="ts">
 import { Slider as SliderPrimitive } from 'bits-ui';
-import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
+import { cn, type WithoutChildrenOrChild } from '$lib/utils';
 
 // bits-ui Slider.RootProps is a discriminated union on `type: 'single' | 'multiple'`.
 // Svelte 5 $props() destructuring loses discriminant narrowing, causing TypeScript to

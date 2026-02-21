@@ -31,9 +31,14 @@ pub struct CaptureFilters {
     pub scene_id: Option<SceneId>,
     pub version_id: Option<ShaderVersionId>,
     pub profile_id: Option<String>,
-    pub status: Option<CaptureStatus>,
+    pub statuses: Option<Vec<CaptureStatus>>,
+    pub freshness: Option<Vec<CaptureFreshness>>,
     pub run_id: Option<CaptureRunId>,
     pub scene_active: Option<bool>,
+    pub captured_after: Option<DateTime<Utc>>,
+    pub captured_before: Option<DateTime<Utc>>,
+    pub min_file_size: Option<i64>,
+    pub max_file_size: Option<i64>,
 }
 
 /// Controls DISTINCT ON behavior for capture list queries.
@@ -352,7 +357,10 @@ impl CaptureRepo {
         pagination: Option<&Page>,
         distinct: CaptureDistinct,
     ) -> AppResult<(Vec<CaptureWithContext>, Option<i64>)> {
-        let status_str = filters.status.map(|s| s.as_str().to_owned());
+        let status_strs: Option<Vec<String>> = filters
+            .statuses
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str().to_owned()).collect());
         let shader_id = filters.shader_id.as_ref().map(AsRef::<str>::as_ref);
         let scene_id = filters.scene_id.as_ref().map(AsRef::<str>::as_ref);
         let version_id = filters.version_id.as_ref().map(AsRef::<str>::as_ref);
@@ -380,7 +388,7 @@ impl CaptureRepo {
                           AND ($3::text IS NULL OR scene_id = $3)
                           AND ($4::text IS NULL OR shader_version_id = $4)
                           AND ($5::text IS NULL OR profile_id = $5)
-                          AND ($6::text IS NULL OR capture_status = $6)
+                          AND ($6::text[] IS NULL OR capture_status = ANY($6))
                           AND ($7::text IS NULL OR run_id = $7)
                           AND ($8::bool IS NULL OR scene_active = $8)
                         ORDER BY captured_at DESC NULLS LAST
@@ -391,7 +399,7 @@ impl CaptureRepo {
                         scene_id,
                         version_id,
                         filters.profile_id,
-                        status_str,
+                        status_strs.as_deref(),
                         run_id,
                         filters.scene_active,
                         page.limit_i64(),
@@ -420,7 +428,7 @@ impl CaptureRepo {
                           AND ($3::text IS NULL OR scene_id = $3)
                           AND ($4::text IS NULL OR shader_version_id = $4)
                           AND ($5::text IS NULL OR profile_id = $5)
-                          AND ($6::text IS NULL OR capture_status = $6)
+                          AND ($6::text[] IS NULL OR capture_status = ANY($6))
                           AND ($7::text IS NULL OR run_id = $7)
                           AND ($8::bool IS NULL OR scene_active = $8)
                         ORDER BY captured_at DESC NULLS LAST
@@ -430,7 +438,7 @@ impl CaptureRepo {
                         scene_id,
                         version_id,
                         filters.profile_id,
-                        status_str,
+                        status_strs.as_deref(),
                         run_id,
                         filters.scene_active,
                     )
@@ -462,7 +470,7 @@ impl CaptureRepo {
                               AND ($3::text IS NULL OR scene_id = $3)
                               AND ($4::text IS NULL OR shader_version_id = $4)
                               AND ($5::text IS NULL OR profile_id = $5)
-                              AND ($6::text IS NULL OR capture_status = $6)
+                              AND ($6::text[] IS NULL OR capture_status = ANY($6))
                               AND ($7::text IS NULL OR run_id = $7)
                               AND ($8::bool IS NULL OR scene_active = $8)
                             ORDER BY shader_id, captured_at DESC NULLS LAST
@@ -475,7 +483,7 @@ impl CaptureRepo {
                         scene_id,
                         version_id,
                         filters.profile_id,
-                        status_str,
+                        status_strs.as_deref(),
                         run_id,
                         filters.scene_active,
                         page.limit_i64(),
@@ -504,7 +512,7 @@ impl CaptureRepo {
                           AND ($3::text IS NULL OR scene_id = $3)
                           AND ($4::text IS NULL OR shader_version_id = $4)
                           AND ($5::text IS NULL OR profile_id = $5)
-                          AND ($6::text IS NULL OR capture_status = $6)
+                          AND ($6::text[] IS NULL OR capture_status = ANY($6))
                           AND ($7::text IS NULL OR run_id = $7)
                           AND ($8::bool IS NULL OR scene_active = $8)
                         ORDER BY shader_id, captured_at DESC NULLS LAST
@@ -514,7 +522,7 @@ impl CaptureRepo {
                         scene_id,
                         version_id,
                         filters.profile_id,
-                        status_str,
+                        status_strs.as_deref(),
                         run_id,
                         filters.scene_active,
                     )
@@ -546,7 +554,7 @@ impl CaptureRepo {
                               AND ($3::text IS NULL OR scene_id = $3)
                               AND ($4::text IS NULL OR shader_version_id = $4)
                               AND ($5::text IS NULL OR profile_id = $5)
-                              AND ($6::text IS NULL OR capture_status = $6)
+                              AND ($6::text[] IS NULL OR capture_status = ANY($6))
                               AND ($7::text IS NULL OR run_id = $7)
                               AND ($8::bool IS NULL OR scene_active = $8)
                             ORDER BY scene_id, captured_at DESC NULLS LAST
@@ -559,7 +567,7 @@ impl CaptureRepo {
                         scene_id,
                         version_id,
                         filters.profile_id,
-                        status_str,
+                        status_strs.as_deref(),
                         run_id,
                         filters.scene_active,
                         page.limit_i64(),
@@ -588,7 +596,7 @@ impl CaptureRepo {
                           AND ($3::text IS NULL OR scene_id = $3)
                           AND ($4::text IS NULL OR shader_version_id = $4)
                           AND ($5::text IS NULL OR profile_id = $5)
-                          AND ($6::text IS NULL OR capture_status = $6)
+                          AND ($6::text[] IS NULL OR capture_status = ANY($6))
                           AND ($7::text IS NULL OR run_id = $7)
                           AND ($8::bool IS NULL OR scene_active = $8)
                         ORDER BY scene_id, captured_at DESC NULLS LAST
@@ -598,7 +606,7 @@ impl CaptureRepo {
                         scene_id,
                         version_id,
                         filters.profile_id,
-                        status_str,
+                        status_strs.as_deref(),
                         run_id,
                         filters.scene_active,
                     )
@@ -620,7 +628,7 @@ impl CaptureRepo {
                       AND ($3::text IS NULL OR scene_id = $3)
                       AND ($4::text IS NULL OR shader_version_id = $4)
                       AND ($5::text IS NULL OR profile_id = $5)
-                      AND ($6::text IS NULL OR capture_status = $6)
+                      AND ($6::text[] IS NULL OR capture_status = ANY($6))
                       AND ($7::text IS NULL OR run_id = $7)
                       AND ($8::bool IS NULL OR scene_active = $8)
                     "#,
@@ -629,7 +637,7 @@ impl CaptureRepo {
                     scene_id,
                     version_id,
                     filters.profile_id,
-                    status_str,
+                    status_strs.as_deref(),
                     run_id,
                     filters.scene_active,
                 )
@@ -645,7 +653,7 @@ impl CaptureRepo {
                       AND ($3::text IS NULL OR scene_id = $3)
                       AND ($4::text IS NULL OR shader_version_id = $4)
                       AND ($5::text IS NULL OR profile_id = $5)
-                      AND ($6::text IS NULL OR capture_status = $6)
+                      AND ($6::text[] IS NULL OR capture_status = ANY($6))
                       AND ($7::text IS NULL OR run_id = $7)
                       AND ($8::bool IS NULL OR scene_active = $8)
                     "#,
@@ -654,7 +662,7 @@ impl CaptureRepo {
                     scene_id,
                     version_id,
                     filters.profile_id,
-                    status_str,
+                    status_strs.as_deref(),
                     run_id,
                     filters.scene_active,
                 )
@@ -670,7 +678,7 @@ impl CaptureRepo {
                       AND ($3::text IS NULL OR scene_id = $3)
                       AND ($4::text IS NULL OR shader_version_id = $4)
                       AND ($5::text IS NULL OR profile_id = $5)
-                      AND ($6::text IS NULL OR capture_status = $6)
+                      AND ($6::text[] IS NULL OR capture_status = ANY($6))
                       AND ($7::text IS NULL OR run_id = $7)
                       AND ($8::bool IS NULL OR scene_active = $8)
                     "#,
@@ -679,7 +687,7 @@ impl CaptureRepo {
                     scene_id,
                     version_id,
                     filters.profile_id,
-                    status_str,
+                    status_strs.as_deref(),
                     run_id,
                     filters.scene_active,
                 )
@@ -697,8 +705,11 @@ impl CaptureRepo {
     }
 
     /// Cursor-paginated list of captures with context, supporting flexible filtering and deduplication.
-    /// Ordered by `captured_at DESC NULLS LAST, id DESC`.
+    /// Default order: `captured_at DESC NULLS LAST, id DESC`.
     /// Keyset cursor on `(captured_at, id)`.
+    ///
+    /// Supported sort values (prefix `-` for descending):
+    /// `capturedAt` (default DESC), `fileSizeBytes`, `shaderName`.
     #[instrument(skip(db, filters), level = "debug")]
     pub async fn list_with_context_cursor(
         db: &DbPool,
@@ -706,6 +717,7 @@ impl CaptureRepo {
         first: i32,
         after: Option<(DateTime<Utc>, String)>,
         distinct: CaptureDistinct,
+        sort: Option<&str>,
     ) -> AppResult<CursorPage<CaptureWithContext>> {
         use sqlx::QueryBuilder;
 
@@ -741,9 +753,29 @@ impl CaptureRepo {
                 qb.push(" AND profile_id = ");
                 qb.push_bind(pid.clone());
             }
-            if let Some(status) = filters.status {
-                qb.push(" AND capture_status = ");
-                qb.push_bind(status.as_str().to_owned());
+            if let Some(ref statuses) = filters.statuses
+                && !statuses.is_empty()
+            {
+                qb.push(" AND capture_status IN (");
+                {
+                    let mut separated = qb.separated(", ");
+                    for s in statuses {
+                        separated.push_bind(s.as_str().to_owned());
+                    }
+                }
+                qb.push(")");
+            }
+            if let Some(ref freshness) = filters.freshness
+                && !freshness.is_empty()
+            {
+                qb.push(" AND freshness IN (");
+                {
+                    let mut separated = qb.separated(", ");
+                    for f in freshness {
+                        separated.push_bind(f.as_str().to_owned());
+                    }
+                }
+                qb.push(")");
             }
             if let Some(ref rid) = filters.run_id {
                 qb.push(" AND run_id = ");
@@ -753,6 +785,37 @@ impl CaptureRepo {
                 qb.push(" AND scene_active = ");
                 qb.push_bind(active);
             }
+            if let Some(ref after) = filters.captured_after {
+                qb.push(" AND captured_at >= ");
+                qb.push_bind(*after);
+            }
+            if let Some(ref before) = filters.captured_before {
+                qb.push(" AND captured_at <= ");
+                qb.push_bind(*before);
+            }
+            if let Some(size) = filters.min_file_size {
+                qb.push(" AND file_size_bytes >= ");
+                qb.push_bind(size);
+            }
+            if let Some(size) = filters.max_file_size {
+                qb.push(" AND file_size_bytes <= ");
+                qb.push_bind(size);
+            }
+        };
+
+        // Sort clause for the main (non-distinct) query.
+        // Prefix `-` = descending. Default: `-capturedAt`.
+        let push_sort = |qb: &mut QueryBuilder<'_, sqlx::Postgres>| {
+            let sort_value = sort.unwrap_or("-capturedAt");
+            match sort_value {
+                "capturedAt" => qb.push(" ORDER BY captured_at ASC, id ASC"),
+                "fileSizeBytes" => qb.push(" ORDER BY file_size_bytes ASC NULLS LAST, id ASC"),
+                "-fileSizeBytes" => qb.push(" ORDER BY file_size_bytes DESC NULLS LAST, id DESC"),
+                "shaderName" => qb.push(" ORDER BY shader_name ASC, id ASC"),
+                "-shaderName" => qb.push(" ORDER BY shader_name DESC, id DESC"),
+                // Default: most recent first
+                _ => qb.push(" ORDER BY captured_at DESC NULLS LAST, id DESC"),
+            };
         };
 
         let items: Vec<CaptureWithContext> = match distinct {
@@ -770,7 +833,8 @@ impl CaptureRepo {
                     qb.push(")");
                 }
 
-                qb.push(" ORDER BY captured_at DESC NULLS LAST, id DESC LIMIT ");
+                push_sort(&mut qb);
+                qb.push(" LIMIT ");
                 qb.push_bind(limit + 1);
 
                 qb.build_query_as()

@@ -1,46 +1,13 @@
-use async_graphql::{Enum, SimpleObject};
+use async_graphql::{InputObject, SimpleObject};
 use chrono::{DateTime, Utc};
 
 use crate::id::{
     CaptureId, CaptureRunId, SceneId, ScenePresetId, ShaderVersionId, ShaderVersionProfileId,
 };
 use crate::models::{CaptureFreshness, CaptureListItem, CaptureStatus, CaptureWithContext};
+use crate::repo::capture::CaptureFilters;
 
-use super::connection::{CursorEncodable, CursorPage, PageInfo, encode_cursor};
-
-#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
-pub enum CaptureStatusEnum {
-    Uploading,
-    Completed,
-    Failed,
-}
-
-impl From<CaptureStatus> for CaptureStatusEnum {
-    fn from(s: CaptureStatus) -> Self {
-        match s {
-            CaptureStatus::Uploading => Self::Uploading,
-            CaptureStatus::Completed => Self::Completed,
-            CaptureStatus::Failed => Self::Failed,
-        }
-    }
-}
-
-#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
-pub enum CaptureFreshnessEnum {
-    Fresh,
-    Stale,
-    Superseded,
-}
-
-impl From<CaptureFreshness> for CaptureFreshnessEnum {
-    fn from(f: CaptureFreshness) -> Self {
-        match f {
-            CaptureFreshness::Fresh => Self::Fresh,
-            CaptureFreshness::Stale => Self::Stale,
-            CaptureFreshness::Superseded => Self::Superseded,
-        }
-    }
-}
+use super::connection::{CursorPayload, CursorSource};
 
 /// Lightweight capture for public list endpoints.
 #[derive(SimpleObject, Debug, Clone)]
@@ -48,7 +15,7 @@ pub struct CaptureNode {
     pub id: CaptureId,
     pub shader_version_id: ShaderVersionId,
     pub scene_id: SceneId,
-    pub status: CaptureStatusEnum,
+    pub status: CaptureStatus,
     pub profile_id: Option<ShaderVersionProfileId>,
     pub image_path: String,
     pub thumbhash: Option<String>,
@@ -63,7 +30,7 @@ impl From<CaptureListItem> for CaptureNode {
             id: c.id,
             shader_version_id: c.shader_version_id,
             scene_id: c.scene_id,
-            status: c.status.into(),
+            status: c.status,
             profile_id: c.profile_id,
             image_path: c.image_path,
             thumbhash: c.thumbhash,
@@ -99,7 +66,7 @@ pub struct CaptureWithContextNode {
     pub preset_id: Option<ScenePresetId>,
     pub preset_name: Option<String>,
     pub preset_slug: Option<String>,
-    pub freshness: CaptureFreshnessEnum,
+    pub freshness: CaptureFreshness,
 }
 
 impl From<CaptureWithContext> for CaptureWithContextNode {
@@ -127,14 +94,14 @@ impl From<CaptureWithContext> for CaptureWithContextNode {
             preset_id: c.preset_id,
             preset_name: c.preset_name,
             preset_slug: c.preset_slug,
-            freshness: c.freshness.into(),
+            freshness: c.freshness,
         }
     }
 }
 
-impl CursorEncodable for CaptureListItem {
-    fn encode_cursor(&self) -> String {
-        encode_cursor(
+impl CursorSource for CaptureListItem {
+    fn to_cursor(&self) -> CursorPayload {
+        CursorPayload::new(
             self.id.as_ref(),
             self.captured_at
                 .map(|dt| dt.timestamp_millis())
@@ -143,38 +110,9 @@ impl CursorEncodable for CaptureListItem {
     }
 }
 
-/// Relay-style edge for captures.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct CaptureEdge {
-    pub cursor: String,
-    pub node: CaptureNode,
-}
-
-/// Relay-style connection for captures.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct CaptureConnection {
-    pub edges: Vec<CaptureEdge>,
-    pub page_info: PageInfo,
-    pub total_count: i64,
-}
-
-impl From<CursorPage<CaptureListItem>> for CaptureConnection {
-    fn from(page: CursorPage<CaptureListItem>) -> Self {
-        let (edges, page_info, total_count) = page.into_connection(CaptureNode::from);
-        CaptureConnection {
-            edges: edges
-                .into_iter()
-                .map(|(cursor, node)| CaptureEdge { cursor, node })
-                .collect(),
-            page_info,
-            total_count,
-        }
-    }
-}
-
-impl CursorEncodable for CaptureWithContext {
-    fn encode_cursor(&self) -> String {
-        encode_cursor(
+impl CursorSource for CaptureWithContext {
+    fn to_cursor(&self) -> CursorPayload {
+        CursorPayload::new(
             self.id.as_ref(),
             self.captured_at
                 .map(|dt| dt.timestamp_millis())
@@ -183,31 +121,39 @@ impl CursorEncodable for CaptureWithContext {
     }
 }
 
-/// Relay-style edge for captures with context.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct CaptureWithContextEdge {
-    pub cursor: String,
-    pub node: CaptureWithContextNode,
+/// Filters for the admin_captures query.
+#[derive(InputObject, Default)]
+pub struct AdminCaptureFiltersInput {
+    /// Filter by shader slug.
+    pub shader_slug: Option<String>,
+    /// Filter by scene ID.
+    pub scene_id: Option<String>,
+    /// Filter by capture status (OR logic — matches any selected status).
+    pub statuses: Option<Vec<CaptureStatus>>,
+    /// Filter by freshness (OR logic — matches any selected freshness).
+    pub freshness: Option<Vec<CaptureFreshness>>,
+    /// Only captures after this date.
+    pub captured_after: Option<DateTime<Utc>>,
+    /// Only captures before this date.
+    pub captured_before: Option<DateTime<Utc>>,
+    /// Minimum file size in bytes.
+    pub min_file_size: Option<i64>,
+    /// Maximum file size in bytes.
+    pub max_file_size: Option<i64>,
 }
 
-/// Relay-style connection for captures with context.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct CaptureWithContextConnection {
-    pub edges: Vec<CaptureWithContextEdge>,
-    pub page_info: PageInfo,
-    pub total_count: i64,
-}
-
-impl From<CursorPage<CaptureWithContext>> for CaptureWithContextConnection {
-    fn from(page: CursorPage<CaptureWithContext>) -> Self {
-        let (edges, page_info, total_count) = page.into_connection(CaptureWithContextNode::from);
-        CaptureWithContextConnection {
-            edges: edges
-                .into_iter()
-                .map(|(cursor, node)| CaptureWithContextEdge { cursor, node })
-                .collect(),
-            page_info,
-            total_count,
+impl From<AdminCaptureFiltersInput> for CaptureFilters {
+    fn from(f: AdminCaptureFiltersInput) -> Self {
+        Self {
+            shader_slug: f.shader_slug,
+            scene_id: f.scene_id.map(SceneId::from),
+            statuses: f.statuses,
+            freshness: f.freshness,
+            captured_after: f.captured_after,
+            captured_before: f.captured_before,
+            min_file_size: f.min_file_size,
+            max_file_size: f.max_file_size,
+            ..Default::default()
         }
     }
 }

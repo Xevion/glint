@@ -188,7 +188,7 @@ async fn list_shader_captures(
         shader_id: Some(shader.id),
         version_id: query.version_id.map(ShaderVersionId::from),
         profile_id: query.profile_id.map(|id| id.0),
-        status: Some(CaptureStatus::Completed),
+        statuses: Some(vec![CaptureStatus::Completed]),
         scene_active: Some(true),
         ..Default::default()
     };
@@ -282,7 +282,7 @@ async fn get_shader(
         shader_id: Some(shader.id.clone()),
         version_id: effective_version_id.clone(),
         profile_id: query.profile_id.map(|id| id.0),
-        status: Some(CaptureStatus::Completed),
+        statuses: Some(vec![CaptureStatus::Completed]),
         scene_active: Some(true),
         ..Default::default()
     };

@@ -10,38 +10,98 @@ File-based routing with SvelteKit conventions:
 
 ```
 src/routes/
-├── +layout.svelte       # Root layout (nav, sidebar, theme)
-├── +page.svelte          # Home page
-├── +error.svelte         # Global error boundary
+├── +layout.svelte        # Root layout (nav, sidebar, theme)
+├── +layout.server.ts     # Server-side layout load (auth, request context)
+├── +page.svelte           # Home page
+├── +error.svelte          # Global error boundary
 ├── shaders/
-│   ├── +page.svelte      # Shader listing
-│   ├── +page.ts           # Load function
-│   └── [id]/
-│       ├── +page.svelte  # Shader detail
+│   ├── +page.svelte       # Shader listing
+│   ├── +page.ts            # Load function
+│   ├── queries.ts          # GraphQL queries + derived types
+│   └── [slug]/
+│       ├── +page.svelte   # Shader detail
 │       └── +page.ts
-└── admin/                # Admin routes
+├── scenes/                # Scene browsing
+├── compare/               # Shader comparison
+├── auth/                  # Auth callback
+├── login/                 # Login page
+└── admin/                 # Admin routes (CRUD for all resources)
 ```
 
-- Load functions in `+page.ts` (universal, not server-side)
-- No `+page.server.ts` — all data fetching goes through the API client
+- Load functions in `+page.ts` (universal loads, not server-side)
+- `+layout.server.ts` exists at root for server-only concerns (auth, request context)
+- No `+page.server.ts` — all data fetching goes through GraphQL or REST clients
 - Load functions receive SvelteKit's `fetch` for SSR compatibility
 
 ### Data Fetching
 
+Most pages use **GraphQL** via the `query()` wrapper. Admin pages that need mutations use the **REST client**.
+
+**GraphQL (public pages, read-heavy):**
+
 ```typescript
-export const load: PageLoad = async ({ fetch }) => {
-    const api = createApiClient(fetch);
-    const result = await api.shaders.list();
+import { createGraphQLClient, query } from '$lib/graphql';
+import { BrowseShadersQuery } from './queries';
+
+export const load: PageLoad = async ({ fetch, depends }) => {
+    depends('glint:shaders');
+    const client = createGraphQLClient(fetch);
+    const result = await query(client, BrowseShadersQuery, { first: 24 });
     return result.match({
-        Ok: (shaders) => ({ shaders }),
-        Err: () => ({ shaders: [] }),
+        Ok: (data) => ({ shaders: data.shaders, error: null }),
+        Err: (error) => ({ shaders: { edges: [], pageInfo: { hasNextPage: false }, totalCount: 0 }, error: error.message }),
     });
 };
 ```
 
-- Pass `fetch` from load context to `createApiClient` for SSR
+**REST (admin CRUD, mutations, mod-facing):**
+
+```typescript
+import { createApiClient } from '$lib/api';
+
+export const load: PageLoad = async ({ fetch, depends }) => {
+    depends('glint:admin:users');
+    const api = createApiClient(fetch);
+    const result = await api.admin.listUsers();
+    return result.match({
+        Ok: (users) => ({ users }),
+        Err: () => ({ users: [] }),
+    });
+};
+```
+
+- Pass `fetch` from load context for SSR compatibility
 - Handle errors in load functions — return fallback data, don't throw
 - Component receives data via `let { data } = $props()`
+
+### Data Invalidation
+
+After mutations (saves, deletes, status changes), use **targeted `invalidate(key)`** to re-run the relevant load function. Never use `invalidateAll()` — it re-runs every load function on the page including layouts, which is wasteful and imprecise.
+
+**Load functions must declare dependency keys via `depends()`:**
+
+```typescript
+export const load: PageLoad = async ({ params, fetch, depends }) => {
+    depends(`glint:admin:scene:${params.id}`);
+    // ...
+};
+```
+
+**Components invalidate by key after mutations:**
+
+```typescript
+import { invalidate } from '$app/navigation';
+
+const result = await api.admin.updateScene(scene.id, request);
+result.match({
+    Ok: () => void invalidate(`glint:admin:scene:${scene.id}`),
+    Err: (err) => toast.error(err.message),
+});
+```
+
+**Key naming convention:** `glint:<scope>:<resource>:<id?>` — e.g., `glint:shaders`, `glint:admin:scene:${id}`, `glint:admin:backgrounds`.
+
+**Why not `invalidateAll()`?** It invalidates every `depends()` key on the page, including parent layouts. A scene detail page mutation shouldn't re-run the admin layout's load function or any other unrelated data fetching.
 
 ### Valid exports from `+page.ts` / `+layout.ts`
 
@@ -90,6 +150,8 @@ import type { AdminShaderData } from './queries';
 
 `export type` is erased at compile time and will not cause a runtime error, but placing types that depend on query constants in `+page.ts` is fragile — keep them in `queries.ts` alongside the query they're derived from.
 
+**The `_` prefix escape hatch:** SvelteKit allows exports starting with `_` from route modules (see `_anything` above). Some pages export queries or mappers prefixed with `_` (e.g., `export const _ShaderDetailQuery`, `export function _toShaderDetail`) when co-located files need access. This works but is less clean than a separate `queries.ts` — prefer extraction when the page grows.
+
 ## Error Handling
 
 - **API layer**: `true-myth` Result pattern with `.match({ Ok, Err })` for exhaustive handling
@@ -107,16 +169,27 @@ return result.match({
 });
 ```
 
-**Detail pages** — throw SvelteKit `error()` for the error page:
+**Detail pages** — throw structured errors via `pageError()` or `err.throw()`:
 ```typescript
+import { ApiErrorType, pageError } from '$lib/api/errors';
+
 return result.match({
-    Ok: (item) => ({ item }),
+    Ok: (data) => {
+        if (!data.item) pageError(404, `Item "${params.slug}" not found`);
+        return { item: data.item };
+    },
     Err: (err) => {
-        if (err.type === ApiErrorType.NotFound) error(404, { message: 'Not found' });
-        error(500, { message: 'Failed to load data' });
+        if (err.type === ApiErrorType.NotFound) {
+            pageError(404, `Item "${params.slug}" not found`);
+        }
+        return err.throw();
     },
 });
 ```
+
+- `pageError(status, message)` — for non-API errors (invalid params, missing data). Logs and throws a SvelteKit error with enriched `App.Error` fields (errorId, timestamp, source)
+- `err.throw()` — on `ApiError` instances. Propagates the status code, error code, and detail from the backend with the same enriched fields
+- Never use raw `error()` from SvelteKit directly — always use these helpers for consistent error metadata
 
 ```svelte
 <svelte:boundary onerror={(e) => console.error(e)}>
@@ -211,7 +284,7 @@ Using `goto()` on a `<div>` or `<button>` click handler breaks ALL of these. Nev
 - **Form submission redirects** — navigating after a successful save/delete
 - **URL state sync** — updating search params from inputs, dropdowns, or filters
 - **Programmatic redirects** — auth guards, error recovery, post-action navigation
-- **`invalidateAll()`** — reloading current page data (use this instead of `goto(currentUrl)`)
+- **`invalidate(key)`** — reloading current page data via targeted dependency key
 
 ### Card components with nested interactive elements
 
@@ -245,8 +318,8 @@ Design components that might navigate to accept an `href` prop and render an `<a
 
 ### Reference implementations
 
-- `CompactRow` (`$lib/components/item-grid/compact-row.svelte`) — renders `<a>`, `<button>`, or `<div>` based on props
-- `CaptureCard` (`$lib/components/admin/CaptureCard.svelte`) — entire card wrapped in `<a>`
+- `CompactRow` (`$lib/components/CompactRow.svelte`) — renders `<a>`, `<button>`, or `<div>` based on props
+- `CaptureCard` (`$lib/components/CaptureCard.svelte`) — row or tile layout via `layout` prop
 - `DataTable` (`$lib/components/data-table/data-table.svelte`) — `getRowHref` for row-level navigation
 - `ShaderCard` (`$lib/components/ShaderCard.svelte`) — stretched-link pattern for cards with nested interactive elements
 
@@ -254,7 +327,6 @@ Design components that might navigate to accept an `href` prop and render an `<a
 
 - **Tailwind utility classes** directly on elements
 - **`cn()` helper** (clsx + tailwind-merge) for conditional class composition
-- **tailwind-variants** for component variants (buttons, badges, cards)
 - **Dark mode** via `dark:` prefix with class-based strategy
 - No CSS modules, no scoped `<style>` blocks except where Tailwind can't reach
 
@@ -313,32 +385,36 @@ Endpoint classes per resource, aggregated by the client factory:
 
 ```typescript
 const api = createApiClient(fetch);
-const result = await api.shaders.list();    // Result<Shader[], ApiError>
-const shader = await api.shaders.get(id);   // Result<Shader, ApiError>
+const users = await api.admin.listUsers();       // Result<User[], ApiError>
+const shader = await api.admin.getShader(id);    // Result<AdminShader, ApiError>
+const me = await api.user.me();                  // Result<User, ApiError>
+const poll = await api.device.poll(code);        // Result<DevicePollResponse, ApiError>
 ```
+
+Available resources: `admin`, `backgrounds`, `adopt`, `device`, `runs`, `user`.
 
 - All methods return `Result<T, ApiError>` — never throw
 - JSON requests/responses by default
 - SSR-compatible via `fetch` parameter injection
-- Used for admin CRUD, mutations, and mod-facing endpoints
+- A default client instance is available for client-side use: `import { api } from '$lib/api'`
+- Used for admin CRUD, mutations, and mod-facing endpoints — public read pages use GraphQL
 
 ## GraphQL Client
 
 Public data fetching uses GraphQL via urql + gql-tada (`$lib/graphql/`):
 
 ```typescript
-import { graphql } from '$lib/graphql/tada';
-import { createGraphQLClient } from '$lib/graphql/client';
+import { createGraphQLClient, graphql, query, mutation } from '$lib/graphql';
 
 const ShadersQuery = graphql(`query Shaders { shaders { id name slug } }`);
 const client = createGraphQLClient(fetch);
-const result = await client.query(ShadersQuery, {});
+const result = await query(client, ShadersQuery, {});  // Result<Data, ApiError>
 ```
 
+- **`query(client, doc, vars)`** and **`mutation(client, doc, vars)`** — wrapper functions that return `Result<Data, ApiError>`, matching the REST client's error pattern. Use these instead of `client.query()` directly
 - **gql-tada** provides compile-time type safety — query results are fully typed from the schema
 - **Schema auto-generated** from backend async-graphql types (`just bindings` or `just check`)
 - **Subscriptions** via graphql-ws for real-time updates (e.g., capture progress)
-- **Result pattern** — queries are wrapped in `Result<T, ApiError>` matching the REST client
 - **When to use**: Prefer GraphQL for public read-heavy pages (shader listings, scene browsing, comparisons). Use REST for admin CRUD, mutations, and mod API endpoints
 
 ## Admin Data Tables
@@ -348,27 +424,41 @@ Admin list pages use TanStack Table via `$lib/components/data-table/`:
 ```typescript
 // columns.ts — define columns per resource
 import { textColumn, timeColumn, imageColumn } from '$lib/components/data-table/columns';
+import { Sparkles } from '@lucide/svelte';
 
 export const columns = [
-    imageColumn<Shader>({ accessorKey: 'image_path', header: '' }),
-    textColumn<Shader>({ accessorKey: 'name', header: 'Name' }),
-    timeColumn<Shader>({ accessorKey: 'updated_at', header: 'Updated' }),
+    imageColumn<Shader>('icon_url', { fallback: Sparkles }),
+    textColumn<Shader>('name', 'Name'),
+    textColumn<Shader>('slug', 'Slug', { sortable: false }),
+    timeColumn<Shader>('updated_at', 'Updated'),
 ];
 ```
 
+Column helpers use positional arguments: `textColumn(accessorKey, header, opts?)`, `timeColumn(accessorKey, header)`, `imageColumn(accessorKey, opts?)`.
+
 - Column definitions in co-located `columns.ts` files alongside the page
 - Custom cell renderers as separate `.svelte` components (e.g., `shader-name-cell.svelte`)
-- `createTable()` composable in `.svelte.ts` for table state management
-- Pagination, sorting, and column visibility built in
+- `createDataTable()` composable in `.svelte.ts` for table state management
+- Pagination, sorting, filtering, row selection, and column visibility built in — pass `false` to disable any feature
 
-## Admin Form Composable
+## Admin Action Composable
 
-Detail pages use `createAdminForm()` from `$lib/components/admin/admin-form.svelte.ts`:
+One-off admin actions (delete, disable, reactivate) use `createAction()` from `$lib/components/action-form.svelte.ts`:
 
-- Reactive field extraction from source entity via `FieldExtractor<T>` functions
-- Dirty tracking — only changed fields are sent on save
-- Automatic field reset when the source entity changes
-- Wraps save actions in `Result<T, ApiError>` with automatic `invalidateAll()` on success
+```typescript
+import { createAction } from '$lib/components/action-form.svelte';
+
+const deleteAction = createAction({
+    action: () => api.admin.deleteShader(shader.id),
+    onSuccess: () => void goto('/admin/shaders'),
+    setError: (msg) => (form.error = msg),
+});
+// Template: disabled={deleteAction.loading}
+// Template: onclick={deleteAction.execute}
+```
+
+- Manages loading state and delegates error display to a shared setter
+- Wraps the action in `Result<T, ApiError>` matching — calls `onSuccess` on `Ok`, `setError` on `Err`
 
 ## Admin Navigation
 
@@ -379,12 +469,24 @@ Admin pages use `Breadcrumb` (not the deleted `AdminPageHeader`/`AdminDetailHead
     { label: 'Shaders', href: '/admin/shaders' },
     { label: shader.name },
 ]} />
+```
 
 ## Logging
 
-- Use `console.warn` / `console.error` for issues that need developer attention
-- No logging framework — browser devtools are sufficient for a SvelteKit app
-- Avoid `console.log` in committed code (use only for temporary debugging)
+Structured logging via [LogTape](https://logtape.org/) (`@logtape/logtape`):
+
+```typescript
+import { getLogger } from '@logtape/logtape';
+
+const logger = getLogger(['ssr', 'api']);
+logger.info('Fetched {count} shaders', { count: shaders.length });
+logger.error('{errorId} [{status}] {message}', { errorId, status, message });
+```
+
+- **Server** (`logger.server.ts`): JSON output in production, console in development. Configurable via `LOG_LEVEL` and `LOG_JSON` env vars. Injects request context (request ID) into log entries
+- **Client** (`logger.client.ts`): Console sink, `debug` level in dev, `warning` in production
+- **Category-based loggers**: Use descriptive categories like `['ssr', 'api']`, `['ssr', 'api', 'error']`
+- Avoid `console.log` / `console.warn` / `console.error` in committed code — use `getLogger()` instead
 
 ## Testing
 

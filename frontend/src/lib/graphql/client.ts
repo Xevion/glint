@@ -1,9 +1,9 @@
-import { Client, fetchExchange, type AnyVariables, type RequestPolicy } from '@urql/core';
-import { cacheExchange } from '@urql/exchange-graphcache';
-import type { TypedDocumentNode } from '@graphql-typed-document-node/core';
-import { Result } from 'true-myth';
 import { ApiError, ApiErrorType } from '$lib/api/errors';
+import type { TypedDocumentNode } from '@graphql-typed-document-node/core';
+import { type AnyVariables, Client, type RequestPolicy, fetchExchange } from '@urql/core';
 import type { CombinedError } from '@urql/core';
+import { cacheExchange } from '@urql/exchange-graphcache';
+import { Result } from 'true-myth';
 
 export function createGraphQLClient(fetchFn: typeof fetch = fetch): Client {
 	return new Client({

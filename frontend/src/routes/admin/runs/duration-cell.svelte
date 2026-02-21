@@ -1,12 +1,15 @@
 <script lang="ts">
-import { formatElapsedDuration } from '$lib/utils/format';
+import { formatDuration } from '$lib/utils/format';
 
 interface Props {
-	started_at: string;
-	completed_at?: string | null;
+	durationSecs: number | null;
 }
 
-let { started_at, completed_at }: Props = $props();
+let { durationSecs }: Props = $props();
 </script>
 
-{formatElapsedDuration({ started_at, completed_at })}
+{#if durationSecs != null}
+	{formatDuration(durationSecs * 1000)}
+{:else}
+	In progress
+{/if}

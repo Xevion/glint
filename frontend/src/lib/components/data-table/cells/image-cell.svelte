@@ -8,4 +8,4 @@ interface Props {
 let { url, sizeClass, roundedClass }: Props = $props();
 </script>
 
-<img src={url} alt="" loading="lazy" class="{sizeClass} {roundedClass} shrink-0 object-cover" />
+<img src={url} alt="" loading="lazy" class="{sizeClass} {roundedClass} shrink-0 object-cover pointer-events-none" />

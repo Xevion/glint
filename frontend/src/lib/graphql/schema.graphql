@@ -1,3 +1,67 @@
+"""
+Filters for the admin_captures query.
+"""
+input AdminCaptureFiltersInput {
+	"""
+	Filter by shader slug.
+	"""
+	shaderSlug: String
+	"""
+	Filter by scene ID.
+	"""
+	sceneId: String
+	"""
+	Filter by capture status (OR logic — matches any selected status).
+	"""
+	statuses: [CaptureStatus!]
+	"""
+	Filter by freshness (OR logic — matches any selected freshness).
+	"""
+	freshness: [CaptureFreshness!]
+	"""
+	Only captures after this date.
+	"""
+	capturedAfter: DateTime
+	"""
+	Only captures before this date.
+	"""
+	capturedBefore: DateTime
+	"""
+	Minimum file size in bytes.
+	"""
+	minFileSize: Int
+	"""
+	Maximum file size in bytes.
+	"""
+	maxFileSize: Int
+}
+
+"""
+Filters for listing capture runs.
+"""
+input AdminRunFiltersInput {
+	"""
+	Filter by run status (OR logic).
+	"""
+	statuses: [CaptureRunStatus!]
+	"""
+	Only runs started after this date.
+	"""
+	startedAfter: DateTime
+	"""
+	Only runs started before this date.
+	"""
+	startedBefore: DateTime
+	"""
+	Minimum duration in seconds (only applies to completed runs).
+	"""
+	minDurationSecs: Int
+	"""
+	Maximum duration in seconds (only applies to completed runs).
+	"""
+	maxDurationSecs: Int
+}
+
 scalar BackgroundId
 
 type BackgroundNode {
@@ -23,25 +87,20 @@ type CaptureCompletedEvent {
 }
 
 """
-Relay-style connection for captures.
+Freshness status of a capture relative to current versions and newer captures
 """
-type CaptureConnection {
-	edges: [CaptureEdge!]!
-	pageInfo: PageInfo!
-	totalCount: Int!
-}
-
-"""
-Relay-style edge for captures.
-"""
-type CaptureEdge {
-	cursor: String!
-	node: CaptureNode!
-}
-
-enum CaptureFreshnessEnum {
+enum CaptureFreshness {
+	"""
+	Latest capture for its target, scene version and preset match current
+	"""
 	FRESH
+	"""
+	Latest capture for its target, but scene version or preset is outdated
+	"""
 	STALE
+	"""
+	A newer capture exists for this target — this capture is obsolete
+	"""
 	SUPERSEDED
 }
 
@@ -65,13 +124,39 @@ type CaptureNode {
 	id: CaptureId!
 	shaderVersionId: ShaderVersionId!
 	sceneId: SceneId!
-	status: CaptureStatusEnum!
+	status: CaptureStatus!
 	profileId: ShaderVersionProfileId
 	imagePath: String!
 	thumbhash: String
 	capturedAt: DateTime
 	resolutionWidth: Int
 	resolutionHeight: Int
+}
+
+type CaptureNodeConnection {
+	"""
+	Information to aid in pagination.
+	"""
+	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [CaptureNodeEdge!]!
+	totalCount: Int!
+}
+
+"""
+An edge in a connection.
+"""
+type CaptureNodeEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: CaptureNode!
+	"""
+	A cursor for use in pagination
+	"""
+	cursor: String!
 }
 
 scalar CaptureRunId
@@ -88,7 +173,7 @@ type CaptureRunItemNode {
 	profileName: String
 	profileDisplayName: String
 	presetId: ScenePresetId
-	status: CaptureRunItemStatusEnum!
+	status: CaptureRunItemStatus!
 	captureId: CaptureId
 	errorMessage: String
 	errorLog: String
@@ -103,12 +188,60 @@ type CaptureRunItemNode {
 	thumbhash: String
 }
 
-enum CaptureRunItemStatusEnum {
+enum CaptureRunItemStatus {
 	PENDING
 	RUNNING
 	COMPLETED
 	FAILED
 	SKIPPED
+}
+
+"""
+Lightweight capture run node for list queries (no embedded items).
+"""
+type CaptureRunListNode {
+	id: CaptureRunId!
+	agentId: String
+	startedAt: DateTime!
+	completedAt: DateTime
+	status: CaptureRunStatus!
+	totalItems: Int!
+	completedItems: Int!
+	failedItems: Int!
+	skippedItems: Int!
+	resolutionWidth: Int!
+	resolutionHeight: Int!
+	imageFormat: String!
+	"""
+	Duration in seconds (null if the run hasn't completed).
+	"""
+	durationSecs: Float
+}
+
+type CaptureRunListNodeConnection {
+	"""
+	Information to aid in pagination.
+	"""
+	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [CaptureRunListNodeEdge!]!
+	totalCount: Int!
+}
+
+"""
+An edge in a connection.
+"""
+type CaptureRunListNodeEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: CaptureRunListNode!
+	"""
+	A cursor for use in pagination
+	"""
+	cursor: String!
 }
 
 """
@@ -119,7 +252,7 @@ type CaptureRunNode {
 	agentId: String
 	startedAt: DateTime!
 	completedAt: DateTime
-	status: CaptureRunStatusEnum!
+	status: CaptureRunStatus!
 	totalItems: Int!
 	completedItems: Int!
 	failedItems: Int!
@@ -130,7 +263,7 @@ type CaptureRunNode {
 	items: [CaptureRunItemNode!]!
 }
 
-enum CaptureRunStatusEnum {
+enum CaptureRunStatus {
 	RUNNING
 	COMPLETED
 	PARTIAL
@@ -138,27 +271,10 @@ enum CaptureRunStatusEnum {
 	TIMED_OUT
 }
 
-enum CaptureStatusEnum {
+enum CaptureStatus {
 	UPLOADING
 	COMPLETED
 	FAILED
-}
-
-"""
-Relay-style connection for captures with context.
-"""
-type CaptureWithContextConnection {
-	edges: [CaptureWithContextEdge!]!
-	pageInfo: PageInfo!
-	totalCount: Int!
-}
-
-"""
-Relay-style edge for captures with context.
-"""
-type CaptureWithContextEdge {
-	cursor: String!
-	node: CaptureWithContextNode!
 }
 
 """
@@ -187,7 +303,33 @@ type CaptureWithContextNode {
 	presetId: ScenePresetId
 	presetName: String
 	presetSlug: String
-	freshness: CaptureFreshnessEnum!
+	freshness: CaptureFreshness!
+}
+
+type CaptureWithContextNodeConnection {
+	"""
+	Information to aid in pagination.
+	"""
+	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [CaptureWithContextNodeEdge!]!
+	totalCount: Int!
+}
+
+"""
+An edge in a connection.
+"""
+type CaptureWithContextNodeEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: CaptureWithContextNode!
+	"""
+	A cursor for use in pagination
+	"""
+	cursor: String!
 }
 
 type CategoryNode {
@@ -286,12 +428,24 @@ type MutationRoot {
 }
 
 """
-Relay-style page info.
+Information about pagination in a connection
 """
 type PageInfo {
-	hasNextPage: Boolean!
+	"""
+	When paginating backwards, are there more items?
+	"""
 	hasPreviousPage: Boolean!
+	"""
+	When paginating forwards, are there more items?
+	"""
+	hasNextPage: Boolean!
+	"""
+	When paginating backwards, the cursor to continue.
+	"""
 	startCursor: String
+	"""
+	When paginating forwards, the cursor to continue.
+	"""
 	endCursor: String
 }
 
@@ -329,7 +483,7 @@ type QueryRoot {
 		Filter inactive scenes: EXCLUDE (default, active only), INCLUDE (all, admin), ONLY (inactive only, admin)
 		"""
 		visibility: Visibility! = EXCLUDE
-	): SceneConnection!
+	): SceneNodeConnection!
 	"""
 	Get a single scene by ID or slug.
 	"""
@@ -368,7 +522,7 @@ type QueryRoot {
 		Filter hidden items: EXCLUDE (default, public), INCLUDE (all, admin), ONLY (hidden only, admin)
 		"""
 		visibility: Visibility! = EXCLUDE
-	): ShaderConnection!
+	): ShaderNodeConnection!
 	"""
 	Get a shader by ID or slug with full detail.
 	
@@ -406,7 +560,7 @@ type QueryRoot {
 		Cursor from a previous page's endCursor
 		"""
 		after: String
-	): CaptureConnection!
+	): CaptureNodeConnection!
 	"""
 	Capture health summary — target matrix completion status (admin).
 	"""
@@ -420,6 +574,23 @@ type QueryRoot {
 		"""
 		count: Int! = 5
 	): [CaptureWithContextNode!]!
+	"""
+	Cursor-paginated list of captures with rich filtering (admin).
+	"""
+	adminCaptures(
+		"""
+		Number of items to return (max 100)
+		"""
+		first: Int! = 25,
+		"""
+		Cursor from a previous page's endCursor
+		"""
+		after: String,
+		"""
+		Sort: capturedAt, fileSizeBytes, shaderName (prefix - for desc)
+		"""
+		sort: String,		filters: AdminCaptureFiltersInput
+	): CaptureWithContextNodeConnection!
 	"""
 	Aggregate counts for the index page.
 	"""
@@ -441,6 +612,23 @@ type QueryRoot {
 	List all backgrounds including disabled (admin only).
 	"""
 	allBackgrounds: [BackgroundNode!]!
+	"""
+	Cursor-paginated list of capture runs with optional filtering (admin only).
+	"""
+	adminCaptureRuns(
+		"""
+		Number of items to return (max 100)
+		"""
+		first: Int! = 25,
+		"""
+		Cursor from a previous page's endCursor
+		"""
+		after: String,
+		"""
+		Sort: startedAt, durationSecs, status, totalItems (prefix - for desc)
+		"""
+		sort: String,		filters: AdminRunFiltersInput
+	): CaptureRunListNodeConnection!
 	"""
 	Get a capture run by ID with all items (admin only).
 	"""
@@ -467,23 +655,6 @@ type QueryRoot {
 		"""
 		intervalHours: Int! = 1
 	): [StorageBucketNode!]!
-}
-
-"""
-Concrete Relay-style connection for scenes.
-"""
-type SceneConnection {
-	edges: [SceneEdge!]!
-	pageInfo: PageInfo!
-	totalCount: Int!
-}
-
-"""
-Concrete Relay-style edge for scenes.
-"""
-type SceneEdge {
-	cursor: String!
-	node: SceneNode!
 }
 
 scalar SceneId
@@ -531,11 +702,37 @@ type SceneNode {
 		Cursor to paginate after.
 		"""
 		after: String
-	): CaptureWithContextConnection!
+	): CaptureWithContextNodeConnection!
 	"""
 	Tags associated with this scene.
 	"""
 	tags: [TagNode!]!
+}
+
+type SceneNodeConnection {
+	"""
+	Information to aid in pagination.
+	"""
+	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [SceneNodeEdge!]!
+	totalCount: Int!
+}
+
+"""
+An edge in a connection.
+"""
+type SceneNodeEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: SceneNode!
+	"""
+	A cursor for use in pagination
+	"""
+	cursor: String!
 }
 
 scalar ScenePresetId
@@ -566,23 +763,6 @@ type ShaderAuthorNode {
 	name: String!
 	url: String
 	platform: String!
-}
-
-"""
-Relay-style connection for shaders.
-"""
-type ShaderConnection {
-	edges: [ShaderEdge!]!
-	pageInfo: PageInfo!
-	totalCount: Int!
-}
-
-"""
-Relay-style edge for shaders.
-"""
-type ShaderEdge {
-	cursor: String!
-	node: ShaderNode!
 }
 
 scalar ShaderId
@@ -619,7 +799,7 @@ type ShaderNode {
 		Cursor to paginate after.
 		"""
 		after: String
-	): ShaderVersionDetailConnection!
+	): ShaderVersionDetailNodeConnection!
 	"""
 	Authors attributed to this shader from upstream platforms.
 	"""
@@ -675,7 +855,7 @@ type ShaderNode {
 		Cursor to paginate after.
 		"""
 		after: String
-	): CaptureWithContextConnection!
+	): CaptureWithContextNodeConnection!
 	"""
 	Profiles for this shader, optionally filtered to a specific version.
 	
@@ -694,7 +874,7 @@ type ShaderNode {
 		Cursor to paginate after.
 		"""
 		after: String
-	): ShaderVersionProfileConnection!
+	): ShaderVersionProfileNodeConnection!
 	"""
 	Extracted metadata for this shader, optionally for a specific version.
 	
@@ -708,21 +888,30 @@ type ShaderNode {
 	): ShaderVersionMetadataNode
 }
 
-"""
-Relay-style connection for shader version details.
-"""
-type ShaderVersionDetailConnection {
-	edges: [ShaderVersionDetailEdge!]!
+type ShaderNodeConnection {
+	"""
+	Information to aid in pagination.
+	"""
 	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [ShaderNodeEdge!]!
 	totalCount: Int!
 }
 
 """
-Relay-style edge for shader version details.
+An edge in a connection.
 """
-type ShaderVersionDetailEdge {
+type ShaderNodeEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: ShaderNode!
+	"""
+	A cursor for use in pagination
+	"""
 	cursor: String!
-	node: ShaderVersionDetailNode!
 }
 
 """
@@ -731,6 +920,32 @@ A shader version with its completed capture count.
 type ShaderVersionDetailNode {
 	version: ShaderVersionNode!
 	captureCount: Int!
+}
+
+type ShaderVersionDetailNodeConnection {
+	"""
+	Information to aid in pagination.
+	"""
+	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [ShaderVersionDetailNodeEdge!]!
+	totalCount: Int!
+}
+
+"""
+An edge in a connection.
+"""
+type ShaderVersionDetailNodeEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: ShaderVersionDetailNode!
+	"""
+	A cursor for use in pagination
+	"""
+	cursor: String!
 }
 
 scalar ShaderVersionId
@@ -785,23 +1000,6 @@ type ShaderVersionNode {
 	extractedAt: DateTime
 }
 
-"""
-Relay-style connection for shader version profiles.
-"""
-type ShaderVersionProfileConnection {
-	edges: [ShaderVersionProfileEdge!]!
-	pageInfo: PageInfo!
-	totalCount: Int!
-}
-
-"""
-Relay-style edge for shader version profiles.
-"""
-type ShaderVersionProfileEdge {
-	cursor: String!
-	node: ShaderVersionProfileNode!
-}
-
 scalar ShaderVersionProfileId
 
 type ShaderVersionProfileNode {
@@ -817,6 +1015,32 @@ type ShaderVersionProfileNode {
 	options: JSON
 	sortOrder: Int!
 	createdAt: DateTime!
+}
+
+type ShaderVersionProfileNodeConnection {
+	"""
+	Information to aid in pagination.
+	"""
+	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [ShaderVersionProfileNodeEdge!]!
+	totalCount: Int!
+}
+
+"""
+An edge in a connection.
+"""
+type ShaderVersionProfileNodeEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: ShaderVersionProfileNode!
+	"""
+	A cursor for use in pagination
+	"""
+	cursor: String!
 }
 
 type StatsNode {

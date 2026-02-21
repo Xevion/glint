@@ -1,6 +1,6 @@
+import { ApiErrorType, pageError } from '$lib/api/errors';
 import { createGraphQLClient, graphql, query } from '$lib/graphql';
 import type { ResultOf } from '$lib/graphql/tada';
-import { ApiErrorType, pageError } from '$lib/api/errors';
 import type { PageLoad } from './$types';
 
 const CAPTURES_PAGE_SIZE = 24;

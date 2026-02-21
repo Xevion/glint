@@ -1,13 +1,31 @@
 use anyhow::Context;
+use chrono::{DateTime, Utc};
 use tracing::{debug, instrument, warn};
 
+use crate::db::DbPool;
 use crate::error::{AppResult, OptionNotFoundExt};
+use crate::graphql::types::connection::CursorPage;
 use crate::id::{
     CaptureId, CaptureRunId, SceneId, ScenePresetId, ShaderVersionId, ShaderVersionProfileId,
 };
 use crate::models::{
     CaptureRun, CaptureRunItem, CaptureRunItemStatus, CaptureRunItemWithContext, CaptureRunStatus,
 };
+
+/// Filters for cursor-paginated capture run listing.
+#[derive(Default)]
+pub struct CaptureRunFilters {
+    /// Filter by run status (OR logic).
+    pub statuses: Option<Vec<CaptureRunStatus>>,
+    /// Only runs started after this date.
+    pub started_after: Option<DateTime<Utc>>,
+    /// Only runs started before this date.
+    pub started_before: Option<DateTime<Utc>>,
+    /// Minimum duration in seconds (completed runs only).
+    pub min_duration_secs: Option<i64>,
+    /// Maximum duration in seconds (completed runs only).
+    pub max_duration_secs: Option<i64>,
+}
 
 /// Tuple for batch-inserting run items:
 /// `(id, run_id, shader_version_id, scene_id, profile_id, preset_id)`
@@ -134,6 +152,159 @@ impl CaptureRunRepo {
         .context("failed to list capture runs")?;
 
         Ok(runs)
+    }
+
+    /// Cursor-paginated list of capture runs with filtering.
+    /// Default order: `started_at DESC, id DESC`. Keyset cursor on `(started_at, id)`.
+    ///
+    /// Supported sort values (prefix `-` for descending):
+    /// `startedAt` (default DESC), `durationSecs`, `status`, `totalItems`.
+    #[instrument(skip(db, filters), level = "debug")]
+    pub async fn list_cursor(
+        db: &DbPool,
+        limit: i32,
+        after: Option<(DateTime<Utc>, String)>,
+        filters: &CaptureRunFilters,
+        sort: Option<&str>,
+    ) -> AppResult<CursorPage<CaptureRun>> {
+        use sqlx::QueryBuilder;
+
+        let limit = limit.clamp(1, 100) as i64;
+
+        // Base SELECT with the same LATERAL join pattern as `list`
+        let base_from = r#"
+            FROM capture_runs cr
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,
+                    COUNT(*) FILTER (WHERE status = 'skipped') AS skipped
+                FROM capture_run_items WHERE run_id = cr.id
+            ) counts ON TRUE"#;
+
+        let select_cols = r#"
+            cr.id,
+            cr.agent_id,
+            cr.started_at,
+            cr.completed_at,
+            cr.status,
+            cr.total_items,
+            COALESCE(counts.completed, 0)::int4 AS completed_items,
+            COALESCE(counts.failed, 0)::int4 AS failed_items,
+            COALESCE(counts.skipped, 0)::int4 AS skipped_items,
+            cr.resolution_width,
+            cr.resolution_height,
+            cr.image_format,
+            cr.metadata_json"#;
+
+        // Helper closure to push shared WHERE filters
+        let push_filters = |qb: &mut QueryBuilder<'_, sqlx::Postgres>| {
+            if let Some(ref statuses) = filters.statuses
+                && !statuses.is_empty()
+            {
+                qb.push(" AND cr.status IN (");
+                let mut sep = qb.separated(", ");
+                for s in statuses {
+                    sep.push_bind(s.as_str().to_owned());
+                }
+                sep.push_unseparated(")");
+            }
+            if let Some(started_after) = filters.started_after {
+                qb.push(" AND cr.started_at >= ");
+                qb.push_bind(started_after);
+            }
+            if let Some(started_before) = filters.started_before {
+                qb.push(" AND cr.started_at <= ");
+                qb.push_bind(started_before);
+            }
+            if let Some(min_secs) = filters.min_duration_secs {
+                qb.push(
+                    " AND cr.completed_at IS NOT NULL AND EXTRACT(EPOCH FROM (cr.completed_at - cr.started_at)) >= ",
+                );
+                qb.push_bind(min_secs as f64);
+            }
+            if let Some(max_secs) = filters.max_duration_secs {
+                qb.push(
+                    " AND cr.completed_at IS NOT NULL AND EXTRACT(EPOCH FROM (cr.completed_at - cr.started_at)) <= ",
+                );
+                qb.push_bind(max_secs as f64);
+            }
+        };
+
+        // Main data query
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new("SELECT ");
+        qb.push(select_cols);
+        qb.push(base_from);
+        qb.push(" WHERE TRUE");
+        push_filters(&mut qb);
+
+        if let Some((ref cursor_ts, ref cursor_id)) = after {
+            qb.push(" AND (cr.started_at, cr.id) < (");
+            qb.push_bind(*cursor_ts);
+            qb.push(", ");
+            qb.push_bind(cursor_id.as_str());
+            qb.push(")");
+        }
+
+        let sort_value = sort.unwrap_or("-startedAt");
+        match sort_value {
+            "startedAt" => qb.push(" ORDER BY cr.started_at ASC, cr.id ASC"),
+            "durationSecs" => qb.push(
+                " ORDER BY EXTRACT(EPOCH FROM (cr.completed_at - cr.started_at)) ASC NULLS LAST, cr.id ASC",
+            ),
+            "-durationSecs" => qb.push(
+                " ORDER BY EXTRACT(EPOCH FROM (cr.completed_at - cr.started_at)) DESC NULLS LAST, cr.id DESC",
+            ),
+            "status" => {
+                qb.push(" ORDER BY cr.status ASC, cr.started_at DESC, cr.id DESC")
+            }
+            "-status" => {
+                qb.push(" ORDER BY cr.status DESC, cr.started_at DESC, cr.id DESC")
+            }
+            "totalItems" => {
+                qb.push(" ORDER BY cr.total_items ASC, cr.started_at DESC, cr.id DESC")
+            }
+            "-totalItems" => {
+                qb.push(" ORDER BY cr.total_items DESC, cr.started_at DESC, cr.id DESC")
+            }
+            // Default: most recent first
+            _ => qb.push(" ORDER BY cr.started_at DESC, cr.id DESC"),
+        };
+
+        qb.push(" LIMIT ");
+        qb.push_bind(limit + 1);
+
+        let items: Vec<CaptureRun> = qb
+            .build_query_as()
+            .fetch_all(db)
+            .await
+            .context("failed to list capture runs (cursor)")?;
+
+        let has_next_page = items.len() as i64 > limit;
+        let items: Vec<CaptureRun> = items.into_iter().take(limit as usize).collect();
+
+        // Count query (same filters, no cursor/limit).
+        // Intentionally omits the LATERAL join since current filters only reference
+        // `cr.*` columns. If a future filter needs computed counts (e.g., "runs with
+        // >5 failures"), the LATERAL join must be added here too.
+        let mut cqb: QueryBuilder<'_, sqlx::Postgres> =
+            QueryBuilder::new("SELECT COUNT(*) FROM capture_runs cr WHERE TRUE");
+        push_filters(&mut cqb);
+
+        let total_count: i64 = cqb
+            .build_query_scalar::<Option<i64>>()
+            .fetch_one(db)
+            .await
+            .context("failed to count capture runs")?
+            .unwrap_or(0);
+
+        debug!(total_count, has_next_page, "Listed capture runs (cursor)");
+        Ok(CursorPage {
+            items,
+            has_next_page,
+            has_previous_page: after.is_some(),
+            total_count,
+        })
     }
 
     /// Complete a capture run (update counters and status)

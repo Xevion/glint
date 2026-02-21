@@ -1,9 +1,9 @@
 <script lang="ts">
-import { invalidateAll } from '$app/navigation';
+import { invalidate } from '$app/navigation';
 import { api } from '$lib/api';
 import type { UserWithSessions } from '$lib/bindings';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
 import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { Button } from '$lib/components/ui/button';
 import { ConfirmDialog } from '$lib/components/ui/dialog';
 import * as Select from '$lib/components/ui/select';
@@ -38,7 +38,7 @@ function avatarUrl(size: number): string | null {
 async function handleRoleChange(newRole: string) {
 	const result = await api.admin.updateUserRole(user.id, newRole);
 	result.match({
-		Ok: () => void invalidateAll(),
+		Ok: () => void invalidate(`glint:admin:user:${user.id}`),
 		Err: (err) => toast.error(err.message)
 	});
 }
@@ -46,7 +46,7 @@ async function handleRoleChange(newRole: string) {
 async function confirmDeleteAllSessions() {
 	const result = await api.admin.deleteUserSessions(user.id);
 	result.match({
-		Ok: () => void invalidateAll(),
+		Ok: () => void invalidate(`glint:admin:user:${user.id}`),
 		Err: (err) => toast.error(err.message)
 	});
 }
@@ -55,7 +55,7 @@ async function deleteSession(tokenPrefix: string) {
 	deletingSessionToken = tokenPrefix;
 	const result = await api.admin.deleteSession(user.id, tokenPrefix);
 	result.match({
-		Ok: () => void invalidateAll(),
+		Ok: () => void invalidate(`glint:admin:user:${user.id}`),
 		Err: (err) => toast.error(err.message)
 	});
 	deletingSessionToken = null;

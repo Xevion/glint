@@ -1,4 +1,5 @@
-use async_graphql::SimpleObject;
+use async_graphql::types::connection::{self as relay, CursorType, DisableNodesField, EmptyFields};
+use async_graphql::{OutputType, SimpleObject};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use chrono::{DateTime, Utc};
@@ -6,17 +7,68 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
 
-/// Relay-style page info.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct PageInfo {
-    pub has_next_page: bool,
-    pub has_previous_page: bool,
-    pub start_cursor: Option<String>,
-    pub end_cursor: Option<String>,
+/// Cursor payload encoded into each pagination cursor.
+/// Wire format: `base64url_no_pad(json({"id":"...","ts":epoch_millis}))`.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CursorPayload {
+    pub id: String,
+    pub ts: i64,
 }
 
+impl CursorPayload {
+    pub fn new(id: &str, timestamp_millis: i64) -> Self {
+        Self {
+            id: id.to_string(),
+            ts: timestamp_millis,
+        }
+    }
+}
+
+/// Opaque error returned when a cursor string cannot be decoded.
+#[derive(Debug)]
+pub struct CursorDecodeError;
+
+impl std::fmt::Display for CursorDecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Invalid cursor")
+    }
+}
+
+impl CursorType for CursorPayload {
+    type Error = CursorDecodeError;
+
+    fn decode_cursor(s: &str) -> Result<Self, Self::Error> {
+        let bytes = URL_SAFE_NO_PAD.decode(s).map_err(|_| CursorDecodeError)?;
+        serde_json::from_slice(&bytes).map_err(|_| CursorDecodeError)
+    }
+
+    fn encode_cursor(&self) -> String {
+        let json = serde_json::to_string(self).expect("cursor payload is always serializable");
+        URL_SAFE_NO_PAD.encode(json.as_bytes())
+    }
+}
+
+/// Additional fields flattened onto every connection — exposes `totalCount`.
+#[derive(SimpleObject, Default, Clone, Debug)]
+pub struct TotalCount {
+    pub total_count: i64,
+}
+
+/// Relay connection with our standard cursor format and `totalCount`.
+///
+/// Nodes field is disabled — consumers use `edges { node { ... } }`.
+pub type Connection<N> = relay::Connection<
+    CursorPayload,
+    N,
+    TotalCount,
+    EmptyFields,
+    relay::DefaultConnectionName,
+    relay::DefaultEdgeName,
+    DisableNodesField,
+>;
+
 /// Intermediate result from a cursor-paginated repo query.
-/// Repos return this; callers convert it into domain-specific Connection types.
+/// Repos return this; callers convert via [`CursorPage::into_connection`].
 pub struct CursorPage<T> {
     pub items: Vec<T>,
     pub has_next_page: bool,
@@ -24,68 +76,43 @@ pub struct CursorPage<T> {
     pub total_count: i64,
 }
 
-/// Trait for types that can produce a cursor string.
-pub trait CursorEncodable {
-    fn encode_cursor(&self) -> String;
+/// Trait for model types that can produce a pagination cursor.
+pub trait CursorSource {
+    fn to_cursor(&self) -> CursorPayload;
 }
 
-impl<T: CursorEncodable> CursorPage<T> {
-    /// Convert into edges (cursor + mapped node) and page info.
-    pub fn into_connection<N>(self, map: impl Fn(T) -> N) -> (Vec<(String, N)>, PageInfo, i64) {
-        let edges: Vec<(String, N)> = self
-            .items
-            .into_iter()
-            .map(|item| {
-                let cursor = item.encode_cursor();
-                let node = map(item);
-                (cursor, node)
-            })
-            .collect();
-
-        let page_info = PageInfo {
-            has_next_page: self.has_next_page,
-            has_previous_page: self.has_previous_page,
-            start_cursor: edges.first().map(|(c, _)| c.clone()),
-            end_cursor: edges.last().map(|(c, _)| c.clone()),
-        };
-
-        (edges, page_info, self.total_count)
+impl<T> CursorPage<T> {
+    /// Convert into a built-in async-graphql [`Connection`].
+    ///
+    /// `T` must implement [`CursorSource`] (to produce the cursor) and
+    /// `Into<N>` (to convert the repo model into a GraphQL node).
+    pub fn into_connection<N>(self) -> Connection<N>
+    where
+        T: CursorSource + Into<N>,
+        N: OutputType,
+    {
+        let mut conn = relay::Connection::with_additional_fields(
+            self.has_previous_page,
+            self.has_next_page,
+            TotalCount {
+                total_count: self.total_count,
+            },
+        );
+        conn.edges.extend(self.items.into_iter().map(|item| {
+            let cursor = item.to_cursor();
+            let node = item.into();
+            relay::Edge::new(cursor, node)
+        }));
+        conn
     }
 }
 
-/// Cursor payload serialized to JSON inside the base64-encoded cursor string.
-#[derive(Serialize, Deserialize)]
-struct CursorPayload {
-    id: String,
-    ts: i64,
-}
-
-/// Encode a cursor from an ID and sort timestamp.
-/// Format: base64url(json({"id":"...","ts":epoch_millis}))
-pub fn encode_cursor(id: &str, timestamp_millis: i64) -> String {
-    let payload = CursorPayload {
-        id: id.to_string(),
-        ts: timestamp_millis,
-    };
-    let json = serde_json::to_string(&payload).expect("cursor payload is always serializable");
-    URL_SAFE_NO_PAD.encode(json.as_bytes())
-}
-
-/// Decode a cursor back into (id, timestamp_millis).
-pub fn decode_cursor(cursor: &str) -> AppResult<(String, i64)> {
-    let bytes = URL_SAFE_NO_PAD
-        .decode(cursor)
-        .map_err(|_| AppError::BadRequest("Invalid cursor".into()))?;
-    let payload: CursorPayload = serde_json::from_slice(&bytes)
-        .map_err(|_| AppError::BadRequest("Invalid cursor format".into()))?;
-    Ok((payload.id, payload.ts))
-}
-
-/// Decode a cursor and convert the timestamp to a `DateTime<Utc>`.
-/// Returns `(datetime, id)` ready for keyset pagination queries.
+/// Decode a cursor string for use in keyset pagination queries.
+/// Returns `(datetime, id)` ready for SQL WHERE clauses.
 pub fn decode_cursor_for_query(cursor: &str) -> AppResult<(DateTime<Utc>, String)> {
-    let (id, ts) = decode_cursor(cursor)?;
-    let dt = DateTime::from_timestamp_millis(ts)
+    let payload = CursorPayload::decode_cursor(cursor)
+        .map_err(|_| AppError::BadRequest("Invalid cursor".into()))?;
+    let dt = DateTime::from_timestamp_millis(payload.ts)
         .ok_or_else(|| AppError::BadRequest("Invalid cursor timestamp".into()))?;
-    Ok((dt, id))
+    Ok((dt, payload.id))
 }

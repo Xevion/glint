@@ -4,6 +4,7 @@ import type {
 	CaptureWithContext,
 	Paginated,
 	Scene,
+	ScenePreset,
 	SceneWithVersion,
 	ShaderListItem,
 	StorageAuditResult,
@@ -11,7 +12,6 @@ import type {
 	StorageCleanupResult,
 	StorageStats,
 	UpdateSceneMetadataRequest,
-	ScenePreset,
 	User,
 	UserWithSessions,
 	WorkItem

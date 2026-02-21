@@ -1,5 +1,4 @@
 <script lang="ts">
-import type { CaptureRunStatus } from '$lib/bindings';
 import * as Tooltip from '$lib/components/ui/tooltip';
 
 interface Props {
@@ -7,13 +6,13 @@ interface Props {
 	completed: number;
 	failed: number;
 	skipped: number;
-	status: CaptureRunStatus;
+	status: string;
 }
 
 let { total, completed, failed, skipped, status }: Props = $props();
 
 let remaining = $derived(total - completed - failed - skipped);
-let isTimedOut = $derived(status === 'timed_out');
+let isTimedOut = $derived(status === 'TIMED_OUT');
 </script>
 
 {#if total > 0}

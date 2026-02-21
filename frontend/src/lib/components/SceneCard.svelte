@@ -1,5 +1,5 @@
 <script lang="ts" module>
-import { graphql, type ResultOf } from '$lib/graphql';
+import { type ResultOf, graphql } from '$lib/graphql';
 
 /** Shared fragment for scene card fields — used by browse and home queries. */
 export const SceneCardFragment = graphql(`

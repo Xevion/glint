@@ -1,4 +1,4 @@
-import { graphql, type ResultOf } from '$lib/graphql';
+import { type ResultOf, graphql } from '$lib/graphql';
 
 export const ShaderDetailQuery = graphql(`
 	query ShaderDetail($id: String!) {

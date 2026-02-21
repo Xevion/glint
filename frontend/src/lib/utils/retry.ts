@@ -1,5 +1,5 @@
-import type { Result } from 'true-myth';
 import type { ApiError } from '$lib/api/errors';
+import type { Result } from 'true-myth';
 
 interface RetryOptions {
 	maxAttempts?: number;

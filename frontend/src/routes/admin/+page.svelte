@@ -1,15 +1,14 @@
 <script lang="ts">
 import { invalidate } from '$app/navigation';
-import type { CaptureHealthData, RecentCapture } from './+page';
-import { useSubscription } from '$lib/graphql';
-import { CaptureCompletedSubscription } from '$lib/graphql/subscriptions/captures';
-import CaptureCard from '$lib/components/CaptureCard.svelte';
-import { ItemGrid } from '$lib/components/item-grid';
+import CaptureImage from '$lib/components/CaptureImage.svelte';
 import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 import RefreshButton from '$lib/components/RefreshButton.svelte';
 import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
+import { DataView, Grid } from '$lib/components/data-view';
 import { Button } from '$lib/components/ui/button';
+import { useSubscription } from '$lib/graphql';
+import { CaptureCompletedSubscription } from '$lib/graphql/subscriptions/captures';
 import { formatBytes, formatDatetime, toDate } from '$lib/utils/format';
 import {
 	Activity,
@@ -36,6 +35,7 @@ import {
 } from 'layerchart';
 import { onMount } from 'svelte';
 import type { PageData } from './$types';
+import type { CaptureHealthData, RecentCapture } from './+page';
 
 interface Props {
 	data: PageData;
@@ -189,7 +189,7 @@ $effect(() => {
 
 	<!-- Error Summary -->
 	{#if failedSections.length > 0}
-		<ErrorBanner message="Failed to load: {failedSections.join(', ')}" />
+		<ErrorBanner message="Failed to load: {failedSections.join(', ')}" onRetry={() => invalidate('glint:admin:dashboard')} />
 	{/if}
 
 	<!-- Stats Grid -->
@@ -370,9 +370,29 @@ $effect(() => {
 			{#if recentCaptures.length === 0}
 				<p class="text-sm text-muted-foreground">No captures yet</p>
 			{:else}
-			<ItemGrid items={recentCaptures} key={(c: RecentCapture) => c.id} size="small">
+			<DataView items={recentCaptures}>
+			<Grid key={(c: RecentCapture) => c.id} size="small">
 			{#snippet card(capture: RecentCapture)}
-				<CaptureCard {capture}>
+				<a
+					href="/admin/captures/{capture.id}"
+					class="block rounded-lg border bg-card transition-colors hover:bg-muted/50"
+				>
+					<div class="overflow-hidden rounded-t-lg">
+						{#if capture.imagePath}
+							<CaptureImage
+								src={capture.imagePath}
+								thumbhash={capture.thumbhash}
+								preset="card"
+								alt={capture.shaderName}
+								class="w-full"
+								containerClass="aspect-video w-full"
+							/>
+						{:else}
+							<div class="flex aspect-video w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+								No image
+							</div>
+						{/if}
+					</div>
 					<div class="space-y-1 p-3">
 						<div class="flex items-center justify-between gap-2">
 							<span class="truncate font-medium text-sm">{capture.shaderName}</span>
@@ -382,9 +402,9 @@ $effect(() => {
 						</div>
 						<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
 							<span>{capture.shaderVersion}</span>
-					{#if capture.profileDisplayName}
-						<span>&middot; {capture.profileDisplayName}</span>
-						{/if}
+							{#if capture.profileDisplayName}
+								<span>&middot; {capture.profileDisplayName}</span>
+							{/if}
 							{#if capture.resolutionWidth && capture.resolutionHeight}
 								<span>&middot; {capture.resolutionWidth}&times;{capture.resolutionHeight}</span>
 							{/if}
@@ -398,9 +418,10 @@ $effect(() => {
 							</div>
 						{/if}
 					</div>
-				</CaptureCard>
+				</a>
 			{/snippet}
-			</ItemGrid>
+			</Grid>
+			</DataView>
 			{/if}
 		</div>
 </div>

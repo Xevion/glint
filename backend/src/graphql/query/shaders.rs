@@ -1,10 +1,9 @@
 use async_graphql::{Context, Object, Result};
 
-use crate::error::AppError;
 use crate::graphql::guard::require_admin_for_visibility;
 use crate::graphql::types::common::Visibility;
-use crate::graphql::types::connection::decode_cursor;
-use crate::graphql::types::shader::{ShaderConnection, ShaderNode, TrendingShaderNode};
+use crate::graphql::types::connection::{Connection, decode_cursor_for_query};
+use crate::graphql::types::shader::{ShaderNode, TrendingShaderNode};
 use crate::models::Page;
 use crate::repo::{ShaderRepo, SlugRedirectRepo};
 use crate::services::shader::ShaderService;
@@ -33,20 +32,12 @@ impl ShaderQuery {
             desc = "Filter hidden items: EXCLUDE (default, public), INCLUDE (all, admin), ONLY (hidden only, admin)"
         )]
         visibility: Visibility,
-    ) -> Result<ShaderConnection> {
+    ) -> Result<Connection<ShaderNode>> {
         require_admin_for_visibility(ctx, visibility)?;
 
         let state = ctx.data_unchecked::<AppState>();
 
-        let decoded_after = after
-            .map(|c| decode_cursor(&c))
-            .transpose()?
-            .map(|(id, ts)| {
-                let dt = chrono::DateTime::from_timestamp_millis(ts)
-                    .ok_or_else(|| AppError::BadRequest("Invalid cursor timestamp".into()))?;
-                Ok::<_, AppError>((dt, id))
-            })
-            .transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
 
         let page = ShaderRepo::list_cursor(
             state.db(),
@@ -58,7 +49,7 @@ impl ShaderQuery {
         )
         .await?;
 
-        Ok(page.into())
+        Ok(page.into_connection())
     }
 
     /// Get a shader by ID or slug with full detail.

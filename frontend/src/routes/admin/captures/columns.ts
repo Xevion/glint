@@ -1,46 +1,45 @@
-import type { CaptureWithContext } from '$lib/bindings';
 import {
 	type ColumnDef,
+	DataTableColumnHeader,
 	renderComponent,
 	textColumn,
 	timeColumn
 } from '$lib/components/data-table';
 import FreshnessCell from './freshness-cell.svelte';
 import PreviewCell from './preview-cell.svelte';
+import type { AdminCaptureNode } from './queries';
 import ResolutionCell from './resolution-cell.svelte';
 import RunCell from './run-cell.svelte';
 import ShaderCell from './shader-cell.svelte';
 import SizeCell from './size-cell.svelte';
 
-export const columns: ColumnDef<CaptureWithContext>[] = [
+export const columns: ColumnDef<AdminCaptureNode>[] = [
 	{
-		accessorKey: 'image_path',
+		accessorKey: 'imagePath',
 		header: 'Preview',
 		size: 96,
 		enableSorting: false,
 		cell: ({ row }) => renderComponent(PreviewCell, { capture: row.original })
 	},
 	{
-		accessorKey: 'shader_name',
-		header: 'Shader',
-		enableSorting: false,
+		accessorKey: 'shaderName',
+		header: ({ column }) => renderComponent(DataTableColumnHeader, { column, title: 'Shader' }),
 		cell: ({ row }) => renderComponent(ShaderCell, { capture: row.original })
 	},
-	textColumn<CaptureWithContext>('scene_name', 'Scene', { sortable: false }),
-	textColumn<CaptureWithContext>('profile_display_name', 'Profile', { sortable: false }),
+	textColumn<AdminCaptureNode>('sceneName', 'Scene', { sortable: false }),
+	textColumn<AdminCaptureNode>('profileDisplayName', 'Profile', { sortable: false }),
 	{
-		accessorKey: 'resolution_width',
+		accessorKey: 'resolutionWidth',
 		header: 'Resolution',
 		enableSorting: false,
 		cell: ({ row }) => renderComponent(ResolutionCell, { capture: row.original })
 	},
 	{
-		accessorKey: 'file_size_bytes',
-		header: 'Size',
-		enableSorting: false,
+		accessorKey: 'fileSizeBytes',
+		header: ({ column }) => renderComponent(DataTableColumnHeader, { column, title: 'Size' }),
 		cell: ({ row }) => renderComponent(SizeCell, { capture: row.original })
 	},
-	timeColumn<CaptureWithContext>('captured_at', 'Captured'),
+	timeColumn<AdminCaptureNode>('capturedAt', 'Captured'),
 	{
 		accessorKey: 'freshness',
 		header: 'Freshness',
@@ -48,7 +47,7 @@ export const columns: ColumnDef<CaptureWithContext>[] = [
 		cell: ({ row }) => renderComponent(FreshnessCell, { capture: row.original })
 	},
 	{
-		accessorKey: 'run_id',
+		accessorKey: 'runId',
 		header: 'Run',
 		enableSorting: false,
 		cell: ({ row }) => renderComponent(RunCell, { capture: row.original })

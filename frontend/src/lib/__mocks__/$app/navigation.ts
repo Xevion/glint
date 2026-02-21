@@ -8,10 +8,6 @@ export async function invalidate(_url: string | URL | ((url: URL) => boolean)): 
 	return Promise.resolve();
 }
 
-export async function invalidateAll(): Promise<void> {
-	return Promise.resolve();
-}
-
 export async function preloadData(_url: string | URL): Promise<void> {
 	return Promise.resolve();
 }

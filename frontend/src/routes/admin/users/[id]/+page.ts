@@ -2,7 +2,8 @@ import { ApiErrorType, createApiClient } from '$lib/api';
 import { pageError } from '$lib/api/errors';
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ params, fetch }) => {
+export const load: PageLoad = async ({ params, fetch, depends }) => {
+	depends(`glint:admin:user:${params.id}`);
 	const api = createApiClient(fetch);
 	const id = parseInt(params.id, 10);
 

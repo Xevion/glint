@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
+import { connectivity } from '$lib/stores/connectivity.svelte';
 import { type Logger, getLogger } from '@logtape/logtape';
 import { Result } from 'true-myth';
-import { connectivity } from '$lib/stores/connectivity.svelte';
 import { getApiUrl } from './config';
 import { ApiError, ApiErrorType } from './errors';
 

@@ -1,5 +1,5 @@
 <script lang="ts" module>
-import { graphql, type ResultOf } from '$lib/graphql';
+import { type ResultOf, graphql } from '$lib/graphql';
 
 /** Shared fragment for shader card fields — used by browse, home, and similar queries. */
 export const ShaderCardFragment = graphql(`

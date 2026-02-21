@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { Column } from '@tanstack/table-core';
-import { ArrowDown, ArrowUp, ChevronsUpDown } from '@lucide/svelte';
-import { cn } from '$lib/utils';
 import { Button } from '$lib/components/ui/button';
+import { cn } from '$lib/utils';
+import { ArrowDown, ArrowUp, ChevronsUpDown } from '@lucide/svelte';
+import type { Column } from '@tanstack/table-core';
 
 interface Props {
 	// Column<TData> is contravariant on TData, so we accept any to avoid

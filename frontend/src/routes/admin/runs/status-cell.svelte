@@ -1,12 +1,14 @@
 <script lang="ts">
-import type { CaptureRunStatus } from '$lib/bindings';
-import { StatusBadge } from '$lib/components/ui/status-badge';
+import { StatusBadge, type StatusBadgeStatus } from '$lib/components/ui/status-badge';
 
 interface Props {
-	status: CaptureRunStatus;
+	status: string;
 }
 
 let { status }: Props = $props();
+
+const badgeStatus = $derived(status.toLowerCase() as StatusBadgeStatus);
+const displayLabel = $derived(status.toLowerCase().replace(/_/g, ' '));
 </script>
 
-<StatusBadge {status}>{status}</StatusBadge>
+<StatusBadge status={badgeStatus}>{displayLabel}</StatusBadge>

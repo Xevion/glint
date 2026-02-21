@@ -1,6 +1,6 @@
+import TimeAgo from '$lib/components/TimeAgo.svelte';
 import type { ColumnDef, HeaderContext, RowData } from '@tanstack/table-core';
 import type { Component } from 'svelte';
-import TimeAgo from '$lib/components/TimeAgo.svelte';
 import ImageCell from './cells/image-cell.svelte';
 import ImageFallbackCell from './cells/image-fallback-cell.svelte';
 import DataTableColumnHeader from './data-table-column-header.svelte';
@@ -116,6 +116,7 @@ export function imageColumn<TData extends RowData>(
 		accessorKey,
 		header,
 		size: size === 'md' ? 64 : 48,
+		minSize: size === 'md' ? 64 : 48,
 		enableSorting: false,
 		cell: cellDef
 	};

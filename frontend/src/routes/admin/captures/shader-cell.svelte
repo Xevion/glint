@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { CaptureWithContext } from '$lib/bindings';
+import type { AdminCaptureNode } from './queries';
 
 interface Props {
-	capture: CaptureWithContext;
+	capture: AdminCaptureNode;
 }
 
 let { capture }: Props = $props();
@@ -10,9 +10,9 @@ let { capture }: Props = $props();
 
 <div>
 	<a
-		href="/shaders/{capture.shader_slug}"
+		href="/shaders/{capture.shaderSlug}"
 		class="relative z-10 font-medium text-primary hover:underline"
-		>{capture.shader_name}</a
+		>{capture.shaderName}</a
 	>
-	<div class="text-xs text-muted-foreground">{capture.shader_version}</div>
+	<div class="text-xs text-muted-foreground">{capture.shaderVersion}</div>
 </div>

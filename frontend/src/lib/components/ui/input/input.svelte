@@ -1,5 +1,5 @@
 <script lang="ts">
-import { type WithElementRef, cn } from '$lib/utils.js';
+import { type WithElementRef, cn } from '$lib/utils';
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import type { HTMLInputAttributes, HTMLInputTypeAttribute } from 'svelte/elements';
 
