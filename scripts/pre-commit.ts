@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { getCommand } from "./lib/commands";
 import { runPiped } from "./lib/proc";
 
 function main() {
@@ -29,24 +30,15 @@ function main() {
 	let needsFormatting = false;
 
 	// Run format checks for each subsystem with staged files
-	if (frontendFiles.length > 0) {
-		const checkResult = runPiped(["bun", "run", "--cwd", "frontend", "format:check"]);
-		if (checkResult.exitCode !== 0) {
-			needsFormatting = true;
-		}
-	}
-
-	if (backendFiles.length > 0) {
-		const backendCheckResult = runPiped(["cargo", "fmt", "--manifest-path", "backend/Cargo.toml", "--", "--check"]);
-		if (backendCheckResult.exitCode !== 0) {
-			needsFormatting = true;
-		}
-	}
-
-	if (modFiles.length > 0) {
-		const checkResult = runPiped(["./gradlew", "spotlessCheck", "ktlintCheck", "--quiet"], { cwd: "mod" });
-		if (checkResult.exitCode !== 0) {
-			needsFormatting = true;
+	for (const [files, sub] of [
+		[frontendFiles, "frontend"],
+		[backendFiles, "backend"],
+		[modFiles, "mod"],
+	] as const) {
+		if (files.length > 0) {
+			const def = getCommand(sub, "format-check");
+			const result = runPiped(def.cmd, { cwd: def.cwd });
+			if (result.exitCode !== 0) needsFormatting = true;
 		}
 	}
 
@@ -58,16 +50,15 @@ function main() {
 	console.log("⚠  Formatting issues detected, running auto-format...");
 
 	// Run auto-format for subsystems that need it
-	if (frontendFiles.length > 0) {
-		runPiped(["bun", "run", "--cwd", "frontend", "format"]);
-	}
-
-	if (backendFiles.length > 0) {
-		runPiped(["cargo", "fmt", "--manifest-path", "backend/Cargo.toml"]);
-	}
-
-	if (modFiles.length > 0) {
-		runPiped(["./gradlew", "spotlessApply", "ktlintFormat", "--quiet"], { cwd: "mod" });
+	for (const [files, sub] of [
+		[frontendFiles, "frontend"],
+		[backendFiles, "backend"],
+		[modFiles, "mod"],
+	] as const) {
+		if (files.length > 0) {
+			const def = getCommand(sub, "format-apply");
+			runPiped(def.cmd, { cwd: def.cwd });
+		}
 	}
 
 	// Get files modified by formatting (unstaged changes after formatting)

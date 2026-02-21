@@ -8,6 +8,7 @@
  *   Omit targets to lint everything.
  */
 
+import { getCommand } from './lib/commands';
 import { c } from './lib/fmt';
 import { run } from './lib/proc';
 import { isAll, resolveTargets, targetLabel } from './lib/targets';
@@ -38,11 +39,12 @@ if (!isAll(targets)) {
 }
 
 if (targets.subsystems.has('frontend')) {
-	run(['bun', 'run', '--cwd', 'frontend', 'lint']);
+	run(getCommand('frontend', 'lint').cmd);
 }
 if (targets.subsystems.has('backend')) {
-	run(['cargo', 'clippy', '--manifest-path', 'backend/Cargo.toml', '--', '--deny', 'warnings']);
+	run(getCommand('backend', 'lint').cmd);
 }
 if (targets.subsystems.has('mod')) {
-	run(['./gradlew', 'detekt', '--quiet'], { cwd: 'mod' });
+	const def = getCommand('mod', 'lint');
+	run(def.cmd, { cwd: def.cwd });
 }

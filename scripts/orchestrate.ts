@@ -29,13 +29,14 @@ import {
   BUILD_ERROR_PATTERNS,
   FATAL_MIXIN_ERRORS,
   EARLY_CRASH_PATTERNS,
-  isProcessAlive,
   sleep,
   ensureQuietOptions,
   monitorStream,
   spawnMinecraft,
   registerSignalHandlers,
   printFailureTail,
+  validatePlatform,
+  runMonitorLoop,
   type StreamBuffers,
   type PatternAction,
 } from "./lib/minecraft";
@@ -98,12 +99,7 @@ Examples:
 const platform = flags.platform as string;
 const verbose = flags.verbose;
 
-if (platform !== "fabric" && platform !== "neoforge") {
-  console.error(
-    c("31", `Invalid platform: ${platform} (must be 'fabric' or 'neoforge')`),
-  );
-  process.exit(1);
-}
+validatePlatform(platform);
 
 interface ModConfig {
   apiUrl?: string;
@@ -378,73 +374,64 @@ if (mc.proc.stdout)
 if (mc.proc.stderr)
   monitorStream(mc.proc.stderr, true, buffers, verbose, actions);
 
-const startTime = Date.now();
 const EARLY_TIMEOUT = 120;
 const INACTIVITY_TIMEOUT = 180;
 
-try {
-  while (true) {
-    const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+await runMonitorLoop({
+  mc,
+  cleanup: mc.cleanup,
+  label: "orchestrate",
 
-    // Orchestration completed normally
-    if (terminated && terminateCode === 0) {
-      if (runFailed) {
-        console.error(c("31", `[orchestrate] Run failed (${elapsedSec}s)`));
-        if (!verbose) printFailureTail(buffers, 30, "-v");
-        await mc.cleanup();
-        process.exit(1);
+  isComplete: () => terminated && terminateCode === 0,
+  onComplete: async (elapsedSec) => {
+    if (runFailed) {
+      console.error(c("31", `[orchestrate] Run failed (${elapsedSec}s)`));
+      if (!verbose) printFailureTail(buffers, 30, "-v");
+      return 1;
+    }
+    console.log(
+      c("32", `[orchestrate] Orchestration complete (${elapsedSec}s)`),
+    );
+    await sleep(3000);
+    return 0;
+  },
+
+  isFailed: () => terminated && terminateCode !== 0,
+  onFailed: async () => {
+    console.error(c("31", `[orchestrate] ${terminateReason}`));
+    if (!verbose) printFailureTail(buffers, 50, "-v");
+    return terminateCode;
+  },
+
+  checkTimeout: (elapsedSec) => {
+    if (gameStarted) {
+      const idleSeconds = Math.floor((Date.now() - lastActivity) / 1000);
+      if (idleSeconds > INACTIVITY_TIMEOUT) {
+        return `No activity for ${idleSeconds}s (limit: ${INACTIVITY_TIMEOUT}s)`;
       }
+    } else if (elapsedSec > EARLY_TIMEOUT) {
+      return `Game did not start within ${EARLY_TIMEOUT}s`;
+    }
+    return null;
+  },
+  onTimeout: async (reason) => {
+    console.error(c("31", `[orchestrate] Timeout: ${reason}`));
+    if (!verbose) printFailureTail(buffers, 50, "-v");
+    return 3;
+  },
+
+  onProcessDied: async (elapsedSec) => {
+    const exitCode = await mc.proc.exited;
+    if (exitCode === 0) {
       console.log(
-        c("32", `[orchestrate] Orchestration complete (${elapsedSec}s)`),
+        c("32", `[orchestrate] Process exited cleanly (${elapsedSec}s)`),
       );
-      await sleep(3000);
-      await mc.cleanup();
-      process.exit(0);
-    }
-
-    // Fatal error detected
-    if (terminated && terminateCode !== 0) {
-      console.error(c("31", `[orchestrate] ${terminateReason}`));
+    } else {
+      console.error(
+        c("31", `[orchestrate] Process exited with code ${exitCode}`),
+      );
       if (!verbose) printFailureTail(buffers, 50, "-v");
-      await mc.cleanup();
-      process.exit(terminateCode);
     }
-
-    // Process died
-    if (!isProcessAlive(mc.pid)) {
-      const exitCode = await mc.proc.exited;
-      if (exitCode === 0) {
-        console.log(
-          c("32", `[orchestrate] Process exited cleanly (${elapsedSec}s)`),
-        );
-      } else {
-        console.error(
-          c("31", `[orchestrate] Process exited with code ${exitCode}`),
-        );
-        if (!verbose) printFailureTail(buffers, 50, "-v");
-      }
-      process.exit(exitCode);
-    }
-
-    // Timeout
-    const idleSeconds = Math.floor((Date.now() - lastActivity) / 1000);
-    const timedOut = gameStarted
-      ? idleSeconds > INACTIVITY_TIMEOUT
-      : elapsedSec > EARLY_TIMEOUT;
-    if (timedOut) {
-      const reason = gameStarted
-        ? `No activity for ${idleSeconds}s (limit: ${INACTIVITY_TIMEOUT}s)`
-        : `Game did not start within ${EARLY_TIMEOUT}s`;
-      console.error(c("31", `[orchestrate] Timeout: ${reason}`));
-      if (!verbose) printFailureTail(buffers, 50, "-v");
-      await mc.cleanup();
-      process.exit(3);
-    }
-
-    await sleep(500);
-  }
-} catch (err) {
-  console.error(c("31", `[orchestrate] Monitoring error: ${err}`));
-  await mc.cleanup();
-  process.exit(1);
-}
+    return exitCode;
+  },
+});

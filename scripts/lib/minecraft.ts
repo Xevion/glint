@@ -52,6 +52,24 @@ export const EARLY_CRASH_PATTERNS = [
   /Error: Could not find or load main class/,
 ];
 
+/** Valid Minecraft mod platform identifiers. */
+export type Platform = "fabric" | "neoforge";
+
+/**
+ * Validate that a platform string is a valid mod platform.
+ * Exits with code 1 and an error message if invalid.
+ */
+export function validatePlatform(
+  platform: string,
+): asserts platform is Platform {
+  if (platform !== "fabric" && platform !== "neoforge") {
+    console.error(
+      c("31", `Invalid platform: ${platform} (must be 'fabric' or 'neoforge')`),
+    );
+    process.exit(1);
+  }
+}
+
 /** Check whether a process with the given PID is still alive. */
 export function isProcessAlive(pid: number): boolean {
   try {
@@ -298,5 +316,101 @@ export function printFailureTail(
     console.error(
       `   grep -i "error\\|exception\\|fatal" mod/${platform}/run/logs/latest.log | tail -50`,
     );
+  }
+}
+
+/** Configuration for the unified monitor loop. */
+export interface MonitorLoopConfig {
+  /** Minecraft process handle. */
+  mc: MinecraftProcess;
+  /** Cleanup function called before exit. */
+  cleanup: () => Promise<void>;
+  /** Polling interval in ms (default: 500). */
+  pollInterval?: number;
+  /** Label for the catch-block error message. */
+  label?: string;
+
+  /** Return true when the operation has completed successfully. */
+  isComplete: () => boolean;
+  /** Handle successful completion. Return the process exit code. */
+  onComplete: (elapsedSec: number) => Promise<number>;
+
+  /** Return true when a fatal error has been detected. */
+  isFailed: () => boolean;
+  /** Handle failure. Return the process exit code. */
+  onFailed: (elapsedSec: number) => Promise<number>;
+
+  /** Check if any timeout has been exceeded. Return a reason string, or null. */
+  checkTimeout: (elapsedSec: number) => string | null;
+  /** Handle timeout. Return the process exit code. */
+  onTimeout: (reason: string, elapsedSec: number) => Promise<number>;
+
+  /** Handle unexpected process death. Return the process exit code. */
+  onProcessDied: (elapsedSec: number) => Promise<number>;
+}
+
+/**
+ * Unified polling monitor loop for Minecraft process management.
+ *
+ * Polls at `pollInterval` (default 500ms), checking in order:
+ * isComplete → isFailed → checkTimeout → process death.
+ *
+ * Each handler returns an exit code; the loop calls cleanup() then
+ * process.exit() with that code. Never returns.
+ */
+export async function runMonitorLoop(
+  config: MonitorLoopConfig,
+): Promise<never> {
+  const {
+    mc,
+    cleanup,
+    pollInterval = 500,
+    label = "monitor",
+    isComplete,
+    onComplete,
+    isFailed,
+    onFailed,
+    checkTimeout,
+    onTimeout,
+    onProcessDied,
+  } = config;
+
+  const startTime = Date.now();
+
+  try {
+    while (true) {
+      const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+
+      if (isComplete()) {
+        const code = await onComplete(elapsedSec);
+        await cleanup();
+        process.exit(code);
+      }
+
+      if (isFailed()) {
+        const code = await onFailed(elapsedSec);
+        await cleanup();
+        process.exit(code);
+      }
+
+      const timeoutReason = checkTimeout(elapsedSec);
+      if (timeoutReason !== null) {
+        const code = await onTimeout(timeoutReason, elapsedSec);
+        await cleanup();
+        process.exit(code);
+      }
+
+      if (!isProcessAlive(mc.pid)) {
+        const code = await onProcessDied(elapsedSec);
+        await cleanup();
+        process.exit(code);
+      }
+
+      await sleep(pollInterval);
+    }
+  } catch (err) {
+    console.error(c("31", `[${label}] Monitoring error: ${err}`));
+    await cleanup();
+    process.exit(1);
   }
 }

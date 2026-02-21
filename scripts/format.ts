@@ -8,6 +8,7 @@
  *   Omit targets to format everything.
  */
 
+import { getCommand } from './lib/commands';
 import { c } from './lib/fmt';
 import { run, runPiped } from './lib/proc';
 import { isAll, resolveTargets, targetLabel } from './lib/targets';
@@ -38,11 +39,12 @@ if (!isAll(targets)) {
 }
 
 if (targets.subsystems.has('frontend')) {
-	run(['bun', 'run', '--cwd', 'frontend', 'format']);
+	run(getCommand('frontend', 'format-apply').cmd);
 }
 if (targets.subsystems.has('backend')) {
-	run(['cargo', 'fmt', '--manifest-path', 'backend/Cargo.toml']);
+	run(getCommand('backend', 'format-apply').cmd);
 }
 if (targets.subsystems.has('mod')) {
-	runPiped(['./gradlew', 'spotlessApply', 'ktlintFormat', '--quiet'], { cwd: 'mod' });
+	const def = getCommand('mod', 'format-apply');
+	runPiped(def.cmd, { cwd: def.cwd });
 }

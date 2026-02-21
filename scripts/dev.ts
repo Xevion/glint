@@ -17,6 +17,7 @@
 
 import { existsSync } from "fs";
 import { parseFlags, c } from "./lib/fmt";
+import { validatePlatform } from "./lib/minecraft";
 import { run, ProcessGroup } from "./lib/proc";
 import { BackendWatcher } from "./lib/watch";
 
@@ -61,11 +62,7 @@ const noWatch = flags["no-watch"];
 const release = flags.release;
 const platform = flags.platform as string;
 
-// Validate platform
-if (platform !== "fabric" && platform !== "neoforge") {
-  console.error(`Invalid platform: ${platform} (must be 'fabric' or 'neoforge')`);
-  process.exit(1);
-}
+validatePlatform(platform);
 
 // Determine what to run based on flags
 // Default: frontend + backend

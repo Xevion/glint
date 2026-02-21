@@ -32,7 +32,6 @@ import {
   BUILD_ERROR_PATTERNS,
   FATAL_MIXIN_ERRORS,
   EARLY_CRASH_PATTERNS,
-  isProcessAlive,
   sleep,
   extractErrorContext,
   ensureQuietOptions,
@@ -40,6 +39,8 @@ import {
   spawnMinecraft,
   registerSignalHandlers,
   printFailureTail,
+  validatePlatform,
+  runMonitorLoop,
   type StreamBuffers,
   type PatternAction,
 } from "./lib/minecraft";
@@ -78,12 +79,7 @@ Exit codes:
 const platform = flags.platform as string;
 const verbose = flags.verbose || !!process.env.VERBOSE;
 
-if (platform !== "fabric" && platform !== "neoforge") {
-  console.error(
-    c("31", `Invalid platform: ${platform} (must be 'fabric' or 'neoforge')`),
-  );
-  process.exit(1);
-}
+validatePlatform(platform);
 
 const SESSION_ID = randomUUID();
 const SESSION_FILE = `/tmp/glint-smoke-${SESSION_ID}.session`;
@@ -204,91 +200,81 @@ console.log(
   ),
 );
 
-const startTime = Date.now();
+await runMonitorLoop({
+  mc,
+  cleanup: cleanupAll,
+  label: "smoke",
 
-try {
-  while (true) {
-    const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
-
-    if (testPassed) {
-      await sleep(2000);
-      if (testFailed) {
-        console.error(c("31", "[FAIL] Late error detected!"));
-        console.error(failureReason);
-        await cleanupAll();
-        process.exit(failureExitCode);
-      }
-
-      console.log(
-        c("32", `[PASS] Smoke test passed! (elapsed: ${elapsedSec}s)`),
-      );
-
-      if (warningCount > 0) {
-        console.warn(c("33", `[WARN] ${warningCount} warning(s) detected`));
-        if (verbose) {
-          warnings.forEach((warning, idx) => {
-            console.warn(`\nWarning ${idx + 1}:`);
-            console.warn(warning);
-          });
-        } else {
-          console.warn("   Run with -v to see details");
-        }
-      }
-
-      await cleanupAll();
-      process.exit(0);
-    }
-
+  isComplete: () => testPassed,
+  onComplete: async (elapsedSec) => {
+    await sleep(2000);
     if (testFailed) {
-      console.error(c("31", "[FAIL] Test failed!"));
-      console.error("");
+      console.error(c("31", "[FAIL] Late error detected!"));
       console.error(failureReason);
-      console.error("");
-      if (!verbose) printFailureTail(buffers, 100, "-v or VERBOSE=1", platform);
-      await cleanupAll();
-      process.exit(failureExitCode);
+      return failureExitCode;
     }
 
+    console.log(
+      c("32", `[PASS] Smoke test passed! (elapsed: ${elapsedSec}s)`),
+    );
+
+    if (warningCount > 0) {
+      console.warn(c("33", `[WARN] ${warningCount} warning(s) detected`));
+      if (verbose) {
+        warnings.forEach((warning, idx) => {
+          console.warn(`\nWarning ${idx + 1}:`);
+          console.warn(warning);
+        });
+      } else {
+        console.warn("   Run with -v to see details");
+      }
+    }
+
+    return 0;
+  },
+
+  isFailed: () => testFailed,
+  onFailed: async () => {
+    console.error(c("31", "[FAIL] Test failed!"));
+    console.error("");
+    console.error(failureReason);
+    console.error("");
+    if (!verbose) printFailureTail(buffers, 100, "-v or VERBOSE=1", platform);
+    return failureExitCode;
+  },
+
+  checkTimeout: (elapsedSec) => {
     const currentTimeout = gameStarted ? TIMEOUT : EARLY_TIMEOUT;
     if (elapsedSec > currentTimeout) {
-      console.error(
-        c(
-          "31",
-          `[FAIL] Timeout exceeded (${currentTimeout}s, game ${gameStarted ? "started" : "not started"})!`,
-        ),
-      );
-      console.error("");
-      if (verbose) {
-        console.error("Full output:");
-        console.error(buffers.stdout + buffers.stderr);
-      } else {
-        printFailureTail(buffers, 100, "-v or VERBOSE=1", platform);
-      }
-      await cleanupAll();
-      process.exit(3);
+      return `Timeout exceeded (${currentTimeout}s, game ${gameStarted ? "started" : "not started"})`;
     }
-
-    if (!isProcessAlive(mc.pid)) {
-      console.error(c("31", "[FAIL] Process died unexpectedly!"));
-      console.error("");
-      if (verbose) {
-        if (buffers.stderr) {
-          console.error("Full stderr output:");
-          console.error(buffers.stderr);
-        }
-        console.error("Full stdout output:");
-        console.error(buffers.stdout);
-      } else {
-        printFailureTail(buffers, 100, "-v or VERBOSE=1", platform);
-      }
-      await cleanupAll();
-      process.exit(4);
+    return null;
+  },
+  onTimeout: async (reason) => {
+    console.error(c("31", `[FAIL] ${reason}!`));
+    console.error("");
+    if (verbose) {
+      console.error("Full output:");
+      console.error(buffers.stdout + buffers.stderr);
+    } else {
+      printFailureTail(buffers, 100, "-v or VERBOSE=1", platform);
     }
+    return 3;
+  },
 
-    await sleep(500);
-  }
-} catch (err) {
-  console.error(c("31", `[FAIL] Error during monitoring: ${err}`));
-  await cleanupAll();
-  process.exit(4);
-}
+  onProcessDied: async () => {
+    console.error(c("31", "[FAIL] Process died unexpectedly!"));
+    console.error("");
+    if (verbose) {
+      if (buffers.stderr) {
+        console.error("Full stderr output:");
+        console.error(buffers.stderr);
+      }
+      console.error("Full stdout output:");
+      console.error(buffers.stdout);
+    } else {
+      printFailureTail(buffers, 100, "-v or VERBOSE=1", platform);
+    }
+    return 4;
+  },
+});

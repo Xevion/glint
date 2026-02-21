@@ -8,6 +8,7 @@
  *   Omit targets to run all unit tests in parallel.
  */
 
+import { getCommand } from './lib/commands';
 import { ProcessGroup, run } from './lib/proc';
 import { isAll, resolveTargets } from './lib/targets';
 
@@ -37,9 +38,10 @@ const all = isAll(targets) && !targets.e2e;
 
 if (all) {
 	const group = new ProcessGroup();
-	group.spawn(['bun', 'run', '--cwd', 'frontend', 'test:unit']);
-	group.spawn(['cargo', 'nextest', 'run', '--manifest-path', 'backend/Cargo.toml']);
-	group.spawn(['./gradlew', 'test', '--quiet'], { cwd: 'mod' });
+	for (const sub of ['frontend', 'backend', 'mod'] as const) {
+		const def = getCommand(sub, 'test');
+		group.spawn(def.cmd, { cwd: def.cwd });
+	}
 	const code = await group.waitForAll();
 	process.exit(code);
 }
@@ -48,7 +50,8 @@ const group = new ProcessGroup();
 let spawned = 0;
 
 if (targets.subsystems.has('frontend') && !targets.e2e) {
-	group.spawn(['bun', 'run', '--cwd', 'frontend', 'test:unit']);
+	const def = getCommand('frontend', 'test');
+	group.spawn(def.cmd, { cwd: def.cwd });
 	spawned++;
 }
 if (targets.e2e) {
@@ -56,11 +59,13 @@ if (targets.e2e) {
 	spawned++;
 }
 if (targets.subsystems.has('backend')) {
-	group.spawn(['cargo', 'nextest', 'run', '--manifest-path', 'backend/Cargo.toml']);
+	const def = getCommand('backend', 'test');
+	group.spawn(def.cmd, { cwd: def.cwd });
 	spawned++;
 }
 if (targets.subsystems.has('mod')) {
-	group.spawn(['./gradlew', 'test', '--quiet'], { cwd: 'mod' });
+	const def = getCommand('mod', 'test');
+	group.spawn(def.cmd, { cwd: def.cwd });
 	spawned++;
 }
 

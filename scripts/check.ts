@@ -11,6 +11,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { getCommand } from './lib/commands';
 import { c, elapsed, isStderrTTY, parseFlags } from './lib/fmt';
 import { type CollectResult, raceInOrder, run, runPiped, spawnCollect } from './lib/proc';
 import { type Subsystem, isAll, resolveTargets, targetLabel } from './lib/targets';
@@ -65,9 +66,12 @@ const fix = flags.fix;
 
 if (fix) {
 	process.stdout.write(c('1;36', '→ Fixing...') + '\n');
-	if (has('frontend')) run(['bun', 'run', '--cwd', 'frontend', 'format']);
-	if (has('backend')) run(['cargo', 'fmt', '--manifest-path', 'backend/Cargo.toml']);
-	if (has('mod')) runPiped(['./gradlew', 'spotlessApply', 'ktlintFormat', '--quiet'], { cwd: 'mod' });
+	if (has('frontend')) run(getCommand('frontend', 'format-apply').cmd);
+	if (has('backend')) run(getCommand('backend', 'format-apply').cmd);
+	if (has('mod')) {
+		const def = getCommand('mod', 'format-apply');
+		runPiped(def.cmd, { cwd: def.cwd });
+	}
 	process.stdout.write(c('1;36', '→ Verifying...') + '\n');
 }
 
@@ -259,87 +263,57 @@ interface Check {
 	subsystem: 'frontend' | 'backend' | 'mod' | 'security';
 }
 
+/** Pick cmd/cwd fields from a registry entry for use in Check objects. */
+const cmdOf = (sub: Subsystem, action: Parameters<typeof getCommand>[1]) => {
+	const { cmd, cwd } = getCommand(sub, action);
+	return cwd ? { cmd, cwd } : { cmd };
+};
+
 const allChecks: Check[] = [
-	{
-		name: 'frontend-check',
-		subsystem: 'frontend',
-		cmd: ['bun', 'run', '--cwd', 'frontend', 'check']
-	},
-	{
-		name: 'frontend-lint',
-		subsystem: 'frontend',
-		cmd: ['bun', 'run', '--cwd', 'frontend', 'lint']
-	},
+	{ name: 'frontend-check', subsystem: 'frontend', ...cmdOf('frontend', 'type-check') },
+	{ name: 'frontend-lint', subsystem: 'frontend', ...cmdOf('frontend', 'lint') },
 	{
 		name: 'frontend-format',
 		subsystem: 'frontend',
-		cmd: ['bun', 'run', '--cwd', 'frontend', 'format:check'],
-		hint: "Run 'just format frontend' to fix."
+		...cmdOf('frontend', 'format-check'),
+		hint: "Run 'just format frontend' to fix.",
 	},
 	{
 		name: 'backend-format',
 		subsystem: 'backend',
-		cmd: ['cargo', 'fmt', '--manifest-path', 'backend/Cargo.toml', '--', '--check'],
-		hint: "Run 'just format backend' to fix."
+		...cmdOf('backend', 'format-check'),
+		hint: "Run 'just format backend' to fix.",
 	},
-	{
-		name: 'backend-lint',
-		subsystem: 'backend',
-		cmd: ['cargo', 'clippy', '--manifest-path', 'backend/Cargo.toml', '--', '--deny', 'warnings']
-	},
+	{ name: 'backend-lint', subsystem: 'backend', ...cmdOf('backend', 'lint') },
 	{
 		name: 'backend-test',
 		subsystem: 'backend',
 		cmd: [
-			'cargo',
-			'nextest',
-			'run',
-			'--manifest-path',
-			'backend/Cargo.toml',
+			...getCommand('backend', 'test').cmd,
 			'-E',
-			'not test(export_bindings) and not test(export_graphql_sdl)'
-		]
+			'not test(export_bindings) and not test(export_graphql_sdl)',
+		],
 	},
 	{
 		name: 'mod-format',
 		subsystem: 'mod',
-		cmd: ['./gradlew', 'spotlessCheck', 'ktlintCheck', '--quiet'],
-		cwd: 'mod',
-		hint: "Run 'just format mod' to fix."
+		...cmdOf('mod', 'format-check'),
+		hint: "Run 'just format mod' to fix.",
 	},
-	{
-		name: 'mod-lint',
-		subsystem: 'mod',
-		cmd: ['./gradlew', 'detekt', '--quiet'],
-		cwd: 'mod'
-	},
-	{
-		name: 'mod-check',
-		subsystem: 'mod',
-		cmd: ['./gradlew', ':common:compileKotlin', ':common:compileJava', '--quiet'],
-		cwd: 'mod'
-	},
-	{
-		name: 'mod-test',
-		subsystem: 'mod',
-		cmd: ['./gradlew', 'test', '--quiet'],
-		cwd: 'mod'
-	},
-	{
-		name: 'frontend-test',
-		subsystem: 'frontend',
-		cmd: ['bun', 'run', '--cwd', 'frontend', 'test:unit']
-	},
+	{ name: 'mod-lint', subsystem: 'mod', ...cmdOf('mod', 'lint') },
+	{ name: 'mod-check', subsystem: 'mod', ...cmdOf('mod', 'compile') },
+	{ name: 'mod-test', subsystem: 'mod', ...cmdOf('mod', 'test') },
+	{ name: 'frontend-test', subsystem: 'frontend', ...cmdOf('frontend', 'test') },
 	{
 		name: 'backend-audit',
 		subsystem: 'security',
-		cmd: ['cargo', 'audit', '-f', 'backend/Cargo.lock']
+		cmd: ['cargo', 'audit', '-f', 'backend/Cargo.lock'],
 	},
 	{
 		name: 'frontend-audit',
 		subsystem: 'security',
-		cmd: ['bun', 'scripts/audit.ts']
-	}
+		cmd: ['bun', 'scripts/audit.ts'],
+	},
 ];
 
 // Filter checks: include matching subsystems + always include security
@@ -357,54 +331,31 @@ const domains: Record<
 > = {
 	'frontend-format': {
 		peers: ['frontend-check', 'frontend-lint', 'frontend-test'],
-		format: () => runPiped(['bun', 'run', '--cwd', 'frontend', 'format']),
+		format: () => runPiped(getCommand('frontend', 'format-apply').cmd),
 		recheck: [
-			{
-				name: 'frontend-format',
-				subsystem: 'frontend',
-				cmd: ['bun', 'run', '--cwd', 'frontend', 'format:check']
-			},
-			{
-				name: 'frontend-check',
-				subsystem: 'frontend',
-				cmd: ['bun', 'run', '--cwd', 'frontend', 'check']
-			}
-		]
+			{ name: 'frontend-format', subsystem: 'frontend', ...cmdOf('frontend', 'format-check') },
+			{ name: 'frontend-check', subsystem: 'frontend', ...cmdOf('frontend', 'type-check') },
+		],
 	},
 	'backend-format': {
 		peers: ['backend-lint', 'backend-test'],
-		format: () => runPiped(['cargo', 'fmt', '--manifest-path', 'backend/Cargo.toml']),
+		format: () => runPiped(getCommand('backend', 'format-apply').cmd),
 		recheck: [
-			{
-				name: 'backend-format',
-				subsystem: 'backend',
-				cmd: ['cargo', 'fmt', '--manifest-path', 'backend/Cargo.toml', '--', '--check']
-			},
-			{
-				name: 'backend-lint',
-				subsystem: 'backend',
-				cmd: ['cargo', 'clippy', '--manifest-path', 'backend/Cargo.toml', '--', '--deny', 'warnings']
-			}
-		]
+			{ name: 'backend-format', subsystem: 'backend', ...cmdOf('backend', 'format-check') },
+			{ name: 'backend-lint', subsystem: 'backend', ...cmdOf('backend', 'lint') },
+		],
 	},
 	'mod-format': {
 		peers: ['mod-lint', 'mod-check', 'mod-test'],
-		format: () => runPiped(['./gradlew', 'spotlessApply', 'ktlintFormat', '--quiet'], { cwd: 'mod' }),
+		format: () => {
+			const def = getCommand('mod', 'format-apply');
+			return runPiped(def.cmd, { cwd: def.cwd });
+		},
 		recheck: [
-			{
-				name: 'mod-format',
-				subsystem: 'mod',
-				cmd: ['./gradlew', 'spotlessCheck', 'ktlintCheck', '--quiet'],
-				cwd: 'mod'
-			},
-			{
-				name: 'mod-check',
-				subsystem: 'mod',
-				cmd: ['./gradlew', ':common:compileKotlin', ':common:compileJava', '--quiet'],
-				cwd: 'mod'
-			}
-		]
-	}
+			{ name: 'mod-format', subsystem: 'mod', ...cmdOf('mod', 'format-check') },
+			{ name: 'mod-check', subsystem: 'mod', ...cmdOf('mod', 'compile') },
+		],
+	},
 };
 
 // Filter domains to only include targeted subsystems
