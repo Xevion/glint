@@ -48,9 +48,6 @@ impl SessionCache {
         let cache = Cache::builder()
             .max_capacity(DEFAULT_MAX_CAPACITY)
             .time_to_live(ttl)
-            // TODO: register eviction listener to clean up user_tokens reverse index
-            // when entries expire via TTL (currently leaks HashSet entries until
-            // explicit invalidation). Negligible with few users in alpha.
             .build();
 
         Self {
@@ -104,6 +101,25 @@ impl SessionCache {
                 self.inner.cache.invalidate(&token);
             }
             debug!(user_id, count, "Invalidated cached sessions for user");
+        }
+    }
+
+    /// Remove stale entries from the `user_tokens` reverse index.
+    ///
+    /// Tokens that have been evicted from the moka cache via TTL are still
+    /// referenced in the DashMap. This method scans the reverse index and
+    /// removes tokens that are no longer in the cache, dropping empty user
+    /// entries entirely.
+    pub fn cleanup_stale_tokens(&self) {
+        let mut removed = 0usize;
+        self.inner.user_tokens.retain(|_user_id, tokens| {
+            let before = tokens.len();
+            tokens.retain(|t| self.inner.cache.get(t).is_some());
+            removed += before - tokens.len();
+            !tokens.is_empty()
+        });
+        if removed > 0 {
+            debug!(removed, "Cleaned up stale session cache tokens");
         }
     }
 
@@ -238,5 +254,30 @@ mod tests {
         assert!(cache.inner.cache.get(&"expires_soon".to_string()).is_some());
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert!(cache.inner.cache.get(&"expires_soon".to_string()).is_none());
+    }
+
+    #[tokio::test]
+    async fn cleanup_stale_tokens_removes_expired_entries() {
+        let cache = SessionCache::with_ttl(Duration::from_millis(50));
+        seed(&cache, 1, "token_a");
+        seed(&cache, 1, "token_b");
+        seed(&cache, 2, "token_c");
+
+        // Reverse index has entries for both users
+        assert!(cache.inner.user_tokens.get(&1).is_some());
+        assert!(cache.inner.user_tokens.get(&2).is_some());
+
+        // Wait for TTL expiration
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Tokens are gone from moka cache but reverse index is stale
+        assert!(cache.inner.cache.get(&"token_a".to_string()).is_none());
+        assert!(cache.inner.user_tokens.get(&1).is_some());
+
+        // Cleanup should remove all stale entries
+        cache.cleanup_stale_tokens();
+
+        assert!(cache.inner.user_tokens.get(&1).is_none());
+        assert!(cache.inner.user_tokens.get(&2).is_none());
     }
 }

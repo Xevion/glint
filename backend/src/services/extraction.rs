@@ -1,6 +1,8 @@
+use std::path::PathBuf;
 use std::time::Duration;
 
 use sqlx::PgPool;
+use tokio::io::AsyncWriteExt;
 use tracing::{debug, error, info, warn};
 
 use crate::extraction::limits::MAX_ARCHIVE_SIZE;
@@ -89,8 +91,6 @@ async fn process_one(pool: &PgPool, http: &reqwest::Client, version: &ShaderVers
     let download_url = match &version.download_url {
         Some(url) => url,
         None => {
-            // Shouldn't happen (query filters download_url IS NOT NULL), but
-            // mark failed defensively so it doesn't re-poll indefinitely.
             warn!(version_id, "Version has no download URL");
             if let Err(e) =
                 ShaderVersionRepo::mark_extraction_failed(pool, version_id, "no download URL").await
@@ -108,9 +108,9 @@ async fn process_one(pool: &PgPool, http: &reqwest::Client, version: &ShaderVers
         "Starting extraction"
     );
 
-    // Download
-    let bytes = match download_zip(http, download_url).await {
-        Ok(b) => b,
+    // Download to temp file (avoids holding full zip in async memory)
+    let tmp_path = match download_zip_to_file(http, download_url).await {
+        Ok(p) => p,
         Err(e) => {
             let msg = format!("download failed: {e}");
             error!(version_id, error = %e, "Download failed");
@@ -123,21 +123,29 @@ async fn process_one(pool: &PgPool, http: &reqwest::Client, version: &ShaderVers
         }
     };
 
+    let file_size = tmp_path.metadata().map(|m| m.len()).unwrap_or(0);
     debug!(
         version_id,
-        size_bytes = bytes.len(),
-        "Downloaded shader pack"
+        size_bytes = file_size,
+        "Downloaded shader pack to temp file"
     );
 
-    // Extract (CPU-bound, run on blocking thread pool)
+    // Extract (CPU-bound, run on blocking thread pool).
+    // The blocking thread opens the temp file and reads directly via seek —
+    // no full-file Vec<u8> allocation on the async side.
+    let tmp = tmp_path.clone();
     let extract_result = {
-        match tokio::task::spawn_blocking(move || crate::extraction::extract_shader_pack(&bytes))
-            .await
+        match tokio::task::spawn_blocking(move || {
+            let file = std::fs::File::open(&tmp)?;
+            crate::extraction::extract_shader_pack(file)
+        })
+        .await
         {
             Ok(result) => result,
             Err(e) => {
                 let msg = format!("extraction task panicked: {e}");
                 error!(version_id, error = %e, "Extraction task panicked");
+                let _ = std::fs::remove_file(&tmp_path);
                 if let Err(mark_err) =
                     ShaderVersionRepo::mark_extraction_failed(pool, version_id, &msg).await
                 {
@@ -147,6 +155,9 @@ async fn process_one(pool: &PgPool, http: &reqwest::Client, version: &ShaderVers
             }
         }
     };
+
+    // Clean up temp file regardless of extraction outcome
+    let _ = std::fs::remove_file(&tmp_path);
 
     let data = match extract_result {
         Ok(d) => d,
@@ -164,7 +175,6 @@ async fn process_one(pool: &PgPool, http: &reqwest::Client, version: &ShaderVers
 
     let profile_count = data.properties.as_ref().map_or(0, |p| p.profiles.len());
 
-    // Persist (profiles + metadata + status update in one transaction)
     if let Err(e) = ExtractionRepo::persist_extraction(pool, version_id, &data).await {
         let msg = format!("persist failed: {e}");
         error!(version_id, error = %e, "Failed to persist extraction data");
@@ -187,12 +197,12 @@ async fn process_one(pool: &PgPool, http: &reqwest::Client, version: &ShaderVers
     );
 }
 
-/// Download a shader pack zip archive from the given URL.
+/// Stream a shader pack zip archive to a temporary file.
 ///
-/// Validates response status and enforces the archive size limit before
-/// reading the full body.
-async fn download_zip(http: &reqwest::Client, url: &str) -> Result<Vec<u8>, DownloadError> {
-    let response = http
+/// Validates response status and enforces the archive size limit via
+/// Content-Length header (if present) and total bytes written.
+async fn download_zip_to_file(http: &reqwest::Client, url: &str) -> Result<PathBuf, DownloadError> {
+    let mut response = http
         .get(url)
         .timeout(DOWNLOAD_TIMEOUT)
         .send()
@@ -204,7 +214,6 @@ async fn download_zip(http: &reqwest::Client, url: &str) -> Result<Vec<u8>, Down
         return Err(DownloadError::BadStatus(status.as_u16()));
     }
 
-    // Check Content-Length header if present for early rejection
     if let Some(content_length) = response.content_length()
         && content_length as usize > MAX_ARCHIVE_SIZE
     {
@@ -214,16 +223,27 @@ async fn download_zip(http: &reqwest::Client, url: &str) -> Result<Vec<u8>, Down
         });
     }
 
-    let bytes = response.bytes().await.map_err(DownloadError::Http)?;
+    let tmp_path = std::env::temp_dir().join(format!("glint-extract-{}", nanoid::nanoid!(12)));
+    let mut file = tokio::fs::File::create(&tmp_path)
+        .await
+        .map_err(DownloadError::Io)?;
 
-    if bytes.len() > MAX_ARCHIVE_SIZE {
-        return Err(DownloadError::TooLarge {
-            size: bytes.len(),
-            max: MAX_ARCHIVE_SIZE,
-        });
+    let mut total: usize = 0;
+    while let Some(chunk) = response.chunk().await.map_err(DownloadError::Http)? {
+        total += chunk.len();
+        if total > MAX_ARCHIVE_SIZE {
+            file.shutdown().await.ok();
+            let _ = tokio::fs::remove_file(&tmp_path).await;
+            return Err(DownloadError::TooLarge {
+                size: total,
+                max: MAX_ARCHIVE_SIZE,
+            });
+        }
+        file.write_all(&chunk).await.map_err(DownloadError::Io)?;
     }
+    file.shutdown().await.map_err(DownloadError::Io)?;
 
-    Ok(bytes.to_vec())
+    Ok(tmp_path)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -236,4 +256,7 @@ enum DownloadError {
 
     #[error("archive too large: {size} bytes (max {max})")]
     TooLarge { size: usize, max: usize },
+
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
 }

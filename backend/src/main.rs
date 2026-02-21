@@ -1,3 +1,6 @@
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 use std::net::SocketAddr;
 use std::time::Duration;
 
@@ -164,7 +167,7 @@ async fn main() -> anyhow::Result<()> {
         metadata_tx,
         event_tx,
         analytics,
-        session_cache,
+        session_cache.clone(),
     );
 
     // Spawn background services with graceful shutdown support
@@ -202,9 +205,11 @@ async fn main() -> anyhow::Result<()> {
 
     services.spawn("session-cleanup", {
         let pool = pool.clone();
+        let cache = session_cache.clone();
         |ctx| async move {
             let mut interval = tokio::time::interval(Duration::from_secs(3600));
             while ctx.tick(&mut interval).await {
+                cache.cleanup_stale_tokens();
                 match SessionRepo::delete_expired(&pool).await {
                     Ok(count) if count > 0 => {
                         info!(count, "Purged expired sessions");

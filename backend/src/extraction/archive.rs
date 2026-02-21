@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read};
+use std::io::{Read, Seek, SeekFrom};
 
 use super::ExtractionError;
 use super::limits;
@@ -15,16 +15,18 @@ pub struct ZipScanResult {
 }
 
 /// Scan a zip archive's structure without extracting files.
-pub fn scan_zip(data: &[u8]) -> Result<ZipScanResult, ExtractionError> {
-    if data.len() > limits::MAX_ARCHIVE_SIZE {
+pub fn scan_zip<R: Read + Seek>(mut reader: R) -> Result<ZipScanResult, ExtractionError> {
+    let size = reader.seek(SeekFrom::End(0))? as usize;
+    reader.seek(SeekFrom::Start(0))?;
+
+    if size > limits::MAX_ARCHIVE_SIZE {
         return Err(ExtractionError::ArchiveTooLarge {
-            size: data.len(),
+            size,
             max: limits::MAX_ARCHIVE_SIZE,
         });
     }
 
-    let cursor = Cursor::new(data);
-    let archive = zip::ZipArchive::new(cursor)?;
+    let archive = zip::ZipArchive::new(reader)?;
 
     if archive.len() > limits::MAX_ENTRY_COUNT {
         return Err(ExtractionError::TooManyEntries {
@@ -83,9 +85,12 @@ pub fn scan_zip(data: &[u8]) -> Result<ZipScanResult, ExtractionError> {
 }
 
 /// Read a specific entry from a zip archive by path, with size limit enforcement.
-pub fn read_zip_entry(data: &[u8], path: &str, max_size: usize) -> Result<String, ExtractionError> {
-    let cursor = Cursor::new(data);
-    let mut archive = zip::ZipArchive::new(cursor)?;
+pub fn read_zip_entry<R: Read + Seek>(
+    reader: R,
+    path: &str,
+    max_size: usize,
+) -> Result<String, ExtractionError> {
+    let mut archive = zip::ZipArchive::new(reader)?;
 
     let entry = match archive.by_name(path) {
         Ok(entry) => entry,
@@ -121,7 +126,7 @@ pub fn read_zip_entry(data: &[u8], path: &str, max_size: usize) -> Result<String
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
+    use std::io::{Cursor, Write};
     use zip::write::SimpleFileOptions;
 
     fn make_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
@@ -144,7 +149,7 @@ mod tests {
             ("shaders/lang/en_US.lang", b"profile.LOW=Low"),
             ("shaders/gbuffers_terrain.vsh", b""),
         ]);
-        let result = scan_zip(&zip).unwrap();
+        let result = scan_zip(Cursor::new(zip.as_slice())).unwrap();
         assert_eq!(result.file_paths.len(), 3);
         assert!(
             result
@@ -159,7 +164,7 @@ mod tests {
             ("shaders/world0/gbuffers_terrain.vsh", b""),
             ("shaders/world-1/gbuffers_terrain.vsh", b""),
         ]);
-        let result = scan_zip(&zip).unwrap();
+        let result = scan_zip(Cursor::new(zip.as_slice())).unwrap();
         assert!(result.dimension_support.contains(&"overworld".into()));
         assert!(result.dimension_support.contains(&"nether".into()));
         assert!(!result.dimension_support.contains(&"end".into()));
@@ -168,14 +173,14 @@ mod tests {
     #[test]
     fn test_custom_texture_detection() {
         let zip = make_zip(&[("shaders/image/noise.png", b"fake-png")]);
-        let result = scan_zip(&zip).unwrap();
+        let result = scan_zip(Cursor::new(zip.as_slice())).unwrap();
         assert!(result.has_custom_textures);
     }
 
     #[test]
     fn test_no_custom_textures() {
         let zip = make_zip(&[("shaders/gbuffers_terrain.vsh", b"")]);
-        let result = scan_zip(&zip).unwrap();
+        let result = scan_zip(Cursor::new(zip.as_slice())).unwrap();
         assert!(!result.has_custom_textures);
     }
 
@@ -184,7 +189,7 @@ mod tests {
         let content = "key=value\nother=thing";
         let zip = make_zip(&[("shaders/shaders.properties", content.as_bytes())]);
         let result = read_zip_entry(
-            &zip,
+            Cursor::new(zip.as_slice()),
             "shaders/shaders.properties",
             limits::MAX_PROPERTIES_SIZE,
         )
@@ -196,7 +201,7 @@ mod tests {
     fn test_read_entry_not_found() {
         let zip = make_zip(&[("shaders/other.txt", b"")]);
         let result = read_zip_entry(
-            &zip,
+            Cursor::new(zip.as_slice()),
             "shaders/shaders.properties",
             limits::MAX_PROPERTIES_SIZE,
         );
@@ -207,15 +212,14 @@ mod tests {
     fn test_read_entry_too_large() {
         let big = vec![b'x'; 100];
         let zip = make_zip(&[("big.txt", &big)]);
-        let result = read_zip_entry(&zip, "big.txt", 50);
+        let result = read_zip_entry(Cursor::new(zip.as_slice()), "big.txt", 50);
         assert!(matches!(result, Err(ExtractionError::EntryTooLarge { .. })));
     }
 
     #[test]
     fn test_too_many_entries_accepted() {
-        // Verify that a small archive with few entries succeeds.
         let zip = make_zip(&[("a.txt", b""), ("b.txt", b"")]);
-        let result = scan_zip(&zip);
+        let result = scan_zip(Cursor::new(zip.as_slice()));
         assert!(result.is_ok());
     }
 }

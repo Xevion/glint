@@ -8,6 +8,8 @@ pub mod shader_props;
 
 pub use error::ExtractionError;
 
+use std::io::{Read, Seek, SeekFrom};
+
 use self::archive::ZipScanResult;
 use self::lang::LangData;
 use self::shader_props::ShaderPropertiesData;
@@ -20,20 +22,26 @@ pub struct ShaderPackData {
     pub scan: ZipScanResult,
 }
 
-/// Extract all metadata from an in-memory shader pack zip archive.
+/// Extract all metadata from a shader pack zip archive.
 ///
-/// This is the main entry point for the extraction module. It:
+/// Accepts any seekable reader (e.g. `File`, `Cursor<Vec<u8>>`).
+/// The archive is re-opened for each entry read via seek-to-start,
+/// so the reader must support seeking.
+///
 /// 1. Scans the zip structure (file paths, dimensions, textures)
 /// 2. Reads and parses shaders.properties (if present)
 /// 3. Reads and parses en_US.lang (if present)
 ///
 /// Missing files are not errors — many shader packs omit shaders.properties
 /// or lang files entirely.
-pub fn extract_shader_pack(data: &[u8]) -> Result<ShaderPackData, ExtractionError> {
-    let scan = archive::scan_zip(data)?;
+pub fn extract_shader_pack<R: Read + Seek>(
+    mut reader: R,
+) -> Result<ShaderPackData, ExtractionError> {
+    let scan = archive::scan_zip(&mut reader)?;
 
+    reader.seek(SeekFrom::Start(0))?;
     let properties = match archive::read_zip_entry(
-        data,
+        &mut reader,
         "shaders/shaders.properties",
         limits::MAX_PROPERTIES_SIZE,
     ) {
@@ -45,8 +53,12 @@ pub fn extract_shader_pack(data: &[u8]) -> Result<ShaderPackData, ExtractionErro
         Err(e) => return Err(e),
     };
 
-    let lang = match archive::read_zip_entry(data, "shaders/lang/en_US.lang", limits::MAX_LANG_SIZE)
-    {
+    reader.seek(SeekFrom::Start(0))?;
+    let lang = match archive::read_zip_entry(
+        &mut reader,
+        "shaders/lang/en_US.lang",
+        limits::MAX_LANG_SIZE,
+    ) {
         Ok(content) => Some(lang::parse_lang(&content)?),
         Err(ExtractionError::EntryNotFound(_)) => None,
         Err(e) => return Err(e),
@@ -100,7 +112,7 @@ mod tests {
             ("shaders/world-1/gbuffers_terrain.vsh", b""),
         ]);
 
-        let result = extract_shader_pack(&zip).unwrap();
+        let result = extract_shader_pack(Cursor::new(zip.as_slice())).unwrap();
 
         // Scan
         assert_eq!(result.scan.file_paths.len(), 5);
@@ -128,7 +140,7 @@ mod tests {
     #[test]
     fn test_extraction_without_properties() {
         let zip = make_zip(&[("shaders/gbuffers_terrain.vsh", b"")]);
-        let result = extract_shader_pack(&zip).unwrap();
+        let result = extract_shader_pack(Cursor::new(zip.as_slice())).unwrap();
         assert!(result.properties.is_none());
         assert!(result.lang.is_none());
         assert_eq!(result.scan.file_paths.len(), 1);
@@ -137,7 +149,7 @@ mod tests {
     #[test]
     fn test_extraction_empty_archive() {
         let zip = make_zip(&[]);
-        let result = extract_shader_pack(&zip).unwrap();
+        let result = extract_shader_pack(Cursor::new(zip.as_slice())).unwrap();
         assert!(result.properties.is_none());
         assert!(result.lang.is_none());
         assert!(result.scan.file_paths.is_empty());
@@ -147,7 +159,7 @@ mod tests {
     fn test_archive_too_large_rejected() {
         // Size check happens before zip parsing, so data needn't be valid zip
         let oversized = vec![0u8; limits::MAX_ARCHIVE_SIZE + 1];
-        let result = extract_shader_pack(&oversized);
+        let result = extract_shader_pack(Cursor::new(oversized.as_slice()));
         assert!(matches!(
             result,
             Err(ExtractionError::ArchiveTooLarge { .. })

@@ -4,7 +4,7 @@ FROM rust:1.91-slim AS chef
 WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev \
+    pkg-config libssl-dev make \
     && rm -rf /var/lib/apt/lists/* \
     && cargo install cargo-chef --locked
 

@@ -86,7 +86,7 @@ log('info', 'Axum backend is healthy');
 
 log('info', 'Starting SvelteKit SSR', { host: '0.0.0.0', port: PORT });
 const bunProc = spawn({
-	cmd: ['bun', '--preload', '/app/web/console-logger.js', 'build/index.js'],
+	cmd: ['bun', '--smol', '--preload', '/app/web/console-logger.js', 'build/index.js'],
 	cwd: '/app/web',
 	env: {
 		...sharedEnv,
