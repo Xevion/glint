@@ -23,6 +23,7 @@ import {
 	getModrinthUrl
 } from '$lib/utils/format';
 import { imageUrl } from '$lib/utils/image';
+import { slugify } from '$lib/utils/slugify';
 import {
 	Camera,
 	ChevronDown,
@@ -267,18 +268,14 @@ const ogDescription = $derived.by(() => {
 					<div class="flex flex-wrap items-baseline gap-x-2">
 						<h1 class="text-2xl font-bold text-card-foreground sm:text-3xl">{shader.name}</h1>
 						{#if shader.authors.length > 0}
-							<!-- eslint-disable svelte/no-navigation-without-resolve -->
 							<span class="text-sm text-muted-foreground">
 								by {#each shader.authors as author, i (author.name)}{#if i > 0},
-								{/if}{#if author.url}<a
-											href={author.url}
-											target="_blank"
-											rel="noopener noreferrer"
+								{/if}<a
+											href={resolve('/authors/[slug]', { slug: slugify(author.name) })}
 											class="text-card-foreground underline decoration-foreground/30 underline-offset-2 transition-colors hover:decoration-foreground"
 										>{author.name}</a
-									>{:else}<span class="text-card-foreground">{author.name}</span>{/if}{/each}
+									>{/each}
 							</span>
-							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/if}
 				</div>
 			</div>

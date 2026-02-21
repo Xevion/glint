@@ -208,6 +208,20 @@ pub struct ShaderSearchRequest {
     pub sort: Option<ShaderSearchSort>,
 }
 
+/// Aggregated author data across all shaders by an author name.
+#[derive(Debug, Clone, FromRow)]
+pub struct AuthorAggregate {
+    pub name: String,
+    pub shader_count: i64,
+    pub total_views: i64,
+    pub total_captures: i64,
+    pub last_modified: DateTime<Utc>,
+    pub image_path: Option<String>,
+    pub thumbhash: Option<String>,
+    pub top_shader_name: Option<String>,
+    pub top_shader_slug: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateShaderRequest {
     pub name: String,

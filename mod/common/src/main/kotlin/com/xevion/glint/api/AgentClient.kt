@@ -74,9 +74,9 @@ object AgentClient {
         presignedUrl: String,
         fileBytes: ByteArray,
         contentType: String = "image/webp",
-    ): Result<Unit> =
-        try {
-            val connection = URI(presignedUrl).toURL().openConnection() as HttpURLConnection
+    ): Result<Unit> {
+        val connection = URI(presignedUrl).toURL().openConnection() as HttpURLConnection
+        return try {
             connection.requestMethod = "PUT"
             connection.setRequestProperty("Content-Type", contentType)
             connection.doOutput = true
@@ -85,18 +85,18 @@ object AgentClient {
             connection.outputStream.use { it.write(fileBytes) }
 
             when (connection.responseCode) {
-                in 200..299 -> {
-                    Result.success(Unit)
-                }
-
+                in 200..299 -> Result.success(Unit)
                 else -> {
-                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    val errorBody = connection.errorStream?.use { it.readBytes() }?.toString(StandardCharsets.UTF_8)
                     Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
                 }
             }
         } catch (e: Exception) {
             Result.failure(ApiError.fromException(e))
+        } finally {
+            connection.disconnect()
         }
+    }
 
     fun confirmUpload(
         client: HttpClient,

@@ -218,12 +218,12 @@ class AssetPreparer(
         expectedHash: String?,
         label: String,
     ): File? {
+        val connection =
+            java.net
+                .URI(url)
+                .toURL()
+                .openConnection() as java.net.HttpURLConnection
         try {
-            val connection =
-                java.net
-                    .URI(url)
-                    .toURL()
-                    .openConnection() as java.net.HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 10000
             connection.readTimeout = 120000
@@ -242,7 +242,6 @@ class AssetPreparer(
                 }
             }
 
-            // Verify downloaded file hash if expected
             if (expectedHash != null) {
                 val downloadedHash = sha1Hex(targetFile)
                 if (downloadedHash != expectedHash) {
@@ -265,6 +264,8 @@ class AssetPreparer(
             log.error(e, "Failed to download file") { "label" to label }
             targetFile.delete()
             return null
+        } finally {
+            connection.disconnect()
         }
     }
 

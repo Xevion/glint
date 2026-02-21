@@ -68,9 +68,8 @@ class HttpClient(
     ): Result<T> {
         val startUrl = if (builder.fullUrl != null) builder.fullUrl!! else "$baseUrl${builder.path}"
 
+        val (connection, _) = executeWithRedirects(startUrl, builder)
         return try {
-            val (connection, _) = executeWithRedirects(startUrl, builder)
-
             val responseCode = connection.responseCode
             val statusHandler = builder.statusHandlers[responseCode]
             if (statusHandler != null) {
@@ -78,7 +77,7 @@ class HttpClient(
             }
 
             if (responseCode in builder.expectedStatus) {
-                val body = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                val body = connection.inputStream.use { it.readBytes() }.toString(StandardCharsets.UTF_8)
                 try {
                     Result.success(json.decodeFromString(serializer, body))
                 } catch (e: Exception) {
@@ -88,20 +87,21 @@ class HttpClient(
                 val retryAfter = connection.getHeaderField("Retry-After")?.toLongOrNull() ?: 1L
                 Result.failure(ApiError.RateLimited(retryAfter))
             } else {
-                val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                val errorBody = connection.errorStream?.use { it.readBytes() }?.toString(StandardCharsets.UTF_8)
                 Result.failure(ApiError.HttpError(responseCode, errorBody))
             }
         } catch (e: Exception) {
             Result.failure(ApiError.fromException(e))
+        } finally {
+            connection.disconnect()
         }
     }
 
     fun executeUnitRequest(builder: RequestBuilder): Result<Unit> {
         val startUrl = if (builder.fullUrl != null) builder.fullUrl!! else "$baseUrl${builder.path}"
 
+        val (connection, _) = executeWithRedirects(startUrl, builder)
         return try {
-            val (connection, _) = executeWithRedirects(startUrl, builder)
-
             val responseCode = connection.responseCode
             val statusHandler = builder.statusHandlers[responseCode]
             if (statusHandler != null) {
@@ -114,11 +114,13 @@ class HttpClient(
                 val retryAfter = connection.getHeaderField("Retry-After")?.toLongOrNull() ?: 1L
                 Result.failure(ApiError.RateLimited(retryAfter))
             } else {
-                val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                val errorBody = connection.errorStream?.use { it.readBytes() }?.toString(StandardCharsets.UTF_8)
                 Result.failure(ApiError.HttpError(responseCode, errorBody))
             }
         } catch (e: Exception) {
             Result.failure(ApiError.fromException(e))
+        } finally {
+            connection.disconnect()
         }
     }
 
@@ -144,9 +146,11 @@ class HttpClient(
                 return Pair(connection, currentUrl)
             }
 
-            val location =
-                connection.getHeaderField("Location")
-                    ?: return Pair(connection, currentUrl)
+            val location = connection.getHeaderField("Location")
+            connection.disconnect()
+            if (location == null) {
+                return Pair(connection, currentUrl)
+            }
 
             currentUrl = URI(currentUrl).resolve(location).toString()
 

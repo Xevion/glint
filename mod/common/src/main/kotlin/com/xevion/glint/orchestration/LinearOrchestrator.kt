@@ -958,6 +958,7 @@ class LinearOrchestrator {
         runId = null
         outputDir = null
         pendingCapture = null
+        onCaptureTaken = null
         stagingWorld.reset()
     }
 

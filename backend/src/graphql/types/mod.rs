@@ -1,3 +1,4 @@
+pub mod author;
 pub mod background;
 pub mod capture;
 pub mod capture_health;

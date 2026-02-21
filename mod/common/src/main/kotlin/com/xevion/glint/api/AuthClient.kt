@@ -20,21 +20,20 @@ object AuthClient {
      */
     fun startDeviceAuth(apiUrl: String): Result<DeviceAuthResponse> {
         val url = "$apiUrl/api/device/authorize"
+        val connection = URI(url).toURL().openConnection() as HttpURLConnection
 
         return try {
-            val connection = URI(url).toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
             connection.connectTimeout = 5000
             connection.readTimeout = 10000
 
-            // Empty body for POST
             connection.outputStream.use { it.write("{}".toByteArray(StandardCharsets.UTF_8)) }
 
             when (connection.responseCode) {
                 200 -> {
-                    val responseBody = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    val responseBody = connection.inputStream.use { it.readBytes() }.toString(StandardCharsets.UTF_8)
                     try {
                         val response = json.decodeFromString<DeviceAuthResponse>(responseBody)
                         Result.success(response)
@@ -44,12 +43,14 @@ object AuthClient {
                 }
 
                 else -> {
-                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    val errorBody = connection.errorStream?.use { it.readBytes() }?.toString(StandardCharsets.UTF_8)
                     Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
                 }
             }
         } catch (e: Exception) {
             Result.failure(ApiError.fromException(e))
+        } finally {
+            connection.disconnect()
         }
     }
 
@@ -62,9 +63,9 @@ object AuthClient {
         deviceCode: String,
     ): Result<DeviceTokenResponse> {
         val url = "$apiUrl/api/device/token"
+        val connection = URI(url).toURL().openConnection() as HttpURLConnection
 
         return try {
-            val connection = URI(url).toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
@@ -76,7 +77,7 @@ object AuthClient {
 
             when (connection.responseCode) {
                 200 -> {
-                    val responseBody = connection.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+                    val responseBody = connection.inputStream.use { it.readBytes() }.toString(StandardCharsets.UTF_8)
                     try {
                         val response = json.decodeFromString<DeviceTokenResponse>(responseBody)
                         Result.success(response)
@@ -86,8 +87,8 @@ object AuthClient {
                 }
 
                 400 -> {
-                    // Parse error response to determine specific error type
-                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8) ?: ""
+                    val errorBody =
+                        connection.errorStream?.use { it.readBytes() }?.toString(StandardCharsets.UTF_8) ?: ""
                     try {
                         val errorJson = json.decodeFromString<JsonObject>(errorBody)
                         val errorType = errorJson["error"]?.jsonPrimitive?.content
@@ -108,12 +109,14 @@ object AuthClient {
                 }
 
                 else -> {
-                    val errorBody = connection.errorStream?.readBytes()?.toString(StandardCharsets.UTF_8)
+                    val errorBody = connection.errorStream?.use { it.readBytes() }?.toString(StandardCharsets.UTF_8)
                     Result.failure(ApiError.HttpError(connection.responseCode, errorBody))
                 }
             }
         } catch (e: Exception) {
             Result.failure(ApiError.fromException(e))
+        } finally {
+            connection.disconnect()
         }
     }
 }

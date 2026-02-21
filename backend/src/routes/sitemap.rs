@@ -88,11 +88,10 @@ async fn generate_sitemap(db: &crate::db::DbPool) -> AppResult<String> {
         );
     }
 
-    // Author pages (placeholder — routes don't exist yet)
     for entry in &authors {
         write_url(
             &mut xml,
-            &format!("/authors/{}", xml_escape(&entry.name)),
+            &format!("/authors/{}", crate::slug::slugify(&entry.name)),
             Some(entry.last_modified),
         );
     }

@@ -17,7 +17,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
@@ -56,7 +57,15 @@ class RunUploader(
 ) {
     private val log = Loggers.Orchestration.get()
     private val client = HttpClient(apiUrl, token = apiToken)
-    private val executor: ExecutorService = Executors.newFixedThreadPool(maxConcurrent)
+    private val executor: ExecutorService =
+        ThreadPoolExecutor(
+            maxConcurrent,
+            maxConcurrent,
+            0L,
+            TimeUnit.MILLISECONDS,
+            LinkedBlockingQueue(maxConcurrent * 2),
+            ThreadPoolExecutor.CallerRunsPolicy(),
+        )
     private val submittedItemIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val pendingCount = AtomicInteger(0)
     private val completedCount = AtomicInteger(0)

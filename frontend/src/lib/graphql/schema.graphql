@@ -62,6 +62,67 @@ input AdminRunFiltersInput {
 	maxDurationSecs: Int
 }
 
+type AuthorNode {
+	name: String!
+	slug: String!
+	shaderCount: Int!
+	totalViews: Int!
+	totalCaptures: Int!
+	lastModified: DateTime!
+	imagePath: String
+	thumbhash: String
+	topShaderName: String
+	topShaderSlug: String
+	"""
+	Paginated shaders by this author.
+	"""
+	shaders(
+		"""
+		Number of items to return.
+		"""
+		first: Int! = 24,
+		"""
+		Cursor to paginate after.
+		"""
+		after: String
+	): ShaderNodeConnection!
+	"""
+	Platform links (Modrinth/CurseForge profile URLs) for this author.
+	"""
+	platforms: [AuthorPlatformLink!]!
+}
+
+type AuthorNodeConnection {
+	"""
+	Information to aid in pagination.
+	"""
+	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [AuthorNodeEdge!]!
+	totalCount: Int!
+}
+
+"""
+An edge in a connection.
+"""
+type AuthorNodeEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: AuthorNode!
+	"""
+	A cursor for use in pagination
+	"""
+	cursor: String!
+}
+
+type AuthorPlatformLink {
+	platform: String!
+	url: String
+}
+
 scalar BackgroundId
 
 type BackgroundNode {
@@ -655,6 +716,36 @@ type QueryRoot {
 		"""
 		intervalHours: Int! = 1
 	): [StorageBucketNode!]!
+	"""
+	Paginated list of authors aggregated across all shaders.
+	"""
+	authors(
+		"""
+		Number of items to return (max 100)
+		"""
+		first: Int! = 20,
+		"""
+		Cursor from a previous page's endCursor
+		"""
+		after: String,
+		"""
+		Search by author name
+		"""
+		search: String,
+		"""
+		Sort: popular (default), shaders, or name
+		"""
+		sort: String
+	): AuthorNodeConnection!
+	"""
+	Get a single author by slugified name.
+	"""
+	author(
+		"""
+		Author slug (slugified name)
+		"""
+		slug: String!
+	): AuthorNode
 }
 
 scalar SceneId

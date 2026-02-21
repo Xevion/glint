@@ -1,12 +1,13 @@
 <script lang="ts">
 import { page } from '$app/state';
 import { navigationStore } from '$lib/stores/navigation.svelte';
-import { GitCompare, Home, Layers } from '@lucide/svelte';
+import { GitCompare, Home, Layers, Users } from '@lucide/svelte';
 import ThemeToggle from './ThemeToggle.svelte';
 
 const staticTabs = [
 	{ href: '/', label: 'Home', icon: Home },
 	{ href: '/shaders', label: 'Shaders', icon: Layers },
+	{ href: '/authors', label: 'Authors', icon: Users },
 	{ href: '/compare', label: 'Compare', icon: GitCompare }
 ] as const;
 

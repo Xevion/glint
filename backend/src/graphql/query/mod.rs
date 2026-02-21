@@ -1,3 +1,4 @@
+pub mod authors;
 pub mod backgrounds;
 pub mod captures;
 pub mod featured;
@@ -15,6 +16,7 @@ use crate::graphql::types::scene::SceneNode;
 use crate::repo::SceneRepo;
 use crate::state::AppState;
 
+use authors::AuthorQuery;
 use backgrounds::BackgroundQuery;
 use captures::CaptureQuery;
 use featured::FeaturedQuery;
@@ -34,6 +36,7 @@ pub struct QueryRoot(
     BackgroundQuery,
     RunQuery,
     StorageQuery,
+    AuthorQuery,
 );
 
 #[derive(Default)]

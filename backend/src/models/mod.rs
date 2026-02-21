@@ -47,10 +47,10 @@ pub use scene::{
     ReconcileSceneStatus, SyncStatus,
 };
 pub use shader::{
-    CreateShaderRequest, CreateShaderVersionRequest, ExtractionSummary, Shader, ShaderAdopted,
-    ShaderAuthor, ShaderListItem, ShaderSearchRequest, ShaderSearchResponse, ShaderSearchResult,
-    ShaderSearchSort, ShaderVersion, ShaderVersionDetail, ShaderWithCaptures, ShaderWithVersions,
-    TrendingShader, UpdateShaderRequest,
+    AuthorAggregate, CreateShaderRequest, CreateShaderVersionRequest, ExtractionSummary, Shader,
+    ShaderAdopted, ShaderAuthor, ShaderListItem, ShaderSearchRequest, ShaderSearchResponse,
+    ShaderSearchResult, ShaderSearchSort, ShaderVersion, ShaderVersionDetail, ShaderWithCaptures,
+    ShaderWithVersions, TrendingShader, UpdateShaderRequest,
 };
 pub use storage::{
     AuditObject, AuditReference, AuditSummary, CleanupKeyResult, CleanupKeyStatus,

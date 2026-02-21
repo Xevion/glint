@@ -737,6 +737,30 @@ function handleLinkKeydown(e: KeyboardEvent) {
                     </DetailField>
                 </dl>
 
+                <!-- Authors -->
+                {#if shader.authors.length > 0}
+                    <div class="space-y-3">
+                        <h3 class="text-sm font-medium">Authors ({shader.authors.length})</h3>
+                        <div class="divide-y rounded-lg border">
+                            {#each shader.authors as author (author.id)}
+                                <div class="flex items-center justify-between px-4 py-2.5 text-sm">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium">{author.name}</span>
+                                        <Badge variant="outline" class="text-xs">{author.platform}</Badge>
+                                    </div>
+                                    {#if author.url}
+                                        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                                        <a href={author.url} target="_blank" rel="noopener noreferrer"
+                                           class="text-xs text-muted-foreground hover:text-foreground">
+                                            {author.url}
+                                        </a>
+                                    {/if}
+                                </div>
+                            {/each}
+                        </div>
+                    </div>
+                {/if}
+
                 <!-- Versions -->
                 <div class="space-y-3">
                     <h3 class="text-sm font-medium">
