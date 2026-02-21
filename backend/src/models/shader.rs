@@ -149,6 +149,7 @@ pub struct ShaderAuthor {
     pub id: String,
     pub shader_id: ShaderId,
     pub name: String,
+    pub slug: String,
     pub url: Option<String>,
     pub platform: String,
 }
@@ -211,9 +212,11 @@ pub struct ShaderSearchRequest {
 }
 
 /// Aggregated author data across all shaders by an author name.
+/// Matches the `author_aggregates` SQL view columns.
 #[derive(Debug, Clone, FromRow)]
 pub struct AuthorAggregate {
     pub name: String,
+    pub slug: String,
     pub shader_count: i64,
     pub total_views: i64,
     pub total_captures: i64,

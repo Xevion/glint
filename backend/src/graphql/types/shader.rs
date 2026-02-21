@@ -15,7 +15,7 @@ use crate::state::AppState;
 
 use super::capture::CaptureWithContextNode;
 use super::connection::{
-    Connection, CursorPayload, CursorSource, TotalCount, decode_cursor_for_query,
+    Connection, CursorPayload, CursorSource, TotalCount, decode_cursor_as_datetime,
 };
 use super::taxonomy::{CategoryNode, FeatureNode};
 
@@ -89,7 +89,7 @@ impl ShaderNode {
         #[graphql(desc = "Cursor to paginate after.")] after: Option<String>,
     ) -> Result<Connection<ShaderVersionDetailNode>> {
         let state = ctx.data_unchecked::<AppState>();
-        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_as_datetime(&c)).transpose()?;
         let page = ShaderVersionRepo::list_by_shader_cursor(
             state.db(),
             self.id.as_ref(),
@@ -236,7 +236,7 @@ impl ShaderNode {
             ..Default::default()
         };
 
-        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_as_datetime(&c)).transpose()?;
         let page = CaptureRepo::list_with_context_cursor(
             db,
             &filters,
@@ -278,7 +278,7 @@ impl ShaderNode {
         );
 
         if let Some(ref vid) = effective_version_id {
-            let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+            let decoded_after = after.map(|c| decode_cursor_as_datetime(&c)).transpose()?;
             let page = ExtractionRepo::list_profiles_by_version_cursor(
                 db,
                 vid.as_ref(),

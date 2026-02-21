@@ -1,7 +1,7 @@
 use async_graphql::{Context, Object, Result};
 
 use crate::graphql::guard::AdminGuard;
-use crate::graphql::types::connection::{Connection, decode_cursor_for_query};
+use crate::graphql::types::connection::{Connection, decode_cursor_as_datetime};
 use crate::graphql::types::run::{
     AdminRunFiltersInput, CaptureRunItemNode, CaptureRunListNode, CaptureRunNode,
 };
@@ -26,7 +26,7 @@ impl RunQuery {
     ) -> Result<Connection<CaptureRunListNode>> {
         let state = ctx.data_unchecked::<AppState>();
 
-        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_as_datetime(&c)).transpose()?;
 
         let run_filters = filters.unwrap_or_default().into();
 

@@ -10,7 +10,7 @@ use crate::repo::capture::{CaptureDistinct, CaptureFilters};
 use crate::state::AppState;
 
 use super::capture::CaptureWithContextNode;
-use super::connection::{Connection, CursorPayload, CursorSource, decode_cursor_for_query};
+use super::connection::{Connection, CursorPayload, CursorSource, decode_cursor_as_datetime};
 use super::preset::PresetNode;
 use super::taxonomy::TagNode;
 use super::version::SceneVersionNode;
@@ -94,7 +94,7 @@ impl SceneNode {
             statuses: Some(vec![CaptureStatus::Completed]),
             ..Default::default()
         };
-        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_as_datetime(&c)).transpose()?;
         let page = CaptureRepo::list_with_context_cursor(
             state.db(),
             &filters,

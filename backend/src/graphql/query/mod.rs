@@ -11,7 +11,7 @@ use async_graphql::{Context, MergedObject, Object, Result};
 
 use crate::graphql::guard::require_admin_for_visibility;
 use crate::graphql::types::common::Visibility;
-use crate::graphql::types::connection::{Connection, decode_cursor_for_query};
+use crate::graphql::types::connection::{Connection, decode_cursor_as_datetime};
 use crate::graphql::types::scene::SceneNode;
 use crate::repo::SceneRepo;
 use crate::state::AppState;
@@ -59,7 +59,7 @@ impl SceneQuery {
         require_admin_for_visibility(ctx, visibility)?;
         let state = ctx.data_unchecked::<AppState>();
 
-        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_as_datetime(&c)).transpose()?;
 
         let page = SceneRepo::list_cursor(state.db(), first, decoded_after, visibility).await?;
         Ok(page.into_connection())

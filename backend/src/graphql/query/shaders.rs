@@ -2,7 +2,7 @@ use async_graphql::{Context, ErrorExtensions, Object, Result};
 
 use crate::graphql::guard::require_admin_for_visibility;
 use crate::graphql::types::common::Visibility;
-use crate::graphql::types::connection::{Connection, decode_cursor_for_query};
+use crate::graphql::types::connection::{Connection, decode_cursor_as_datetime};
 use crate::graphql::types::shader::{ShaderNode, TrendingShaderNode};
 use crate::models::Page;
 use crate::repo::{ShaderRepo, SlugRedirectRepo};
@@ -37,7 +37,7 @@ impl ShaderQuery {
 
         let state = ctx.data_unchecked::<AppState>();
 
-        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_as_datetime(&c)).transpose()?;
 
         let page = ShaderRepo::list_cursor(
             state.db(),

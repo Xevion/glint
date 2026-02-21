@@ -5,7 +5,7 @@ use crate::graphql::types::capture::{
     AdminCaptureFiltersInput, CaptureNode, CaptureWithContextNode,
 };
 use crate::graphql::types::capture_health::CaptureHealthNode;
-use crate::graphql::types::connection::{Connection, decode_cursor_for_query};
+use crate::graphql::types::connection::{Connection, decode_cursor_as_datetime};
 use crate::models::{CaptureStatus, PageQuery};
 use crate::repo::capture::{CaptureDistinct, CaptureFilters};
 use crate::repo::{CaptureHealthRepo, CaptureRepo};
@@ -25,7 +25,7 @@ impl CaptureQuery {
     ) -> Result<Connection<CaptureNode>> {
         let state = ctx.data_unchecked::<AppState>();
 
-        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_as_datetime(&c)).transpose()?;
 
         let page = CaptureRepo::list_items_cursor(state.db(), first, decoded_after).await?;
         Ok(page.into_connection())
@@ -78,7 +78,7 @@ impl CaptureQuery {
         filters: Option<AdminCaptureFiltersInput>,
     ) -> Result<Connection<CaptureWithContextNode>> {
         let state = ctx.data_unchecked::<AppState>();
-        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_as_datetime(&c)).transpose()?;
 
         let capture_filters: CaptureFilters = filters.unwrap_or_default().into();
 

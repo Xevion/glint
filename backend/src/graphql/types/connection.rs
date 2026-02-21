@@ -8,18 +8,18 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AppError, AppResult};
 
 /// Cursor payload encoded into each pagination cursor.
-/// Wire format: `base64url_no_pad(json({"id":"...","ts":epoch_millis}))`.
+/// Wire format: `base64url_no_pad(json({"id":"...","sv":sort_value}))`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CursorPayload {
     pub id: String,
-    pub ts: i64,
+    pub sv: i64,
 }
 
 impl CursorPayload {
-    pub fn new(id: &str, timestamp_millis: i64) -> Self {
+    pub fn new(id: &str, sort_value: i64) -> Self {
         Self {
             id: id.to_string(),
-            ts: timestamp_millis,
+            sv: sort_value,
         }
     }
 }
@@ -107,12 +107,17 @@ impl<T> CursorPage<T> {
     }
 }
 
-/// Decode a cursor string for use in keyset pagination queries.
-/// Returns `(datetime, id)` ready for SQL WHERE clauses.
-pub fn decode_cursor_for_query(cursor: &str) -> AppResult<(DateTime<Utc>, String)> {
+/// Decode a cursor string into its raw `(sort_value, id)` pair.
+pub fn decode_cursor_for_query(cursor: &str) -> AppResult<(i64, String)> {
     let payload = CursorPayload::decode_cursor(cursor)
         .map_err(|_| AppError::BadRequest("Invalid cursor".into()))?;
-    let dt = DateTime::from_timestamp_millis(payload.ts)
+    Ok((payload.sv, payload.id))
+}
+
+/// Decode a cursor string into `(datetime, id)` for timestamp-based keyset pagination.
+pub fn decode_cursor_as_datetime(cursor: &str) -> AppResult<(DateTime<Utc>, String)> {
+    let (sv, id) = decode_cursor_for_query(cursor)?;
+    let dt = DateTime::from_timestamp_millis(sv)
         .ok_or_else(|| AppError::BadRequest("Invalid cursor timestamp".into()))?;
-    Ok((dt, payload.id))
+    Ok((dt, id))
 }

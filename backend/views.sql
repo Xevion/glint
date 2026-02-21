@@ -7,6 +7,23 @@
 -- To apply manually: just migrate-run (runs migrations then views)
 -- Views are also applied on every app startup via db::apply_views().
 
+-- Layer 0: Base filters
+
+-- Shaders visible to public users: not deleted, with at least one
+-- completed capture (with image) from an active scene.
+CREATE OR REPLACE VIEW visible_shaders AS
+SELECT s.* FROM shaders s
+WHERE s.deleted_at IS NULL
+  AND EXISTS (
+    SELECT 1 FROM captures c
+    JOIN shader_versions sv ON c.shader_version_id = sv.id
+    JOIN scenes sc ON c.scene_id = sc.id
+    WHERE sv.shader_id = s.id
+      AND c.status = 'completed'
+      AND c.image_path IS NOT NULL
+      AND sc.active = TRUE
+  );
+
 -- Layer 1: Latest version lookups
 
 -- Latest scene version per scene (by created_at DESC, id DESC tiebreaker).
@@ -41,6 +58,56 @@ ORDER BY sv.shader_id,
     (sv.id = s.preferred_version_id) DESC,
     sv.upstream_published_at DESC NULLS LAST,
     sv.created_at DESC;
+
+-- Layer 1.5: Aggregated views
+
+-- Aggregated author stats across all visible shaders.
+-- One row per distinct author name. Used by author browsing pages.
+CREATE OR REPLACE VIEW author_aggregates AS
+SELECT
+    sa.name,
+    COALESCE(MIN(sa.slug), '') AS slug,
+    COUNT(DISTINCT sa.shader_id)::BIGINT AS shader_count,
+    COALESCE(SUM(s.view_count), 0)::BIGINT AS total_views,
+    COALESCE((SELECT COUNT(DISTINCT c2.id)
+     FROM shader_authors sa2
+     JOIN shaders s2 ON s2.id = sa2.shader_id
+     JOIN shader_versions sv2 ON sv2.shader_id = s2.id
+     JOIN captures c2 ON c2.shader_version_id = sv2.id AND c2.status = 'completed'
+     WHERE sa2.name = sa.name AND s2.deleted_at IS NULL
+    ), 0)::BIGINT AS total_captures,
+    MAX(s.updated_at) AS last_modified,
+    (SELECT c3.image_path FROM shaders s3
+     JOIN shader_authors sa3 ON sa3.shader_id = s3.id
+     JOIN shader_versions sv3 ON sv3.shader_id = s3.id
+     JOIN captures c3 ON c3.shader_version_id = sv3.id AND c3.status = 'completed' AND c3.image_path IS NOT NULL
+     WHERE sa3.name = sa.name AND s3.deleted_at IS NULL
+     ORDER BY s3.view_count DESC
+     LIMIT 1
+    ) AS image_path,
+    (SELECT c4.thumbhash FROM shaders s4
+     JOIN shader_authors sa4 ON sa4.shader_id = s4.id
+     JOIN shader_versions sv4 ON sv4.shader_id = s4.id
+     JOIN captures c4 ON c4.shader_version_id = sv4.id AND c4.status = 'completed' AND c4.image_path IS NOT NULL
+     WHERE sa4.name = sa.name AND s4.deleted_at IS NULL
+     ORDER BY s4.view_count DESC
+     LIMIT 1
+    ) AS thumbhash,
+    (SELECT s5.name FROM shaders s5
+     JOIN shader_authors sa5 ON sa5.shader_id = s5.id
+     WHERE sa5.name = sa.name AND s5.deleted_at IS NULL
+     ORDER BY s5.view_count DESC
+     LIMIT 1
+    ) AS top_shader_name,
+    (SELECT s6.slug FROM shaders s6
+     JOIN shader_authors sa6 ON sa6.shader_id = s6.id
+     WHERE sa6.name = sa.name AND s6.deleted_at IS NULL
+     ORDER BY s6.view_count DESC
+     LIMIT 1
+    ) AS top_shader_slug
+FROM shader_authors sa
+JOIN visible_shaders s ON s.id = sa.shader_id
+GROUP BY sa.name;
 
 -- Layer 2: Composed views
 

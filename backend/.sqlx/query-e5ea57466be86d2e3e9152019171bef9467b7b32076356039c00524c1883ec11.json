@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(DISTINCT s.id) AS \"count!\"\n            FROM visible_shaders s\n            JOIN shader_authors sa ON sa.shader_id = s.id\n            WHERE sa.name = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e5ea57466be86d2e3e9152019171bef9467b7b32076356039c00524c1883ec11"
+}

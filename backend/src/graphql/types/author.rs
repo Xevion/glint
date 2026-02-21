@@ -2,12 +2,11 @@ use async_graphql::{ComplexObject, Context, Result, SimpleObject};
 use chrono::{DateTime, Utc};
 
 use crate::graphql::types::connection::{
-    Connection, CursorPayload, CursorSource, decode_cursor_for_query,
+    Connection, CursorPayload, CursorSource, decode_cursor_as_datetime,
 };
 use crate::graphql::types::shader::ShaderNode;
 use crate::models::shader::AuthorAggregate;
 use crate::repo::ShaderAuthorRepo;
-use crate::slug::slugify;
 use crate::state::AppState;
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -35,7 +34,7 @@ impl AuthorNode {
         #[graphql(desc = "Cursor to paginate after.")] after: Option<String>,
     ) -> Result<Connection<ShaderNode>> {
         let state = ctx.data_unchecked::<AppState>();
-        let decoded_after = after.map(|c| decode_cursor_for_query(&c)).transpose()?;
+        let decoded_after = after.map(|c| decode_cursor_as_datetime(&c)).transpose()?;
         let page = ShaderAuthorRepo::list_shaders_by_author_cursor(
             state.db(),
             &self.name,
@@ -65,10 +64,9 @@ pub struct AuthorPlatformLink {
 
 impl From<AuthorAggregate> for AuthorNode {
     fn from(a: AuthorAggregate) -> Self {
-        let slug = slugify(&a.name);
         Self {
+            slug: a.slug,
             name: a.name,
-            slug,
             shader_count: a.shader_count,
             total_views: a.total_views,
             total_captures: a.total_captures,
@@ -83,7 +81,6 @@ impl From<AuthorAggregate> for AuthorNode {
 
 impl CursorSource for AuthorAggregate {
     fn to_cursor(&self) -> CursorPayload {
-        // Encode total_views in the timestamp field for keyset pagination
         CursorPayload::new(&self.name, self.total_views)
     }
 }

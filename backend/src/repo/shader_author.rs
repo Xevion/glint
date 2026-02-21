@@ -12,6 +12,19 @@ use crate::models::{Shader, ShaderAuthor};
 use crate::platform::PlatformAuthor;
 use crate::slug::slugify;
 
+/// ILIKE-safe search pattern from a raw query string.
+fn search_pattern(q: &str) -> Option<String> {
+    if q.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "%{}%",
+        q.replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_")
+    ))
+}
+
 pub struct ShaderAuthorRepo;
 
 impl ShaderAuthorRepo {
@@ -79,18 +92,21 @@ impl ShaderAuthorRepo {
         url: Option<&str>,
         platform: &str,
     ) -> AppResult<ShaderAuthor> {
+        let slug = slugify(name);
         sqlx::query_as!(
             ShaderAuthor,
             r#"
-            INSERT INTO shader_authors (id, shader_id, name, url, platform)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO shader_authors (id, shader_id, name, slug, url, platform)
+            VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (shader_id, name, platform) DO UPDATE SET
-                url = COALESCE(EXCLUDED.url, shader_authors.url)
+                url = COALESCE(EXCLUDED.url, shader_authors.url),
+                slug = EXCLUDED.slug
             RETURNING *
             "#,
             id,
             shader_id,
             name,
+            slug,
             url,
             platform
         )
@@ -118,19 +134,22 @@ impl ShaderAuthorRepo {
         let ids: Vec<String> = authors.iter().map(|_| crate::id::generate_id()).collect();
         let shader_ids: Vec<&str> = vec![shader_id; authors.len()];
         let names: Vec<&str> = authors.iter().map(|a| a.name.as_str()).collect();
+        let slugs: Vec<String> = authors.iter().map(|a| slugify(&a.name)).collect();
         let urls: Vec<Option<&str>> = authors.iter().map(|a| a.url.as_deref()).collect();
         let platforms: Vec<&str> = vec![platform; authors.len()];
 
         sqlx::query!(
             r#"
-            INSERT INTO shader_authors (id, shader_id, name, url, platform)
-            SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::text[]), unnest($4::text[]), unnest($5::text[])
+            INSERT INTO shader_authors (id, shader_id, name, slug, url, platform)
+            SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::text[]), unnest($4::text[]), unnest($5::text[]), unnest($6::text[])
             ON CONFLICT (shader_id, name, platform) DO UPDATE SET
-                url = COALESCE(EXCLUDED.url, shader_authors.url)
+                url = COALESCE(EXCLUDED.url, shader_authors.url),
+                slug = EXCLUDED.slug
             "#,
             &ids as &[String],
             &shader_ids as &[&str],
             &names as &[&str],
+            &slugs as &[String],
             &urls as &[Option<&str>],
             &platforms as &[&str],
         )
@@ -165,115 +184,45 @@ impl ShaderAuthorRepo {
     }
 
     /// Paginated list of unique authors aggregated across all shaders.
-    /// Only includes authors whose shaders have completed captures from active scenes.
+    /// Reads from the `author_aggregates` view (visibility filter built in).
     #[instrument(skip(db), level = "debug")]
     pub async fn list_authors_cursor(
         db: &DbPool,
         first: i32,
-        after: Option<(DateTime<Utc>, String)>,
+        after: Option<(i64, String)>,
         search: Option<&str>,
         sort: Option<&str>,
     ) -> AppResult<CursorPage<AuthorAggregate>> {
         use sqlx::QueryBuilder;
 
         let limit = first.clamp(1, 100) as i64;
+        let pattern = search.and_then(search_pattern);
 
-        let search_pattern = search.filter(|q| !q.is_empty()).map(|q| {
-            format!(
-                "%{}%",
-                q.replace('\\', "\\\\")
-                    .replace('%', "\\%")
-                    .replace('_', "\\_")
-            )
-        });
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> =
+            QueryBuilder::new("SELECT * FROM author_aggregates WHERE TRUE");
 
-        let visibility_join = "
-            JOIN shaders s ON s.id = sa.shader_id
-            WHERE s.deleted_at IS NULL
-              AND EXISTS (
-                SELECT 1 FROM captures c
-                JOIN shader_versions sv ON c.shader_version_id = sv.id
-                JOIN scenes sc ON c.scene_id = sc.id
-                WHERE sv.shader_id = s.id
-                  AND c.status = 'completed'
-                  AND c.image_path IS NOT NULL
-                  AND sc.active = TRUE
-            )";
-
-        let base_select = "
-            SELECT
-                sa.name,
-                COUNT(DISTINCT sa.shader_id)::BIGINT AS shader_count,
-                COALESCE(SUM(s.view_count), 0)::BIGINT AS total_views,
-                COALESCE((SELECT COUNT(DISTINCT c2.id)
-                 FROM shader_authors sa2
-                 JOIN shaders s2 ON s2.id = sa2.shader_id
-                 JOIN shader_versions sv2 ON sv2.shader_id = s2.id
-                 JOIN captures c2 ON c2.shader_version_id = sv2.id AND c2.status = 'completed'
-                 WHERE sa2.name = sa.name AND s2.deleted_at IS NULL
-                ), 0)::BIGINT AS total_captures,
-                MAX(s.updated_at) AS last_modified,
-                (SELECT c3.image_path FROM shaders s3
-                 JOIN shader_authors sa3 ON sa3.shader_id = s3.id
-                 JOIN shader_versions sv3 ON sv3.shader_id = s3.id
-                 JOIN captures c3 ON c3.shader_version_id = sv3.id AND c3.status = 'completed' AND c3.image_path IS NOT NULL
-                 WHERE sa3.name = sa.name AND s3.deleted_at IS NULL
-                 ORDER BY s3.view_count DESC
-                 LIMIT 1
-                ) AS image_path,
-                (SELECT c4.thumbhash FROM shaders s4
-                 JOIN shader_authors sa4 ON sa4.shader_id = s4.id
-                 JOIN shader_versions sv4 ON sv4.shader_id = s4.id
-                 JOIN captures c4 ON c4.shader_version_id = sv4.id AND c4.status = 'completed' AND c4.image_path IS NOT NULL
-                 WHERE sa4.name = sa.name AND s4.deleted_at IS NULL
-                 ORDER BY s4.view_count DESC
-                 LIMIT 1
-                ) AS thumbhash,
-                (SELECT s5.name FROM shaders s5
-                 JOIN shader_authors sa5 ON sa5.shader_id = s5.id
-                 WHERE sa5.name = sa.name AND s5.deleted_at IS NULL
-                 ORDER BY s5.view_count DESC
-                 LIMIT 1
-                ) AS top_shader_name,
-                (SELECT s6.slug FROM shaders s6
-                 JOIN shader_authors sa6 ON sa6.shader_id = s6.id
-                 WHERE sa6.name = sa.name AND s6.deleted_at IS NULL
-                 ORDER BY s6.view_count DESC
-                 LIMIT 1
-                ) AS top_shader_slug
-            FROM shader_authors sa";
-
-        let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(base_select);
-        qb.push(visibility_join);
-
-        if let Some(ref pattern) = search_pattern {
-            qb.push(" AND sa.name ILIKE ");
-            qb.push_bind(pattern.as_str());
+        if let Some(ref p) = pattern {
+            qb.push(" AND name ILIKE ");
+            qb.push_bind(p.as_str());
         }
 
-        qb.push(" GROUP BY sa.name");
-
-        // Cursor (keyset pagination over aggregated results via HAVING)
-        if let Some((ref cursor_ts, ref cursor_name)) = after {
-            let sort_value = sort.unwrap_or("popular");
-            match sort_value {
+        if let Some((ref sort_val, ref cursor_name)) = after {
+            let sort_key = sort.unwrap_or("popular");
+            match sort_key {
                 "name" => {
-                    qb.push(" HAVING sa.name > ");
+                    qb.push(" AND name > ");
                     qb.push_bind(cursor_name.as_str());
                 }
                 "shaders" => {
-                    qb.push(" HAVING (COUNT(DISTINCT sa.shader_id), sa.name) < (");
-                    // Use cursor_ts as a proxy for the sort column value encoded in the cursor
-                    // We encode shader_count in the timestamp field for this sort
-                    qb.push_bind(cursor_ts.timestamp_millis());
+                    qb.push(" AND (shader_count, name) < (");
+                    qb.push_bind(*sort_val);
                     qb.push(", ");
                     qb.push_bind(cursor_name.as_str());
                     qb.push(")");
                 }
                 _ => {
-                    // popular: ORDER BY total_views DESC, name ASC
-                    qb.push(" HAVING (COALESCE(SUM(s.view_count), 0), sa.name) < (");
-                    qb.push_bind(cursor_ts.timestamp_millis());
+                    qb.push(" AND (total_views, name) < (");
+                    qb.push_bind(*sort_val);
                     qb.push(", ");
                     qb.push_bind(cursor_name.as_str());
                     qb.push(")");
@@ -281,11 +230,10 @@ impl ShaderAuthorRepo {
             }
         }
 
-        let sort_value = sort.unwrap_or("popular");
-        match sort_value {
-            "name" => qb.push(" ORDER BY sa.name ASC"),
-            "shaders" => qb.push(" ORDER BY COUNT(DISTINCT sa.shader_id) DESC, sa.name ASC"),
-            _ => qb.push(" ORDER BY COALESCE(SUM(s.view_count), 0) DESC, sa.name ASC"),
+        match sort.unwrap_or("popular") {
+            "name" => qb.push(" ORDER BY name ASC"),
+            "shaders" => qb.push(" ORDER BY shader_count DESC, name ASC"),
+            _ => qb.push(" ORDER BY total_views DESC, name ASC"),
         };
 
         qb.push(" LIMIT ");
@@ -302,12 +250,11 @@ impl ShaderAuthorRepo {
 
         // Count query
         let mut cqb: QueryBuilder<'_, sqlx::Postgres> =
-            QueryBuilder::new("SELECT COUNT(DISTINCT sa.name) FROM shader_authors sa");
-        cqb.push(visibility_join);
+            QueryBuilder::new("SELECT COUNT(*) FROM author_aggregates WHERE TRUE");
 
-        if let Some(ref pattern) = search_pattern {
-            cqb.push(" AND sa.name ILIKE ");
-            cqb.push_bind(pattern.as_str());
+        if let Some(ref p) = pattern {
+            cqb.push(" AND name ILIKE ");
+            cqb.push_bind(p.as_str());
         }
 
         let total_count: i64 = cqb
@@ -326,83 +273,37 @@ impl ShaderAuthorRepo {
         })
     }
 
-    /// Find an author by slugified name. Scans all distinct author names and matches.
+    /// Find an author by slug. Returns the aggregate from the `author_aggregates` view.
     #[instrument(skip(db), level = "debug")]
     pub async fn find_by_slug(db: &DbPool, slug: &str) -> AppResult<Option<AuthorAggregate>> {
-        // Fetch all distinct author names and match by slug
-        let names: Vec<String> = sqlx::query_scalar!(
-            r#"SELECT DISTINCT name AS "name!" FROM shader_authors ORDER BY name"#
-        )
-        .fetch_all(db as &DbPool)
-        .await
-        .context("failed to fetch distinct author names")?;
-
-        let matched_name = names.into_iter().find(|name| slugify(name) == slug);
-
-        let Some(author_name) = matched_name else {
-            return Ok(None);
-        };
-
-        // Fetch the full aggregate for this author
         let row = sqlx::query_as!(
             AuthorAggregate,
             r#"
             SELECT
-                sa.name,
-                COUNT(DISTINCT sa.shader_id) AS "shader_count!",
-                COALESCE(SUM(s.view_count), 0)::BIGINT AS "total_views!",
-                COALESCE((SELECT COUNT(DISTINCT c2.id)
-                 FROM shader_authors sa2
-                 JOIN shaders s2 ON s2.id = sa2.shader_id
-                 JOIN shader_versions sv2 ON sv2.shader_id = s2.id
-                 JOIN captures c2 ON c2.shader_version_id = sv2.id AND c2.status = 'completed'
-                 WHERE sa2.name = sa.name AND s2.deleted_at IS NULL
-                ), 0) AS "total_captures!",
-                MAX(s.updated_at) AS "last_modified!",
-                (SELECT c3.image_path FROM shaders s3
-                 JOIN shader_authors sa3 ON sa3.shader_id = s3.id
-                 JOIN shader_versions sv3 ON sv3.shader_id = s3.id
-                 JOIN captures c3 ON c3.shader_version_id = sv3.id AND c3.status = 'completed' AND c3.image_path IS NOT NULL
-                 WHERE sa3.name = sa.name AND s3.deleted_at IS NULL
-                 ORDER BY s3.view_count DESC
-                 LIMIT 1
-                ) AS image_path,
-                (SELECT c4.thumbhash FROM shaders s4
-                 JOIN shader_authors sa4 ON sa4.shader_id = s4.id
-                 JOIN shader_versions sv4 ON sv4.shader_id = s4.id
-                 JOIN captures c4 ON c4.shader_version_id = sv4.id AND c4.status = 'completed' AND c4.image_path IS NOT NULL
-                 WHERE sa4.name = sa.name AND s4.deleted_at IS NULL
-                 ORDER BY s4.view_count DESC
-                 LIMIT 1
-                ) AS thumbhash,
-                (SELECT s5.name FROM shaders s5
-                 JOIN shader_authors sa5 ON sa5.shader_id = s5.id
-                 WHERE sa5.name = sa.name AND s5.deleted_at IS NULL
-                 ORDER BY s5.view_count DESC
-                 LIMIT 1
-                ) AS top_shader_name,
-                (SELECT s6.slug FROM shaders s6
-                 JOIN shader_authors sa6 ON sa6.shader_id = s6.id
-                 WHERE sa6.name = sa.name AND s6.deleted_at IS NULL
-                 ORDER BY s6.view_count DESC
-                 LIMIT 1
-                ) AS top_shader_slug
-            FROM shader_authors sa
-            JOIN shaders s ON s.id = sa.shader_id
-            WHERE sa.name = $1 AND s.deleted_at IS NULL
-            GROUP BY sa.name
+                name AS "name!",
+                slug AS "slug!",
+                shader_count AS "shader_count!",
+                total_views AS "total_views!",
+                total_captures AS "total_captures!",
+                last_modified AS "last_modified!",
+                image_path,
+                thumbhash,
+                top_shader_name,
+                top_shader_slug
+            FROM author_aggregates
+            WHERE slug = $1
             "#,
-            &author_name
+            slug
         )
         .fetch_optional(db)
         .await
-        .context("failed to fetch author aggregate")?;
+        .context("failed to find author by slug")?;
 
         Ok(row)
     }
 
     /// List shaders by a specific author name with cursor pagination.
-    /// Only returns shaders with completed captures from active scenes.
+    /// Uses `visible_shaders` view for the visibility filter.
     #[instrument(skip(db), level = "debug")]
     pub async fn list_shaders_by_author_cursor(
         db: &DbPool,
@@ -415,23 +316,11 @@ impl ShaderAuthorRepo {
         let limit = first.clamp(1, 100) as i64;
 
         let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
-            "SELECT DISTINCT s.* FROM shaders s
+            "SELECT DISTINCT s.* FROM visible_shaders s
              JOIN shader_authors sa ON sa.shader_id = s.id
-             WHERE s.deleted_at IS NULL AND sa.name = ",
+             WHERE sa.name = ",
         );
         qb.push_bind(author_name);
-
-        qb.push(
-            " AND EXISTS (
-                SELECT 1 FROM captures c
-                JOIN shader_versions sv ON c.shader_version_id = sv.id
-                JOIN scenes sc ON c.scene_id = sc.id
-                WHERE sv.shader_id = s.id
-                  AND c.status = 'completed'
-                  AND c.image_path IS NOT NULL
-                  AND sc.active = TRUE
-            )",
-        );
 
         if let Some((ref cursor_ts, ref cursor_id)) = after {
             qb.push(" AND (s.created_at, s.id) < (");
@@ -454,23 +343,12 @@ impl ShaderAuthorRepo {
         let has_next_page = items.len() as i64 > limit;
         let items: Vec<Shader> = items.into_iter().take(limit as usize).collect();
 
-        // Count query
         let total_count: i64 = sqlx::query_scalar!(
             r#"
             SELECT COUNT(DISTINCT s.id) AS "count!"
-            FROM shaders s
+            FROM visible_shaders s
             JOIN shader_authors sa ON sa.shader_id = s.id
-            WHERE s.deleted_at IS NULL
-              AND sa.name = $1
-              AND EXISTS (
-                SELECT 1 FROM captures c
-                JOIN shader_versions sv ON c.shader_version_id = sv.id
-                JOIN scenes sc ON c.scene_id = sc.id
-                WHERE sv.shader_id = s.id
-                  AND c.status = 'completed'
-                  AND c.image_path IS NOT NULL
-                  AND sc.active = TRUE
-              )
+            WHERE sa.name = $1
             "#,
             author_name
         )

@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                name AS \"name!\",\n                slug AS \"slug!\",\n                shader_count AS \"shader_count!\",\n                total_views AS \"total_views!\",\n                total_captures AS \"total_captures!\",\n                last_modified AS \"last_modified!\",\n                image_path,\n                thumbhash,\n                top_shader_name,\n                top_shader_slug\n            FROM author_aggregates\n            WHERE slug = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "slug!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "shader_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "total_views!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "total_captures!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_modified!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "image_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "thumbhash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "top_shader_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "top_shader_slug",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "5717aca60ac61eb05edcb415e5bded46f9d2f05db4eccc4ca0bf353604bf88a0"
+}

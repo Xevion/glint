@@ -57,23 +57,14 @@ impl ShaderRepo {
             )
         });
 
-        let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
-            "SELECT s.*, COUNT(*) OVER() AS total FROM shaders s WHERE s.deleted_at IS NULL",
-        );
-
-        if require_captures {
-            qb.push(
-                " AND EXISTS (
-                 SELECT 1 FROM captures c
-                 JOIN shader_versions sv ON c.shader_version_id = sv.id
-                 JOIN scenes sc ON c.scene_id = sc.id
-                 WHERE sv.shader_id = s.id
-                   AND c.status = 'completed'
-                    AND c.image_path IS NOT NULL
-                   AND sc.active = TRUE
-             )",
-            );
-        }
+        let source = if require_captures {
+            "visible_shaders"
+        } else {
+            "shaders"
+        };
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(format!(
+            "SELECT s.*, COUNT(*) OVER() AS total FROM {source} s WHERE s.deleted_at IS NULL"
+        ));
 
         if let Some(ref pattern) = search_pattern {
             qb.push(" AND s.name ILIKE ");
@@ -146,30 +137,17 @@ impl ShaderRepo {
             )
         });
 
-        let captures_subquery = " EXISTS (
-                 SELECT 1 FROM captures c
-                 JOIN shader_versions sv ON c.shader_version_id = sv.id
-                 JOIN scenes sc ON c.scene_id = sc.id
-                 WHERE sv.shader_id = s.id
-                   AND c.status = 'completed'
-                   AND c.image_path IS NOT NULL
-                   AND sc.active = TRUE
-             )";
-
-        let mut qb: QueryBuilder<'_, sqlx::Postgres> =
-            QueryBuilder::new("SELECT s.* FROM shaders s WHERE s.deleted_at IS NULL");
-
-        match visibility {
+        let mut qb: QueryBuilder<'_, sqlx::Postgres> = match visibility {
             Visibility::Exclude => {
-                qb.push(" AND");
-                qb.push(captures_subquery);
+                QueryBuilder::new("SELECT s.* FROM visible_shaders s WHERE TRUE")
             }
-            Visibility::Include => { /* no filter — return everything */ }
-            Visibility::Only => {
-                qb.push(" AND NOT");
-                qb.push(captures_subquery);
+            Visibility::Include => {
+                QueryBuilder::new("SELECT s.* FROM shaders s WHERE s.deleted_at IS NULL")
             }
-        }
+            Visibility::Only => QueryBuilder::new(
+                "SELECT s.* FROM shaders s WHERE s.deleted_at IS NULL AND s.id NOT IN (SELECT id FROM visible_shaders)",
+            ),
+        };
 
         if let Some(ref pattern) = search_pattern {
             qb.push(" AND s.name ILIKE ");
@@ -205,20 +183,17 @@ impl ShaderRepo {
         let has_next_page = items.len() as i64 > limit;
         let items: Vec<Shader> = items.into_iter().take(limit as usize).collect();
 
-        let mut cqb: QueryBuilder<'_, sqlx::Postgres> =
-            QueryBuilder::new("SELECT COUNT(*) FROM shaders s WHERE s.deleted_at IS NULL");
-
-        match visibility {
+        let mut cqb: QueryBuilder<'_, sqlx::Postgres> = match visibility {
             Visibility::Exclude => {
-                cqb.push(" AND");
-                cqb.push(captures_subquery);
+                QueryBuilder::new("SELECT COUNT(*) FROM visible_shaders s WHERE TRUE")
             }
-            Visibility::Include => {}
-            Visibility::Only => {
-                cqb.push(" AND NOT");
-                cqb.push(captures_subquery);
+            Visibility::Include => {
+                QueryBuilder::new("SELECT COUNT(*) FROM shaders s WHERE s.deleted_at IS NULL")
             }
-        }
+            Visibility::Only => QueryBuilder::new(
+                "SELECT COUNT(*) FROM shaders s WHERE s.deleted_at IS NULL AND s.id NOT IN (SELECT id FROM visible_shaders)",
+            ),
+        };
 
         if let Some(ref pattern) = search_pattern {
             cqb.push(" AND s.name ILIKE ");

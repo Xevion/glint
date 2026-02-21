@@ -27,6 +27,11 @@
         "ordinal": 4,
         "name": "platform",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "slug",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -37,6 +42,7 @@
       false,
       false,
       true,
+      false,
       false
     ]
   },
