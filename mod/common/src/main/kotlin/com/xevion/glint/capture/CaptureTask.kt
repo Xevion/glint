@@ -96,7 +96,7 @@ class CaptureTask(
                     WebpWriter.write(nativeImage, file)
                     future.complete(file)
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 log.error("Failed to save high-res screenshot") {
                     "exception" to e.javaClass.simpleName
                     "error" to (e.message ?: "no message")
