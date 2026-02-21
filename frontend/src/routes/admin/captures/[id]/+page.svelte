@@ -4,7 +4,6 @@ import { api } from '$lib/api';
 import type { CaptureDetail, CaptureWithContext } from '$lib/bindings';
 import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
-import Lightbox from '$lib/components/Lightbox.svelte';
 import TimeAgo from '$lib/components/TimeAgo.svelte';
 import { createAction } from '$lib/components/action-form.svelte';
 import { DataView, Grid } from '$lib/components/data-view';
@@ -13,6 +12,7 @@ import { ConfirmDialog } from '$lib/components/ui/dialog';
 import { StatusBadge } from '$lib/components/ui/status-badge';
 import * as Tabs from '$lib/components/ui/tabs';
 import { formatBytes, formatDecimal, formatMetric, formatPercent } from '$lib/utils/format';
+import { lightbox } from '$lib/stores/lightbox.svelte';
 import { preloadImage } from '$lib/utils/image';
 import { Trash2 } from '@lucide/svelte';
 import { scaleBand } from 'd3-scale';
@@ -38,7 +38,6 @@ let histogramData = $derived.by(() => {
 let hoveredColorIndex = $state<number | null>(null);
 
 let showDeleteConfirm = $state(false);
-let lightboxOpen = $state(false);
 
 const deleteAction = createAction({
 	action: () => api.admin.deleteCapture(capture.id),
@@ -150,7 +149,20 @@ let viewAllHref = $derived.by(() => {
 			<button
 				type="button"
 				class="group relative w-full cursor-pointer self-start overflow-hidden rounded-lg border"
-				onclick={() => (lightboxOpen = true)}
+				onclick={() =>
+				lightbox.open(
+					[
+						{
+							id: capture.id,
+							imagePath: capture.image_path,
+							thumbhash: capture.thumbhash,
+							sceneName: capture.scene_name,
+							profileDisplayName: capture.profile_display_name,
+							shaderVersion: capture.shader_version,
+						},
+					],
+					0,
+				)}
 				onmouseenter={() => preloadImage(capture.image_path, 'full')}
 				disabled={!capture.image_path}
 			>
@@ -587,18 +599,3 @@ let viewAllHref = $derived.by(() => {
 	onConfirm={deleteAction.execute}
 />
 
-{#if lightboxOpen && capture.image_path}
-	<Lightbox
-		captures={[{
-			id: capture.id,
-			imagePath: capture.image_path,
-			thumbhash: capture.thumbhash,
-			sceneName: capture.scene_name,
-			profileDisplayName: capture.profile_display_name,
-			shaderVersion: capture.shader_version,
-		}]}
-		currentIndex={0}
-		onClose={() => (lightboxOpen = false)}
-		onNavigate={() => { /* single capture, no navigation */ }}
-	/>
-{/if}

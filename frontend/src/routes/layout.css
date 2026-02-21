@@ -166,6 +166,12 @@
 	width: 0;
 }
 
+/* Hide OverlayScrollbars when lightbox is open — CSS selector is live,
+   so it handles OS re-creating scrollbar elements (e.g. on theme change). */
+html[data-lightbox-open] .os-scrollbar {
+	display: none !important;
+}
+
 /* OverlayScrollbars — subtle variant for inline scroll regions (not the root scrollbar) */
 .os-subtle.os-theme-dark {
 	--os-handle-bg: rgba(0, 0, 0, 0.15);

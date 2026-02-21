@@ -63,6 +63,7 @@ let pendingNavigationIndex: number | null = null;
 let velocitySamples: { x: number; t: number }[] = [];
 
 const currentCapture = $derived(captures[currentIndex]);
+const isSingle = $derived(captures.length <= 1);
 const hasPrev = $derived(currentIndex > 0);
 const hasNext = $derived(currentIndex < captures.length - 1);
 
@@ -119,6 +120,18 @@ $effect(() => {
 			img.src = imageUrl(path, 'full') ?? '';
 		}
 	}
+});
+
+// Lock body scroll and hide OverlayScrollbars while lightbox is open
+$effect(() => {
+	document.documentElement.style.overflow = 'hidden';
+	document.body.style.overflow = 'hidden';
+	document.documentElement.dataset.lightboxOpen = '';
+	return () => {
+		document.documentElement.style.overflow = '';
+		document.body.style.overflow = '';
+		delete document.documentElement.dataset.lightboxOpen;
+	};
 });
 
 // Navigation
@@ -219,7 +232,7 @@ function handlePointerDown(e: PointerEvent) {
 	velocitySamples = [];
 	swipeOffset = 0;
 
-	if (zoomLevel > 1) {
+	if (zoomLevel > 1 || isSingle) {
 		gesture = {
 			type: 'panning',
 			dragStart: { x: e.clientX, y: e.clientY },
@@ -387,6 +400,7 @@ function handleTouchEnd(e: TouchEvent) {
 	class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
 	onclick={handleBackdropClick}
 	onkeydown={(e) => e.key === 'Escape' && onClose()}
+	onwheel={(e) => e.preventDefault()}
 	role="dialog"
 	aria-modal="true"
 	tabindex="-1"
@@ -428,8 +442,8 @@ function handleTouchEnd(e: TouchEvent) {
 	{#if currentCapture?.imagePath}
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<div
-			class="relative h-[90vh] w-[90vw] select-none overflow-hidden"
-			class:cursor-grab={zoomLevel > 1 && gesture.type !== 'panning'}
+			class="relative h-dvh w-dvw select-none overflow-hidden"
+			class:cursor-grab={(zoomLevel > 1 || isSingle) && gesture.type !== 'panning'}
 			class:cursor-grabbing={gesture.type === 'panning'}
 			style:touch-action="none"
 			role="img"
@@ -466,14 +480,14 @@ function handleTouchEnd(e: TouchEvent) {
 					style:transform="translateX({displayOffset - containerWidth}px)"
 				>
 					<div
-						class="grid max-h-[90vh] max-w-[90vw]"
+						class="grid max-h-dvh max-w-dvw"
 						style:grid-template="1fr / 1fr"
 					>
 						{#if prevThumb}
 							<img
 								src={prevThumb}
 								alt=""
-								class="col-start-1 row-start-1 h-[90vh] w-[90vw] object-contain"
+								class="col-start-1 row-start-1 h-dvh w-dvw object-contain"
 								aria-hidden="true"
 							/>
 						{/if}
@@ -481,7 +495,7 @@ function handleTouchEnd(e: TouchEvent) {
 							<img
 								src={prevUrl}
 								alt="Previous capture"
-								class="col-start-1 row-start-1 h-[90vh] w-[90vw] object-contain"
+								class="col-start-1 row-start-1 h-dvh w-dvw object-contain"
 								loading="eager"
 								draggable="false"
 							/>
@@ -497,14 +511,14 @@ function handleTouchEnd(e: TouchEvent) {
 			>
 				<div
 					style="transform: scale({zoomLevel}) translate({panOffset.x}px, {panOffset.y}px); transition: transform {gesture.type === 'panning' ? '0s' : '0.15s'} ease;"
-					class="grid max-h-[90vh] max-w-[90vw]"
+					class="grid max-h-dvh max-w-dvw"
 					style:grid-template="1fr / 1fr"
 				>
 					{#if placeholderUrl && !imageLoaded}
 						<img
 							src={placeholderUrl}
 							alt=""
-							class="col-start-1 row-start-1 h-[90vh] w-[90vw] object-contain"
+							class="col-start-1 row-start-1 h-dvh w-dvw object-contain"
 							aria-hidden="true"
 						/>
 					{/if}
@@ -512,7 +526,7 @@ function handleTouchEnd(e: TouchEvent) {
 					bind:this={imgEl}
 					src={fullImageUrl}
 					alt="Capture fullscreen view"
-					class="col-start-1 row-start-1 max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-300"
+					class="col-start-1 row-start-1 max-h-dvh max-w-dvw object-contain transition-opacity duration-300"
 					class:opacity-0={!imageLoaded || imageErrored}
 					loading="eager"
 					decoding="async"
@@ -524,7 +538,7 @@ function handleTouchEnd(e: TouchEvent) {
 				<img
 					src={rawUrl}
 						alt="Capture fullscreen view (full resolution)"
-						class="col-start-1 row-start-1 max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-200"
+						class="col-start-1 row-start-1 max-h-dvh max-w-dvw object-contain transition-opacity duration-200"
 						class:opacity-0={!rawImageLoaded}
 						loading="eager"
 						decoding="async"
@@ -552,14 +566,14 @@ function handleTouchEnd(e: TouchEvent) {
 					style:transform="translateX({displayOffset + containerWidth}px)"
 				>
 					<div
-						class="grid max-h-[90vh] max-w-[90vw]"
+						class="grid max-h-dvh max-w-dvw"
 						style:grid-template="1fr / 1fr"
 					>
 						{#if nextThumb}
 							<img
 								src={nextThumb}
 								alt=""
-								class="col-start-1 row-start-1 h-[90vh] w-[90vw] object-contain"
+								class="col-start-1 row-start-1 h-dvh w-dvw object-contain"
 								aria-hidden="true"
 							/>
 						{/if}
@@ -567,7 +581,7 @@ function handleTouchEnd(e: TouchEvent) {
 							<img
 								src={nextUrl}
 								alt="Next capture"
-								class="col-start-1 row-start-1 h-[90vh] w-[90vw] object-contain"
+								class="col-start-1 row-start-1 h-dvh w-dvw object-contain"
 								loading="eager"
 								draggable="false"
 							/>
@@ -600,9 +614,11 @@ function handleTouchEnd(e: TouchEvent) {
 						</span>
 					{/if}
 					</div>
-					<span class="text-sm text-white/70">
-						{currentIndex + 1} / {captures.length}
-					</span>
+					{#if !isSingle}
+						<span class="text-sm text-white/70">
+							{currentIndex + 1} / {captures.length}
+						</span>
+					{/if}
 				</div>
 			</div>
 		</div>

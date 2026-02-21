@@ -4,7 +4,6 @@ import type { ShaderCardShader } from '$lib/components/ShaderCard.svelte';
 
 import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
-import Lightbox from '$lib/components/Lightbox.svelte';
 import Meta from '$lib/components/Meta.svelte';
 import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import BrandIcon from '$lib/components/icons/BrandIcon.svelte';
@@ -14,6 +13,7 @@ import { DataView, Grid } from '$lib/components/data-view';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import * as Select from '$lib/components/ui/select';
 import { createGraphQLClient, query } from '$lib/graphql';
+import { lightbox } from '$lib/stores/lightbox.svelte';
 import { themeStore } from '$lib/stores/theme.svelte';
 import {
 	formatDate,
@@ -76,9 +76,9 @@ $effect(() => {
 	void data.shader;
 	shaderOverride = null;
 	versionOverride = null;
-	_selectedCaptureId = null;
 	selectedProfileId = null;
 	iconErrored = false;
+	lightbox.close();
 });
 
 // Core data: prefer override (from version change), fall back to page data
@@ -142,14 +142,7 @@ function formatFeatureName(feature: string): string {
 // Active profile filter (null = show all captures)
 let selectedProfileId = $state<string | null>(null);
 
-// Lightbox state
-let _selectedCaptureId = $state<string | null>(null);
-let lightboxOpen = $state(false);
-let lightboxIndex = $state(0);
 let iconErrored = $state(false);
-
-// Captures already match Lightbox's CaptureItem interface (camelCase)
-const lightboxCaptures = $derived(captures);
 
 // Guards stale responses from racing version/profile fetches
 let fetchGeneration = 0;
@@ -182,25 +175,18 @@ async function refetchShader(versionId?: string, profileId?: string) {
 
 async function onVersionChange(versionId: string) {
 	versionOverride = versionId;
-	_selectedCaptureId = null;
 	selectedProfileId = null;
 	await refetchShader(versionId);
 }
 
 async function onProfileChange(profileId: string | null) {
 	selectedProfileId = profileId;
-	_selectedCaptureId = null;
 	await refetchShader(selectedVersionId ?? undefined, profileId ?? undefined);
 }
 
 function loadMoreCaptures() {
 	if (!hasMoreCaptures) return;
 	visibleCount = Math.min(visibleCount + capturesPageSize, allCaptures.length);
-}
-
-function openLightbox(captureIndex: number) {
-	lightboxIndex = captureIndex;
-	lightboxOpen = true;
 }
 
 // Svelte action for infinite scroll IntersectionObserver
@@ -471,10 +457,7 @@ const ogDescription = $derived.by(() => {
 							type="button"
 							aria-label="View {capture.sceneName ?? 'capture'} in lightbox"
 							class="shadow-theme-sm group relative cursor-pointer overflow-hidden rounded-lg border border-border transition-all hover:border-primary"
-							onclick={() => {
-								_selectedCaptureId = capture.id;
-								openLightbox(i);
-							}}
+							onclick={() => lightbox.open(captures, i)}
 					onmouseenter={() => {
 						const url = imageUrl(capture.imagePath, 'full');
 						if (url) {
@@ -633,15 +616,3 @@ const ogDescription = $derived.by(() => {
 	</div>
 {/key}
 
-<!-- Lightbox -->
-{#if lightboxOpen && lightboxCaptures.length > 0}
-	<Lightbox
-		captures={lightboxCaptures}
-		currentIndex={lightboxIndex}
-		onClose={() => (lightboxOpen = false)}
-		onNavigate={(index: number) => {
-			lightboxIndex = index;
-			_selectedCaptureId = lightboxCaptures[index]?.id ?? null;
-		}}
-	/>
-{/if}

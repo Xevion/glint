@@ -11,6 +11,8 @@ import Navigation from '$lib/components/Navigation.svelte';
 import SectionBoundary from '$lib/components/SectionBoundary.svelte';
 import Sidebar from '$lib/components/Sidebar.svelte';
 import BrandIconSprite from '$lib/components/icons/BrandIconSprite.svelte';
+import Lightbox from '$lib/components/Lightbox.svelte';
+import { lightbox } from '$lib/stores/lightbox.svelte';
 import { initNavigation } from '$lib/stores/navigation.svelte';
 import { themeStore } from '$lib/stores/theme.svelte';
 import { telemetry } from '$lib/telemetry';
@@ -59,6 +61,15 @@ onMount(() => {
 <BrandIconSprite />
 <ConnectivityBanner />
 <Toaster richColors />
+
+{#if lightbox.isOpen && lightbox.captures.length > 0}
+	<Lightbox
+		captures={lightbox.captures}
+		currentIndex={lightbox.currentIndex}
+		onClose={() => lightbox.close()}
+		onNavigate={(index) => lightbox.navigate(index)}
+	/>
+{/if}
 
 <BackgroundImage
 	lightBackgrounds={data.lightBackgrounds}

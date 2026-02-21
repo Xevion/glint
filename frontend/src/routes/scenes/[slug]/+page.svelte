@@ -4,6 +4,7 @@ import CaptureBadges from '$lib/components/CaptureBadges.svelte';
 import CaptureImage from '$lib/components/CaptureImage.svelte';
 import { ImageOverlay } from '$lib/components/ui/image-overlay';
 import Meta from '$lib/components/Meta.svelte';
+import { lightbox } from '$lib/stores/lightbox.svelte';
 import { ChevronRight, ImageOff } from '@lucide/svelte';
 import type { SceneCapture } from './+page';
 
@@ -259,7 +260,18 @@ const ogDescription = $derived.by(() => {
 					<div role="listitem">
 						<button
 							type="button"
-							onclick={() => (selectedCapture = capture)}
+							onclick={() =>
+								lightbox.open(
+									visibleCaptures.map((c) => ({
+										id: c.id,
+										imagePath: c.imagePath,
+										thumbhash: c.thumbhash,
+										profileDisplayName: c.profileDisplayName,
+										shaderVersion: c.shaderVersion,
+										sceneName: scene.name,
+									})),
+									visibleCaptures.indexOf(capture),
+								)}
 							class="group relative overflow-hidden rounded-xl transition-transform hover:scale-[1.02]"
 						>
 							<CaptureImage
