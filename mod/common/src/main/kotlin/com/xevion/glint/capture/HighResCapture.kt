@@ -155,6 +155,35 @@ object HighResCapture {
     fun isCapturing(): Boolean = activeTask != null
 
     /**
+     * Re-applies capture dimensions to the window and render targets without re-saving real
+     * dimensions. Call after [IrisIntegration.enableShaders] (and thus [net.irisshaders.iris.Iris.reload])
+     * because Iris may replace [net.minecraft.client.Minecraft.mainRenderTarget] with a new
+     * framebuffer sized to the physical GLFW window instead of the spoofed 3840×2160.
+     *
+     * Note: the [WindowMixin] suppresses GLFW callbacks during capture to prevent
+     * [com.mojang.blaze3d.platform.Window.onFramebufferResize] from overwriting our spoofed
+     * fields. This method handles any residual reset of [net.minecraft.client.Minecraft.mainRenderTarget].
+     */
+    fun refreshCaptureDimensions() {
+        if (!sessionActive) return
+        val mc = Minecraft.getInstance()
+        val window = mc.window
+
+        window.setWidth(CAPTURE_WIDTH)
+        window.setHeight(CAPTURE_HEIGHT)
+
+        val guiScale = window.calculateScale(mc.options.guiScale().get(), mc.isEnforceUnicode)
+        window.setGuiScale(guiScale.toDouble())
+
+        mc.mainRenderTarget?.resize(CAPTURE_WIDTH, CAPTURE_HEIGHT)
+        mc.gameRenderer.resize(CAPTURE_WIDTH, CAPTURE_HEIGHT)
+
+        log.debug("Refreshed capture dimensions after shader reload") {
+            "resolution" to "${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}"
+        }
+    }
+
+    /**
      * Fake a window resize to the capture resolution. Mirrors what Minecraft.resizeDisplay()
      * does, but with our target dimensions instead of the actual GLFW framebuffer size.
      */

@@ -17,7 +17,8 @@
     "MinecraftMixin",
     "MouseHandlerMixin",
     "SystemTimeUniformsMixin",
-    "TitleScreenMixin"
+    "TitleScreenMixin",
+    "WindowMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -391,6 +391,7 @@ class LinearOrchestrator {
             log.debug("Shader unchanged, skipping reload") {
                 "shader" to newSpec.displayName
             }
+            ChunkForceLoader.releaseAll()
             ChunkForceLoader.forceLoadRenderDistance()
             transitionTo(State.Stabilizing)
             return
@@ -426,6 +427,12 @@ class LinearOrchestrator {
         currentShaderVersionId = item.shader.versionId
         currentShaderSpec = newSpec
 
+        // Iris.reload() (called inside loadShader) may replace mc.mainRenderTarget with a
+        // new framebuffer sized to the physical GLFW window. Re-apply 3840×2160 to ensure
+        // the capture target is correct before the stabilization and capture phases.
+        HighResCapture.refreshCaptureDimensions()
+
+        ChunkForceLoader.releaseAll()
         ChunkForceLoader.forceLoadRenderDistance()
         transitionTo(State.Stabilizing)
     }
