@@ -78,7 +78,6 @@ $effect(() => {
 	versionOverride = null;
 	selectedProfileId = null;
 	iconErrored = false;
-	lightbox.close();
 });
 
 // Core data: prefer override (from version change), fall back to page data

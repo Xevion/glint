@@ -1,4 +1,5 @@
 <script lang="ts">
+import { beforeNavigate } from '$app/navigation';
 import { OverlayScrollbars } from 'overlayscrollbars';
 import type { OverlayScrollbars as OverlayScrollbarsInstance } from 'overlayscrollbars';
 import type { Snippet } from 'svelte';
@@ -30,6 +31,10 @@ let { data, children }: Props = $props();
 let osInstance: OverlayScrollbarsInstance | null = null;
 
 initNavigation();
+
+beforeNavigate(() => {
+	if (lightbox.isOpen) lightbox.close();
+});
 
 // Reactively update scrollbar theme when theme changes
 $effect(() => {

@@ -1,5 +1,6 @@
 <script lang="ts">
 import { Button } from '$lib/components/ui/button';
+import { lightbox } from '$lib/stores/lightbox.svelte';
 import { imageUrl, rawImageUrl } from '$lib/utils/image';
 import { decodeThumbhash } from '$lib/utils/thumbhash';
 import { ChevronLeft, ChevronRight, ImageOff, X } from '@lucide/svelte';
@@ -120,6 +121,17 @@ $effect(() => {
 			img.src = imageUrl(path, 'full') ?? '';
 		}
 	}
+});
+
+// Close lightbox when user presses browser back (pops the lightbox history entry)
+$effect(() => {
+	function onPopstate() {
+		if (!(history.state as Record<string, unknown>)?.lightbox) {
+			lightbox.closeFromPopstate();
+		}
+	}
+	window.addEventListener('popstate', onPopstate);
+	return () => window.removeEventListener('popstate', onPopstate);
 });
 
 // Lock body scroll and hide OverlayScrollbars while lightbox is open
