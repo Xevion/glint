@@ -1,5 +1,11 @@
 import sharp from 'sharp';
 import { OG_HEIGHT, OG_WIDTH } from './constants';
+
+// Disable libvips internal operation cache — we handle caching at the JS level
+// via ogCache (LRU, 100 entries). Without this, libvips retains multi-MB native
+// buffers from intermediate pipeline stages that the JS GC cannot reclaim,
+// causing steady RSS growth over time.
+sharp.cache(false);
 import { type TextOverlayProps, renderTextOverlay } from './text';
 
 /**
