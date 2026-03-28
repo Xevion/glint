@@ -87,9 +87,9 @@ if (has('frontend')) {
 			const tmpDir = mkdtempSync(join(tmpdir(), 'glint-bindings-'));
 			try {
 				for (const cmd of [
-					{ cmd: ['cargo', 'test', '--no-run', '--quiet'], opts: { cwd: 'backend' } },
+					{ cmd: ['cargo', 'test', '--lib', '--no-run', '--quiet'], opts: { cwd: 'backend' } },
 					{
-						cmd: ['cargo', 'test', 'export_bindings', '--quiet'],
+						cmd: ['cargo', 'test', '--lib', 'export_bindings', '--quiet'],
 						opts: { cwd: 'backend', env: { TS_RS_EXPORT_DIR: tmpDir } },
 					},
 				]) {
