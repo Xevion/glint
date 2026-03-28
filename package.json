@@ -2,12 +2,10 @@
   "name": "glint",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Shader Preview Catalog - Automated shader capture and comparison platform",
-  "scripts": {
-    "prepare": "husky"
-  },
   "devDependencies": {
-    "husky": "^9.1.7",
+    "@xevion/tempo": "^0.1.2",
     "sharp": "^0.34.5"
   },
   "engines": {

@@ -1,156 +1,80 @@
 set positional-arguments := true
 
 alias c := check
+alias cf := check-fix
 alias d := dev
 alias t := test
 alias f := format
 alias l := lint
-alias dm := dev-mod
-alias sm := smoke
-alias lf := loom-fix
+alias s3 := r2
 
 default:
     @just --list
 
 # Validate code: pre-flight + format + lint + test + security. Targets: backend,frontend,mod
 check *targets:
-    bun scripts/check.ts {{targets}}
+    bunx tempo check {{targets}}
 
-# Run tests. Targets: backend,frontend,mod,e2e
+# Validate with auto-fix. Targets: backend,frontend,mod
+check-fix *targets:
+    bunx tempo check --fix {{targets}}
+
+# Run tests. Targets: backend,frontend,mod. Flags: --e2e
 test *targets:
-    bun scripts/test.ts {{targets}}
+    bunx tempo run test {{targets}}
 
 # Lint code. Targets: backend,frontend,mod
 lint *targets:
-    bun scripts/lint.ts {{targets}}
+    bunx tempo lint {{targets}}
 
 # Auto-format code. Targets: backend,frontend,mod
 format *targets:
-    bun scripts/format.ts {{targets}}
+    bunx tempo fmt {{targets}}
 
-# Dev server: -f(rontend) -b(ackend) -m(od) -W(no-watch) -r(elease) -p(latform) -- <args>
-dev *flags:
-    bun scripts/dev.ts {{flags}}
+# Dev server. Targets: frontend,backend,mod
+dev *targets:
+    bunx tempo dev {{targets}}
 
-# Run Minecraft client (Fabric by default)
-dev-mod platform="fabric":
-    bun scripts/dev.ts -m -p {{platform}}
+# Integration test - verify client starts and mixins load
+smoke *flags:
+    bunx tempo run smoke {{flags}}
 
 # Run autonomous shader capture
 orchestrate *flags:
-    bun scripts/orchestrate.ts {{flags}}
-
-# Integration test - verify client starts and mixins load
-smoke platform="fabric":
-    bun ./scripts/smoke.ts {{platform}}
-
-# Manage dev services (PostgreSQL + MinIO). Commands: start (default), reset, rm
-db cmd="start":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    case "{{cmd}}" in
-        start)
-            docker compose up -d
-            bun scripts/db-init.ts
-            ;;
-        reset)
-            docker compose up -d
-            docker compose exec postgres psql -U glint -d postgres -c "DROP DATABASE IF EXISTS glint"
-            docker compose exec postgres psql -U glint -d postgres -c "CREATE DATABASE glint"
-            bun scripts/db-init.ts
-            ;;
-        rm)
-            docker compose down
-            ;;
-        *)
-            echo "Unknown command: {{cmd}}" >&2
-            exit 1
-            ;;
-    esac
-
-# Reset database (drops and recreates)
-migrate-reset:
-    cd backend && cargo sqlx database reset -y
-
-# Run pending migrations, then apply views
-migrate-run:
-    cd backend && cargo sqlx migrate run
-    @echo "Applying views..."
-    cd backend && bash -c 'source .env 2>/dev/null && psql "$DATABASE_URL" -f views.sql -q' || echo "⚠ psql not available or failed; views will be applied on next app startup"
-
-# Create new migration file
-migrate-create name:
-    cd backend && cargo sqlx migrate add {{name}}
+    bunx tempo run orchestrate {{flags}}
 
 # Docker operations. Usage: just docker [build|run] <web|capture>
 docker *args:
-    bun scripts/docker.ts {{args}}
+    bunx tempo run docker {{args}}
+
+# Query Minecraft source JAR
+mcjar +args='':
+    bunx tempo run mcjar {{args}}
+
+# Manage dev services (PostgreSQL + MinIO). Commands: start (default), reset, rm
+db *args:
+    bunx tempo run db {{args}}
+
+# Manage database migrations. Commands: run, reset, create <name>
+migrate *args:
+    bunx tempo run migrate {{args}}
 
 # Regenerate TypeScript bindings from Rust types + GraphQL schema
 bindings:
-    cd backend && cargo test export_bindings --quiet
-    bun scripts/bindings-barrel.ts
-    cd backend && cargo test --test graphql_schema --quiet
-    cd frontend && bunx gql-tada generate output
+    bunx tempo run bindings
 
-# Run aws s3 commands against the R2 bucket.
-# Usage: just r2 ls worlds/ | just r2 cp R2/worlds/a.zip R2/worlds/b.zip
-# Shorthand: R2 or R2/ expands to s3://<bucket> or s3://<bucket>/
+# Run aws s3 commands against the R2 bucket. R2/ expands to s3://<bucket>/
 r2 *args:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    [ -f .env ] && set -a && source .env && set +a
-    export AWS_ACCESS_KEY_ID="$GLINT_R2_ACCESS_KEY_ID"
-    export AWS_SECRET_ACCESS_KEY="$GLINT_R2_SECRET_ACCESS_KEY"
-    export AWS_ENDPOINT_URL="https://${GLINT_R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-    bucket="s3://${GLINT_R2_BUCKET}"
-    args=()
-    for arg in "$@"; do
-        if [[ "$arg" == "R2" ]]; then
-            args+=("$bucket")
-        elif [[ "$arg" == R2/* ]]; then
-            args+=("${bucket}/${arg#R2/}")
-        else
-            args+=("$arg")
-        fi
-    done
-    exec aws s3 "${args[@]}"
-
-alias s3 := r2
-
-# Query Minecraft source JAR
-# Usage:
-#   just mcjar list net/minecraft/client/renderer/
-#   just mcjar cat net/minecraft/client/Minecraft.java
-#   just mcjar grep shouldEntityAppearGlowing net/minecraft/client/Minecraft.java
-#   just mcjar grep-all startUseItem 'net/minecraft/client/*.java'
-#   just mcjar asset rendertype_lines.vsh
-#   just mcjar asset-list shaders/
-mcjar +args='':
-    #!/usr/bin/env bash
-    set -euo pipefail
-    exec bun ./scripts/mcjar.ts "$@"
-
-# Run bun commands in frontend (e.g., `just bun run test`)
-bun *args:
-    cd frontend && bun {{args}}
-
-# Run commands in mod directory (e.g., `just mod ./gradlew clean`)
-mod *args:
-    cd mod && {{args}}
+    bunx tempo run r2 {{args}}
 
 # Fix Loom remapping cache corruption (stale intermediary names in mixin annotations)
 loom-fix:
-    rm -rf mod/.gradle/loom-cache/remapped_mods
-    cd mod && ./gradlew --stop
-    cd mod && ./gradlew :fabric:configureClientLaunch --refresh-dependencies
-    @echo "✓ Loom remapped_mods cache rebuilt"
+    bunx tempo run loom-fix
 
 # Install git pre-commit hooks
 install-hooks:
     #!/usr/bin/env bash
     set -euo pipefail
-    chmod +x scripts/pre-commit.ts
-    echo "bun scripts/pre-commit.ts" > .husky/pre-commit
+    echo "bunx tempo pre-commit" > .husky/pre-commit
     chmod +x .husky/pre-commit
-    echo "✓ Pre-commit hook installed"
+    echo "Pre-commit hook installed"

@@ -4,7 +4,7 @@ Style guides for each subsystem: [Rust (backend)](RUST.md) | [Kotlin (mod)](KOTL
 
 ## Formatting
 
-Automated. Rust uses `rustfmt`, Kotlin uses Spotless + KtLint, frontend uses Biome. Don't think about it — `just format` handles everything.
+Automated via Tempo. Rust uses `rustfmt`, Kotlin uses Spotless + KtLint, frontend uses Biome. Don't think about it — `just format` (delegating to `tempo fmt`) handles everything.
 
 ## Naming & Domain Vocabulary
 
