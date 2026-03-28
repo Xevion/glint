@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, presets } from "@xevion/tempo";
@@ -23,6 +24,50 @@ function loadEnvFile(path: string): Record<string, string> {
     env[key] = val;
   }
   return env;
+}
+
+const BINDINGS_DIR = "frontend/src/lib/bindings";
+
+/** Generate the barrel (index.ts) for TypeScript bindings */
+function generateBarrel(): void {
+  const types = readdirSync(BINDINGS_DIR)
+    .filter((f) => f.endsWith(".ts") && f !== "index.ts")
+    .map((f) => f.replace(/\.ts$/, ""))
+    .sort();
+
+  const barrelContent =
+    "// Auto-generated barrel file — do not edit manually.\n" +
+    "// Regenerate with: cd backend && cargo test export_bindings\n" +
+    types.map((t) => `export type { ${t} } from "./${t}";`).join("\n") +
+    "\n";
+
+  const barrelPath = join(BINDINGS_DIR, "index.ts");
+  const existing = existsSync(barrelPath) ? readFileSync(barrelPath, "utf-8") : null;
+
+  if (existing !== barrelContent) {
+    writeFileSync(barrelPath, barrelContent);
+  }
+}
+
+const DATABASE_URL = "postgresql://glint:glint@localhost:59490/glint";
+
+/** Write DATABASE_URL to backend/.env after docker compose up */
+async function ensureDatabaseUrl(): Promise<void> {
+  const envFile = "backend/.env";
+  let content: string;
+  try {
+    content = await readFile(envFile, "utf8");
+    const regex = /^DATABASE_URL=.*$/m;
+    if (regex.test(content)) {
+      content = content.replace(regex, `DATABASE_URL=${DATABASE_URL}`);
+    } else {
+      content = content.trimEnd() + `\nDATABASE_URL=${DATABASE_URL}\n`;
+    }
+  } catch {
+    content = `DATABASE_URL=${DATABASE_URL}\n`;
+  }
+  await writeFile(envFile, content);
+  console.log(`Updated ${envFile}`);
 }
 
 // Shared: newest mtime across backend Rust sources + Cargo files
@@ -122,7 +167,6 @@ export default defineConfig({
 
     // TS bindings: Rust types → frontend TypeScript (complex: temp dir + diffing + barrel)
     async (ctx) => {
-      const BINDINGS_DIR = "frontend/src/lib/bindings";
       const srcMtime = rustSrcMtime();
       const artifactMtime = newestMtime(BINDINGS_DIR, "**/*");
 
@@ -190,10 +234,9 @@ export default defineConfig({
         }
 
         // Regenerate barrel file
-        const barrel = spawnSync("bun", ["scripts/bindings-barrel.ts"], {
-          stdio: ["ignore", "pipe", "pipe"],
-        });
-        if (barrel.status !== 0) {
+        try {
+          generateBarrel();
+        } catch {
           ctx.logger.warn("Barrel generation failed (non-fatal)");
         }
 
@@ -338,43 +381,9 @@ export default defineConfig({
     },
   },
   custom: {
-    smoke: {
-      description: "Integration test — verify Minecraft client starts and mixins load",
-      flags: {
-        platform: { type: String, alias: "p", description: "Mod platform: fabric or neoforge" },
-        verbose: { type: Boolean, alias: "v", description: "Show full Minecraft output" },
-      },
-      run: async (ctx) => {
-        const platform = ctx.flags.platform || "fabric";
-        const verbose = ctx.flags.verbose ? "VERBOSE=1 " : "";
-        ctx.run(`${verbose}bun scripts/smoke.ts -p ${platform}${ctx.flags.verbose ? " -v" : ""}`);
-        return 0;
-      },
-    },
-    orchestrate: {
-      description: "Run autonomous shader capture session",
-      flags: {
-        platform: { type: String, alias: "p", description: "Mod platform (default: fabric)" },
-        verbose: { type: Boolean, alias: "v", description: "Show full Minecraft output" },
-        force: { type: Boolean, description: "Re-capture existing combinations" },
-      },
-      run: async (ctx) => {
-        const args = ctx.args.join(" ");
-        const flags: string[] = [];
-        if (ctx.flags.platform) flags.push(`-p ${ctx.flags.platform}`);
-        if (ctx.flags.verbose) flags.push("-v");
-        if (ctx.flags.force) flags.push("--force");
-        ctx.run(`bun scripts/orchestrate.ts ${flags.join(" ")} ${args}`.trim());
-        return 0;
-      },
-    },
-    docker: {
-      description: "Docker build/run for web or capture services",
-      run: async (ctx) => {
-        ctx.run(`bun scripts/docker.ts ${ctx.args.join(" ")}`);
-        return 0;
-      },
-    },
+    smoke: "scripts/smoke.ts",
+    orchestrate: "scripts/orchestrate.ts",
+    docker: "scripts/docker.ts",
     mcjar: {
       description: "Query Minecraft source files from decompiled JAR",
       run: async (ctx) => {
@@ -422,13 +431,13 @@ export default defineConfig({
         switch (subcmd) {
           case "start":
             ctx.run("docker compose up -d");
-            ctx.run("bun scripts/db-init.ts");
+            await ensureDatabaseUrl();
             break;
           case "reset":
             ctx.run("docker compose up -d");
             ctx.run(["docker", "compose", "exec", "postgres", "psql", "-U", "glint", "-d", "postgres", "-c", "DROP DATABASE IF EXISTS glint"]);
             ctx.run(["docker", "compose", "exec", "postgres", "psql", "-U", "glint", "-d", "postgres", "-c", "CREATE DATABASE glint"]);
-            ctx.run("bun scripts/db-init.ts");
+            await ensureDatabaseUrl();
             break;
           case "rm":
             ctx.run("docker compose down");
@@ -477,7 +486,7 @@ export default defineConfig({
       run: async (ctx) => {
         const sqlxEnv = { SQLX_OFFLINE: "true" };
         ctx.run("cargo test --manifest-path backend/Cargo.toml export_bindings --quiet", { env: sqlxEnv });
-        ctx.run("bun scripts/bindings-barrel.ts");
+        generateBarrel();
         ctx.run("cargo test --manifest-path backend/Cargo.toml --test graphql_schema --quiet", { env: sqlxEnv });
         ctx.run("bunx --cwd frontend gql-tada generate output");
         return 0;

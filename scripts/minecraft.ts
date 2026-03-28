@@ -6,10 +6,11 @@
  * and ensuring clean shutdown.
  */
 
-import { spawn, type Subprocess } from "bun";
-import * as fs from "fs/promises";
-import { existsSync } from "fs";
-import { c } from "./fmt";
+import { spawn, type ChildProcess } from "node:child_process";
+import * as fs from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { Readable } from "node:stream";
+import { c } from "@xevion/tempo/fmt";
 
 /** Patterns indicating the game has begun loading (but not yet fully started). */
 export const GAME_STARTED_MARKERS = [
@@ -64,7 +65,7 @@ export function validatePlatform(
 ): asserts platform is Platform {
   if (platform !== "fabric" && platform !== "neoforge") {
     console.error(
-      c("31", `Invalid platform: ${platform} (must be 'fabric' or 'neoforge')`),
+      c.red(`Invalid platform: ${platform} (must be 'fabric' or 'neoforge')`),
     );
     process.exit(1);
   }
@@ -153,49 +154,42 @@ export interface StreamBuffers {
  * Appends all data to the appropriate buffer. If verbose is true, data
  * is also written to the corresponding process stream.
  */
-export async function monitorStream(
-  stream: ReadableStream,
+export function monitorStream(
+  stream: Readable,
   isStderr: boolean,
   buffers: StreamBuffers,
   verbose: boolean,
   actions: PatternAction[],
-): Promise<void> {
-  try {
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
+): void {
+  stream.on("data", (chunk: Buffer) => {
+    const data = chunk.toString();
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    if (isStderr) {
+      buffers.stderr += data;
+    } else {
+      buffers.stdout += data;
+    }
 
-      const data = decoder.decode(value, { stream: true });
-
+    if (verbose) {
       if (isStderr) {
-        buffers.stderr += data;
+        process.stderr.write(data);
       } else {
-        buffers.stdout += data;
+        process.stdout.write(data);
       }
+    }
 
-      if (verbose) {
-        if (isStderr) {
-          process.stderr.write(data);
-        } else {
-          process.stdout.write(data);
-        }
-      }
-
-      for (const action of actions) {
-        for (const pattern of action.patterns) {
-          if (pattern.test(data)) {
-            const result = action.onMatch(data, pattern);
-            if (result === "stop") return;
+    for (const action of actions) {
+      for (const pattern of action.patterns) {
+        if (pattern.test(data)) {
+          const result = action.onMatch(data, pattern);
+          if (result === "stop") {
+            stream.destroy();
+            return;
           }
         }
       }
     }
-  } catch {
-    // Stream closed — normal on process exit
-  }
+  });
 }
 
 /** Options for spawning and managing a Minecraft process. */
@@ -207,8 +201,9 @@ export interface MinecraftProcessOptions {
 
 /** Handle for a managed Minecraft process with cleanup support. */
 export interface MinecraftProcess {
-  proc: Subprocess;
+  proc: ChildProcess;
   pid: number;
+  exited: Promise<number>;
   cleanup: () => Promise<void>;
 }
 
@@ -228,13 +223,18 @@ export function spawnMinecraft(
   ];
   const args = options.gradleArgs ?? defaultArgs;
 
-  const proc = spawn(["./gradlew", ...args], {
+  const proc = spawn("./gradlew", args, {
     cwd: "mod",
     stdio: ["ignore", "pipe", "pipe"],
     env: options.env ?? { ...process.env },
   });
 
   const pid = proc.pid!;
+
+  const exited = new Promise<number>((resolve) => {
+    proc.on("exit", (code) => resolve(code ?? 1));
+  });
+
   let cleanupDone = false;
 
   const cleanup = async () => {
@@ -262,7 +262,7 @@ export function spawnMinecraft(
     }
   };
 
-  return { proc, pid, cleanup };
+  return { proc, pid, exited, cleanup };
 }
 
 /**
@@ -409,7 +409,7 @@ export async function runMonitorLoop(
       await sleep(pollInterval);
     }
   } catch (err) {
-    console.error(c("31", `[${label}] Monitoring error: ${err}`));
+    console.error(c.red(`[${label}] Monitoring error: ${err}`));
     await cleanup();
     process.exit(1);
   }
