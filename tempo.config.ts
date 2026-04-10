@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { defineConfig, presets } from "@xevion/tempo";
+import { defineConfig, presets, runners } from "@xevion/tempo";
 import { newestMtime } from "@xevion/tempo/preflight";
 import { resolveTargets } from "@xevion/tempo/targets";
 
@@ -147,8 +147,7 @@ export default defineConfig({
       commands: {
         "cargo-audit": {
           cmd: "cargo audit -f backend/Cargo.lock",
-          requires: ["cargo-audit"],
-          hint: "Install cargo-audit: cargo install cargo-audit",
+          requires: [{ tool: "cargo-audit", hint: "Install with `cargo install cargo-audit`" }],
         },
         "bun-audit": {
           cmd: bunAuditCmd,
@@ -331,13 +330,6 @@ export default defineConfig({
       ctx.logger.info("gql-tada: updated");
     },
   ],
-  check: {
-    autoFixStrategy: "fix-first",
-    exclude: [
-      "frontend:build",       // don't build frontend during checks
-      "backend:build",        // don't build backend during checks
-    ],
-  },
   hooks: {
     "before:dev": (ctx) => {
       if (ctx.targets.has("frontend") && !existsSync("frontend/node_modules")) {
@@ -380,12 +372,24 @@ export default defineConfig({
       },
     },
   },
-  custom: {
+  commands: {
+    check: runners.check({
+      autoFixStrategy: "fix-first",
+      exclude: [
+        "frontend:build",
+        "backend:build",
+      ],
+    }),
+    fmt: runners.sequential("format-apply", { description: "Sequential per-subsystem formatting", autoFixFallback: true }),
+    lint: runners.sequential("lint", { description: "Sequential per-subsystem linting" }),
+    dev: runners.dev(),
+    "pre-commit": runners.preCommit(),
     smoke: "scripts/smoke.ts",
     orchestrate: "scripts/orchestrate.ts",
     docker: "scripts/docker.ts",
     mcjar: {
       description: "Query Minecraft source files from decompiled JAR",
+      parameters: ["[args...]"],
       run: async (ctx) => {
         ctx.run(`bun scripts/mcjar.ts ${ctx.args.join(" ")}`);
         return 0;
@@ -393,6 +397,7 @@ export default defineConfig({
     },
     test: {
       description: "Run tests across subsystems in parallel",
+      parameters: ["[targets...]"],
       flags: {
         e2e: { type: Boolean, description: "Run Playwright E2E tests instead of unit tests for frontend" },
       },
@@ -420,12 +425,12 @@ export default defineConfig({
           ctx.group.spawn(["./gradlew", "test", "--quiet"], { cwd: "mod" });
         }
 
-        const code = await ctx.group.waitForAll();
-        return code;
+        return ctx.group.waitForAll();
       },
     },
     db: {
       description: "Manage dev services (PostgreSQL + MinIO + imgproxy)",
+      parameters: ["[subcommand]"],
       run: async (ctx) => {
         const subcmd = ctx.args[0] || "start";
         switch (subcmd) {
@@ -451,6 +456,7 @@ export default defineConfig({
     },
     migrate: {
       description: "Manage database migrations (SQLx)",
+      parameters: ["<subcommand>", "[name]"],
       run: async (ctx) => {
         const subcmd = ctx.args[0];
         switch (subcmd) {
@@ -468,7 +474,7 @@ export default defineConfig({
           case "create": {
             const name = ctx.args[1];
             if (!name) {
-              console.error("Usage: tempo run migrate create <name>");
+              console.error("Usage: tempo migrate create <name>");
               return 1;
             }
             ctx.run(`cargo sqlx migrate add ${name}`, { cwd: "backend" });
@@ -494,6 +500,7 @@ export default defineConfig({
     },
     r2: {
       description: "Run aws s3 commands against the R2 bucket (R2/ expands to s3://<bucket>/)",
+      parameters: ["[args...]"],
       run: async (ctx) => {
         const env = loadEnvFile("backend/.env");
         const accessKey = env.GLINT_R2_ACCESS_KEY_ID;
